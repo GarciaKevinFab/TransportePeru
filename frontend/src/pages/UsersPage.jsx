@@ -1,0 +1,525 @@
+import React, { useState, useEffect } from 'react';
+import { usersApi } from '../services/api';
+import { Card, CardContent } from '../components/ui/card';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Badge } from '../components/ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
+import { Label } from '../components/ui/label';
+import {
+  Users,
+  Plus,
+  Search,
+  MoreVertical,
+  Edit,
+  Key,
+  Loader2,
+  User,
+  Truck,
+  Shield,
+} from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu';
+import { toast } from 'sonner';
+
+const ROLES = [
+  { value: 'admin', label: 'Administrador', icon: Shield, color: 'bg-purple-100 text-purple-800' },
+  { value: 'operaciones', label: 'Operaciones', icon: User, color: 'bg-blue-100 text-blue-800' },
+  { value: 'flota', label: 'Flota', icon: Truck, color: 'bg-green-100 text-green-800' },
+  { value: 'mantenimiento', label: 'Mantenimiento', icon: User, color: 'bg-yellow-100 text-yellow-800' },
+  { value: 'almacen', label: 'Almacén', icon: User, color: 'bg-orange-100 text-orange-800' },
+  { value: 'contabilidad', label: 'Contabilidad', icon: User, color: 'bg-teal-100 text-teal-800' },
+  { value: 'chofer', label: 'Chofer', icon: Truck, color: 'bg-slate-100 text-slate-800' },
+];
+
+const UsersPage = () => {
+  const [loading, setLoading] = useState(true);
+  const [users, setUsers] = useState([]);
+  const [filteredUsers, setFilteredUsers] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
+  
+  // Dialog states
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showResetPinDialog, setShowResetPinDialog] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [newPin, setNewPin] = useState('');
+  
+  // Form state
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    dni: '',
+    role: 'chofer',
+    password: '',
+    pin: '',
+    license_number: '',
+    phone: '',
+  });
+
+  const fetchUsers = async () => {
+    setLoading(true);
+    try {
+      const response = await usersApi.getAll();
+      setUsers(response.data);
+      setFilteredUsers(response.data);
+    } catch (error) {
+      toast.error('Error al cargar usuarios');
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  useEffect(() => {
+    let filtered = users;
+    
+    if (searchTerm) {
+      filtered = filtered.filter(
+        (u) =>
+          u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          u.dni?.includes(searchTerm)
+      );
+    }
+    
+    if (roleFilter !== 'all') {
+      filtered = filtered.filter((u) => u.role === roleFilter);
+    }
+    
+    setFilteredUsers(filtered);
+  }, [searchTerm, roleFilter, users]);
+
+  const handleCreateUser = async () => {
+    setSaving(true);
+    try {
+      await usersApi.create(formData);
+      toast.success('Usuario creado exitosamente');
+      setShowCreateDialog(false);
+      resetForm();
+      fetchUsers();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Error al crear usuario');
+    }
+    setSaving(false);
+  };
+
+  const handleResetPin = async () => {
+    if (!selectedUser || !newPin) return;
+    if (newPin.length !== 6 || !/^\d+$/.test(newPin)) {
+      toast.error('El PIN debe ser de 6 dígitos numéricos');
+      return;
+    }
+    
+    setSaving(true);
+    try {
+      await usersApi.resetPin(selectedUser.id, newPin);
+      toast.success('PIN reseteado exitosamente');
+      setShowResetPinDialog(false);
+      setNewPin('');
+      setSelectedUser(null);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Error al resetear PIN');
+    }
+    setSaving(false);
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      email: '',
+      dni: '',
+      role: 'chofer',
+      password: '',
+      pin: '',
+      license_number: '',
+      phone: '',
+    });
+  };
+
+  const getRoleBadge = (role) => {
+    const roleConfig = ROLES.find((r) => r.value === role);
+    if (!roleConfig) return <Badge>{role}</Badge>;
+    return (
+      <Badge className={roleConfig.color}>
+        {roleConfig.label}
+      </Badge>
+    );
+  };
+
+  const isDriver = formData.role === 'chofer';
+
+  return (
+    <div className="space-y-6" data-testid="users-page">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-slate-900">
+            Usuarios
+          </h1>
+          <p className="text-slate-500 mt-1">
+            Gestión de usuarios y permisos del sistema
+          </p>
+        </div>
+        <Button className="btn-action" onClick={() => setShowCreateDialog(true)} data-testid="new-user-btn">
+          <Plus className="w-4 h-4 mr-2" />
+          Nuevo Usuario
+        </Button>
+      </div>
+
+      {/* Filters */}
+      <Card className="bg-white">
+        <CardContent className="py-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Input
+                placeholder="Buscar por nombre, email o DNI..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 rounded-sm"
+                data-testid="search-users-input"
+              />
+            </div>
+            <Select value={roleFilter} onValueChange={setRoleFilter}>
+              <SelectTrigger className="w-[180px] rounded-sm" data-testid="role-filter">
+                <SelectValue placeholder="Filtrar por rol" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los roles</SelectItem>
+                {ROLES.map((role) => (
+                  <SelectItem key={role.value} value={role.value}>
+                    {role.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Table */}
+      <Card className="bg-white">
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="flex items-center justify-center h-64">
+              <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+            </div>
+          ) : filteredUsers.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-64 text-slate-400">
+              <Users className="w-12 h-12 mb-2" />
+              <p>No se encontraron usuarios</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="table-dense">
+                  <TableHead>Nombre</TableHead>
+                  <TableHead>Contacto</TableHead>
+                  <TableHead>Rol</TableHead>
+                  <TableHead>Licencia</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredUsers.map((user) => (
+                  <TableRow key={user.id} className="table-dense hover:bg-orange-50">
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 font-bold">
+                          {user.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="font-medium">{user.name}</p>
+                          {user.dni && (
+                            <p className="text-xs text-slate-500 font-mono">DNI: {user.dni}</p>
+                          )}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        {user.email && <p className="text-sm">{user.email}</p>}
+                        {user.phone && <p className="text-xs text-slate-500">{user.phone}</p>}
+                      </div>
+                    </TableCell>
+                    <TableCell>{getRoleBadge(user.role)}</TableCell>
+                    <TableCell>
+                      {user.license_number ? (
+                        <span className="font-mono text-sm">{user.license_number}</span>
+                      ) : (
+                        <span className="text-slate-400">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={user.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                        {user.is_active ? 'Activo' : 'Inactivo'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreVertical className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem>
+                            <Edit className="w-4 h-4 mr-2" />
+                            Editar
+                          </DropdownMenuItem>
+                          {user.role === 'chofer' && (
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setSelectedUser(user);
+                                setShowResetPinDialog(true);
+                              }}
+                            >
+                              <Key className="w-4 h-4 mr-2" />
+                              Resetear PIN
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {ROLES.slice(0, 4).map((role) => (
+          <Card key={role.value} className="bg-white">
+            <CardContent className="py-4 text-center">
+              <p className="font-heading text-3xl font-bold text-slate-900">
+                {users.filter((u) => u.role === role.value).length}
+              </p>
+              <p className="text-xs uppercase tracking-widest text-slate-500 mt-1">{role.label}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Create Dialog */}
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
+              Nuevo Usuario
+            </DialogTitle>
+            <DialogDescription>
+              Crear un nuevo usuario del sistema
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">
+            <div className="space-y-2">
+              <Label className="input-label">Nombre Completo *</Label>
+              <Input
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Juan Pérez"
+                className="rounded-sm"
+                data-testid="user-name-input"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="input-label">Rol *</Label>
+              <Select
+                value={formData.role}
+                onValueChange={(v) => setFormData({ ...formData, role: v })}
+              >
+                <SelectTrigger className="rounded-sm" data-testid="user-role-select">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ROLES.map((role) => (
+                    <SelectItem key={role.value} value={role.value}>
+                      {role.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {isDriver ? (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="input-label">DNI *</Label>
+                    <Input
+                      value={formData.dni}
+                      onChange={(e) => setFormData({ ...formData, dni: e.target.value.replace(/\D/g, '').slice(0, 8) })}
+                      placeholder="12345678"
+                      maxLength={8}
+                      className="rounded-sm font-mono"
+                      data-testid="user-dni-input"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="input-label">PIN (6 dígitos) *</Label>
+                    <Input
+                      type="password"
+                      value={formData.pin}
+                      onChange={(e) => setFormData({ ...formData, pin: e.target.value.replace(/\D/g, '').slice(0, 6) })}
+                      placeholder="••••••"
+                      maxLength={6}
+                      className="rounded-sm font-mono text-center"
+                      data-testid="user-pin-input"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="input-label">Número de Licencia</Label>
+                    <Input
+                      value={formData.license_number}
+                      onChange={(e) => setFormData({ ...formData, license_number: e.target.value.toUpperCase() })}
+                      placeholder="Q12345678"
+                      className="rounded-sm uppercase"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="input-label">Teléfono</Label>
+                    <Input
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      placeholder="+51 987 654 321"
+                      className="rounded-sm"
+                    />
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label className="input-label">Correo Electrónico *</Label>
+                  <Input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    placeholder="usuario@empresa.com"
+                    className="rounded-sm"
+                    data-testid="user-email-input"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="input-label">Contraseña *</Label>
+                  <Input
+                    type="password"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    placeholder="••••••••"
+                    className="rounded-sm"
+                    data-testid="user-password-input"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="input-label">Teléfono</Label>
+                  <Input
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    placeholder="+51 987 654 321"
+                    className="rounded-sm"
+                  />
+                </div>
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
+              Cancelar
+            </Button>
+            <Button
+              className="btn-action"
+              onClick={handleCreateUser}
+              disabled={!formData.name || saving || (isDriver ? !formData.dni || !formData.pin : !formData.email || !formData.password)}
+              data-testid="save-user-btn"
+            >
+              {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Crear Usuario
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset PIN Dialog */}
+      <Dialog open={showResetPinDialog} onOpenChange={setShowResetPinDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Resetear PIN</DialogTitle>
+            <DialogDescription>
+              Ingresa el nuevo PIN para {selectedUser?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="input-label">Nuevo PIN (6 dígitos)</Label>
+              <Input
+                type="password"
+                value={newPin}
+                onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="••••••"
+                maxLength={6}
+                className="rounded-sm font-mono text-center text-lg"
+                data-testid="reset-pin-input"
+              />
+            </div>
+            <p className="text-xs text-slate-500">
+              El usuario deberá cambiar su PIN en el próximo inicio de sesión.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowResetPinDialog(false)}>
+              Cancelar
+            </Button>
+            <Button
+              className="btn-action"
+              onClick={handleResetPin}
+              disabled={newPin.length !== 6 || saving}
+              data-testid="confirm-reset-pin-btn"
+            >
+              {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Resetear PIN
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+export default UsersPage;
