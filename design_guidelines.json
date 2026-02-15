@@ -1,0 +1,130 @@
+{
+  "project_name": "TransportePeru SaaS",
+  "design_philosophy": {
+    "persona": "E1 - The Anti-AI Designer",
+    "archetype": "The Logistics Command Center",
+    "core_values": [
+      "Industrial Precision",
+      "High Visibility",
+      "Data Density",
+      "Operational Clarity"
+    ],
+    "vibe": "A mix of Swiss International Style (for data) and Industrial Safety aesthetics (for alerts/actions). Think 'Caterpillar meets Braun'.",
+    "anti_patterns": [
+      "Generic SaaS Blue gradients",
+      "Low contrast text",
+      "Excessive whitespace in data tables",
+      "Cute/Playful illustrations"
+    ]
+  },
+  "typography": {
+    "font_family": {
+      "headings": "Barlow Condensed, sans-serif",
+      "body": "Inter, sans-serif",
+      "mono": "JetBrains Mono, monospace"
+    },
+    "usage_rules": {
+      "headings": "Uppercase, Bold (700) or Black (900). Tracking-tight. Use for Page Titles, KPI values, and Section Headers.",
+      "body": "Regular (400) or Medium (500). High legibility. Use for table data, form labels.",
+      "labels": "Uppercase, text-xs, tracking-widest, font-bold. Use for table headers and form hints."
+    },
+    "installation": "Import 'Barlow Condensed' and 'Inter' from Google Fonts in index.css"
+  },
+  "colors": {
+    "palette": {
+      "primary": {
+        "name": "Slate Command",
+        "hex": "#0F172A",
+        "tailwind": "slate-900",
+        "usage": "Sidebars, Headers, Primary Text"
+      },
+      "brand": {
+        "name": "Safety Orange",
+        "hex": "#F97316",
+        "tailwind": "orange-500",
+        "usage": "Primary Actions, Active States, Critical Alerts"
+      },
+      "secondary": {
+        "name": "Industrial Steel",
+        "hex": "#64748B",
+        "tailwind": "slate-500",
+        "usage": "Secondary Text, Borders, Icons"
+      },
+      "background": {
+        "light": "#F8FAFC",
+        "dark": "#020617",
+        "paper": "#FFFFFF"
+      },
+      "status": {
+        "success": "#16A34A",
+        "warning": "#EAB308",
+        "error": "#DC2626",
+        "info": "#2563EB"
+      }
+    },
+    "theme_strategy": "Smart Hybrid. Sidebar and Header are ALWAYS Dark (Slate-900) to frame the content. The Content Area is Light (Slate-50) for maximum readability of complex data tables. Dark mode toggles the Content Area to Slate-950."
+  },
+  "layout": {
+    "grid_system": "Bento Grid (Mode B - High Density)",
+    "spacing": {
+      "container_padding": "p-4 md:p-6 lg:p-8",
+      "element_gap": "gap-4",
+      "section_gap": "gap-8"
+    },
+    "containers": {
+      "card": "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm rounded-none",
+      "dashboard_widget": "h-full flex flex-col justify-between p-6 border-l-4 border-l-orange-500 bg-white shadow-sm"
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-slate-900 text-white hover:bg-slate-800 rounded-sm uppercase font-bold tracking-wide text-sm h-10 px-6",
+      "action": "bg-orange-500 text-white hover:bg-orange-600 rounded-sm uppercase font-bold tracking-wide text-sm h-10 px-6",
+      "ghost": "hover:bg-slate-100 text-slate-700 rounded-sm"
+    },
+    "inputs": {
+      "style": "rounded-sm border-slate-300 focus:border-orange-500 focus:ring-orange-500 bg-slate-50",
+      "labels": "text-xs font-bold uppercase text-slate-500 mb-1 block"
+    },
+    "tables": {
+      "style": "dense",
+      "header": "bg-slate-100 text-slate-600 uppercase text-xs font-bold tracking-wider border-b-2 border-slate-200",
+      "row": "hover:bg-orange-50 transition-colors border-b border-slate-100",
+      "cell": "py-3 px-4 text-sm text-slate-700"
+    },
+    "cards": {
+      "style": "rounded-sm border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200"
+    }
+  },
+  "special_modules": {
+    "tire_schema": {
+      "description": "A graphical representation of a truck chassis with tires.",
+      "implementation": "Use SVG or CSS Grid to layout tires (18-wheeler layout). Each tire is a clickable circle/rounded-rect. Color code by status (Green=Good, Yellow=Wear, Red=Critical).",
+      "interaction": "Click to open inspection modal."
+    },
+    "document_matrix": {
+      "description": "Excel-like grid for tracking document expirations.",
+      "implementation": "Rows = Vehicles/Drivers. Columns = Document Types (SOAT, ITV, License). Cells = Expiration Date.",
+      "logic": "Cell Background: Green (>30 days), Yellow (<30 days), Red (Expired).",
+      "visuals": "Use 'Badge' component inside table cells."
+    }
+  },
+  "assets": {
+    "icons": "Lucide React (default). Use 'Truck', 'Wrench', 'FileText', 'AlertTriangle', 'Fuel', 'Users' heavily.",
+    "images": {
+      "login_bg": "https://images.unsplash.com/photo-1767336455449-d490de078da5?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTZ8MHwxfHNlYXJjaHwxfHxoZWF2eSUyMGNhcmdvJTIwdHJ1Y2slMjBoaWdod2F5JTIwbG9naXN0aWNzfGVufDB8fHx8MTc3MTE5ODk4NHww&ixlib=rb-4.1.0&q=85",
+      "maintenance_bg": "https://images.unsplash.com/photo-1655553712434-657a5bf60585?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzV8MHwxfHNlYXJjaHwyfHx0cnVjayUyMG1lY2hhbmljJTIwd29ya3Nob3AlMjB0aXJlc3xlbnwwfHx8fDE3NzExOTg5ODh8MA&ixlib=rb-4.1.0&q=85",
+      "fleet_hero": "https://images.unsplash.com/photo-1766561994067-dbd575e1cff2?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTZ8MHwxfHNlYXJjaHwzfHxoZWF2eSUyMGNhcmdvJTIwdHJ1Y2slMjBoaWdod2F5JTIwbG9naXN0aWNzfGVufDB8fHx8MTc3MTE5ODk4NHww&ixlib=rb-4.1.0&q=85"
+    }
+  },
+  "universal_guidelines": [
+    "Use 'Barlow Condensed' for all numbers and KPIs to give a dashboard feel.",
+    "Avoid rounded corners > 4px. Keep it sharp and industrial.",
+    "Use 'Sonner' for all notifications.",
+    "All dates must be formatted as 'DD/MM/YYYY' (Peru standard).",
+    "Currency must be 'S/ ' (Soles) or '$' (USD).",
+    "Input fields for License Plates must force uppercase.",
+    "Driver DNI input must be numeric only, max 8 chars."
+  ],
+  "instructions_to_main_agent": "You are building a mission-critical tool. Reliability > Flashiness. Focus on the 'Document Matrix' and 'Tire Schema' as they are the USP of this app. Use the provided image URLs for the login and landing pages. Ensure the sidebar is collapsible to maximize screen real estate for the tables."
+}
