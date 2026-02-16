@@ -506,12 +506,12 @@ const FuelPage = () => {
               </div>
               <div className="space-y-2">
                 <Label className="input-label">Vale (opcional)</Label>
-                <Select value={loadForm.voucher_id} onValueChange={(v) => setLoadForm({ ...loadForm, voucher_id: v })}>
+                <Select value={loadForm.voucher_id || "none"} onValueChange={(v) => setLoadForm({ ...loadForm, voucher_id: v === "none" ? "" : v })}>
                   <SelectTrigger className="rounded-sm">
                     <SelectValue placeholder="Sin vale" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Sin vale</SelectItem>
+                    <SelectItem value="none">Sin vale</SelectItem>
                     {vouchers.filter(v => !v.is_used && v.vehicle_id === loadForm.vehicle_id).map(v => (
                       <SelectItem key={v.id} value={v.id}>{v.voucher_number}</SelectItem>
                     ))}
