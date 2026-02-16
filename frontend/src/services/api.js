@@ -185,6 +185,42 @@ export const maintenanceApi = {
   getWorkOrders: (params) => api.get('/maintenance/work-orders', { params }),
   createWorkOrder: (data) => api.post('/maintenance/work-orders', data),
   updateWorkOrder: (id, data) => api.put(`/maintenance/work-orders/${id}`, data),
+  startWorkOrder: (id, data) => api.post(`/maintenance/work-orders/${id}/start`, data),
+  completeWorkOrder: (id, data) => api.post(`/maintenance/work-orders/${id}/complete`, data),
+};
+
+// Settlement API
+export const settlementsApi = {
+  getAll: (params) => api.get('/settlements', { params }),
+  getByTrip: (tripId) => api.get(`/trips/${tripId}/settlement`),
+  createOrUpdate: (tripId, data) => api.post(`/trips/${tripId}/settlement`, data),
+  close: (id, data) => api.post(`/settlements/${id}/close`, data),
+};
+
+// Inventory API
+export const inventoryApi = {
+  getItems: (params) => api.get('/inventory/items', { params }),
+  createItem: (data) => api.post('/inventory/items', data),
+  createMove: (data) => api.post('/inventory/moves', data),
+  getKardex: (itemId) => api.get(`/inventory/kardex/${itemId}`),
+};
+
+// Suppliers API
+export const suppliersApi = {
+  getAll: () => api.get('/suppliers'),
+  create: (data) => api.post('/suppliers', data),
+};
+
+// Purchase Orders API
+export const purchaseOrdersApi = {
+  getAll: (params) => api.get('/purchase-orders', { params }),
+  create: (data) => api.post('/purchase-orders', data),
+  receive: (id, data) => api.post(`/purchase-orders/${id}/receive`, data),
+};
+
+// Audit Logs API
+export const auditLogsApi = {
+  getAll: (params) => api.get('/audit-logs', { params }),
 };
 
 // Issues API
