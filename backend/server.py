@@ -2377,6 +2377,991 @@ async def update_issue(issue_id: str, request: dict, current_user: dict = Depend
     
     return {"message": "Incidente actualizado"}
 
+# ============== CHECKLIST TEMPLATE ROUTES ==============
+@api_router.get("/checklist-templates")
+async def get_checklist_templates(
+    vehicle_type: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    query = {"company_id": current_user["company_id"], "is_active": True}
+    if vehicle_type:
+        query["vehicle_type"] = vehicle_type
+    templates = await db.checklist_templates.find(query, {"_id": 0}).to_list(100)
+    return [serialize_doc(t) for t in templates]
+
+@api_router.post("/checklist-templates")
+async def create_checklist_template(request: dict, current_user: dict = Depends(get_current_user)):
+    if current_user["role"] not in ["owner", "admin"]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+    
+    template = ChecklistTemplate(
+        company_id=current_user["company_id"],
+        name=request["name"],
+        vehicle_type=request.get("vehicle_type"),
+        items=request.get("items", []),
+        created_by=current_user["id"]
+    )
+    
+    doc = template.model_dump()
+    doc["created_at"] = doc["created_at"].isoformat()
+    await db.checklist_templates.insert_one(doc)
+    return {"id": template.id, "message": "Plantilla creada"}
+
+@api_router.put("/checklist-templates/{template_id}")
+async def update_checklist_template(template_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+    if current_user["role"] not in ["owner", "admin"]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+    
+    request.pop("id", None)
+    request.pop("company_id", None)
+    
+    await db.checklist_templates.update_one(
+        {"id": template_id, "company_id": current_user["company_id"]},
+        {"$set": request}
+    )
+    return {"message": "Plantilla actualizada"}
+
+# ============== CHECKLIST RUN ROUTES ==============
+@api_router.get("/checklists/trip/{trip_id}")
+async def get_checklist_by_trip(trip_id: str, current_user: dict = Depends(get_current_user)):
+    checklist = await db.checklist_runs.find_one(
+        {"trip_id": trip_id, "company_id": current_user["company_id"]},
+        {"_id": 0}
+    )
+    return serialize_doc(checklist) if checklist else None
+
+@api_router.post("/checklists/start")
+async def start_checklist(request: dict, current_user: dict = Depends(get_current_user)):
+    """Start a new checklist for a trip"""
+    trip_id = request["trip_id"]
+    
+    # Get trip
+    trip = await db.trips.find_one({"id": trip_id, "company_id": current_user["company_id"]})
+    if not trip:
+        raise HTTPException(status_code=404, detail="Viaje no encontrado")
+    
+    # Check if checklist already exists
+    existing = await db.checklist_runs.find_one({"trip_id": trip_id})
+    if existing and existing.get("result") != "pending":
+        raise HTTPException(status_code=400, detail="Ya existe un checklist completado para este viaje")
+    
+    # Get default template
+    template_id = request.get("template_id")
+    if not template_id:
+        template = await db.checklist_templates.find_one({
+            "company_id": current_user["company_id"],
+            "is_active": True
+        })
+        template_id = template["id"] if template else None
+    
+    if not template_id:
+        raise HTTPException(status_code=400, detail="No hay plantilla de checklist disponible")
+    
+    checklist = ChecklistRun(
+        company_id=current_user["company_id"],
+        template_id=template_id,
+        trip_id=trip_id,
+        tracto_id=trip["tracto_id"],
+        carreta_id=trip.get("carreta_id"),
+        driver_id=current_user["id"],
+        location=request.get("location"),
+        created_by=current_user["id"]
+    )
+    
+    doc = checklist.model_dump()
+    doc["started_at"] = doc["started_at"].isoformat()
+    await db.checklist_runs.insert_one(doc)
+    
+    # Update trip
+    await db.trips.update_one(
+        {"id": trip_id},
+        {"$set": {"checklist_id": checklist.id, "status": "checklist_pendiente"}}
+    )
+    
+    return {"id": checklist.id, "message": "Checklist iniciado"}
+
+@api_router.post("/checklists/{checklist_id}/submit")
+async def submit_checklist(checklist_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+    """Submit a completed checklist"""
+    checklist = await db.checklist_runs.find_one({
+        "id": checklist_id,
+        "company_id": current_user["company_id"]
+    })
+    if not checklist:
+        raise HTTPException(status_code=404, detail="Checklist no encontrado")
+    
+    responses = request.get("responses", [])
+    tire_checks = request.get("tire_checks", [])
+    signature_url = request.get("signature_url")
+    photos = request.get("photos", [])
+    location = request.get("location")
+    
+    # Calculate result based on responses
+    result = "ok"
+    critical_items = []
+    observed_items = []
+    
+    for resp in responses:
+        if resp.get("severity") == "critico" and resp.get("value") == False:
+            result = "critico"
+            critical_items.append(resp.get("label", "Item"))
+        elif resp.get("severity") == "observado" and resp.get("value") == False:
+            if result != "critico":
+                result = "observado"
+            observed_items.append(resp.get("label", "Item"))
+    
+    # Check tire conditions
+    for tire in tire_checks:
+        if tire.get("condition") == "critico":
+            result = "critico"
+            critical_items.append(f"Llanta {tire.get('position', '')}")
+        elif tire.get("condition") == "mal" and result != "critico":
+            result = "observado"
+            observed_items.append(f"Llanta {tire.get('position', '')}")
+    
+    # Update checklist
+    await db.checklist_runs.update_one(
+        {"id": checklist_id},
+        {"$set": {
+            "responses": responses,
+            "tire_checks": tire_checks,
+            "signature_url": signature_url,
+            "photos": photos,
+            "location": location,
+            "result": result,
+            "completed_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    # Update trip
+    await db.trips.update_one(
+        {"id": checklist["trip_id"]},
+        {"$set": {
+            "checklist_result": result,
+            "status": "programado" if result != "critico" else "checklist_pendiente"
+        }}
+    )
+    
+    # Create issue if critical
+    if result == "critico":
+        issue_count = await db.issues.count_documents({"company_id": current_user["company_id"]})
+        issue = Issue(
+            company_id=current_user["company_id"],
+            issue_number=f"ISS-{issue_count + 1:05d}",
+            trip_id=checklist["trip_id"],
+            vehicle_id=checklist["tracto_id"],
+            driver_id=checklist["driver_id"],
+            checklist_id=checklist_id,
+            issue_type="checklist_critico",
+            severity="alta",
+            title="Checklist Pre-Viaje Crítico",
+            description=f"Items críticos: {', '.join(critical_items)}",
+            photos=photos,
+            created_by=current_user["id"]
+        )
+        issue_doc = issue.model_dump()
+        for k, v in issue_doc.items():
+            if isinstance(v, datetime):
+                issue_doc[k] = v.isoformat()
+        await db.issues.insert_one(issue_doc)
+    
+    # Audit log
+    await create_audit_log(
+        current_user["company_id"],
+        current_user["id"],
+        current_user["name"],
+        "submit_checklist",
+        "checklist",
+        checklist_id,
+        {"result": result, "trip_id": checklist["trip_id"]}
+    )
+    
+    return {
+        "message": "Checklist enviado",
+        "result": result,
+        "critical_items": critical_items,
+        "observed_items": observed_items
+    }
+
+# ============== SETTLEMENT ROUTES ==============
+@api_router.get("/settlements")
+async def get_settlements(
+    status: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    query = {"company_id": current_user["company_id"]}
+    if status:
+        query["status"] = status
+    settlements = await db.settlements.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return [serialize_doc(s) for s in settlements]
+
+@api_router.get("/trips/{trip_id}/settlement")
+async def get_trip_settlement(trip_id: str, current_user: dict = Depends(get_current_user)):
+    settlement = await db.settlements.find_one(
+        {"trip_id": trip_id, "company_id": current_user["company_id"]},
+        {"_id": 0}
+    )
+    return serialize_doc(settlement) if settlement else None
+
+@api_router.post("/trips/{trip_id}/settlement")
+async def create_or_update_settlement(trip_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+    """Create or update settlement for a trip"""
+    trip = await db.trips.find_one({"id": trip_id, "company_id": current_user["company_id"]})
+    if not trip:
+        raise HTTPException(status_code=404, detail="Viaje no encontrado")
+    
+    # Calculate totals
+    advances = await db.trip_advances.find({"trip_id": trip_id}, {"_id": 0}).to_list(100)
+    expenses = await db.trip_expenses.find({"trip_id": trip_id}, {"_id": 0}).to_list(500)
+    
+    total_advances = sum(a.get("amount", 0) for a in advances)
+    total_expenses = sum(e.get("amount", 0) for e in expenses)
+    deductions = request.get("deductions", 0)
+    
+    balance = total_advances - total_expenses - deductions
+    balance_type = "favor_empresa" if balance >= 0 else "favor_chofer"
+    
+    existing = await db.settlements.find_one({"trip_id": trip_id})
+    
+    if existing:
+        if existing.get("status") == "cerrado":
+            raise HTTPException(status_code=400, detail="Liquidación ya cerrada")
+        
+        await db.settlements.update_one(
+            {"id": existing["id"]},
+            {"$set": {
+                "total_advances": total_advances,
+                "total_expenses": total_expenses,
+                "deductions": deductions,
+                "deduction_notes": request.get("deduction_notes"),
+                "balance": abs(balance),
+                "balance_type": balance_type,
+                "notes": request.get("notes"),
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        return {"id": existing["id"], "message": "Liquidación actualizada"}
+    else:
+        settlement = TripSettlement(
+            company_id=current_user["company_id"],
+            trip_id=trip_id,
+            total_advances=total_advances,
+            total_expenses=total_expenses,
+            deductions=deductions,
+            deduction_notes=request.get("deduction_notes"),
+            balance=abs(balance),
+            balance_type=balance_type,
+            notes=request.get("notes")
+        )
+        doc = settlement.model_dump()
+        for k, v in doc.items():
+            if isinstance(v, datetime):
+                doc[k] = v.isoformat()
+        await db.settlements.insert_one(doc)
+        
+        await db.trips.update_one(
+            {"id": trip_id},
+            {"$set": {"settlement_id": settlement.id, "settlement_status": "pendiente"}}
+        )
+        
+        return {"id": settlement.id, "message": "Liquidación creada"}
+
+@api_router.post("/settlements/{settlement_id}/close")
+async def close_settlement(settlement_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+    """Close a settlement"""
+    if current_user["role"] not in ["owner", "admin", "contabilidad"]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+    
+    settlement = await db.settlements.find_one({
+        "id": settlement_id,
+        "company_id": current_user["company_id"]
+    })
+    if not settlement:
+        raise HTTPException(status_code=404, detail="Liquidación no encontrada")
+    
+    if settlement.get("status") == "cerrado":
+        raise HTTPException(status_code=400, detail="Liquidación ya cerrada")
+    
+    await db.settlements.update_one(
+        {"id": settlement_id},
+        {"$set": {
+            "status": "cerrado",
+            "closed_by": current_user["id"],
+            "closed_at": datetime.now(timezone.utc).isoformat(),
+            "notes": request.get("notes", settlement.get("notes"))
+        }}
+    )
+    
+    # Update trip
+    await db.trips.update_one(
+        {"id": settlement["trip_id"]},
+        {"$set": {"settlement_status": "cerrado"}}
+    )
+    
+    # Audit log
+    await create_audit_log(
+        current_user["company_id"],
+        current_user["id"],
+        current_user["name"],
+        "close_settlement",
+        "settlement",
+        settlement_id,
+        {"trip_id": settlement["trip_id"], "balance": settlement.get("balance")}
+    )
+    
+    return {"message": "Liquidación cerrada"}
+
+# ============== INVENTORY ROUTES ==============
+@api_router.get("/inventory/items")
+async def get_inventory_items(
+    category: Optional[str] = None,
+    low_stock: Optional[bool] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    query = {"company_id": current_user["company_id"], "is_active": True}
+    if category:
+        query["category"] = category
+    
+    items = await db.inventory_items.find(query, {"_id": 0}).to_list(1000)
+    
+    if low_stock:
+        items = [i for i in items if i.get("current_stock", 0) <= i.get("min_stock", 0)]
+    
+    return [serialize_doc(i) for i in items]
+
+@api_router.post("/inventory/items")
+async def create_inventory_item(request: dict, current_user: dict = Depends(get_current_user)):
+    if current_user["role"] not in ["owner", "admin", "almacen"]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+    
+    item = InventoryItem(
+        company_id=current_user["company_id"],
+        code=request["code"],
+        name=request["name"],
+        description=request.get("description"),
+        category=request["category"],
+        unit=request.get("unit", "unidad"),
+        min_stock=request.get("min_stock", 0),
+        max_stock=request.get("max_stock"),
+        unit_cost=request.get("unit_cost", 0),
+        location=request.get("location")
+    )
+    
+    doc = item.model_dump()
+    for k, v in doc.items():
+        if isinstance(v, datetime):
+            doc[k] = v.isoformat()
+    await db.inventory_items.insert_one(doc)
+    return {"id": item.id, "message": "Item creado"}
+
+@api_router.post("/inventory/moves")
+async def create_stock_move(request: dict, current_user: dict = Depends(get_current_user)):
+    """Create a stock movement (entry/exit/adjustment)"""
+    if current_user["role"] not in ["owner", "admin", "almacen", "mantenimiento"]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+    
+    item_id = request["item_id"]
+    move_type = request["move_type"]
+    quantity = request["quantity"]
+    
+    # Get current item
+    item = await db.inventory_items.find_one({"id": item_id, "company_id": current_user["company_id"]})
+    if not item:
+        raise HTTPException(status_code=404, detail="Item no encontrado")
+    
+    current_stock = item.get("current_stock", 0)
+    
+    if move_type in ["salida", "consumo_ot"]:
+        if current_stock < quantity:
+            raise HTTPException(status_code=400, detail="Stock insuficiente")
+        new_stock = current_stock - quantity
+    elif move_type == "entrada":
+        new_stock = current_stock + quantity
+    else:  # ajuste
+        new_stock = quantity
+    
+    move = StockMove(
+        company_id=current_user["company_id"],
+        item_id=item_id,
+        move_type=move_type,
+        quantity=quantity,
+        unit_cost=request.get("unit_cost", item.get("unit_cost", 0)),
+        total_cost=quantity * request.get("unit_cost", item.get("unit_cost", 0)),
+        reference_type=request.get("reference_type"),
+        reference_id=request.get("reference_id"),
+        work_order_id=request.get("work_order_id"),
+        notes=request.get("notes"),
+        created_by=current_user["id"]
+    )
+    
+    doc = move.model_dump()
+    doc["move_date"] = doc["move_date"].isoformat()
+    await db.stock_moves.insert_one(doc)
+    
+    # Update item stock
+    await db.inventory_items.update_one(
+        {"id": item_id},
+        {"$set": {"current_stock": new_stock, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    # Check for low stock alert
+    if new_stock <= item.get("min_stock", 0):
+        alert = Alert(
+            company_id=current_user["company_id"],
+            alert_type="low_stock",
+            entity_type="inventory",
+            entity_id=item_id,
+            message=f"Stock bajo: {item.get('name', '')} - {new_stock} {item.get('unit', 'unidades')}",
+            severity="warning"
+        )
+        alert_doc = alert.model_dump()
+        alert_doc["created_at"] = alert_doc["created_at"].isoformat()
+        await db.alerts.insert_one(alert_doc)
+    
+    return {"id": move.id, "new_stock": new_stock, "message": "Movimiento registrado"}
+
+@api_router.get("/inventory/kardex/{item_id}")
+async def get_kardex(item_id: str, current_user: dict = Depends(get_current_user)):
+    """Get stock movement history for an item"""
+    moves = await db.stock_moves.find(
+        {"item_id": item_id, "company_id": current_user["company_id"]},
+        {"_id": 0}
+    ).sort("move_date", -1).to_list(500)
+    return [serialize_doc(m) for m in moves]
+
+# ============== SUPPLIER ROUTES ==============
+@api_router.get("/suppliers")
+async def get_suppliers(current_user: dict = Depends(get_current_user)):
+    suppliers = await db.suppliers.find(
+        {"company_id": current_user["company_id"], "is_active": True},
+        {"_id": 0}
+    ).to_list(500)
+    return [serialize_doc(s) for s in suppliers]
+
+@api_router.post("/suppliers")
+async def create_supplier(request: dict, current_user: dict = Depends(get_current_user)):
+    if current_user["role"] not in ["owner", "admin", "almacen"]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+    
+    supplier = Supplier(
+        company_id=current_user["company_id"],
+        name=request["name"],
+        ruc=request.get("ruc"),
+        address=request.get("address"),
+        phone=request.get("phone"),
+        email=request.get("email"),
+        contact_person=request.get("contact_person"),
+        category=request.get("category")
+    )
+    
+    doc = supplier.model_dump()
+    doc["created_at"] = doc["created_at"].isoformat()
+    await db.suppliers.insert_one(doc)
+    return {"id": supplier.id, "message": "Proveedor creado"}
+
+# ============== PURCHASE ORDER ROUTES ==============
+@api_router.get("/purchase-orders")
+async def get_purchase_orders(
+    status: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    query = {"company_id": current_user["company_id"]}
+    if status:
+        query["status"] = status
+    orders = await db.purchase_orders.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return [serialize_doc(o) for o in orders]
+
+@api_router.post("/purchase-orders")
+async def create_purchase_order(request: dict, current_user: dict = Depends(get_current_user)):
+    if current_user["role"] not in ["owner", "admin", "almacen"]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+    
+    count = await db.purchase_orders.count_documents({"company_id": current_user["company_id"]})
+    order_number = f"OC-{count + 1:05d}"
+    
+    items = request.get("items", [])
+    subtotal = sum(i.get("quantity", 0) * i.get("unit_price", 0) for i in items)
+    tax = subtotal * 0.18  # IGV Peru
+    total = subtotal + tax
+    
+    order = PurchaseOrder(
+        company_id=current_user["company_id"],
+        order_number=order_number,
+        supplier_id=request["supplier_id"],
+        items=items,
+        subtotal=subtotal,
+        tax=tax,
+        total=total,
+        notes=request.get("notes"),
+        created_by=current_user["id"]
+    )
+    
+    doc = order.model_dump()
+    for k, v in doc.items():
+        if isinstance(v, datetime):
+            doc[k] = v.isoformat()
+    await db.purchase_orders.insert_one(doc)
+    return {"id": order.id, "order_number": order_number, "message": "Orden de compra creada"}
+
+@api_router.post("/purchase-orders/{order_id}/receive")
+async def receive_purchase_order(order_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+    """Receive a purchase order and update inventory"""
+    if current_user["role"] not in ["owner", "admin", "almacen"]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+    
+    order = await db.purchase_orders.find_one({
+        "id": order_id,
+        "company_id": current_user["company_id"]
+    })
+    if not order:
+        raise HTTPException(status_code=404, detail="Orden no encontrada")
+    
+    if order.get("status") == "recibido":
+        raise HTTPException(status_code=400, detail="Orden ya recibida")
+    
+    # Create stock entries for each item
+    for item in order.get("items", []):
+        if item.get("item_id"):
+            move = StockMove(
+                company_id=current_user["company_id"],
+                item_id=item["item_id"],
+                move_type="entrada",
+                quantity=item.get("quantity", 0),
+                unit_cost=item.get("unit_price", 0),
+                total_cost=item.get("quantity", 0) * item.get("unit_price", 0),
+                reference_type="purchase_order",
+                reference_id=order_id,
+                notes=f"Recepción OC {order.get('order_number', '')}",
+                created_by=current_user["id"]
+            )
+            move_doc = move.model_dump()
+            move_doc["move_date"] = move_doc["move_date"].isoformat()
+            await db.stock_moves.insert_one(move_doc)
+            
+            # Update stock
+            await db.inventory_items.update_one(
+                {"id": item["item_id"]},
+                {"$inc": {"current_stock": item.get("quantity", 0)}}
+            )
+    
+    await db.purchase_orders.update_one(
+        {"id": order_id},
+        {"$set": {
+            "status": "recibido",
+            "received_by": current_user["id"],
+            "received_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    return {"message": "Orden recibida e inventario actualizado"}
+
+# ============== EXTENDED WORK ORDER ROUTES ==============
+@api_router.post("/maintenance/work-orders/{order_id}/start")
+async def start_work_order(order_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+    """Start a work order"""
+    if current_user["role"] not in ["owner", "admin", "mantenimiento"]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+    
+    order = await db.work_orders.find_one({
+        "id": order_id,
+        "company_id": current_user["company_id"]
+    })
+    if not order:
+        raise HTTPException(status_code=404, detail="Orden no encontrada")
+    
+    await db.work_orders.update_one(
+        {"id": order_id},
+        {"$set": {
+            "status": "en_proceso",
+            "start_date": datetime.now(timezone.utc).isoformat(),
+            "technician": request.get("technician"),
+            "odometer_at_service": request.get("odometer")
+        }}
+    )
+    
+    # Create downtime record
+    downtime = DowntimeRecord(
+        company_id=current_user["company_id"],
+        vehicle_id=order["vehicle_id"],
+        work_order_id=order_id,
+        reason=order.get("description", "Mantenimiento"),
+        created_by=current_user["id"]
+    )
+    dt_doc = downtime.model_dump()
+    dt_doc["start_time"] = dt_doc["start_time"].isoformat()
+    await db.downtime_records.insert_one(dt_doc)
+    
+    # Update vehicle status
+    await db.vehicles.update_one(
+        {"id": order["vehicle_id"]},
+        {"$set": {"status": "en_mantenimiento"}}
+    )
+    
+    return {"message": "Orden iniciada"}
+
+@api_router.post("/maintenance/work-orders/{order_id}/complete")
+async def complete_work_order(order_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+    """Complete a work order"""
+    if current_user["role"] not in ["owner", "admin", "mantenimiento"]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+    
+    order = await db.work_orders.find_one({
+        "id": order_id,
+        "company_id": current_user["company_id"]
+    })
+    if not order:
+        raise HTTPException(status_code=404, detail="Orden no encontrada")
+    
+    labor_cost = request.get("labor_cost", 0)
+    parts_cost = request.get("parts_cost", 0)
+    total_cost = labor_cost + parts_cost
+    
+    await db.work_orders.update_one(
+        {"id": order_id},
+        {"$set": {
+            "status": "completada",
+            "end_date": datetime.now(timezone.utc).isoformat(),
+            "labor_cost": labor_cost,
+            "parts_cost": parts_cost,
+            "total_cost": total_cost,
+            "items": request.get("items", order.get("items", [])),
+            "notes": request.get("notes"),
+            "closed_by": current_user["id"]
+        }}
+    )
+    
+    # Consume parts from inventory
+    for item in request.get("consumed_items", []):
+        if item.get("item_id") and item.get("quantity"):
+            move = StockMove(
+                company_id=current_user["company_id"],
+                item_id=item["item_id"],
+                move_type="consumo_ot",
+                quantity=item["quantity"],
+                work_order_id=order_id,
+                notes=f"Consumo OT {order.get('order_number', '')}",
+                created_by=current_user["id"]
+            )
+            move_doc = move.model_dump()
+            move_doc["move_date"] = move_doc["move_date"].isoformat()
+            await db.stock_moves.insert_one(move_doc)
+            
+            await db.inventory_items.update_one(
+                {"id": item["item_id"]},
+                {"$inc": {"current_stock": -item["quantity"]}}
+            )
+    
+    # Close downtime
+    await db.downtime_records.update_one(
+        {"work_order_id": order_id, "end_time": None},
+        {"$set": {
+            "end_time": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    # Update vehicle
+    await db.vehicles.update_one(
+        {"id": order["vehicle_id"]},
+        {"$set": {
+            "status": "disponible",
+            "last_maintenance_km": request.get("odometer", 0),
+            "last_maintenance_date": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    # Resolve any blocks
+    await db.blocks.update_many(
+        {"work_order_id": order_id, "is_active": True},
+        {"$set": {
+            "is_active": False,
+            "resolved_at": datetime.now(timezone.utc).isoformat(),
+            "resolved_by": current_user["id"]
+        }}
+    )
+    
+    # Audit log
+    await create_audit_log(
+        current_user["company_id"],
+        current_user["id"],
+        current_user["name"],
+        "complete_work_order",
+        "work_order",
+        order_id,
+        {"total_cost": total_cost, "vehicle_id": order["vehicle_id"]}
+    )
+    
+    return {"message": "Orden completada", "total_cost": total_cost}
+
+# ============== TIRE EXTENDED ROUTES ==============
+@api_router.post("/tires/rotate")
+async def rotate_tires(request: dict, current_user: dict = Depends(get_current_user)):
+    """Rotate tires on a vehicle"""
+    if current_user["role"] not in ["owner", "admin", "mantenimiento", "flota"]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+    
+    vehicle_id = request["vehicle_id"]
+    changes = request.get("changes", [])  # [{from_position, to_position, tire_id}]
+    odometer = request.get("odometer", 0)
+    
+    # Validate all tires exist and are mounted
+    for change in changes:
+        tire = await db.tires.find_one({
+            "id": change["tire_id"],
+            "current_vehicle_id": vehicle_id
+        })
+        if not tire:
+            raise HTTPException(status_code=400, detail=f"Llanta {change['tire_id']} no está montada en este vehículo")
+    
+    # Perform rotation
+    for change in changes:
+        await db.tires.update_one(
+            {"id": change["tire_id"]},
+            {"$set": {"current_position": change["to_position"]}}
+        )
+    
+    # Create rotation record
+    rotation = TireRotation(
+        company_id=current_user["company_id"],
+        vehicle_id=vehicle_id,
+        changes=changes,
+        reason=request.get("reason"),
+        odometer=odometer,
+        created_by=current_user["id"]
+    )
+    doc = rotation.model_dump()
+    doc["rotation_date"] = doc["rotation_date"].isoformat()
+    await db.tire_rotations.insert_one(doc)
+    
+    return {"id": rotation.id, "message": "Rotación realizada"}
+
+@api_router.post("/tires/align")
+async def record_alignment(request: dict, current_user: dict = Depends(get_current_user)):
+    """Record an alignment service"""
+    if current_user["role"] not in ["owner", "admin", "mantenimiento", "flota"]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+    
+    alignment = AlignmentRecord(
+        company_id=current_user["company_id"],
+        vehicle_id=request["vehicle_id"],
+        axle=request["axle"],
+        workshop=request.get("workshop"),
+        cost=request.get("cost", 0),
+        notes=request.get("notes"),
+        created_by=current_user["id"]
+    )
+    doc = alignment.model_dump()
+    doc["alignment_date"] = doc["alignment_date"].isoformat()
+    await db.alignment_records.insert_one(doc)
+    
+    # Resolve any alignment alerts
+    await db.alerts.update_many(
+        {
+            "company_id": current_user["company_id"],
+            "entity_id": request["vehicle_id"],
+            "alert_type": {"$in": ["tire_irregular_wear", "axle_misalignment"]},
+            "resolved": False
+        },
+        {"$set": {"resolved": True, "resolved_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    return {"id": alignment.id, "message": "Alineación registrada"}
+
+@api_router.get("/tires/reports/required")
+async def get_tires_required_report(current_user: dict = Depends(get_current_user)):
+    """Get report of tires that need replacement/retreading"""
+    company_id = current_user["company_id"]
+    
+    # Get company config for thresholds
+    company = await db.companies.find_one({"id": company_id})
+    config = company.get("config", {}) if company else {}
+    critical_depth = config.get("tire_critical_depth", 3)
+    warning_depth = config.get("tire_warning_depth", 5)
+    
+    # Get all tires in use with their latest inspection
+    tires = await db.tires.find({
+        "company_id": company_id,
+        "status": "en_uso"
+    }, {"_id": 0}).to_list(1000)
+    
+    replace_needed = []
+    retread_needed = []
+    
+    for tire in tires:
+        last_depth = tire.get("last_depth")
+        if last_depth is not None:
+            if last_depth <= critical_depth:
+                if tire.get("life_number", 1) < 3:  # Can still retread
+                    retread_needed.append(serialize_doc(tire))
+                else:
+                    replace_needed.append(serialize_doc(tire))
+            elif last_depth <= warning_depth:
+                retread_needed.append(serialize_doc(tire))
+    
+    # Group by dimension
+    replace_by_dim = {}
+    for t in replace_needed:
+        dim = t.get("dimension", "Unknown")
+        if dim not in replace_by_dim:
+            replace_by_dim[dim] = []
+        replace_by_dim[dim].append(t)
+    
+    retread_by_dim = {}
+    for t in retread_needed:
+        dim = t.get("dimension", "Unknown")
+        if dim not in retread_by_dim:
+            retread_by_dim[dim] = []
+        retread_by_dim[dim].append(t)
+    
+    return {
+        "replace_needed": replace_by_dim,
+        "retread_needed": retread_by_dim,
+        "total_replace": len(replace_needed),
+        "total_retread": len(retread_needed)
+    }
+
+@api_router.get("/tires/{tire_id}/history")
+async def get_tire_history(tire_id: str, current_user: dict = Depends(get_current_user)):
+    """Get complete history of a tire"""
+    tire = await db.tires.find_one({
+        "id": tire_id,
+        "company_id": current_user["company_id"]
+    }, {"_id": 0})
+    if not tire:
+        raise HTTPException(status_code=404, detail="Llanta no encontrada")
+    
+    mounts = await db.tire_mounts.find({"tire_id": tire_id}, {"_id": 0}).sort("mount_date", -1).to_list(100)
+    inspections = await db.tire_inspections.find({"tire_id": tire_id}, {"_id": 0}).sort("inspection_date", -1).to_list(100)
+    life_events = await db.tire_life_events.find({"tire_id": tire_id}, {"_id": 0}).sort("event_date", -1).to_list(100)
+    
+    return {
+        "tire": serialize_doc(tire),
+        "mounts": [serialize_doc(m) for m in mounts],
+        "inspections": [serialize_doc(i) for i in inspections],
+        "life_events": [serialize_doc(e) for e in life_events]
+    }
+
+# ============== AUDIT LOG ROUTES ==============
+@api_router.get("/audit-logs")
+async def get_audit_logs(
+    entity_type: Optional[str] = None,
+    entity_id: Optional[str] = None,
+    action: Optional[str] = None,
+    limit: int = 100,
+    current_user: dict = Depends(get_current_user)
+):
+    if current_user["role"] not in ["owner", "admin"]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+    
+    query = {"company_id": current_user["company_id"]}
+    if entity_type:
+        query["entity_type"] = entity_type
+    if entity_id:
+        query["entity_id"] = entity_id
+    if action:
+        query["action"] = action
+    
+    logs = await db.audit_logs.find(query, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+    return [serialize_doc(l) for l in logs]
+
+# ============== FUEL EXTENDED ROUTES ==============
+@api_router.get("/fuel/conciliation")
+async def get_fuel_conciliation(
+    vehicle_id: Optional[str] = None,
+    trip_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get fuel conciliation report (vouchers vs actual loads)"""
+    query = {"company_id": current_user["company_id"]}
+    if vehicle_id:
+        query["vehicle_id"] = vehicle_id
+    if trip_id:
+        query["trip_id"] = trip_id
+    
+    vouchers = await db.fuel_vouchers.find(query, {"_id": 0}).to_list(500)
+    loads = await db.fuel_loads.find(query, {"_id": 0}).to_list(1000)
+    
+    results = []
+    for voucher in vouchers:
+        voucher_loads = [l for l in loads if l.get("voucher_id") == voucher["id"]]
+        total_loaded = sum(l.get("liters", 0) for l in voucher_loads)
+        total_amount = sum(l.get("total_amount", 0) for l in voucher_loads)
+        
+        limit = voucher.get("limit_liters") or voucher.get("limit_amount")
+        used = total_loaded if voucher.get("limit_liters") else total_amount
+        
+        results.append({
+            "voucher": serialize_doc(voucher),
+            "loads": [serialize_doc(l) for l in voucher_loads],
+            "total_loaded_liters": total_loaded,
+            "total_amount": total_amount,
+            "limit": limit,
+            "used_percentage": (used / limit * 100) if limit else 0,
+            "over_limit": used > limit if limit else False
+        })
+    
+    # Loads without voucher
+    no_voucher_loads = [l for l in loads if not l.get("voucher_id")]
+    
+    return {
+        "voucher_conciliation": results,
+        "loads_without_voucher": [serialize_doc(l) for l in no_voucher_loads],
+        "total_without_voucher": len(no_voucher_loads)
+    }
+
+@api_router.get("/fuel/kpis")
+async def get_fuel_kpis(
+    vehicle_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get fuel KPIs (km/gal, cost/km)"""
+    company_id = current_user["company_id"]
+    
+    query = {"company_id": company_id}
+    if vehicle_id:
+        query["vehicle_id"] = vehicle_id
+    
+    loads = await db.fuel_loads.find(query, {"_id": 0}).sort("load_date", -1).to_list(1000)
+    
+    if not loads:
+        return {"message": "No hay datos de combustible"}
+    
+    # Group by vehicle
+    vehicles_data = {}
+    for load in loads:
+        vid = load.get("vehicle_id")
+        if vid not in vehicles_data:
+            vehicles_data[vid] = {"loads": [], "total_liters": 0, "total_amount": 0}
+        vehicles_data[vid]["loads"].append(load)
+        vehicles_data[vid]["total_liters"] += load.get("liters", 0)
+        vehicles_data[vid]["total_amount"] += load.get("total_amount", 0)
+    
+    kpis = []
+    for vid, data in vehicles_data.items():
+        sorted_loads = sorted(data["loads"], key=lambda x: x.get("odometer", 0))
+        if len(sorted_loads) >= 2:
+            km_traveled = sorted_loads[-1].get("odometer", 0) - sorted_loads[0].get("odometer", 0)
+            if km_traveled > 0 and data["total_liters"] > 0:
+                km_per_liter = km_traveled / data["total_liters"]
+                km_per_gallon = km_per_liter * 3.78541  # Convert to gallons
+                cost_per_km = data["total_amount"] / km_traveled
+                
+                vehicle = await db.vehicles.find_one({"id": vid}, {"_id": 0})
+                kpis.append({
+                    "vehicle_id": vid,
+                    "plate": vehicle.get("plate") if vehicle else "Unknown",
+                    "km_traveled": km_traveled,
+                    "total_liters": data["total_liters"],
+                    "total_amount": data["total_amount"],
+                    "km_per_gallon": round(km_per_gallon, 2),
+                    "cost_per_km": round(cost_per_km, 2),
+                    "loads_count": len(data["loads"])
+                })
+    
+    # Sort by km/gal efficiency
+    kpis.sort(key=lambda x: x.get("km_per_gallon", 0), reverse=True)
+    
+    return {"vehicle_kpis": kpis}
+
 # ============== DASHBOARD/REPORTS ROUTES ==============
 @api_router.get("/dashboard/kpis")
 async def get_dashboard_kpis(current_user: dict = Depends(get_current_user)):
