@@ -144,6 +144,12 @@ export const tripsApi = {
 export const checklistsApi = {
   getAll: (params) => api.get('/checklists', { params }),
   create: (data) => api.post('/checklists', data),
+  getTemplates: (params) => api.get('/checklist-templates', { params }),
+  createTemplate: (data) => api.post('/checklist-templates', data),
+  updateTemplate: (id, data) => api.put(`/checklist-templates/${id}`, data),
+  getByTrip: (tripId) => api.get(`/checklists/trip/${tripId}`),
+  start: (data) => api.post('/checklists/start', data),
+  submit: (id, data) => api.post(`/checklists/${id}/submit`, data),
 };
 
 // Fuel API
@@ -152,6 +158,8 @@ export const fuelApi = {
   createVoucher: (data) => api.post('/fuel/vouchers', data),
   getLoads: (params) => api.get('/fuel/loads', { params }),
   createLoad: (data) => api.post('/fuel/loads', data),
+  getConciliation: (params) => api.get('/fuel/conciliation', { params }),
+  getKPIs: (params) => api.get('/fuel/kpis', { params }),
 };
 
 // Tires API
@@ -164,6 +172,10 @@ export const tiresApi = {
   getByVehicle: (vehicleId) => api.get(`/tires/vehicle/${vehicleId}`),
   createInspection: (data) => api.post('/tires/inspect', data),
   getInspections: (tireId) => api.get(`/tires/${tireId}/inspections`),
+  rotate: (data) => api.post('/tires/rotate', data),
+  align: (data) => api.post('/tires/align', data),
+  getRequiredReport: () => api.get('/tires/reports/required'),
+  getHistory: (tireId) => api.get(`/tires/${tireId}/history`),
 };
 
 // Maintenance API
