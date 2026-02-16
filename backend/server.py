@@ -1603,26 +1603,23 @@ async def create_trip(request: CreateTripRequest, current_user: dict = Depends(g
     if current_user["role"] not in ["owner", "admin", "operaciones"]:
         raise HTTPException(status_code=403, detail="No autorizado")
     
-    # Check for active blocks on tracto
-    tracto_blocks = await db.blocks.find_one({
-        "entity_id": request.tracto_id,
-        "is_active": True,
-        "block_type": "bloquea_asignacion"
-    })
-    if tracto_blocks:
-        raise HTTPException(status_code=400, detail=f"Tracto bloqueado: {tracto_blocks.get('reason')}")
+    # Validate all blocks using helper function
+    validation = await validate_trip_can_be_assigned(
+        current_user["company_id"],
+        request.tracto_id,
+        request.carreta_id,
+        request.driver_id
+    )
+    if not validation["valid"]:
+        raise HTTPException(status_code=400, detail="; ".join(validation["errors"]))
     
-    # Check for active blocks on driver
-    driver_blocks = await db.blocks.find_one({
-        "entity_id": request.driver_id,
-        "is_active": True,
-        "block_type": "bloquea_asignacion"
-    })
-    if driver_blocks:
-        raise HTTPException(status_code=400, detail=f"Chofer bloqueado: {driver_blocks.get('reason')}")
+    # Generate trip number
+    count = await db.trips.count_documents({"company_id": current_user["company_id"]})
+    trip_number = f"VJ-{count + 1:05d}"
     
     trip = Trip(
         company_id=current_user["company_id"],
+        trip_number=trip_number,
         tracto_id=request.tracto_id,
         carreta_id=request.carreta_id,
         driver_id=request.driver_id,
