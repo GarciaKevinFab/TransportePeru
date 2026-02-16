@@ -1054,9 +1054,13 @@ async def get_documents_matrix(
     current_user: dict = Depends(get_current_user)
 ):
     """Get document matrix for vehicles or drivers"""
+    # Map entity_type to applies_to field
+    applies_to_map = {"vehicle": "vehiculo", "user": "chofer"}
+    applies_to = applies_to_map.get(entity_type, entity_type)
+    
     # Get document types
     doc_types = await db.document_types.find(
-        {"company_id": current_user["company_id"], "applies_to": entity_type},
+        {"company_id": current_user["company_id"], "applies_to": applies_to},
         {"_id": 0}
     ).to_list(100)
     
