@@ -83,6 +83,60 @@ class TireStatus(str, Enum):
     EN_USO = "en_uso"
     REENCAUCHE = "reencauche"
     BAJA = "baja"
+    ALMACEN = "almacen"
+
+class ChecklistResult(str, Enum):
+    PENDING = "pending"
+    OK = "ok"
+    OBSERVADO = "observado"
+    CRITICO = "critico"
+
+class WorkOrderStatus(str, Enum):
+    ABIERTA = "abierta"
+    EN_PROCESO = "en_proceso"
+    COMPLETADA = "completada"
+    CANCELADA = "cancelada"
+
+class WorkOrderPriority(str, Enum):
+    BAJA = "baja"
+    NORMAL = "normal"
+    ALTA = "alta"
+    CRITICA = "critica"
+
+class IssueType(str, Enum):
+    INCIDENTE = "incidente"
+    MULTA = "multa"
+    SINIESTRO = "siniestro"
+    CHECKLIST_CRITICO = "checklist_critico"
+    LLANTA_CRITICA = "llanta_critica"
+    OTRO = "otro"
+
+class IssueSeverity(str, Enum):
+    BAJA = "baja"
+    MEDIA = "media"
+    ALTA = "alta"
+    CRITICA = "critica"
+
+class ExpenseCategory(str, Enum):
+    ALIMENTACION = "alimentacion"
+    HOSPEDAJE = "hospedaje"
+    MOVILIDAD = "movilidad"
+    PEAJES = "peajes"
+    PARQUEO = "parqueo"
+    COMBUSTIBLE = "combustible"
+    OTROS = "otros"
+
+class SettlementStatus(str, Enum):
+    PENDIENTE = "pendiente"
+    EN_REVISION = "en_revision"
+    APROBADO = "aprobado"
+    CERRADO = "cerrado"
+
+class StockMoveType(str, Enum):
+    ENTRADA = "entrada"
+    SALIDA = "salida"
+    AJUSTE = "ajuste"
+    CONSUMO_OT = "consumo_ot"
 
 class BlockRule(str, Enum):
     BLOQUEA_ASIGNACION = "bloquea_asignacion"
