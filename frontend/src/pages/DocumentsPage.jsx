@@ -70,14 +70,16 @@ const DocumentsPage = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
+      const appliesTo = entityType === 'vehicle' ? 'vehiculo' : 'chofer';
       const [matrixRes, typesRes, vehiclesRes, driversRes] = await Promise.all([
         documentsApi.getMatrix(entityType),
-        documentTypesApi.getAll({ applies_to: entityType === 'vehicle' ? 'vehiculo' : 'chofer' }),
+        documentTypesApi.getAll({ applies_to: appliesTo }),
         vehiclesApi.getAll(),
         usersApi.getAll({ role: 'chofer' }),
       ]);
       setMatrix(matrixRes.data);
-      setDocumentTypes(typesRes.data);
+      // Use types from matrix response if available, otherwise from types endpoint
+      setDocumentTypes(matrixRes.data.document_types || typesRes.data);
       setVehicles(vehiclesRes.data);
       setDrivers(driversRes.data);
     } catch (error) {
