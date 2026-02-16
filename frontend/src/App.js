@@ -10,6 +10,7 @@ import TripsPage from './pages/TripsPage';
 import DocumentsPage from './pages/DocumentsPage';
 import UsersPage from './pages/UsersPage';
 import TireSchemaPage from './pages/TireSchemaPage';
+import TiresPage from './pages/TiresPage';
 import FuelPage from './pages/FuelPage';
 import MaintenancePage from './pages/MaintenancePage';
 import InventoryPage from './pages/InventoryPage';
@@ -140,7 +141,7 @@ function AppRoutes() {
         path="/tires"
         element={
           <ProtectedRoute allowedRoles={['owner', 'admin', 'flota', 'mantenimiento']}>
-            <PlaceholderPage title="Llantas" />
+            <TiresPage />
           </ProtectedRoute>
         }
       />
