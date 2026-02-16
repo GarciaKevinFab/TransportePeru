@@ -521,12 +521,12 @@ const IssuesPage = () => {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">Viaje Relacionado</Label>
-                <Select value={formData.trip_id} onValueChange={(v) => setFormData({ ...formData, trip_id: v })}>
+                <Select value={formData.trip_id || "none"} onValueChange={(v) => setFormData({ ...formData, trip_id: v === "none" ? "" : v })}>
                   <SelectTrigger className="rounded-sm">
                     <SelectValue placeholder="Ninguno" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Ninguno</SelectItem>
+                    <SelectItem value="none">Ninguno</SelectItem>
                     {trips.slice(0, 20).map(t => (
                       <SelectItem key={t.id} value={t.id}>{t.client_name || 'Sin cliente'} - {format(new Date(t.scheduled_date), 'dd/MM')}</SelectItem>
                     ))}
