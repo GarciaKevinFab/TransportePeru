@@ -10,6 +10,10 @@ import TripsPage from './pages/TripsPage';
 import DocumentsPage from './pages/DocumentsPage';
 import UsersPage from './pages/UsersPage';
 import TireSchemaPage from './pages/TireSchemaPage';
+import FuelPage from './pages/FuelPage';
+import MaintenancePage from './pages/MaintenancePage';
+import InventoryPage from './pages/InventoryPage';
+import IssuesPage from './pages/IssuesPage';
 import './App.css';
 
 // Protected Route Component
@@ -127,7 +131,7 @@ function AppRoutes() {
         path="/fuel"
         element={
           <ProtectedRoute allowedRoles={['owner', 'admin', 'operaciones']}>
-            <PlaceholderPage title="Combustible" />
+            <FuelPage />
           </ProtectedRoute>
         }
       />
@@ -145,7 +149,7 @@ function AppRoutes() {
         path="/maintenance"
         element={
           <ProtectedRoute allowedRoles={['owner', 'admin', 'mantenimiento']}>
-            <PlaceholderPage title="Mantenimiento" />
+            <MaintenancePage />
           </ProtectedRoute>
         }
       />
@@ -154,7 +158,7 @@ function AppRoutes() {
         path="/inventory"
         element={
           <ProtectedRoute allowedRoles={['owner', 'admin', 'almacen']}>
-            <PlaceholderPage title="Inventario" />
+            <InventoryPage />
           </ProtectedRoute>
         }
       />
@@ -163,7 +167,7 @@ function AppRoutes() {
         path="/issues"
         element={
           <ProtectedRoute allowedRoles={['owner', 'admin', 'operaciones']}>
-            <PlaceholderPage title="Incidentes" />
+            <IssuesPage />
           </ProtectedRoute>
         }
       />
