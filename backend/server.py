@@ -839,6 +839,113 @@ def serialize_doc(doc: dict) -> dict:
             result[key] = value.isoformat()
     return result
 
+async def check_entity_blocks(company_id: str, entity_type: str, entity_id: str, block_type: str = None) -> List[dict]:
+    """Check for active blocks on an entity"""
+    query = {
+        "company_id": company_id,
+        "entity_type": entity_type,
+        "entity_id": entity_id,
+        "is_active": True
+    }
+    if block_type:
+        query["block_type"] = block_type
+    blocks = await db.blocks.find(query, {"_id": 0}).to_list(100)
+    return blocks
+
+async def validate_trip_can_be_assigned(company_id: str, tracto_id: str, carreta_id: str, driver_id: str) -> dict:
+    """Validate that a trip can be assigned (no blocking conditions)"""
+    errors = []
+    
+    # Check tracto blocks
+    tracto_blocks = await check_entity_blocks(company_id, "vehicle", tracto_id, "bloquea_asignacion")
+    if tracto_blocks:
+        errors.append(f"Tracto bloqueado: {tracto_blocks[0].get('reason', 'Sin razón')}")
+    
+    # Check carreta blocks
+    if carreta_id:
+        carreta_blocks = await check_entity_blocks(company_id, "vehicle", carreta_id, "bloquea_asignacion")
+        if carreta_blocks:
+            errors.append(f"Carreta bloqueada: {carreta_blocks[0].get('reason', 'Sin razón')}")
+    
+    # Check driver blocks
+    driver_blocks = await check_entity_blocks(company_id, "user", driver_id, "bloquea_asignacion")
+    if driver_blocks:
+        errors.append(f"Chofer bloqueado: {driver_blocks[0].get('reason', 'Sin razón')}")
+    
+    # Check critical work orders
+    wo_query = {
+        "company_id": company_id,
+        "vehicle_id": {"$in": [tracto_id, carreta_id] if carreta_id else [tracto_id]},
+        "status": {"$in": ["abierta", "en_proceso"]},
+        "priority": "critica"
+    }
+    critical_wos = await db.work_orders.find(wo_query, {"_id": 0}).to_list(10)
+    if critical_wos:
+        errors.append(f"OT crítica pendiente: {critical_wos[0].get('description', '')[:50]}")
+    
+    return {"valid": len(errors) == 0, "errors": errors}
+
+async def validate_trip_can_start(company_id: str, trip_id: str, trip: dict) -> dict:
+    """Validate that a trip can be started"""
+    errors = []
+    
+    # Check if checklist is required and approved
+    company = await db.companies.find_one({"id": company_id}, {"_id": 0})
+    config = company.get("config", {}) if company else {}
+    
+    if config.get("require_checklist_for_start", True):
+        if not trip.get("checklist_id"):
+            errors.append("Se requiere completar el checklist pre-viaje")
+        elif trip.get("checklist_result") == "critico":
+            errors.append("Checklist con resultado CRÍTICO - no se puede iniciar")
+    
+    # Check blocks with rule "bloquea_inicio"
+    tracto_blocks = await check_entity_blocks(company_id, "vehicle", trip["tracto_id"], "bloquea_inicio")
+    if tracto_blocks:
+        errors.append(f"Tracto bloqueado para inicio: {tracto_blocks[0].get('reason', '')}")
+    
+    if trip.get("carreta_id"):
+        carreta_blocks = await check_entity_blocks(company_id, "vehicle", trip["carreta_id"], "bloquea_inicio")
+        if carreta_blocks:
+            errors.append(f"Carreta bloqueada para inicio: {carreta_blocks[0].get('reason', '')}")
+    
+    driver_blocks = await check_entity_blocks(company_id, "user", trip["driver_id"], "bloquea_inicio")
+    if driver_blocks:
+        errors.append(f"Chofer bloqueado para inicio: {driver_blocks[0].get('reason', '')}")
+    
+    return {"valid": len(errors) == 0, "errors": errors}
+
+async def create_audit_log(company_id: str, user_id: str, user_name: str, action: str, 
+                           entity_type: str, entity_id: str, details: dict = None):
+    """Create an audit log entry"""
+    log = AuditLog(
+        company_id=company_id,
+        user_id=user_id,
+        user_name=user_name,
+        action=action,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        details=details or {}
+    )
+    doc = log.model_dump()
+    doc["created_at"] = doc["created_at"].isoformat()
+    await db.audit_logs.insert_one(doc)
+
+async def create_block_for_expired_doc(company_id: str, doc_type: dict, document: dict, entity_type: str, entity_id: str):
+    """Create operational block for expired document"""
+    block = OperationalBlock(
+        company_id=company_id,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        reason=f"Documento vencido: {doc_type.get('name', 'Desconocido')}",
+        block_type=doc_type.get("block_rule", "solo_alerta"),
+        document_id=document["id"]
+    )
+    doc = block.model_dump()
+    doc["created_at"] = doc["created_at"].isoformat()
+    await db.blocks.insert_one(doc)
+    return block
+
 # ============== AUTH ROUTES ==============
 @api_router.post("/auth/login", response_model=TokenResponse)
 async def login(request: LoginRequest):
