@@ -1676,12 +1676,13 @@ async def start_trip(trip_id: str, request: dict, current_user: dict = Depends(g
     if not trip:
         raise HTTPException(status_code=404, detail="Viaje no encontrado")
     
-    if trip["status"] != "programado":
+    if trip["status"] not in ["programado", "checklist_pendiente"]:
         raise HTTPException(status_code=400, detail="El viaje no está en estado programado")
     
-    # Check checklist if required
-    # if not trip.get("checklist_approved"):
-    #     raise HTTPException(status_code=400, detail="Checklist no aprobado")
+    # Validate trip can start (checklist, blocks, etc)
+    validation = await validate_trip_can_start(current_user["company_id"], trip_id, trip)
+    if not validation["valid"]:
+        raise HTTPException(status_code=400, detail="; ".join(validation["errors"]))
     
     await db.trips.update_one(
         {"id": trip_id},
@@ -1702,6 +1703,17 @@ async def start_trip(trip_id: str, request: dict, current_user: dict = Depends(g
             {"id": trip["carreta_id"]},
             {"$set": {"status": VehicleStatus.EN_VIAJE.value}}
         )
+    
+    # Audit log
+    await create_audit_log(
+        current_user["company_id"],
+        current_user["id"],
+        current_user["name"],
+        "start_trip",
+        "trip",
+        trip_id,
+        {"km_start": request.get("km_start", 0)}
+    )
     
     return {"message": "Viaje iniciado"}
 
