@@ -229,7 +229,7 @@ const ChecklistWizardPage = () => {
     try {
       const result = calculateResult();
       
-      await api.post(`/api/trip/${tripId}/checklist`, {
+      await api.post(`/trip/${tripId}/checklist`, {
         responses: responses,
         tire_checks: tireChecks,
         signature_url: signature,
