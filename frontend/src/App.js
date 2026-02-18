@@ -17,6 +17,8 @@ import InventoryPage from './pages/InventoryPage';
 import IssuesPage from './pages/IssuesPage';
 import SettlementsPage from './pages/SettlementsPage';
 import ChecklistWizardPage from './pages/ChecklistWizardPage';
+import ReportsPage from './pages/ReportsPage';
+import SettingsPage from './pages/SettingsPage';
 import './App.css';
 
 // Protected Route Component
