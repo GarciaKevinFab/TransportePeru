@@ -199,7 +199,7 @@ function AppRoutes() {
         path="/reports"
         element={
           <ProtectedRoute allowedRoles={['owner', 'admin', 'contabilidad']}>
-            <PlaceholderPage title="Reportes" />
+            <ReportsPage />
           </ProtectedRoute>
         }
       />
@@ -217,7 +217,7 @@ function AppRoutes() {
         path="/settings"
         element={
           <ProtectedRoute allowedRoles={['owner', 'admin']}>
-            <PlaceholderPage title="Configuración" />
+            <SettingsPage />
           </ProtectedRoute>
         }
       />
