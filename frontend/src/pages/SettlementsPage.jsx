@@ -123,8 +123,8 @@ const SettlementsPage = () => {
   const fetchTripDetails = async (trip) => {
     try {
       const [expensesRes, advancesRes] = await Promise.all([
-        api.get(`/api/trips/${trip.id}/expenses`),
-        api.get(`/api/trips/${trip.id}/advances`),
+        api.get(`/trips/${trip.id}/expenses`),
+        api.get(`/trips/${trip.id}/advances`),
       ]);
       setTripExpenses(expensesRes.data);
       setTripAdvances(advancesRes.data);
@@ -156,7 +156,7 @@ const SettlementsPage = () => {
     
     setSaving(true);
     try {
-      await api.post(`/api/trips/${selectedTrip.id}/expenses`, {
+      await api.post(`/trips/${selectedTrip.id}/expenses`, {
         ...expenseForm,
         amount: parseFloat(expenseForm.amount),
       });
@@ -186,7 +186,7 @@ const SettlementsPage = () => {
     
     setSaving(true);
     try {
-      await api.post(`/api/trips/${selectedTrip.id}/advances`, {
+      await api.post(`/trips/${selectedTrip.id}/advances`, {
         ...advanceForm,
         amount: parseFloat(advanceForm.amount),
       });
