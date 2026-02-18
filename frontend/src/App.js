@@ -15,6 +15,8 @@ import FuelPage from './pages/FuelPage';
 import MaintenancePage from './pages/MaintenancePage';
 import InventoryPage from './pages/InventoryPage';
 import IssuesPage from './pages/IssuesPage';
+import SettlementsPage from './pages/SettlementsPage';
+import ChecklistWizardPage from './pages/ChecklistWizardPage';
 import './App.css';
 
 // Protected Route Component
@@ -169,6 +171,24 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={['owner', 'admin', 'operaciones']}>
             <IssuesPage />
+          </ProtectedRoute>
+        }
+      />
+      
+      <Route
+        path="/settlements"
+        element={
+          <ProtectedRoute allowedRoles={['owner', 'admin', 'contabilidad', 'operaciones']}>
+            <SettlementsPage />
+          </ProtectedRoute>
+        }
+      />
+      
+      <Route
+        path="/trips/:tripId/checklist"
+        element={
+          <ProtectedRoute allowedRoles={['owner', 'admin', 'operaciones', 'chofer']}>
+            <ChecklistWizardPage />
           </ProtectedRoute>
         }
       />
