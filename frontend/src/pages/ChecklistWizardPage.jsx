@@ -114,7 +114,7 @@ const ChecklistWizardPage = () => {
       
       // Try to get checklist template
       try {
-        const templatesRes = await api.get('/api/checklist-templates');
+        const templatesRes = await api.get('/checklist-templates');
         if (templatesRes.data.length > 0) {
           setChecklistTemplate(templatesRes.data[0]);
           // Initialize responses from template
