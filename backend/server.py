@@ -3819,6 +3819,519 @@ async def seed_demo_data():
         }
     }
 
+# ============== REPORTS ENDPOINTS ==============
+from fastapi.responses import StreamingResponse
+from io import BytesIO
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+import openpyxl
+from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
+
+@api_router.get("/reports/trips")
+async def get_trips_report(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    status: Optional[str] = None,
+    driver_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get trips report data"""
+    query = {"company_id": current_user["company_id"]}
+    if start_date:
+        query["scheduled_date"] = {"$gte": start_date}
+    if end_date:
+        query.setdefault("scheduled_date", {})["$lte"] = end_date
+    if status:
+        query["status"] = status
+    if driver_id:
+        query["driver_id"] = driver_id
+    
+    trips = await db.trips.find(query, {"_id": 0}).sort("scheduled_date", -1).to_list(500)
+    
+    # Enrich with driver and vehicle info
+    for trip in trips:
+        driver = await db.users.find_one({"id": trip.get("driver_id")}, {"_id": 0, "name": 1})
+        tracto = await db.vehicles.find_one({"id": trip.get("tracto_id")}, {"_id": 0, "plate": 1})
+        trip["driver_name"] = driver.get("name") if driver else "-"
+        trip["tracto_plate"] = tracto.get("plate") if tracto else "-"
+    
+    # Calculate totals
+    total_km = sum((t.get("km_end", 0) or 0) - (t.get("km_start", 0) or 0) for t in trips)
+    total_advances = sum(t.get("total_advance", 0) or 0 for t in trips)
+    total_expenses = sum(t.get("total_expenses", 0) or 0 for t in trips)
+    
+    return {
+        "trips": [serialize_doc(t) for t in trips],
+        "totals": {
+            "count": len(trips),
+            "total_km": total_km,
+            "total_advances": total_advances,
+            "total_expenses": total_expenses,
+            "balance": total_advances - total_expenses
+        }
+    }
+
+@api_router.get("/reports/trips/export/excel")
+async def export_trips_excel(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Export trips report to Excel"""
+    query = {"company_id": current_user["company_id"]}
+    if start_date:
+        query["scheduled_date"] = {"$gte": start_date}
+    if end_date:
+        query.setdefault("scheduled_date", {})["$lte"] = end_date
+    
+    trips = await db.trips.find(query, {"_id": 0}).sort("scheduled_date", -1).to_list(500)
+    
+    # Create Excel workbook
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Viajes"
+    
+    # Header style
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+    header_align = Alignment(horizontal="center", vertical="center")
+    thin_border = Border(
+        left=Side(style='thin'), right=Side(style='thin'),
+        top=Side(style='thin'), bottom=Side(style='thin')
+    )
+    
+    # Headers
+    headers = ["Fecha", "Tracto", "Carreta", "Chofer", "Cliente", "Carga", "Estado", "Km Inicio", "Km Fin", "Anticipo", "Gastos", "Saldo"]
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
+        cell.border = thin_border
+    
+    # Data
+    for row, trip in enumerate(trips, 2):
+        driver = await db.users.find_one({"id": trip.get("driver_id")}, {"_id": 0, "name": 1})
+        tracto = await db.vehicles.find_one({"id": trip.get("tracto_id")}, {"_id": 0, "plate": 1})
+        carreta = await db.vehicles.find_one({"id": trip.get("carreta_id")}, {"_id": 0, "plate": 1}) if trip.get("carreta_id") else None
+        
+        data = [
+            trip.get("scheduled_date", "")[:10] if trip.get("scheduled_date") else "",
+            tracto.get("plate") if tracto else "-",
+            carreta.get("plate") if carreta else "-",
+            driver.get("name") if driver else "-",
+            trip.get("client_name", "-"),
+            trip.get("cargo_description", "-"),
+            trip.get("status", "-"),
+            trip.get("km_start", 0),
+            trip.get("km_end", 0),
+            trip.get("total_advance", 0),
+            trip.get("total_expenses", 0),
+            (trip.get("total_advance", 0) or 0) - (trip.get("total_expenses", 0) or 0)
+        ]
+        for col, value in enumerate(data, 1):
+            cell = ws.cell(row=row, column=col, value=value)
+            cell.border = thin_border
+    
+    # Auto-adjust column widths
+    for col in range(1, len(headers) + 1):
+        ws.column_dimensions[openpyxl.utils.get_column_letter(col)].width = 15
+    
+    # Save to bytes
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=reporte_viajes.xlsx"}
+    )
+
+@api_router.get("/reports/settlements/export/pdf/{trip_id}")
+async def export_settlement_pdf(trip_id: str, current_user: dict = Depends(get_current_user)):
+    """Export settlement to PDF"""
+    trip = await db.trips.find_one({"id": trip_id, "company_id": current_user["company_id"]}, {"_id": 0})
+    if not trip:
+        raise HTTPException(status_code=404, detail="Viaje no encontrado")
+    
+    driver = await db.users.find_one({"id": trip.get("driver_id")}, {"_id": 0})
+    tracto = await db.vehicles.find_one({"id": trip.get("tracto_id")}, {"_id": 0})
+    advances = await db.trip_advances.find({"trip_id": trip_id}, {"_id": 0}).to_list(100)
+    expenses = await db.trip_expenses.find({"trip_id": trip_id}, {"_id": 0}).to_list(100)
+    
+    # Create PDF
+    output = BytesIO()
+    doc = SimpleDocTemplate(output, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
+    styles = getSampleStyleSheet()
+    elements = []
+    
+    # Title
+    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=18, alignment=1, spaceAfter=20)
+    elements.append(Paragraph("LIQUIDACIÓN DE VIAJE", title_style))
+    elements.append(Spacer(1, 12))
+    
+    # Trip info
+    info_data = [
+        ["Fecha:", trip.get("scheduled_date", "")[:10] if trip.get("scheduled_date") else "-"],
+        ["Chofer:", driver.get("name") if driver else "-"],
+        ["Vehículo:", tracto.get("plate") if tracto else "-"],
+        ["Cliente:", trip.get("client_name", "-")],
+        ["Carga:", trip.get("cargo_description", "-")],
+    ]
+    info_table = Table(info_data, colWidths=[100, 300])
+    info_table.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+    ]))
+    elements.append(info_table)
+    elements.append(Spacer(1, 20))
+    
+    # Advances table
+    elements.append(Paragraph("ANTICIPOS", styles['Heading2']))
+    if advances:
+        adv_data = [["Fecha", "Método", "Monto"]]
+        for adv in advances:
+            adv_data.append([
+                adv.get("delivered_date", "")[:10] if adv.get("delivered_date") else "-",
+                adv.get("payment_method", "-"),
+                f"S/ {adv.get('amount', 0):.2f}"
+            ])
+        adv_table = Table(adv_data, colWidths=[150, 150, 100])
+        adv_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ]))
+        elements.append(adv_table)
+    else:
+        elements.append(Paragraph("Sin anticipos registrados", styles['Normal']))
+    elements.append(Spacer(1, 20))
+    
+    # Expenses table
+    elements.append(Paragraph("GASTOS", styles['Heading2']))
+    if expenses:
+        exp_data = [["Categoría", "Descripción", "Proveedor", "Monto"]]
+        for exp in expenses:
+            exp_data.append([
+                exp.get("category", "-"),
+                exp.get("description", "-")[:30],
+                exp.get("provider", "-"),
+                f"S/ {exp.get('amount', 0):.2f}"
+            ])
+        exp_table = Table(exp_data, colWidths=[100, 150, 100, 80])
+        exp_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ]))
+        elements.append(exp_table)
+    else:
+        elements.append(Paragraph("Sin gastos registrados", styles['Normal']))
+    elements.append(Spacer(1, 20))
+    
+    # Summary
+    total_advances = sum(a.get("amount", 0) for a in advances)
+    total_expenses = sum(e.get("amount", 0) for e in expenses)
+    balance = total_advances - total_expenses
+    
+    summary_data = [
+        ["Total Anticipos:", f"S/ {total_advances:.2f}"],
+        ["Total Gastos:", f"S/ {total_expenses:.2f}"],
+        ["SALDO:", f"S/ {abs(balance):.2f} {'(A favor empresa)' if balance >= 0 else '(A favor chofer)'}"],
+    ]
+    summary_table = Table(summary_data, colWidths=[150, 200])
+    summary_table.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 11),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('BACKGROUND', (0, 2), (-1, 2), colors.lightgrey),
+    ]))
+    elements.append(summary_table)
+    elements.append(Spacer(1, 40))
+    
+    # Signatures
+    sig_data = [["", ""], ["_______________________", "_______________________"], ["Chofer", "Contabilidad"]]
+    sig_table = Table(sig_data, colWidths=[200, 200])
+    sig_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('TOPPADDING', (0, 1), (-1, 1), 40),
+    ]))
+    elements.append(sig_table)
+    
+    doc.build(elements)
+    output.seek(0)
+    
+    return StreamingResponse(
+        output,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=liquidacion_{trip_id[:8]}.pdf"}
+    )
+
+@api_router.get("/reports/fuel")
+async def get_fuel_report(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    vehicle_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get fuel consumption report"""
+    query = {"company_id": current_user["company_id"]}
+    if start_date:
+        query["load_date"] = {"$gte": start_date}
+    if end_date:
+        query.setdefault("load_date", {})["$lte"] = end_date
+    if vehicle_id:
+        query["vehicle_id"] = vehicle_id
+    
+    loads = await db.fuel_loads.find(query, {"_id": 0}).sort("load_date", -1).to_list(500)
+    
+    # Calculate totals and KPIs
+    total_liters = sum(l.get("liters", 0) for l in loads)
+    total_amount = sum(l.get("total_amount", 0) for l in loads)
+    
+    # Group by vehicle
+    by_vehicle = {}
+    for load in loads:
+        vid = load.get("vehicle_id", "unknown")
+        if vid not in by_vehicle:
+            by_vehicle[vid] = {"liters": 0, "amount": 0, "loads": 0}
+        by_vehicle[vid]["liters"] += load.get("liters", 0)
+        by_vehicle[vid]["amount"] += load.get("total_amount", 0)
+        by_vehicle[vid]["loads"] += 1
+    
+    return {
+        "loads": [serialize_doc(l) for l in loads],
+        "totals": {
+            "total_liters": total_liters,
+            "total_amount": total_amount,
+            "total_loads": len(loads),
+            "avg_price_per_liter": total_amount / total_liters if total_liters > 0 else 0
+        },
+        "by_vehicle": by_vehicle
+    }
+
+@api_router.get("/reports/maintenance")
+async def get_maintenance_report(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    vehicle_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get maintenance report"""
+    query = {"company_id": current_user["company_id"]}
+    if start_date:
+        query["created_at"] = {"$gte": start_date}
+    if end_date:
+        query.setdefault("created_at", {})["$lte"] = end_date
+    if vehicle_id:
+        query["vehicle_id"] = vehicle_id
+    
+    work_orders = await db.work_orders.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
+    
+    # Calculate totals
+    total_cost = sum(wo.get("total_cost", 0) for wo in work_orders)
+    by_status = {}
+    by_type = {}
+    
+    for wo in work_orders:
+        status = wo.get("status", "unknown")
+        by_status[status] = by_status.get(status, 0) + 1
+        
+        order_type = wo.get("order_type", "unknown")
+        by_type[order_type] = by_type.get(order_type, 0) + 1
+    
+    return {
+        "work_orders": [serialize_doc(wo) for wo in work_orders],
+        "totals": {
+            "count": len(work_orders),
+            "total_cost": total_cost
+        },
+        "by_status": by_status,
+        "by_type": by_type
+    }
+
+# ============== CONFIGURATION ENDPOINTS ==============
+@api_router.get("/config/document-types")
+async def get_document_types_config(current_user: dict = Depends(get_current_user)):
+    """Get document types configuration"""
+    doc_types = await db.document_types.find(
+        {"company_id": current_user["company_id"]},
+        {"_id": 0}
+    ).to_list(100)
+    return [serialize_doc(dt) for dt in doc_types]
+
+@api_router.post("/config/document-types")
+async def create_document_type_config(request: dict, current_user: dict = Depends(get_current_user)):
+    """Create new document type"""
+    if current_user["role"] not in ["owner", "admin"]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+    
+    doc_type = DocumentType(
+        company_id=current_user["company_id"],
+        name=request.get("name"),
+        applies_to=request.get("applies_to", "vehiculo"),
+        is_critical=request.get("is_critical", False),
+        requires_expiry=request.get("requires_expiry", True),
+        alert_days=request.get("alert_days", [60, 30, 15, 7, 3, 1]),
+        block_rule=BlockRule(request.get("block_rule", "solo_alerta"))
+    )
+    
+    doc = doc_type.model_dump()
+    doc["created_at"] = doc["created_at"].isoformat()
+    await db.document_types.insert_one(doc)
+    
+    return {"id": doc_type.id, "message": "Tipo de documento creado"}
+
+@api_router.put("/config/document-types/{doc_type_id}")
+async def update_document_type_config(doc_type_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+    """Update document type"""
+    if current_user["role"] not in ["owner", "admin"]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+    
+    update_data = {}
+    if "name" in request:
+        update_data["name"] = request["name"]
+    if "is_critical" in request:
+        update_data["is_critical"] = request["is_critical"]
+    if "requires_expiry" in request:
+        update_data["requires_expiry"] = request["requires_expiry"]
+    if "alert_days" in request:
+        update_data["alert_days"] = request["alert_days"]
+    if "block_rule" in request:
+        update_data["block_rule"] = request["block_rule"]
+    
+    await db.document_types.update_one(
+        {"id": doc_type_id, "company_id": current_user["company_id"]},
+        {"$set": update_data}
+    )
+    
+    return {"message": "Tipo de documento actualizado"}
+
+@api_router.delete("/config/document-types/{doc_type_id}")
+async def delete_document_type_config(doc_type_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete document type"""
+    if current_user["role"] not in ["owner", "admin"]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+    
+    # Check if any documents use this type
+    docs_count = await db.documents.count_documents({
+        "document_type_id": doc_type_id,
+        "company_id": current_user["company_id"]
+    })
+    
+    if docs_count > 0:
+        raise HTTPException(status_code=400, detail=f"No se puede eliminar: {docs_count} documentos usan este tipo")
+    
+    await db.document_types.delete_one({
+        "id": doc_type_id,
+        "company_id": current_user["company_id"]
+    })
+    
+    return {"message": "Tipo de documento eliminado"}
+
+@api_router.get("/config/checklist-templates")
+async def get_checklist_templates_config(current_user: dict = Depends(get_current_user)):
+    """Get checklist templates"""
+    templates = await db.checklist_templates.find(
+        {"company_id": current_user["company_id"]},
+        {"_id": 0}
+    ).to_list(100)
+    return [serialize_doc(t) for t in templates]
+
+@api_router.post("/config/checklist-templates")
+async def create_checklist_template_config(request: dict, current_user: dict = Depends(get_current_user)):
+    """Create checklist template"""
+    if current_user["role"] not in ["owner", "admin"]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+    
+    template = ChecklistTemplate(
+        company_id=current_user["company_id"],
+        name=request.get("name"),
+        vehicle_type=request.get("vehicle_type"),
+        items=request.get("items", []),
+        is_active=request.get("is_active", True),
+        created_by=current_user["id"]
+    )
+    
+    doc = template.model_dump()
+    doc["created_at"] = doc["created_at"].isoformat()
+    await db.checklist_templates.insert_one(doc)
+    
+    return {"id": template.id, "message": "Plantilla creada"}
+
+@api_router.put("/config/checklist-templates/{template_id}")
+async def update_checklist_template_config(template_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+    """Update checklist template"""
+    if current_user["role"] not in ["owner", "admin"]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+    
+    update_data = {}
+    if "name" in request:
+        update_data["name"] = request["name"]
+    if "vehicle_type" in request:
+        update_data["vehicle_type"] = request["vehicle_type"]
+    if "items" in request:
+        update_data["items"] = request["items"]
+    if "is_active" in request:
+        update_data["is_active"] = request["is_active"]
+    
+    await db.checklist_templates.update_one(
+        {"id": template_id, "company_id": current_user["company_id"]},
+        {"$set": update_data}
+    )
+    
+    return {"message": "Plantilla actualizada"}
+
+@api_router.get("/config/company")
+async def get_company_config(current_user: dict = Depends(get_current_user)):
+    """Get company configuration"""
+    company = await db.companies.find_one(
+        {"id": current_user["company_id"]},
+        {"_id": 0}
+    )
+    return serialize_doc(company)
+
+@api_router.put("/config/company")
+async def update_company_config(request: dict, current_user: dict = Depends(get_current_user)):
+    """Update company configuration"""
+    if current_user["role"] not in ["owner", "admin"]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+    
+    update_data = {}
+    if "name" in request:
+        update_data["name"] = request["name"]
+    if "address" in request:
+        update_data["address"] = request["address"]
+    if "phone" in request:
+        update_data["phone"] = request["phone"]
+    if "email" in request:
+        update_data["email"] = request["email"]
+    if "config" in request:
+        update_data["config"] = request["config"]
+    
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    await db.companies.update_one(
+        {"id": current_user["company_id"]},
+        {"$set": update_data}
+    )
+    
+    return {"message": "Configuración actualizada"}
+
 # Include router
 app.include_router(api_router)
 
