@@ -1,174 +1,224 @@
 # TransportePeru SaaS - PRD (Product Requirements Document)
 
-## Fecha de Inicio: Enero 2026
+## 1. Visión del Producto
 
----
+**TransportePeru SaaS** es un sistema de gestión integral para empresas de transporte de carga terrestre en Perú. El sistema es multi-tenant, permitiendo que múltiples empresas de transporte utilicen la misma plataforma de manera aislada.
 
-## 1. Problema Original
+## 2. Stack Tecnológico
 
-SaaS completo de Gestión de Transportes y Flota para Perú (carga pesada), inspirado en funcionalidades tipo CloudFleet pero con UI/branding/código 100% original.
-
-### Stack Técnico
-- **Backend**: FastAPI + MongoDB (adaptado del requisito original Django/PostgreSQL)
-- **Frontend**: React + Tailwind + shadcn/ui
+- **Backend**: FastAPI + Python 3.x
+- **Base de Datos**: MongoDB (motor async)
+- **Frontend**: React 18 + TailwindCSS + shadcn/ui
 - **Autenticación**: JWT con refresh tokens
-- **Almacenamiento**: Local (S3 opcional)
+- **Hosting**: Emergent Platform
 
-### Decisiones del Usuario
-1. MongoDB + FastAPI (entorno actual) ✓
-2. Almacenamiento local ✓
-3. Jobs síncronos para MVP ✓
-4. JWT con refresh tokens ✓
-5. Orden de implementación propuesto ✓
+## 3. Arquitectura Multi-Tenant
 
----
+Cada empresa tiene su propio `company_id` que se utiliza para aislar todos los datos. Los usuarios pertenecen a una empresa y solo pueden ver/modificar datos de su empresa.
 
-## 2. User Personas
+## 4. Roles y Permisos (RBAC)
 
-| Rol | Descripción | Acceso Principal |
-|-----|-------------|------------------|
-| **Owner/Admin** | Gerencia, acceso total | Todo el sistema |
-| **Operaciones** | Coordinadores de viajes | Viajes, monitoreo, asignación |
-| **Flota** | Gestión de vehículos | Vehículos, documentos, llantas |
-| **Mantenimiento** | Técnicos y mecánicos | OT, llantas, inspecciones |
-| **Almacén** | Control de inventario | Stock, compras |
-| **Contabilidad** | Finanzas | Anticipos, liquidaciones |
-| **Chofer** | Conductores (PWA) | Viajes asignados, checklist, gastos |
+| Rol | Descripción | Permisos |
+|-----|-------------|----------|
+| owner | Dueño de la empresa | Acceso total |
+| admin | Administrador | Acceso total excepto facturación |
+| operaciones | Jefe de operaciones | Viajes, combustible, incidentes |
+| flota | Encargado de flota | Vehículos, documentos, llantas |
+| mantenimiento | Jefe de taller | Mantenimiento, llantas |
+| almacen | Encargado de almacén | Inventario |
+| contabilidad | Contador | Viáticos, reportes |
+| chofer | Conductor | App móvil (checklist, gastos, incidentes) |
 
----
+## 5. Módulos Implementados
 
-## 3. Requisitos Core (Implementados)
+### 5.1 Autenticación (✅ Completo)
+- Login dual: Admin (email/password) + Chofer (DNI/PIN)
+- JWT con refresh tokens
+- Bloqueo de cuenta tras 5 intentos fallidos
+- Force password change
 
-### 3.1 Autenticación y RBAC ✅
-- Login Admin: email + password
-- Login Chofer: DNI (8 dígitos) + PIN (6 dígitos)
-- Lockout: 5 intentos fallidos = bloqueo 15 min
-- JWT con access_token + refresh_token
-- Permisos por rol en cada endpoint
-
-### 3.2 Gestión de Vehículos ✅
+### 5.2 Vehículos (✅ Completo)
 - Tipos: Tracto y Carreta
-- CRUD completo con validaciones
-- Estados: disponible, en_viaje, en_mantenimiento, fuera_servicio
-- Historial de enganche (tracto + carreta)
-- Configuración de llantas por tipo
+- Estados: Disponible, En Viaje, En Mantenimiento, Fuera de Servicio
+- Configuración de llantas por vehículo
+- Historial de acoplamiento tracto-carreta
 
-### 3.3 Documentos y Vencimientos ✅
-- Tipos de documento configurables
-- Matriz visual (Excel-like) por vehículo/chofer
-- Estados: vigente, por_vencer, vencido, pendiente
-- Reglas de bloqueo configurables
-- Alertas por días configurables (60/30/15/7/3/1)
+### 5.3 Documentos (✅ Completo)
+- Tipos de documento configurables (SOAT, Revisión Técnica, etc.)
+- Alertas automáticas de vencimiento
+- Reglas de bloqueo operativo
+- Matriz de documentos con estados
 
-### 3.4 Viajes ✅
-- Programación y asignación
-- Estados: programado, en_curso, completado, cancelado
-- Validación de bloqueos al asignar
-- Registro de km inicio/fin
+### 5.4 Viajes (✅ Completo)
+- Programación de viajes
+- Asignación de tracto, carreta y chofer
+- Validación de bloqueos operativos
+- Estados: Programado, En Curso, Completado, Cancelado
 
-### 3.5 Esquema de Llantas ✅
-- Representación gráfica del vehículo
-- Configuraciones: Tracto 6 llantas, Carreta 6 llantas
-- Montaje/desmontaje con registro
-- Inspecciones con profundidades y presión
-- Alertas por desgaste y profundidad crítica
+### 5.5 Combustible (✅ Completo)
+- Gestión de vales de combustible
+- Registro de cargas con odómetro
+- KPIs de rendimiento (km/galón)
+- Conciliación de vales
 
----
+### 5.6 Llantas (✅ Completo)
+- Inventario de llantas con serial DOT
+- Montaje/desmontaje con registro de km
+- Inspecciones con profundidad y presión
+- Historial de vida (VN, R1, R2)
+- Esquema visual por vehículo
 
-## 4. Lo Implementado (MVP Fase 1)
+### 5.7 Mantenimiento (✅ Completo)
+- Planes de mantenimiento preventivo
+- Órdenes de trabajo (correctivo/preventivo)
+- Consumo de inventario desde OTs
+- Registro de downtime
 
-### Backend (FastAPI)
-- [x] Modelos: Company, User, Vehicle, Document, Trip, Tire, etc.
-- [x] Auth: login dual (admin/chofer), JWT refresh
-- [x] CRUD completo para todas las entidades principales
-- [x] Endpoints especiales: matrix documentos, dashboard KPIs
-- [x] Seed data para demo
+### 5.8 Inventario (✅ Completo)
+- Kardex de repuestos y consumibles
+- Stock mínimo/máximo con alertas
+- Movimientos (entrada, salida, ajuste, consumo OT)
+- Gestión de proveedores
 
-### Frontend (React)
-- [x] Login page con tabs Admin/Chofer
-- [x] Dashboard con KPIs y widgets
-- [x] Página de vehículos con filtros y CRUD
-- [x] Matriz de documentos tipo Excel
-- [x] Esquema gráfico de llantas interactivo
-- [x] Gestión de viajes
-- [x] Gestión de usuarios
-- [x] Layout responsive con sidebar colapsable
+### 5.9 Incidentes (✅ Completo)
+- Tipos: Incidente, Multa, Siniestro
+- Severidad: Baja, Media, Alta, Crítica
+- Generación automática desde checklist crítico
+- Vinculación con OTs para resolución
 
-### Diseño
-- Estética "Logistics Command Center"
-- Colores: Slate-900 (sidebar), Orange-500 (accent)
-- Tipografía: Barlow Condensed (headings), Inter (body)
-- Sin gradientes, estilo industrial/profesional
+### 5.10 Viáticos y Liquidación (✅ Completo)
+- Anticipos de viaje
+- Registro de gastos por categoría (alimentación, hospedaje, peajes, etc.)
+- Cálculo automático de saldo
+- Flujo de liquidación (pendiente → en revisión → cerrado)
 
----
+### 5.11 Checklist del Chofer (✅ Completo)
+- Wizard de 5 pasos: Información, Inspección, Llantas, Fotos, Firma
+- Checklist configurable por tipo de vehículo
+- Captura de geolocalización
+- Bloqueo de viaje si hay items críticos
+- Generación automática de incidencias
 
-## 5. Backlog Priorizado
+### 5.12 Dashboard (✅ Completo)
+- KPIs principales: Vehículos disponibles, Viajes activos, Alertas
+- Matriz de documentos resumida
+- Disponibilidad de flota
+- Órdenes de trabajo pendientes
 
-### P0 - Crítico (Próxima iteración)
-- [ ] Checklist pre-viaje del chofer
-- [ ] Anticipos y rendición de gastos
-- [ ] Combustible: vales y cargas
-- [ ] PWA para choferes
+## 6. API Endpoints Principales
 
-### P1 - Alta Prioridad
-- [ ] Órdenes de trabajo (mantenimiento)
-- [ ] Alertas automáticas (job diario)
-- [ ] Bloqueos operacionales automáticos
-- [ ] Rotación y alineación de llantas
-- [ ] Exportación PDF/Excel
+### Autenticación
+- `POST /api/auth/login` - Login admin/chofer
+- `POST /api/auth/refresh` - Refresh token
+- `GET /api/auth/me` - Usuario actual
 
-### P2 - Media Prioridad
-- [ ] Inventario y kardex
-- [ ] Órdenes de compra
-- [ ] Incidentes/multas/siniestros
-- [ ] Reportes avanzados con KPIs
-- [ ] Dashboard de rentabilidad
+### Recursos Core
+- `/api/vehicles` - CRUD vehículos
+- `/api/documents` - CRUD documentos
+- `/api/trips` - CRUD viajes
+- `/api/users` - CRUD usuarios
 
-### P3 - Baja Prioridad
-- [ ] Integración GPS
-- [ ] Notificaciones push
-- [ ] App móvil nativa
-- [ ] Multi-idioma
+### Módulos Especializados
+- `/api/fuel/vouchers` - Vales de combustible
+- `/api/fuel/loads` - Cargas de combustible
+- `/api/tires` - Inventario de llantas
+- `/api/tires/mount`, `/api/tires/unmount` - Montaje/desmontaje
+- `/api/maintenance/work-orders` - Órdenes de trabajo
+- `/api/inventory/items` - Items de inventario
+- `/api/issues` - Incidentes
 
----
+### Viáticos
+- `/api/trips/{id}/advances` - Anticipos
+- `/api/trips/{id}/expenses` - Gastos
+- `/api/settlements` - Liquidaciones
+- `/api/settlements/{id}/close` - Cerrar liquidación
 
-## 6. Credenciales Demo
+### Checklist
+- `/api/checklist-templates` - Plantillas
+- `/api/trip/{id}/checklist` - Enviar checklist
+
+## 7. Credenciales de Prueba
+
+- **Admin**: admin@transperu.com / admin123
+- **Chofer**: DNI 12345678 / PIN 123456
+
+## 8. URLs del Sistema
+
+- **Frontend**: https://flota-peru.preview.emergentagent.com
+- **API**: https://flota-peru.preview.emergentagent.com/api
+
+## 9. Estructura de Archivos
 
 ```
-Admin:
-  Email: admin@transperu.com
-  Password: admin123
-
-Chofer:
-  DNI: 12345678
-  PIN: 123456
+/app/
+├── backend/
+│   ├── server.py          # API principal (FastAPI)
+│   ├── requirements.txt   # Dependencias Python
+│   ├── .env              # Variables de entorno
+│   ├── models/           # Modelos Pydantic (por refactorizar)
+│   ├── routers/          # Routers modulares (por refactorizar)
+│   └── utils/            # Utilidades
+├── frontend/
+│   ├── src/
+│   │   ├── pages/        # Páginas React
+│   │   ├── components/   # Componentes UI (shadcn)
+│   │   ├── context/      # AuthContext
+│   │   ├── layouts/      # MainLayout
+│   │   └── services/     # API client
+│   └── package.json
+├── memory/
+│   └── PRD.md           # Este documento
+└── test_reports/
+    └── iteration_*.json  # Reportes de pruebas
 ```
 
----
+## 10. Changelog
 
-## 7. Próximos Pasos
+### 2025-02-16 (Sesión Actual)
+- ✅ Implementado módulo completo de Viáticos y Liquidación
+- ✅ Implementado Checklist del Chofer con wizard de 5 pasos
+- ✅ Creada página de gestión de Llantas (TiresPage)
+- ✅ Creada página de Incidentes (IssuesPage)
+- ✅ Actualizado menú de navegación con todos los módulos
+- ✅ Corregidos bugs de doble prefijo /api en llamadas a API
+- ✅ Agregado endpoint POST /api/trip/{id}/checklist
 
-1. **Implementar Checklist del Chofer**
-   - Plantilla configurable por tipo de vehículo
-   - Campos: sí/no, texto, fotos, firma
-   - Resultado: OK/OBSERVADO/CRÍTICO
-   - Bloqueo de inicio si crítico
+### Anteriores
+- Fase 1 MVP completada: Auth, Dashboard, Vehículos, Documentos, Viajes
+- Expandido backend con todos los modelos y endpoints
+- Creadas páginas de Combustible, Mantenimiento, Inventario
 
-2. **Sistema de Viáticos**
-   - Registro de anticipos
-   - Gastos con foto de comprobante
-   - Liquidación y cierre
+## 11. Tareas Pendientes (Backlog)
 
-3. **Módulo de Combustible**
-   - Vales con límite y vigencia
-   - Registro de cargas
-   - Conciliación vale vs carga real
+### P1 - Próximas
+- [ ] **Refactorización del Backend**: Dividir server.py (3700+ líneas) en routers modulares
+- [ ] **Página de Reportes**: Implementar exportación PDF/Excel
+- [ ] **Página de Configuración**: Gestión de tipos de documento, plantillas de checklist
 
-4. **PWA para Chofer**
-   - Interfaz simplificada
-   - Acceso offline básico
-   - Cámara para fotos
+### P2 - Futuras
+- [ ] **PWA del Chofer**: Implementar service worker para capacidad offline
+- [ ] **Integración S3**: Para almacenamiento de fotos y documentos
+- [ ] **Notificaciones Push**: Alertas en tiempo real
+- [ ] **Integración GPS**: Tracking de vehículos en tiempo real
 
----
+### P3 - Mejoras
+- [ ] Dashboard personalizado por rol
+- [ ] Gráficos avanzados con tendencias
+- [ ] Sistema de comentarios en incidentes
+- [ ] Historial de auditoría visible
 
-*Documento actualizado: Enero 2026*
+## 12. Notas Técnicas
+
+### MongoDB
+- Todas las respuestas excluyen `_id` para evitar errores de serialización
+- Los ObjectId se convierten a string antes de retornar
+
+### Autenticación
+- Access token expira en 30 minutos
+- Refresh token expira en 7 días
+- Los tokens se almacenan en localStorage
+
+### Frontend
+- Hot reload habilitado (no requiere restart manual)
+- Componentes shadcn/ui en `/app/frontend/src/components/ui/`
+- Estilos personalizados en App.css con variables CSS
