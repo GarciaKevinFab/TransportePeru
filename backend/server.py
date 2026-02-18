@@ -2592,6 +2592,106 @@ async def submit_checklist(checklist_id: str, request: dict, current_user: dict 
         "observed_items": observed_items
     }
 
+@api_router.post("/trip/{trip_id}/checklist")
+async def submit_trip_checklist(trip_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+    """Submit a complete checklist for a trip (combines start and submit)"""
+    # Get trip
+    trip = await db.trips.find_one({"id": trip_id, "company_id": current_user["company_id"]})
+    if not trip:
+        raise HTTPException(status_code=404, detail="Viaje no encontrado")
+    
+    # Check if checklist already exists and is completed
+    existing = await db.checklist_runs.find_one({"trip_id": trip_id})
+    if existing and existing.get("result") not in [None, "pending"]:
+        raise HTTPException(status_code=400, detail="Ya existe un checklist completado para este viaje")
+    
+    # Get or create checklist
+    if existing:
+        checklist_id = existing["id"]
+    else:
+        # Get default template
+        template = await db.checklist_templates.find_one({
+            "company_id": current_user["company_id"],
+            "is_active": True
+        })
+        template_id = template["id"] if template else "default"
+        
+        checklist = ChecklistRun(
+            company_id=current_user["company_id"],
+            template_id=template_id,
+            trip_id=trip_id,
+            tracto_id=trip["tracto_id"],
+            carreta_id=trip.get("carreta_id"),
+            driver_id=current_user["id"],
+            location=request.get("location"),
+            created_by=current_user["id"]
+        )
+        
+        doc = checklist.model_dump()
+        doc["started_at"] = doc["started_at"].isoformat()
+        await db.checklist_runs.insert_one(doc)
+        checklist_id = checklist.id
+    
+    # Process responses
+    responses = request.get("responses", [])
+    tire_checks = request.get("tire_checks", [])
+    result = request.get("result", "ok")
+    
+    # Count critical and observed items
+    critical_items = [r for r in responses if r.get("is_critical") and r.get("status") == "critico"]
+    observed_items = [r for r in responses if r.get("status") in ["observado", "critico"]]
+    
+    # Update checklist
+    await db.checklist_runs.update_one(
+        {"id": checklist_id},
+        {"$set": {
+            "responses": responses,
+            "tire_checks": tire_checks,
+            "signature_url": request.get("signature_url"),
+            "km_start": request.get("km_start"),
+            "notes": request.get("notes"),
+            "result": result,
+            "completed_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    # Update trip
+    await db.trips.update_one(
+        {"id": trip_id},
+        {"$set": {
+            "checklist_id": checklist_id,
+            "checklist_result": result,
+            "km_start": request.get("km_start"),
+            "status": "programado" if result != "critico" else "checklist_pendiente"
+        }}
+    )
+    
+    # If critical, create an issue
+    if result == "critico":
+        issue = Issue(
+            company_id=current_user["company_id"],
+            trip_id=trip_id,
+            vehicle_id=trip["tracto_id"],
+            driver_id=trip["driver_id"],
+            checklist_id=checklist_id,
+            issue_type="checklist_critico",
+            severity="alta",
+            description=f"Checklist crítico: {len(critical_items)} items críticos detectados",
+            created_by=current_user["id"]
+        )
+        issue_doc = issue.model_dump()
+        for k, v in issue_doc.items():
+            if isinstance(v, datetime):
+                issue_doc[k] = v.isoformat()
+        await db.issues.insert_one(issue_doc)
+    
+    return {
+        "message": "Checklist enviado",
+        "result": result,
+        "critical_items": len(critical_items),
+        "observed_items": len(observed_items)
+    }
+
 # ============== SETTLEMENT ROUTES ==============
 @api_router.get("/settlements")
 async def get_settlements(
