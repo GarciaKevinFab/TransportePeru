@@ -19,6 +19,7 @@ import SettlementsPage from './pages/SettlementsPage';
 import ChecklistWizardPage from './pages/ChecklistWizardPage';
 import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
+import OfflineIndicator from './components/OfflineIndicator';
 import './App.css';
 
 // Protected Route Component
@@ -281,6 +282,7 @@ function App() {
       <AuthProvider>
         <AppRoutes />
         <Toaster position="top-right" richColors />
+        <OfflineIndicator />
       </AuthProvider>
     </BrowserRouter>
   );
