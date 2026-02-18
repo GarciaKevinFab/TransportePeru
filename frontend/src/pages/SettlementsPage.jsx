@@ -210,7 +210,12 @@ const SettlementsPage = () => {
     
     setSaving(true);
     try {
-      await api.post(`/api/settlements/${selectedTrip.id}/close`, {});
+      // First create/update the settlement to get the settlement_id
+      const settlementRes = await api.post(`/trips/${selectedTrip.id}/settlement`, {});
+      const settlementId = settlementRes.data.id;
+      
+      // Then close the settlement
+      await api.post(`/settlements/${settlementId}/close`, {});
       toast.success('Liquidación cerrada');
       setShowDetailDialog(false);
       fetchData();
