@@ -19,6 +19,7 @@ import {
   X,
   Bell,
   ChevronDown,
+  Receipt,
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import {
@@ -36,6 +37,7 @@ const menuItems = [
   { path: '/vehicles', icon: Truck, label: 'Vehículos', roles: ['owner', 'admin', 'operaciones', 'flota', 'mantenimiento'] },
   { path: '/documents', icon: FileText, label: 'Documentos', roles: ['owner', 'admin', 'flota'] },
   { path: '/trips', icon: Route, label: 'Viajes', roles: ['owner', 'admin', 'operaciones', 'contabilidad', 'chofer'] },
+  { path: '/settlements', icon: Receipt, label: 'Viáticos', roles: ['owner', 'admin', 'contabilidad', 'operaciones'] },
   { path: '/fuel', icon: Fuel, label: 'Combustible', roles: ['owner', 'admin', 'operaciones', 'chofer'] },
   { path: '/tires', icon: CircleDot, label: 'Llantas', roles: ['owner', 'admin', 'flota', 'mantenimiento'] },
   { path: '/maintenance', icon: Wrench, label: 'Mantenimiento', roles: ['owner', 'admin', 'mantenimiento'] },
