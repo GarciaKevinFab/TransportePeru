@@ -1,0 +1,37 @@
+{
+  "name": "TransportePeru",
+  "short_name": "TransPeru",
+  "description": "Sistema de Gestión de Flota y Transporte",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#f97316",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/logo192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "url": "/dashboard",
+      "description": "Ver dashboard"
+    },
+    {
+      "name": "Viajes",
+      "url": "/trips",
+      "description": "Ver viajes"
+    }
+  ]
+}
