@@ -643,12 +643,12 @@ const SettingsPage = () => {
               </div>
               <div className="space-y-2">
                 <Label className="input-label">Tipo de Vehículo</Label>
-                <Select value={templateForm.vehicle_type} onValueChange={(v) => setTemplateForm({ ...templateForm, vehicle_type: v })}>
+                <Select value={templateForm.vehicle_type || "all"} onValueChange={(v) => setTemplateForm({ ...templateForm, vehicle_type: v === "all" ? "" : v })}>
                   <SelectTrigger className="rounded-sm">
                     <SelectValue placeholder="Todos" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todos</SelectItem>
+                    <SelectItem value="all">Todos</SelectItem>
                     <SelectItem value="tracto">Tracto</SelectItem>
                     <SelectItem value="carreta">Carreta</SelectItem>
                   </SelectContent>
