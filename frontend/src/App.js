@@ -230,12 +230,26 @@ function AppRoutes() {
         }
       />
       
-      {/* Driver Routes */}
+      {/* Driver Mobile App Routes */}
       <Route
-        path="/driver/trips"
+        path="/driver/login"
+        element={<DriverLoginPage />}
+      />
+      
+      <Route
+        path="/driver"
         element={
           <ProtectedRoute allowedRoles={['chofer']}>
-            <PlaceholderPage title="Mis Viajes" />
+            <MobileLayout><DriverHomePage /></MobileLayout>
+          </ProtectedRoute>
+        }
+      />
+      
+      <Route
+        path="/driver/trip"
+        element={
+          <ProtectedRoute allowedRoles={['chofer']}>
+            <MobileLayout><DriverTripPage /></MobileLayout>
           </ProtectedRoute>
         }
       />
@@ -244,7 +258,7 @@ function AppRoutes() {
         path="/driver/checklist"
         element={
           <ProtectedRoute allowedRoles={['chofer']}>
-            <PlaceholderPage title="Checklist" />
+            <MobileLayout><ChecklistWizardPage /></MobileLayout>
           </ProtectedRoute>
         }
       />
@@ -253,16 +267,7 @@ function AppRoutes() {
         path="/driver/fuel"
         element={
           <ProtectedRoute allowedRoles={['chofer']}>
-            <PlaceholderPage title="Combustible" />
-          </ProtectedRoute>
-        }
-      />
-      
-      <Route
-        path="/driver/expenses"
-        element={
-          <ProtectedRoute allowedRoles={['chofer']}>
-            <PlaceholderPage title="Gastos" />
+            <MobileLayout><DriverFuelPage /></MobileLayout>
           </ProtectedRoute>
         }
       />
@@ -271,7 +276,7 @@ function AppRoutes() {
         path="/driver/issues"
         element={
           <ProtectedRoute allowedRoles={['chofer']}>
-            <PlaceholderPage title="Reportar Incidente" />
+            <MobileLayout><DriverIssuesPage /></MobileLayout>
           </ProtectedRoute>
         }
       />
