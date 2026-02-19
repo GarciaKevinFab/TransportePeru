@@ -1961,6 +1961,81 @@ async def create_fuel_load(request: dict, current_user: dict = Depends(get_curre
     
     return {"id": load.id, "message": "Cargue registrado"}
 
+@api_router.put("/fuel/vouchers/{voucher_id}")
+async def update_fuel_voucher(voucher_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+    """Update a fuel voucher - Admin only"""
+    if current_user["role"] not in ["owner", "admin"]:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden editar vales")
+    
+    voucher = await db.fuel_vouchers.find_one({"id": voucher_id, "company_id": current_user["company_id"]})
+    if not voucher:
+        raise HTTPException(status_code=404, detail="Vale no encontrado")
+    
+    update_data = {}
+    allowed_fields = ["voucher_number", "provider", "limit_amount", "limit_liters", "valid_from", "valid_until", "is_used", "photo_url"]
+    for field in allowed_fields:
+        if field in request:
+            if field in ["valid_from", "valid_until"] and isinstance(request[field], str):
+                update_data[field] = request[field]
+            else:
+                update_data[field] = request[field]
+    
+    if update_data:
+        await db.fuel_vouchers.update_one({"id": voucher_id}, {"$set": update_data})
+    
+    return {"message": "Vale actualizado"}
+
+@api_router.delete("/fuel/vouchers/{voucher_id}")
+async def delete_fuel_voucher(voucher_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a fuel voucher - Admin only"""
+    if current_user["role"] not in ["owner", "admin"]:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden eliminar vales")
+    
+    result = await db.fuel_vouchers.delete_one({"id": voucher_id, "company_id": current_user["company_id"]})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Vale no encontrado")
+    
+    return {"message": "Vale eliminado"}
+
+@api_router.put("/fuel/loads/{load_id}")
+async def update_fuel_load(load_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+    """Update a fuel load - Admin only"""
+    if current_user["role"] not in ["owner", "admin"]:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden editar cargas")
+    
+    load = await db.fuel_loads.find_one({"id": load_id, "company_id": current_user["company_id"]})
+    if not load:
+        raise HTTPException(status_code=404, detail="Carga no encontrada")
+    
+    update_data = {}
+    allowed_fields = ["liters", "price_per_liter", "odometer", "provider", "receipt_url", "photo_url"]
+    for field in allowed_fields:
+        if field in request:
+            update_data[field] = request[field]
+    
+    # Recalculate total if liters or price changed
+    if "liters" in update_data or "price_per_liter" in update_data:
+        liters = update_data.get("liters", load.get("liters", 0))
+        price = update_data.get("price_per_liter", load.get("price_per_liter", 0))
+        update_data["total_amount"] = liters * price
+    
+    if update_data:
+        await db.fuel_loads.update_one({"id": load_id}, {"$set": update_data})
+    
+    return {"message": "Carga actualizada"}
+
+@api_router.delete("/fuel/loads/{load_id}")
+async def delete_fuel_load(load_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a fuel load - Admin only"""
+    if current_user["role"] not in ["owner", "admin"]:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden eliminar cargas")
+    
+    result = await db.fuel_loads.delete_one({"id": load_id, "company_id": current_user["company_id"]})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Carga no encontrada")
+    
+    return {"message": "Carga eliminada"}
+
 # ============== TIRE ROUTES ==============
 @api_router.get("/tires")
 async def get_tires(
