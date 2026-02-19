@@ -3646,6 +3646,25 @@ async def get_recent_activity(current_user: dict = Depends(get_current_user)):
     }
 
 # ============== FILE UPLOAD ROUTE ==============
+import boto3
+from botocore.exceptions import ClientError
+import base64
+
+def get_s3_client():
+    """Get S3 client if credentials are configured"""
+    access_key = os.environ.get('AWS_ACCESS_KEY_ID', '')
+    secret_key = os.environ.get('AWS_SECRET_ACCESS_KEY', '')
+    region = os.environ.get('AWS_REGION', 'us-east-1')
+    
+    if access_key and secret_key:
+        return boto3.client(
+            's3',
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key,
+            region_name=region
+        )
+    return None
+
 @api_router.post("/upload")
 async def upload_file(
     file: UploadFile = File(...),
@@ -3653,23 +3672,327 @@ async def upload_file(
     entity_id: str = Form(...),
     current_user: dict = Depends(get_current_user)
 ):
-    # Create directory structure
-    entity_dir = UPLOAD_DIR / entity_type / entity_id
-    entity_dir.mkdir(parents=True, exist_ok=True)
-    
+    """Upload file to S3 or local storage"""
     # Generate unique filename
     ext = Path(file.filename).suffix
     filename = f"{uuid.uuid4()}{ext}"
+    file_key = f"{entity_type}/{entity_id}/{filename}"
+    
+    # Read file content
+    file_content = await file.read()
+    
+    # Try S3 first
+    s3_client = get_s3_client()
+    bucket_name = os.environ.get('S3_BUCKET_NAME', '')
+    
+    if s3_client and bucket_name:
+        try:
+            s3_client.put_object(
+                Bucket=bucket_name,
+                Key=file_key,
+                Body=file_content,
+                ContentType=file.content_type
+            )
+            # Generate presigned URL for access
+            url = s3_client.generate_presigned_url(
+                'get_object',
+                Params={'Bucket': bucket_name, 'Key': file_key},
+                ExpiresIn=86400 * 7  # 7 days
+            )
+            return {"url": url, "filename": filename, "storage": "s3", "key": file_key}
+        except ClientError as e:
+            logging.error(f"S3 upload error: {e}")
+    
+    # Fall back to local storage
+    entity_dir = UPLOAD_DIR / entity_type / entity_id
+    entity_dir.mkdir(parents=True, exist_ok=True)
     file_path = entity_dir / filename
     
-    # Save file
     with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+        buffer.write(file_content)
     
-    # Return relative URL
     relative_url = f"/uploads/{entity_type}/{entity_id}/{filename}"
+    return {"url": relative_url, "filename": filename, "storage": "local"}
+
+@api_router.post("/upload/base64")
+async def upload_base64(request: dict, current_user: dict = Depends(get_current_user)):
+    """Upload base64 encoded image (for camera captures)"""
+    data = request.get("data", "")
+    entity_type = request.get("entity_type", "general")
+    entity_id = request.get("entity_id", "general")
     
-    return {"url": relative_url, "filename": filename}
+    # Parse base64 data
+    if "base64," in data:
+        data = data.split("base64,")[1]
+    
+    try:
+        file_content = base64.b64decode(data)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid base64 data")
+    
+    filename = f"{uuid.uuid4()}.jpg"
+    file_key = f"{entity_type}/{entity_id}/{filename}"
+    
+    # Try S3 first
+    s3_client = get_s3_client()
+    bucket_name = os.environ.get('S3_BUCKET_NAME', '')
+    
+    if s3_client and bucket_name:
+        try:
+            s3_client.put_object(
+                Bucket=bucket_name,
+                Key=file_key,
+                Body=file_content,
+                ContentType="image/jpeg"
+            )
+            url = s3_client.generate_presigned_url(
+                'get_object',
+                Params={'Bucket': bucket_name, 'Key': file_key},
+                ExpiresIn=86400 * 7
+            )
+            return {"url": url, "filename": filename, "storage": "s3"}
+        except ClientError as e:
+            logging.error(f"S3 upload error: {e}")
+    
+    # Fall back to local storage
+    entity_dir = UPLOAD_DIR / entity_type / entity_id
+    entity_dir.mkdir(parents=True, exist_ok=True)
+    file_path = entity_dir / filename
+    
+    with open(file_path, "wb") as buffer:
+        buffer.write(file_content)
+    
+    relative_url = f"/uploads/{entity_type}/{entity_id}/{filename}"
+    return {"url": relative_url, "filename": filename, "storage": "local"}
+
+# ============== PUSH NOTIFICATIONS ==============
+@api_router.post("/notifications/subscribe")
+async def subscribe_push(request: dict, current_user: dict = Depends(get_current_user)):
+    """Subscribe to push notifications"""
+    subscription = request.get("subscription", {})
+    
+    # Store subscription in user document
+    await db.users.update_one(
+        {"id": current_user["id"]},
+        {"$set": {"push_subscription": subscription}}
+    )
+    
+    return {"message": "Subscripción registrada"}
+
+@api_router.delete("/notifications/unsubscribe")
+async def unsubscribe_push(current_user: dict = Depends(get_current_user)):
+    """Unsubscribe from push notifications"""
+    await db.users.update_one(
+        {"id": current_user["id"]},
+        {"$unset": {"push_subscription": ""}}
+    )
+    
+    return {"message": "Subscripción eliminada"}
+
+@api_router.get("/notifications")
+async def get_notifications(
+    unread_only: bool = False,
+    limit: int = 50,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get user notifications"""
+    query = {"company_id": current_user["company_id"]}
+    
+    # Role-based filtering
+    if current_user["role"] == "chofer":
+        query["$or"] = [
+            {"user_id": current_user["id"]},
+            {"target_role": "chofer"},
+            {"target_role": "all"}
+        ]
+    
+    if unread_only:
+        query["is_read"] = False
+    
+    notifications = await db.notifications.find(query, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+    return [serialize_doc(n) for n in notifications]
+
+@api_router.post("/notifications")
+async def create_notification(request: dict, current_user: dict = Depends(get_current_user)):
+    """Create a notification (admin only)"""
+    if current_user["role"] not in ["owner", "admin"]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+    
+    notification = {
+        "id": str(uuid.uuid4()),
+        "company_id": current_user["company_id"],
+        "title": request.get("title", ""),
+        "message": request.get("message", ""),
+        "type": request.get("type", "info"),  # info, warning, alert, success
+        "target_role": request.get("target_role", "all"),  # all, chofer, admin, etc.
+        "user_id": request.get("user_id"),  # specific user
+        "entity_type": request.get("entity_type"),
+        "entity_id": request.get("entity_id"),
+        "is_read": False,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_by": current_user["id"]
+    }
+    
+    await db.notifications.insert_one(notification)
+    
+    # Send push notification to subscribed users
+    await send_push_notifications(
+        current_user["company_id"],
+        notification["title"],
+        notification["message"],
+        notification.get("target_role"),
+        notification.get("user_id")
+    )
+    
+    return {"id": notification["id"], "message": "Notificación creada"}
+
+@api_router.put("/notifications/{notification_id}/read")
+async def mark_notification_read(notification_id: str, current_user: dict = Depends(get_current_user)):
+    """Mark notification as read"""
+    await db.notifications.update_one(
+        {"id": notification_id},
+        {"$set": {"is_read": True, "read_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    return {"message": "Notificación marcada como leída"}
+
+@api_router.put("/notifications/read-all")
+async def mark_all_notifications_read(current_user: dict = Depends(get_current_user)):
+    """Mark all notifications as read"""
+    query = {"company_id": current_user["company_id"], "is_read": False}
+    if current_user["role"] == "chofer":
+        query["$or"] = [
+            {"user_id": current_user["id"]},
+            {"target_role": "chofer"},
+            {"target_role": "all"}
+        ]
+    
+    await db.notifications.update_many(
+        query,
+        {"$set": {"is_read": True, "read_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    return {"message": "Todas las notificaciones marcadas como leídas"}
+
+async def send_push_notifications(company_id: str, title: str, message: str, target_role: str = None, user_id: str = None):
+    """Send push notifications to subscribed users"""
+    try:
+        from pywebpush import webpush, WebPushException
+        
+        vapid_private = os.environ.get('VAPID_PRIVATE_KEY', '')
+        vapid_public = os.environ.get('VAPID_PUBLIC_KEY', '')
+        
+        if not vapid_private or not vapid_public:
+            return
+        
+        # Find users with push subscriptions
+        query = {"company_id": company_id, "push_subscription": {"$exists": True}}
+        if user_id:
+            query["id"] = user_id
+        elif target_role and target_role != "all":
+            query["role"] = target_role
+        
+        users = await db.users.find(query, {"_id": 0, "push_subscription": 1}).to_list(1000)
+        
+        payload = {
+            "title": title,
+            "body": message,
+            "icon": "/logo192.png",
+            "badge": "/logo192.png"
+        }
+        
+        for user in users:
+            subscription = user.get("push_subscription")
+            if subscription:
+                try:
+                    webpush(
+                        subscription,
+                        data=str(payload),
+                        vapid_private_key=vapid_private,
+                        vapid_claims={"sub": "mailto:admin@transperu.com"}
+                    )
+                except WebPushException as e:
+                    logging.error(f"Push notification error: {e}")
+    except ImportError:
+        logging.warning("pywebpush not installed, skipping push notifications")
+    except Exception as e:
+        logging.error(f"Push notification error: {e}")
+
+# ============== ALERTS AUTO-GENERATION ==============
+@api_router.post("/alerts/generate")
+async def generate_alerts(current_user: dict = Depends(get_current_user)):
+    """Generate alerts for expiring documents and other issues"""
+    if current_user["role"] not in ["owner", "admin"]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+    
+    company_id = current_user["company_id"]
+    alerts_created = 0
+    
+    # Check expiring documents
+    now = datetime.now(timezone.utc)
+    alert_days = [60, 30, 15, 7, 3, 1, 0]
+    
+    documents = await db.documents.find({
+        "company_id": company_id,
+        "expiry_date": {"$exists": True}
+    }, {"_id": 0}).to_list(1000)
+    
+    for doc in documents:
+        if not doc.get("expiry_date"):
+            continue
+        
+        expiry = doc["expiry_date"]
+        if isinstance(expiry, str):
+            expiry = datetime.fromisoformat(expiry.replace("Z", "+00:00"))
+        
+        days_until = (expiry - now).days
+        
+        for alert_day in alert_days:
+            if days_until <= alert_day:
+                # Check if alert already exists
+                existing = await db.alerts.find_one({
+                    "entity_id": doc["id"],
+                    "alert_type": "document_expiry",
+                    "resolved": False
+                })
+                
+                if not existing:
+                    doc_type = await db.document_types.find_one({"id": doc["document_type_id"]})
+                    entity = await db.vehicles.find_one({"id": doc["entity_id"]}) or await db.users.find_one({"id": doc["entity_id"]})
+                    
+                    severity = "critical" if days_until <= 0 else "warning" if days_until <= 7 else "info"
+                    
+                    alert = {
+                        "id": str(uuid.uuid4()),
+                        "company_id": company_id,
+                        "alert_type": "document_expiry",
+                        "entity_type": doc["entity_type"],
+                        "entity_id": doc["id"],
+                        "message": f"{doc_type['name'] if doc_type else 'Documento'} de {entity.get('plate') or entity.get('name', 'N/A')} {'VENCIDO' if days_until <= 0 else f'vence en {days_until} días'}",
+                        "severity": severity,
+                        "is_read": False,
+                        "resolved": False,
+                        "created_at": now.isoformat()
+                    }
+                    
+                    await db.alerts.insert_one(alert)
+                    alerts_created += 1
+                    
+                    # Create notification for critical alerts
+                    if severity == "critical":
+                        await db.notifications.insert_one({
+                            "id": str(uuid.uuid4()),
+                            "company_id": company_id,
+                            "title": "⚠️ Documento Vencido",
+                            "message": alert["message"],
+                            "type": "alert",
+                            "target_role": "admin",
+                            "entity_type": "alert",
+                            "entity_id": alert["id"],
+                            "is_read": False,
+                            "created_at": now.isoformat()
+                        })
+                break
+    
+    return {"message": f"{alerts_created} alertas generadas"}
 
 # ============== SEED DATA ROUTE (FOR DEMO) ==============
 @api_router.post("/seed")
