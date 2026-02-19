@@ -866,7 +866,7 @@ const FuelPage = () => {
                     <SelectValue placeholder="Sin vale" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Sin vale</SelectItem>
+                    <SelectItem value="none">Sin vale</SelectItem>
                     {vouchers.filter(v => !v.is_used).map(v => (
                       <SelectItem key={v.id} value={v.id}>{v.voucher_number} - {v.provider}</SelectItem>
                     ))}
