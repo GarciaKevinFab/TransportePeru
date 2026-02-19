@@ -388,6 +388,12 @@ const TripsPage = () => {
                             <Eye className="w-4 h-4 mr-2" />
                             Ver Detalles
                           </DropdownMenuItem>
+                          {isAdmin && (
+                            <DropdownMenuItem onClick={() => handleEditTrip(trip)}>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Editar
+                            </DropdownMenuItem>
+                          )}
                           {trip.status === 'programado' && (
                             <DropdownMenuItem onClick={() => handleStartTrip(trip.id)}>
                               <Play className="w-4 h-4 mr-2" />
@@ -398,6 +404,15 @@ const TripsPage = () => {
                             <DropdownMenuItem onClick={() => handleCompleteTrip(trip.id)}>
                               <CheckCircle className="w-4 h-4 mr-2" />
                               Completar Viaje
+                            </DropdownMenuItem>
+                          )}
+                          {isAdmin && trip.status !== 'en_curso' && (
+                            <DropdownMenuItem 
+                              onClick={() => handleDeleteTrip(trip.id)}
+                              className="text-red-600"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Eliminar
                             </DropdownMenuItem>
                           )}
                         </DropdownMenuContent>
