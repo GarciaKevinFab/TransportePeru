@@ -582,6 +582,124 @@ const UsersPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Edit User Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={(open) => { if (!open) resetForm(); setShowEditDialog(open); }}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
+              Editar Usuario
+            </DialogTitle>
+            <DialogDescription>
+              Modifica los datos de {selectedUser?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="input-label">Nombre *</Label>
+                <Input
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Nombre completo"
+                  className="rounded-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="input-label">Rol *</Label>
+                <Select value={formData.role} onValueChange={(v) => setFormData({ ...formData, role: v })}>
+                  <SelectTrigger className="rounded-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ROLES.map((r) => (
+                      <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="input-label">Email</Label>
+                <Input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="email@example.com"
+                  className="rounded-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="input-label">DNI</Label>
+                <Input
+                  value={formData.dni}
+                  onChange={(e) => setFormData({ ...formData, dni: e.target.value.replace(/\D/g, '').slice(0, 8) })}
+                  placeholder="12345678"
+                  maxLength={8}
+                  className="rounded-sm font-mono"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="input-label">Teléfono</Label>
+                <Input
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  placeholder="+51 999 999 999"
+                  className="rounded-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="input-label">Nro. Licencia</Label>
+                <Input
+                  value={formData.license_number}
+                  onChange={(e) => setFormData({ ...formData, license_number: e.target.value.toUpperCase() })}
+                  placeholder="Q12345678"
+                  className="rounded-sm font-mono"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="input-label">Nueva Contraseña</Label>
+                <Input
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  placeholder="Dejar vacío para no cambiar"
+                  className="rounded-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="input-label">Nuevo PIN</Label>
+                <Input
+                  type="password"
+                  value={formData.pin}
+                  onChange={(e) => setFormData({ ...formData, pin: e.target.value.replace(/\D/g, '').slice(0, 6) })}
+                  placeholder="Dejar vacío para no cambiar"
+                  maxLength={6}
+                  className="rounded-sm font-mono"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { resetForm(); setShowEditDialog(false); }}>
+              Cancelar
+            </Button>
+            <Button
+              className="btn-action"
+              onClick={handleUpdateUser}
+              disabled={!formData.name || saving}
+            >
+              {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Actualizar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
