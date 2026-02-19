@@ -17,7 +17,6 @@ import {
   LogOut,
   Menu,
   X,
-  Bell,
   ChevronDown,
   Receipt,
 } from 'lucide-react';
@@ -31,6 +30,7 @@ import {
 } from '../components/ui/dropdown-menu';
 import { Badge } from '../components/ui/badge';
 import { ScrollArea } from '../components/ui/scroll-area';
+import NotificationsPopover from '../components/NotificationsPopover';
 
 const menuItems = [
   { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', roles: ['owner', 'admin', 'operaciones', 'flota', 'mantenimiento', 'almacen', 'contabilidad'] },
