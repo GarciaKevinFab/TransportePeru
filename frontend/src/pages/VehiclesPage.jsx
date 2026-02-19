@@ -167,7 +167,45 @@ const VehiclesPage = () => {
       color: '',
       fuel_capacity: '',
       tire_config: '6',
+      status: 'disponible',
     });
+    setSelectedVehicle(null);
+  };
+
+  const handleEditVehicle = (vehicle) => {
+    setSelectedVehicle(vehicle);
+    setFormData({
+      plate: vehicle.plate || '',
+      vehicle_type: vehicle.vehicle_type || 'tracto',
+      brand: vehicle.brand || '',
+      model: vehicle.model || '',
+      year: vehicle.year?.toString() || '',
+      vin: vehicle.vin || '',
+      color: vehicle.color || '',
+      fuel_capacity: vehicle.fuel_capacity?.toString() || '',
+      tire_config: vehicle.tire_config || '6',
+      status: vehicle.status || 'disponible',
+    });
+    setShowEditDialog(true);
+  };
+
+  const handleUpdateVehicle = async () => {
+    if (!selectedVehicle) return;
+    setSaving(true);
+    try {
+      await api.put(`/vehicles/${selectedVehicle.id}`, {
+        ...formData,
+        year: formData.year ? parseInt(formData.year) : null,
+        fuel_capacity: formData.fuel_capacity ? parseFloat(formData.fuel_capacity) : null,
+      });
+      toast.success('Vehículo actualizado');
+      setShowEditDialog(false);
+      resetForm();
+      fetchVehicles();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Error al actualizar vehículo');
+    }
+    setSaving(false);
   };
 
   const getStatusBadge = (status) => {
