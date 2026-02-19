@@ -463,14 +463,14 @@ const TripsPage = () => {
               <div className="space-y-2">
                 <Label className="input-label">Carreta</Label>
                 <Select
-                  value={formData.carreta_id}
-                  onValueChange={(v) => setFormData({ ...formData, carreta_id: v })}
+                  value={formData.carreta_id || "none"}
+                  onValueChange={(v) => setFormData({ ...formData, carreta_id: v === "none" ? "" : v })}
                 >
                   <SelectTrigger className="rounded-sm">
                     <SelectValue placeholder="Seleccionar carreta" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Sin carreta</SelectItem>
+                    <SelectItem value="none">Sin carreta</SelectItem>
                     {carretas.map((v) => (
                       <SelectItem key={v.id} value={v.id}>
                         {v.plate} - {v.brand}
