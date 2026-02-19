@@ -231,6 +231,15 @@ function AppRoutes() {
         }
       />
       
+      <Route
+        path="/companies"
+        element={
+          <ProtectedRoute allowedRoles={['owner']}>
+            <CompaniesPage />
+          </ProtectedRoute>
+        }
+      />
+      
       {/* Driver Mobile App Routes */}
       <Route
         path="/driver/login"
