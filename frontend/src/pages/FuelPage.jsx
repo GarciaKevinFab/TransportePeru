@@ -220,29 +220,125 @@ const FuelPage = () => {
     setUploadingPhoto(true);
     
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('entity_type', 'fuel');
-      formData.append('entity_id', 'vouchers');
+      // Convert file to base64 for OCR
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64Data = e.target.result;
+        
+        // Upload file
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('entity_type', 'fuel');
+        formData.append('entity_id', 'vouchers');
+        
+        try {
+          const uploadResponse = await api.post('/upload', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
+          
+          setCapturedPhoto(uploadResponse.data.url);
+          
+          if (showVoucherDialog) {
+            setVoucherForm(prev => ({ ...prev, photo_url: uploadResponse.data.url }));
+          } else if (showLoadDialog) {
+            setLoadForm(prev => ({ ...prev, photo_url: uploadResponse.data.url }));
+            
+            // Try OCR extraction for load receipts
+            try {
+              toast.info('Extrayendo datos del recibo...');
+              const ocrResponse = await api.post('/fuel/ocr', { image_base64: base64Data });
+              
+              if (ocrResponse.data.success && ocrResponse.data.extracted_data) {
+                const extracted = ocrResponse.data.extracted_data;
+                
+                // Auto-fill form with extracted data
+                setLoadForm(prev => ({
+                  ...prev,
+                  liters: extracted.liters?.toString() || prev.liters,
+                  price_per_liter: extracted.price_per_liter?.toString() || prev.price_per_liter,
+                  odometer: extracted.odometer?.toString() || prev.odometer,
+                  provider: extracted.provider || prev.provider,
+                }));
+                
+                toast.success('Datos extraídos automáticamente');
+              }
+            } catch (ocrError) {
+              console.log('OCR extraction failed:', ocrError);
+              // Continue without OCR - not critical
+            }
+          }
+          
+          toast.success('Foto capturada');
+        } catch (uploadError) {
+          toast.error('Error al subir foto');
+        }
+        
+        setUploadingPhoto(false);
+      };
       
-      const response = await api.post('/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      
-      setCapturedPhoto(response.data.url);
-      
-      if (showVoucherDialog) {
-        setVoucherForm({ ...voucherForm, photo_url: response.data.url });
-      } else if (showLoadDialog) {
-        setLoadForm({ ...loadForm, photo_url: response.data.url });
-      }
-      
-      toast.success('Foto capturada');
+      reader.readAsDataURL(file);
     } catch (error) {
-      toast.error('Error al subir foto');
+      toast.error('Error al procesar foto');
+      setUploadingPhoto(false);
+    }
+  };
+
+  // Dedicated OCR function for manual extraction
+  const handleExtractDataFromPhoto = async () => {
+    if (!capturedPhoto) {
+      toast.error('Primero capture una foto');
+      return;
     }
     
-    setUploadingPhoto(false);
+    setUploadingPhoto(true);
+    toast.info('Extrayendo datos del vale...');
+    
+    try {
+      // Fetch the image and convert to base64
+      const response = await fetch(capturedPhoto);
+      const blob = await response.blob();
+      
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const ocrResponse = await api.post('/fuel/ocr', { image_base64: e.target.result });
+          
+          if (ocrResponse.data.success && ocrResponse.data.extracted_data) {
+            const extracted = ocrResponse.data.extracted_data;
+            
+            if (showVoucherDialog) {
+              setVoucherForm(prev => ({
+                ...prev,
+                voucher_number: extracted.voucher_number || prev.voucher_number,
+                provider: extracted.provider || prev.provider,
+                limit_liters: extracted.liters?.toString() || prev.limit_liters,
+                limit_amount: extracted.total_amount?.toString() || prev.limit_amount,
+              }));
+            } else if (showLoadDialog) {
+              setLoadForm(prev => ({
+                ...prev,
+                liters: extracted.liters?.toString() || prev.liters,
+                price_per_liter: extracted.price_per_liter?.toString() || prev.price_per_liter,
+                odometer: extracted.odometer?.toString() || prev.odometer,
+                provider: extracted.provider || prev.provider,
+              }));
+            }
+            
+            toast.success('Datos extraídos correctamente');
+          } else {
+            toast.error('No se pudieron extraer datos de la imagen');
+          }
+        } catch (ocrError) {
+          toast.error('Error al procesar imagen con OCR');
+        }
+        setUploadingPhoto(false);
+      };
+      
+      reader.readAsDataURL(blob);
+    } catch (error) {
+      toast.error('Error al extraer datos');
+      setUploadingPhoto(false);
+    }
   };
 
   const handleSaveVoucher = async () => {
