@@ -780,7 +780,7 @@ const FuelPage = () => {
             {/* Photo capture */}
             <div className="space-y-2">
               <Label className="input-label">Foto del Vale</Label>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <Button 
                   type="button" 
                   variant="outline" 
@@ -799,6 +799,18 @@ const FuelPage = () => {
                   <Image className="w-4 h-4 mr-2" />
                   Seleccionar
                 </Button>
+                {capturedPhoto && (
+                  <Button 
+                    type="button" 
+                    variant="secondary"
+                    onClick={handleExtractDataFromPhoto}
+                    disabled={uploadingPhoto}
+                    className="bg-blue-100 hover:bg-blue-200 text-blue-700"
+                  >
+                    {uploadingPhoto ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <TrendingUp className="w-4 h-4 mr-2" />}
+                    Extraer Datos
+                  </Button>
+                )}
               </div>
               {capturedPhoto && (
                 <div className="mt-2 relative">
