@@ -138,6 +138,7 @@ export const AuthProvider = ({ children }) => {
     loading,
     error,
     login,
+    loginDriver,
     logout,
     isAuthenticated: !!user,
     isAdmin: user?.role === 'admin' || user?.role === 'owner',
