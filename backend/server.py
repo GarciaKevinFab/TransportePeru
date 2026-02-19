@@ -1670,6 +1670,23 @@ async def update_trip(trip_id: str, request: dict, current_user: dict = Depends(
     
     return {"message": "Viaje actualizado"}
 
+@api_router.delete("/trips/{trip_id}")
+async def delete_trip(trip_id: str, current_user: dict = Depends(get_current_user)):
+    if current_user["role"] not in ["owner", "admin"]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+    
+    # Check if trip is in progress
+    trip = await db.trips.find_one({"id": trip_id, "company_id": current_user["company_id"]})
+    if not trip:
+        raise HTTPException(status_code=404, detail="Viaje no encontrado")
+    
+    if trip.get("status") == "en_curso":
+        raise HTTPException(status_code=400, detail="No se puede eliminar un viaje en curso")
+    
+    await db.trips.delete_one({"id": trip_id, "company_id": current_user["company_id"]})
+    
+    return {"message": "Viaje eliminado"}
+
 @api_router.post("/trips/{trip_id}/start")
 async def start_trip(trip_id: str, request: dict, current_user: dict = Depends(get_current_user)):
     trip = await db.trips.find_one({"id": trip_id, "company_id": current_user["company_id"]})
