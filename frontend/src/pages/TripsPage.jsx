@@ -594,6 +594,162 @@ const TripsPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={(open) => { if (!open) resetForm(); setShowEditDialog(open); }}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
+              Editar Viaje
+            </DialogTitle>
+            <DialogDescription>
+              Modifica los datos del viaje
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="input-label">Tracto</Label>
+                <Select
+                  value={formData.tracto_id}
+                  onValueChange={(v) => setFormData({ ...formData, tracto_id: v })}
+                >
+                  <SelectTrigger className="rounded-sm">
+                    <SelectValue placeholder="Seleccionar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {vehicles.filter(v => v.vehicle_type === 'tracto').map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.plate} - {t.brand}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="input-label">Carreta</Label>
+                <Select
+                  value={formData.carreta_id || ""}
+                  onValueChange={(v) => setFormData({ ...formData, carreta_id: v })}
+                >
+                  <SelectTrigger className="rounded-sm">
+                    <SelectValue placeholder="Opcional" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Sin carreta</SelectItem>
+                    {vehicles.filter(v => v.vehicle_type === 'carreta').map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.plate}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="input-label">Chofer</Label>
+                <Select
+                  value={formData.driver_id}
+                  onValueChange={(v) => setFormData({ ...formData, driver_id: v })}
+                >
+                  <SelectTrigger className="rounded-sm">
+                    <SelectValue placeholder="Seleccionar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {drivers.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>
+                        {d.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="input-label">Estado</Label>
+                <Select
+                  value={formData.status}
+                  onValueChange={(v) => setFormData({ ...formData, status: v })}
+                >
+                  <SelectTrigger className="rounded-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="programado">Programado</SelectItem>
+                    <SelectItem value="en_curso">En Curso</SelectItem>
+                    <SelectItem value="completado">Completado</SelectItem>
+                    <SelectItem value="cancelado">Cancelado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="input-label">Cliente</Label>
+                <Input
+                  value={formData.client_name}
+                  onChange={(e) => setFormData({ ...formData, client_name: e.target.value })}
+                  placeholder="Nombre del cliente"
+                  className="rounded-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="input-label">Fecha Programada</Label>
+                <Input
+                  type="datetime-local"
+                  value={formData.scheduled_date}
+                  onChange={(e) => setFormData({ ...formData, scheduled_date: e.target.value })}
+                  className="rounded-sm"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="input-label">Descripción de Carga</Label>
+                <Input
+                  value={formData.cargo_description}
+                  onChange={(e) => setFormData({ ...formData, cargo_description: e.target.value })}
+                  placeholder="Tipo de carga"
+                  className="rounded-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="input-label">Peso (kg)</Label>
+                <Input
+                  type="number"
+                  value={formData.cargo_weight}
+                  onChange={(e) => setFormData({ ...formData, cargo_weight: e.target.value })}
+                  placeholder="25000"
+                  className="rounded-sm"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="input-label">Notas</Label>
+              <Textarea
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                placeholder="Observaciones adicionales"
+                className="rounded-sm"
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { resetForm(); setShowEditDialog(false); }}>
+              Cancelar
+            </Button>
+            <Button
+              className="btn-action"
+              onClick={handleUpdateTrip}
+              disabled={saving}
+            >
+              {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Actualizar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
