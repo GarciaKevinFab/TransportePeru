@@ -10,145 +10,106 @@
 - **Admin:** admin@transperu.com / admin123
 - **Chofer:** DNI 12345678 / PIN 123456
 
+## URLs de Acceso
+- **Panel Admin:** /login
+- **App Chofer:** /driver/login
+
 ---
 
 ## Módulos Implementados
 
 ### 1. ✅ Autenticación
 - Login de administradores (email/password)
-- Login de choferes (DNI/PIN)
+- Login de choferes (DNI/PIN) 
 - JWT tokens para sesiones
 - Roles: owner, admin, operaciones, flota, mantenimiento, almacen, contabilidad, chofer
 
-### 2. ✅ Dashboard
+### 2. ✅ Dashboard Personalizado por Rol
 - **Dashboard Admin:** KPIs completos (vehículos, viajes, alertas, documentos, disponibilidad de flota, choferes, OTs)
 - **Dashboard Chofer:** Vista simplificada con viajes asignados, acciones rápidas
-- Vista personalizada según rol del usuario
 
-### 3. ✅ Gestión de Vehículos
-- CRUD completo de vehículos (tractos y carretas)
-- Edición por admin en modal
+### 3. ✅ App Móvil para Choferes (PWA)
+- Login dedicado con DNI/PIN
+- Home con viaje activo y próximos viajes
+- Registro de combustible con OCR
+- Reporte de incidentes con fotos y ubicación
+- Checklist de salida
+- Navegación inferior optimizada para móvil
+
+### 4. ✅ Gestión de Vehículos
+- CRUD completo con edición por admin
 - Estados: disponible, en_viaje, en_mantenimiento, fuera_servicio
 - Configuración de 6 llantas por vehículo
 
-### 4. ✅ Gestión de Documentos
+### 5. ✅ Gestión de Documentos
 - Matriz de documentos por vehículo/chofer
-- Tipos de documentos configurables
 - Alertas de vencimiento
-- Estados: vigente, por_vencer, vencido
 
-### 5. ✅ Gestión de Viajes
+### 6. ✅ Gestión de Viajes
 - CRUD completo con edición y eliminación por admin
 - Estados: programado, en_curso, completado, cancelado
-- Asignación de tracto, carreta, chofer
-- Control de gastos por viaje
 
-### 6. ✅ Gestión de Combustible
+### 7. ✅ Gestión de Combustible
 - Vales de combustible
-- Cargas de combustible con foto
-- **OCR:** Extracción automática de datos desde foto del vale usando Gemini Vision
+- Cargas con foto y OCR (Gemini Vision)
 - KPIs de consumo
 
-### 7. ✅ Gestión de Llantas
-- Inventario de llantas
-- Esquema visual de llantas (6 por tracto, 6 por carreta)
-- Montaje/desmontaje
-- Alertas de desgaste
+### 8. ✅ Gestión de Llantas
+- Inventario y esquema visual (6 llantas por vehículo)
 
-### 8. ✅ Mantenimiento
-- Órdenes de trabajo (OT)
-- CRUD con edición y eliminación por admin
-- Estados: abierta, en_proceso, completada
-- Tipos: correctivo, preventivo
-- Prioridades: baja, normal, alta, urgente
+### 9. ✅ Mantenimiento
+- Órdenes de trabajo con edición por admin
 
-### 9. ✅ Inventario
-- Gestión de repuestos y partes
-- Niveles de stock
-- Alertas de stock bajo
+### 10. ✅ Inventario
+- Gestión de repuestos
 
-### 10. ✅ Incidentes
-- Reporte de incidentes
-- Estados: reportado, en_revision, resuelto
-- Tipos: accidente, averia, robo, otro
+### 11. ✅ Incidentes
+- Reporte con fotos y geolocalización
 
-### 11. ✅ Viáticos/Liquidaciones
+### 12. ✅ Viáticos/Liquidaciones
 - Gestión de gastos de viaje
-- Estados de liquidación
-- Aprobación de gastos
 
-### 12. ✅ Checklist del Chofer
-- Asistente paso a paso (wizard)
-- Firma digital del chofer
-- Captura de fotos
+### 13. ✅ Checklist del Chofer
+- Asistente paso a paso con firma digital
 
-### 13. ✅ Reportes
+### 14. ✅ Reportes
 - Exportación a PDF y Excel
-- Reportes por módulo
-
-### 14. ✅ Configuración
-- Configuración general de la empresa
-- Tipos de documentos
-- Plantillas de checklist
-- Configuración de alertas
 
 ### 15. ✅ Notificaciones
-- Popover de notificaciones en el header
-- Marcado como leído
-- Historial de notificaciones
+- Popover en header con historial
 
 ### 16. ✅ Usuarios
-- CRUD completo con edición y eliminación por admin
-- Gestión de roles
-- Reset de PIN para choferes
+- CRUD con edición por admin
 
 ---
 
-## Funcionalidades Técnicas
+## Integraciones
 
-### Backend
-- FastAPI con async/await
-- MongoDB con motor
-- JWT para autenticación
-- Endpoints RESTful completos
-- OCR con Gemini Vision (emergentintegrations)
-- Subida de archivos
+### ✅ OCR con Gemini Vision
+- Extracción automática de datos de vales de combustible
+- Usa emergentintegrations con EMERGENT_LLM_KEY
 
-### Frontend
-- React con hooks
-- React Router para navegación
-- Axios para API calls
-- TailwindCSS + shadcn/ui
-- date-fns para fechas
-- react-signature-canvas para firmas
-
-### PWA (Base)
-- manifest.json configurado
-- service-worker.js básico
-- Hook useOffline
+### 🟡 AWS S3 (Preparado)
+- boto3 instalado
+- Endpoints de upload configurados
+- Requiere credenciales AWS para producción
 
 ---
 
 ## Tareas Pendientes (Backlog)
 
 ### P1 - Importantes
-1. **Notificaciones Push Reales:** Implementar Web Push con service worker completo
-2. **Integración S3 Completa:** Subida de archivos a AWS S3 (boto3 instalado, endpoints creados)
-3. **Refactorización Backend:** Dividir server.py (+4800 líneas) en routers modulares
+1. **Notificaciones Push Reales:** Web Push con service worker
+2. **Credenciales S3:** Configurar AWS_ACCESS_KEY_ID y AWS_SECRET_ACCESS_KEY
+3. **Refactorización Backend:** Dividir server.py en routers modulares
 
 ### P2 - Mejoras
-1. **PWA Offline Completa:** Sincronización de datos offline con IndexedDB
-2. **Dashboard Chofer:** Mejorar vista con más acciones y estado del viaje
-3. **Reportes Avanzados:** Gráficos y más filtros
-
-### P3 - Futuras
-1. **Integración GPS:** Tracking de vehículos en tiempo real
-2. **App Móvil Nativa:** React Native para choferes
-3. **Facturación:** Integración con SUNAT
+1. **PWA Offline Completa:** Sincronización con IndexedDB
+2. **GPS Tracking:** Tracking en tiempo real
 
 ---
 
 ## Última Actualización
 - **Fecha:** 2025-02-19
-- **Versión:** 1.5.0
-- **Testing:** iteration_5.json - 94-100% success rate
+- **Versión:** 1.6.0
+- **Nuevas funcionalidades:** App Móvil Chofer, Integración S3 preparada
