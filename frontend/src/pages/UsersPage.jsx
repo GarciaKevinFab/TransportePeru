@@ -305,38 +305,38 @@ const UsersPage = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredUsers.map((user) => (
-                  <TableRow key={user.id} className="table-dense hover:bg-orange-50">
+                {filteredUsers.map((userItem) => (
+                  <TableRow key={userItem.id} className="table-dense hover:bg-orange-50">
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 font-bold">
-                          {user.name.charAt(0).toUpperCase()}
+                          {userItem.name.charAt(0).toUpperCase()}
                         </div>
                         <div>
-                          <p className="font-medium">{user.name}</p>
-                          {user.dni && (
-                            <p className="text-xs text-slate-500 font-mono">DNI: {user.dni}</p>
+                          <p className="font-medium">{userItem.name}</p>
+                          {userItem.dni && (
+                            <p className="text-xs text-slate-500 font-mono">DNI: {userItem.dni}</p>
                           )}
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div>
-                        {user.email && <p className="text-sm">{user.email}</p>}
-                        {user.phone && <p className="text-xs text-slate-500">{user.phone}</p>}
+                        {userItem.email && <p className="text-sm">{userItem.email}</p>}
+                        {userItem.phone && <p className="text-xs text-slate-500">{userItem.phone}</p>}
                       </div>
                     </TableCell>
-                    <TableCell>{getRoleBadge(user.role)}</TableCell>
+                    <TableCell>{getRoleBadge(userItem.role)}</TableCell>
                     <TableCell>
-                      {user.license_number ? (
-                        <span className="font-mono text-sm">{user.license_number}</span>
+                      {userItem.license_number ? (
+                        <span className="font-mono text-sm">{userItem.license_number}</span>
                       ) : (
                         <span className="text-slate-400">-</span>
                       )}
                     </TableCell>
                     <TableCell>
-                      <Badge className={user.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
-                        {user.is_active ? 'Activo' : 'Inactivo'}
+                      <Badge className={userItem.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                        {userItem.is_active ? 'Activo' : 'Inactivo'}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
