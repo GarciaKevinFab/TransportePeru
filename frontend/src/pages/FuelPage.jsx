@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { fuelApi, vehiclesApi, tripsApi } from '../services/api';
+import api from '../services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -16,7 +17,6 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -30,6 +30,12 @@ import {
   SelectValue,
 } from '../components/ui/select';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu';
+import {
   Fuel,
   Plus,
   Loader2,
@@ -37,23 +43,37 @@ import {
   TrendingUp,
   AlertTriangle,
   Camera,
+  MoreVertical,
+  Pencil,
+  Trash2,
+  Image,
+  Check,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useAuth } from '../context/AuthContext';
 
 const FuelPage = () => {
+  const { user } = useAuth();
+  const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
+  
   const [loading, setLoading] = useState(true);
   const [vouchers, setVouchers] = useState([]);
   const [loads, setLoads] = useState([]);
   const [kpis, setKpis] = useState(null);
-  const [conciliation, setConciliation] = useState(null);
   const [vehicles, setVehicles] = useState([]);
   const [trips, setTrips] = useState([]);
   
   const [showVoucherDialog, setShowVoucherDialog] = useState(false);
   const [showLoadDialog, setShowLoadDialog] = useState(false);
+  const [showPhotoDialog, setShowPhotoDialog] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editingVoucher, setEditingVoucher] = useState(null);
+  const [editingLoad, setEditingLoad] = useState(null);
+  const [capturedPhoto, setCapturedPhoto] = useState(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   
   const [voucherForm, setVoucherForm] = useState({
     voucher_number: '',
@@ -61,8 +81,10 @@ const FuelPage = () => {
     trip_id: '',
     provider: '',
     limit_liters: '',
+    limit_amount: '',
     valid_from: '',
     valid_until: '',
+    photo_url: '',
   });
   
   const [loadForm, setLoadForm] = useState({
@@ -73,7 +95,10 @@ const FuelPage = () => {
     price_per_liter: '',
     odometer: '',
     provider: '',
+    photo_url: '',
   });
+
+  const isAdmin = user?.role === 'owner' || user?.role === 'admin';
 
   const fetchData = async () => {
     setLoading(true);
@@ -81,19 +106,15 @@ const FuelPage = () => {
       const [vouchersRes, loadsRes, kpisRes, vehiclesRes, tripsRes] = await Promise.all([
         fuelApi.getVouchers(),
         fuelApi.getLoads(),
-        fuelApi.getKPIs(),
-        vehiclesApi.getAll({ vehicle_type: 'tracto' }),
-        tripsApi.getAll({ status: 'en_curso' }),
+        fuelApi.getKpis(),
+        vehiclesApi.getAll(),
+        tripsApi.getAll(),
       ]);
       setVouchers(vouchersRes.data);
       setLoads(loadsRes.data);
       setKpis(kpisRes.data);
       setVehicles(vehiclesRes.data);
-      setTrips(tripsRes.data);
-      
-      // Get conciliation
-      const concilRes = await fuelApi.getConciliation();
-      setConciliation(concilRes.data);
+      setTrips(tripsRes.data.filter(t => t.status === 'en_curso' || t.status === 'programado'));
     } catch (error) {
       console.error('Error:', error);
     }
@@ -104,65 +125,217 @@ const FuelPage = () => {
     fetchData();
   }, []);
 
-  const handleCreateVoucher = async () => {
-    setSaving(true);
+  const resetVoucherForm = () => {
+    setVoucherForm({
+      voucher_number: '',
+      vehicle_id: '',
+      trip_id: '',
+      provider: '',
+      limit_liters: '',
+      limit_amount: '',
+      valid_from: '',
+      valid_until: '',
+      photo_url: '',
+    });
+    setEditingVoucher(null);
+    setCapturedPhoto(null);
+  };
+
+  const resetLoadForm = () => {
+    setLoadForm({
+      vehicle_id: '',
+      voucher_id: '',
+      trip_id: '',
+      liters: '',
+      price_per_liter: '',
+      odometer: '',
+      provider: '',
+      photo_url: '',
+    });
+    setEditingLoad(null);
+    setCapturedPhoto(null);
+  };
+
+  const handleEditVoucher = (voucher) => {
+    setEditingVoucher(voucher);
+    setVoucherForm({
+      voucher_number: voucher.voucher_number || '',
+      vehicle_id: voucher.vehicle_id || '',
+      trip_id: voucher.trip_id || '',
+      provider: voucher.provider || '',
+      limit_liters: voucher.limit_liters?.toString() || '',
+      limit_amount: voucher.limit_amount?.toString() || '',
+      valid_from: voucher.valid_from?.substring(0, 10) || '',
+      valid_until: voucher.valid_until?.substring(0, 10) || '',
+      photo_url: voucher.photo_url || '',
+    });
+    setCapturedPhoto(voucher.photo_url);
+    setShowVoucherDialog(true);
+  };
+
+  const handleEditLoad = (load) => {
+    setEditingLoad(load);
+    setLoadForm({
+      vehicle_id: load.vehicle_id || '',
+      voucher_id: load.voucher_id || '',
+      trip_id: load.trip_id || '',
+      liters: load.liters?.toString() || '',
+      price_per_liter: load.price_per_liter?.toString() || '',
+      odometer: load.odometer?.toString() || '',
+      provider: load.provider || '',
+      photo_url: load.photo_url || '',
+    });
+    setCapturedPhoto(load.photo_url);
+    setShowLoadDialog(true);
+  };
+
+  const handleDeleteVoucher = async (voucherId) => {
+    if (!confirm('¿Eliminar este vale de combustible?')) return;
+    
     try {
-      await fuelApi.createVoucher({
-        ...voucherForm,
-        limit_liters: parseFloat(voucherForm.limit_liters) || null,
-      });
-      toast.success('Vale creado exitosamente');
-      setShowVoucherDialog(false);
-      setVoucherForm({
-        voucher_number: '',
-        vehicle_id: '',
-        trip_id: '',
-        provider: '',
-        limit_liters: '',
-        valid_from: '',
-        valid_until: '',
-      });
+      await api.delete(`/fuel/vouchers/${voucherId}`);
+      toast.success('Vale eliminado');
       fetchData();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Error al crear vale');
+      toast.error(error.response?.data?.detail || 'Error al eliminar vale');
+    }
+  };
+
+  const handleDeleteLoad = async (loadId) => {
+    if (!confirm('¿Eliminar este registro de carga?')) return;
+    
+    try {
+      await api.delete(`/fuel/loads/${loadId}`);
+      toast.success('Carga eliminada');
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Error al eliminar carga');
+    }
+  };
+
+  const handlePhotoCapture = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    setUploadingPhoto(true);
+    
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('entity_type', 'fuel');
+      formData.append('entity_id', 'vouchers');
+      
+      const response = await api.post('/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      
+      setCapturedPhoto(response.data.url);
+      
+      if (showVoucherDialog) {
+        setVoucherForm({ ...voucherForm, photo_url: response.data.url });
+      } else if (showLoadDialog) {
+        setLoadForm({ ...loadForm, photo_url: response.data.url });
+      }
+      
+      toast.success('Foto capturada');
+    } catch (error) {
+      toast.error('Error al subir foto');
+    }
+    
+    setUploadingPhoto(false);
+  };
+
+  const handleSaveVoucher = async () => {
+    if (!voucherForm.voucher_number || !voucherForm.vehicle_id || !voucherForm.provider) {
+      toast.error('Número de vale, vehículo y proveedor son requeridos');
+      return;
+    }
+    
+    setSaving(true);
+    try {
+      const data = {
+        ...voucherForm,
+        limit_liters: parseFloat(voucherForm.limit_liters) || null,
+        limit_amount: parseFloat(voucherForm.limit_amount) || null,
+        photo_url: capturedPhoto || voucherForm.photo_url,
+      };
+      
+      if (editingVoucher) {
+        await api.put(`/fuel/vouchers/${editingVoucher.id}`, data);
+        toast.success('Vale actualizado');
+      } else {
+        await fuelApi.createVoucher(data);
+        toast.success('Vale creado');
+      }
+      
+      setShowVoucherDialog(false);
+      resetVoucherForm();
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Error al guardar vale');
     }
     setSaving(false);
   };
 
-  const handleCreateLoad = async () => {
+  const handleSaveLoad = async () => {
+    if (!loadForm.vehicle_id || !loadForm.liters || !loadForm.price_per_liter || !loadForm.odometer) {
+      toast.error('Vehículo, litros, precio y odómetro son requeridos');
+      return;
+    }
+    
     setSaving(true);
     try {
-      await fuelApi.createLoad({
+      const data = {
         ...loadForm,
         liters: parseFloat(loadForm.liters),
         price_per_liter: parseFloat(loadForm.price_per_liter),
         odometer: parseInt(loadForm.odometer),
-      });
-      toast.success('Carga registrada exitosamente');
+        photo_url: capturedPhoto || loadForm.photo_url,
+      };
+      
+      if (editingLoad) {
+        await api.put(`/fuel/loads/${editingLoad.id}`, data);
+        toast.success('Carga actualizada');
+      } else {
+        await fuelApi.createLoad(data);
+        toast.success('Carga registrada');
+      }
+      
       setShowLoadDialog(false);
-      setLoadForm({
-        vehicle_id: '',
-        voucher_id: '',
-        trip_id: '',
-        liters: '',
-        price_per_liter: '',
-        odometer: '',
-        provider: '',
-      });
+      resetLoadForm();
       fetchData();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Error al registrar carga');
+      toast.error(error.response?.data?.detail || 'Error al guardar carga');
     }
     setSaving(false);
   };
 
-  const getVehiclePlate = (id) => {
-    const v = vehicles.find(v => v.id === id);
-    return v?.plate || '-';
-  };
+  const getVehiclePlate = (id) => vehicles.find(v => v.id === id)?.plate || '-';
+
+  const totalLiters = loads.reduce((sum, l) => sum + (l.liters || 0), 0);
+  const totalAmount = loads.reduce((sum, l) => sum + (l.total_amount || 0), 0);
+  const activeVouchers = vouchers.filter(v => !v.is_used).length;
+  const avgPrice = totalLiters > 0 ? totalAmount / totalLiters : 0;
 
   return (
     <div className="space-y-6" data-testid="fuel-page">
+      {/* Hidden file inputs */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept="image/*"
+        className="hidden"
+        onChange={handlePhotoCapture}
+      />
+      <input
+        type="file"
+        ref={cameraInputRef}
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={handlePhotoCapture}
+      />
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -170,69 +343,76 @@ const FuelPage = () => {
             Combustible
           </h1>
           <p className="text-slate-500 mt-1">
-            Gestión de vales, cargas y KPIs de combustible
+            Gestión de vales y cargas de combustible
           </p>
         </div>
-        <div className="flex gap-3">
-          <Button variant="outline" onClick={() => setShowVoucherDialog(true)} data-testid="new-voucher-btn">
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => { resetVoucherForm(); setShowVoucherDialog(true); }}>
             <Ticket className="w-4 h-4 mr-2" />
             Nuevo Vale
           </Button>
-          <Button className="btn-action" onClick={() => setShowLoadDialog(true)} data-testid="new-load-btn">
-            <Fuel className="w-4 h-4 mr-2" />
+          <Button className="btn-action" onClick={() => { resetLoadForm(); setShowLoadDialog(true); }}>
+            <Plus className="w-4 h-4 mr-2" />
             Registrar Carga
           </Button>
         </div>
       </div>
 
-      {/* KPIs */}
-      {kpis?.vehicle_kpis?.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="bg-white border-l-4 border-l-green-500">
-            <CardContent className="py-4">
-              <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Mejor Rendimiento</p>
-              <p className="font-heading text-3xl font-bold text-green-600 mt-1">
-                {kpis.vehicle_kpis[0]?.km_per_gallon || 0} km/gal
-              </p>
-              <p className="text-sm text-slate-500">{kpis.vehicle_kpis[0]?.plate}</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-white border-l-4 border-l-blue-500">
-            <CardContent className="py-4">
-              <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Costo Promedio/km</p>
-              <p className="font-heading text-3xl font-bold text-blue-600 mt-1">
-                S/ {(kpis.vehicle_kpis.reduce((a, b) => a + b.cost_per_km, 0) / kpis.vehicle_kpis.length).toFixed(2)}
-              </p>
-            </CardContent>
-          </Card>
-          <Card className="bg-white border-l-4 border-l-orange-500">
-            <CardContent className="py-4">
-              <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Cargas Este Mes</p>
-              <p className="font-heading text-3xl font-bold text-orange-600 mt-1">{loads.length}</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-white border-l-4 border-l-red-500">
-            <CardContent className="py-4">
-              <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Sin Vale</p>
-              <p className="font-heading text-3xl font-bold text-red-600 mt-1">
-                {conciliation?.total_without_voucher || 0}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card className="bg-white border-l-4 border-l-blue-500">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Vales Activos</p>
+                <p className="font-heading text-3xl font-bold text-blue-600 mt-1">{activeVouchers}</p>
+              </div>
+              <Ticket className="w-8 h-8 text-blue-500" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-white border-l-4 border-l-green-500">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Total Litros</p>
+                <p className="font-heading text-2xl font-bold text-green-600 mt-1">{totalLiters.toLocaleString()}</p>
+              </div>
+              <Fuel className="w-8 h-8 text-green-500" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-white border-l-4 border-l-orange-500">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Total Gastado</p>
+                <p className="font-heading text-xl font-bold text-orange-600 mt-1">S/ {totalAmount.toLocaleString()}</p>
+              </div>
+              <TrendingUp className="w-8 h-8 text-orange-500" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-white border-l-4 border-l-slate-500">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Precio Promedio</p>
+                <p className="font-heading text-xl font-bold text-slate-600 mt-1">S/ {avgPrice.toFixed(2)}/L</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Tabs */}
       <Tabs defaultValue="vouchers">
         <TabsList className="bg-slate-100 rounded-sm">
           <TabsTrigger value="vouchers" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
-            Vales
+            Vales ({vouchers.length})
           </TabsTrigger>
           <TabsTrigger value="loads" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
-            Cargas
-          </TabsTrigger>
-          <TabsTrigger value="kpis" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
-            KPIs
+            Cargas ({loads.length})
           </TabsTrigger>
         </TabsList>
 
@@ -256,10 +436,11 @@ const FuelPage = () => {
                       <TableHead>Número</TableHead>
                       <TableHead>Vehículo</TableHead>
                       <TableHead>Proveedor</TableHead>
-                      <TableHead>Límite (L)</TableHead>
-                      <TableHead>Usado (L)</TableHead>
+                      <TableHead>Límite</TableHead>
                       <TableHead>Vigencia</TableHead>
                       <TableHead>Estado</TableHead>
+                      <TableHead>Foto</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -268,17 +449,47 @@ const FuelPage = () => {
                         <TableCell className="font-mono font-bold">{voucher.voucher_number}</TableCell>
                         <TableCell>{getVehiclePlate(voucher.vehicle_id)}</TableCell>
                         <TableCell>{voucher.provider}</TableCell>
-                        <TableCell>{voucher.limit_liters || '-'}</TableCell>
-                        <TableCell>{voucher.used_liters?.toFixed(1) || 0}</TableCell>
                         <TableCell>
-                          <span className="text-xs">
-                            {format(new Date(voucher.valid_until), 'dd/MM/yyyy')}
-                          </span>
+                          {voucher.limit_liters ? `${voucher.limit_liters} L` : 
+                           voucher.limit_amount ? `S/ ${voucher.limit_amount}` : '-'}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {voucher.valid_from?.substring(0, 10)} - {voucher.valid_until?.substring(0, 10)}
                         </TableCell>
                         <TableCell>
-                          <Badge className={voucher.is_used ? 'bg-slate-100 text-slate-600' : 'bg-green-100 text-green-800'}>
-                            {voucher.is_used ? 'Usado' : 'Activo'}
+                          <Badge className={voucher.is_used ? 'bg-slate-100 text-slate-700' : 'bg-green-100 text-green-700'}>
+                            {voucher.is_used ? 'Usado' : 'Disponible'}
                           </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {voucher.photo_url ? (
+                            <Button size="sm" variant="ghost" onClick={() => window.open(voucher.photo_url, '_blank')}>
+                              <Image className="w-4 h-4 text-blue-500" />
+                            </Button>
+                          ) : (
+                            <span className="text-slate-400">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {isAdmin && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon">
+                                  <MoreVertical className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleEditVoucher(voucher)}>
+                                  <Pencil className="w-4 h-4 mr-2" />
+                                  Editar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDeleteVoucher(voucher.id)} className="text-red-600">
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Eliminar
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -308,31 +519,55 @@ const FuelPage = () => {
                     <TableRow className="table-dense">
                       <TableHead>Fecha</TableHead>
                       <TableHead>Vehículo</TableHead>
+                      <TableHead>Proveedor</TableHead>
                       <TableHead>Litros</TableHead>
                       <TableHead>Precio/L</TableHead>
                       <TableHead>Total</TableHead>
                       <TableHead>Odómetro</TableHead>
-                      <TableHead>Proveedor</TableHead>
-                      <TableHead>Vale</TableHead>
+                      <TableHead>Foto</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {loads.map((load) => (
                       <TableRow key={load.id} className="table-dense">
-                        <TableCell>
-                          {format(new Date(load.load_date), 'dd/MM/yyyy HH:mm', { locale: es })}
+                        <TableCell className="text-sm">
+                          {format(new Date(load.load_date || load.created_at), 'dd/MM/yy HH:mm', { locale: es })}
                         </TableCell>
                         <TableCell className="font-mono">{getVehiclePlate(load.vehicle_id)}</TableCell>
-                        <TableCell className="font-mono">{load.liters?.toFixed(2)}</TableCell>
+                        <TableCell>{load.provider || '-'}</TableCell>
+                        <TableCell className="font-bold">{load.liters?.toFixed(2)}</TableCell>
                         <TableCell>S/ {load.price_per_liter?.toFixed(2)}</TableCell>
-                        <TableCell className="font-bold">S/ {load.total_amount?.toFixed(2)}</TableCell>
-                        <TableCell className="font-mono">{load.odometer?.toLocaleString()} km</TableCell>
-                        <TableCell>{load.provider}</TableCell>
+                        <TableCell className="font-bold text-green-600">S/ {load.total_amount?.toFixed(2)}</TableCell>
+                        <TableCell>{load.odometer?.toLocaleString()} km</TableCell>
                         <TableCell>
-                          {load.voucher_id ? (
-                            <Badge className="bg-green-100 text-green-800">Con vale</Badge>
+                          {load.photo_url ? (
+                            <Button size="sm" variant="ghost" onClick={() => window.open(load.photo_url, '_blank')}>
+                              <Image className="w-4 h-4 text-blue-500" />
+                            </Button>
                           ) : (
-                            <Badge className="bg-yellow-100 text-yellow-800">Sin vale</Badge>
+                            <span className="text-slate-400">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {isAdmin && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon">
+                                  <MoreVertical className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleEditLoad(load)}>
+                                  <Pencil className="w-4 h-4 mr-2" />
+                                  Editar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDeleteLoad(load.id)} className="text-red-600">
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Eliminar
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           )}
                         </TableCell>
                       </TableRow>
@@ -343,62 +578,14 @@ const FuelPage = () => {
             </CardContent>
           </Card>
         </TabsContent>
-
-        {/* KPIs Tab */}
-        <TabsContent value="kpis" className="mt-4">
-          <Card className="bg-white">
-            <CardHeader>
-              <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest">
-                Rendimiento por Vehículo
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {!kpis?.vehicle_kpis?.length ? (
-                <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-                  <TrendingUp className="w-12 h-12 mb-2" />
-                  <p>No hay suficientes datos para calcular KPIs</p>
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow className="table-dense">
-                      <TableHead>Vehículo</TableHead>
-                      <TableHead>Km Recorridos</TableHead>
-                      <TableHead>Litros Totales</TableHead>
-                      <TableHead>km/galón</TableHead>
-                      <TableHead>Costo/km</TableHead>
-                      <TableHead>Cargas</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {kpis.vehicle_kpis.map((kpi) => (
-                      <TableRow key={kpi.vehicle_id} className="table-dense">
-                        <TableCell className="font-mono font-bold">{kpi.plate}</TableCell>
-                        <TableCell>{kpi.km_traveled?.toLocaleString()} km</TableCell>
-                        <TableCell>{kpi.total_liters?.toFixed(1)} L</TableCell>
-                        <TableCell>
-                          <span className={`font-bold ${kpi.km_per_gallon > 5 ? 'text-green-600' : 'text-red-600'}`}>
-                            {kpi.km_per_gallon} km/gal
-                          </span>
-                        </TableCell>
-                        <TableCell>S/ {kpi.cost_per_km}</TableCell>
-                        <TableCell>{kpi.loads_count}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
 
-      {/* Create Voucher Dialog */}
-      <Dialog open={showVoucherDialog} onOpenChange={setShowVoucherDialog}>
-        <DialogContent className="sm:max-w-[500px]">
+      {/* Voucher Dialog */}
+      <Dialog open={showVoucherDialog} onOpenChange={(open) => { if (!open) resetVoucherForm(); setShowVoucherDialog(open); }}>
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
-              Nuevo Vale de Combustible
+              {editingVoucher ? 'Editar Vale de Combustible' : 'Nuevo Vale de Combustible'}
             </DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -409,7 +596,7 @@ const FuelPage = () => {
                   value={voucherForm.voucher_number}
                   onChange={(e) => setVoucherForm({ ...voucherForm, voucher_number: e.target.value })}
                   className="rounded-sm"
-                  data-testid="voucher-number-input"
+                  placeholder="Ej: VAL-001"
                 />
               </div>
               <div className="space-y-2">
@@ -419,8 +606,8 @@ const FuelPage = () => {
                     <SelectValue placeholder="Seleccionar" />
                   </SelectTrigger>
                   <SelectContent>
-                    {vehicles.map(v => (
-                      <SelectItem key={v.id} value={v.id}>{v.plate}</SelectItem>
+                    {vehicles.filter(v => v.vehicle_type === 'tracto').map(v => (
+                      <SelectItem key={v.id} value={v.id}>{v.plate} - {v.brand}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -432,10 +619,26 @@ const FuelPage = () => {
                 <Input
                   value={voucherForm.provider}
                   onChange={(e) => setVoucherForm({ ...voucherForm, provider: e.target.value })}
-                  placeholder="Grifo, estación..."
                   className="rounded-sm"
+                  placeholder="Repsol, Primax..."
                 />
               </div>
+              <div className="space-y-2">
+                <Label className="input-label">Viaje (Opcional)</Label>
+                <Select value={voucherForm.trip_id || ""} onValueChange={(v) => setVoucherForm({ ...voucherForm, trip_id: v })}>
+                  <SelectTrigger className="rounded-sm">
+                    <SelectValue placeholder="Sin asignar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Sin asignar</SelectItem>
+                    {trips.map(t => (
+                      <SelectItem key={t.id} value={t.id}>{t.client_name || 'Sin cliente'} - {format(new Date(t.scheduled_date), 'dd/MM')}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">Límite (Litros)</Label>
                 <Input
@@ -443,12 +646,23 @@ const FuelPage = () => {
                   value={voucherForm.limit_liters}
                   onChange={(e) => setVoucherForm({ ...voucherForm, limit_liters: e.target.value })}
                   className="rounded-sm"
+                  placeholder="100"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="input-label">Límite (Soles)</Label>
+                <Input
+                  type="number"
+                  value={voucherForm.limit_amount}
+                  onChange={(e) => setVoucherForm({ ...voucherForm, limit_amount: e.target.value })}
+                  className="rounded-sm"
+                  placeholder="500"
                 />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="input-label">Válido Desde *</Label>
+                <Label className="input-label">Válido Desde</Label>
                 <Input
                   type="date"
                   value={voucherForm.valid_from}
@@ -457,7 +671,7 @@ const FuelPage = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label className="input-label">Válido Hasta *</Label>
+                <Label className="input-label">Válido Hasta</Label>
                 <Input
                   type="date"
                   value={voucherForm.valid_until}
@@ -466,27 +680,60 @@ const FuelPage = () => {
                 />
               </div>
             </div>
+            
+            {/* Photo capture */}
+            <div className="space-y-2">
+              <Label className="input-label">Foto del Vale</Label>
+              <div className="flex gap-2">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => cameraInputRef.current?.click()}
+                  disabled={uploadingPhoto}
+                >
+                  {uploadingPhoto ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Camera className="w-4 h-4 mr-2" />}
+                  Tomar Foto
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingPhoto}
+                >
+                  <Image className="w-4 h-4 mr-2" />
+                  Seleccionar
+                </Button>
+              </div>
+              {capturedPhoto && (
+                <div className="mt-2 relative">
+                  <img src={capturedPhoto} alt="Vale" className="w-full max-h-48 object-contain rounded-sm border" />
+                  <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full p-1">
+                    <Check className="w-4 h-4" />
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowVoucherDialog(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => { resetVoucherForm(); setShowVoucherDialog(false); }}>Cancelar</Button>
             <Button 
               className="btn-action" 
-              onClick={handleCreateVoucher}
+              onClick={handleSaveVoucher}
               disabled={!voucherForm.voucher_number || !voucherForm.vehicle_id || !voucherForm.provider || saving}
             >
               {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Crear Vale
+              {editingVoucher ? 'Actualizar Vale' : 'Crear Vale'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Create Load Dialog */}
-      <Dialog open={showLoadDialog} onOpenChange={setShowLoadDialog}>
-        <DialogContent className="sm:max-w-[500px]">
+      {/* Load Dialog */}
+      <Dialog open={showLoadDialog} onOpenChange={(open) => { if (!open) resetLoadForm(); setShowLoadDialog(open); }}>
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
-              Registrar Carga de Combustible
+              {editingLoad ? 'Editar Carga de Combustible' : 'Registrar Carga de Combustible'}
             </DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -494,26 +741,26 @@ const FuelPage = () => {
               <div className="space-y-2">
                 <Label className="input-label">Vehículo *</Label>
                 <Select value={loadForm.vehicle_id} onValueChange={(v) => setLoadForm({ ...loadForm, vehicle_id: v })}>
-                  <SelectTrigger className="rounded-sm" data-testid="load-vehicle-select">
+                  <SelectTrigger className="rounded-sm">
                     <SelectValue placeholder="Seleccionar" />
                   </SelectTrigger>
                   <SelectContent>
-                    {vehicles.map(v => (
-                      <SelectItem key={v.id} value={v.id}>{v.plate}</SelectItem>
+                    {vehicles.filter(v => v.vehicle_type === 'tracto').map(v => (
+                      <SelectItem key={v.id} value={v.id}>{v.plate} - {v.brand}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label className="input-label">Vale (opcional)</Label>
-                <Select value={loadForm.voucher_id || "none"} onValueChange={(v) => setLoadForm({ ...loadForm, voucher_id: v === "none" ? "" : v })}>
+                <Label className="input-label">Vale (Opcional)</Label>
+                <Select value={loadForm.voucher_id || ""} onValueChange={(v) => setLoadForm({ ...loadForm, voucher_id: v })}>
                   <SelectTrigger className="rounded-sm">
                     <SelectValue placeholder="Sin vale" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Sin vale</SelectItem>
-                    {vouchers.filter(v => !v.is_used && v.vehicle_id === loadForm.vehicle_id).map(v => (
-                      <SelectItem key={v.id} value={v.id}>{v.voucher_number}</SelectItem>
+                    <SelectItem value="">Sin vale</SelectItem>
+                    {vouchers.filter(v => !v.is_used).map(v => (
+                      <SelectItem key={v.id} value={v.id}>{v.voucher_number} - {v.provider}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -528,17 +775,18 @@ const FuelPage = () => {
                   value={loadForm.liters}
                   onChange={(e) => setLoadForm({ ...loadForm, liters: e.target.value })}
                   className="rounded-sm"
-                  data-testid="load-liters-input"
+                  placeholder="50.00"
                 />
               </div>
               <div className="space-y-2">
-                <Label className="input-label">Precio/L *</Label>
+                <Label className="input-label">Precio/Litro *</Label>
                 <Input
                   type="number"
                   step="0.01"
                   value={loadForm.price_per_liter}
                   onChange={(e) => setLoadForm({ ...loadForm, price_per_liter: e.target.value })}
                   className="rounded-sm"
+                  placeholder="15.50"
                 />
               </div>
               <div className="space-y-2">
@@ -546,40 +794,74 @@ const FuelPage = () => {
                 <Input
                   value={`S/ ${((parseFloat(loadForm.liters) || 0) * (parseFloat(loadForm.price_per_liter) || 0)).toFixed(2)}`}
                   disabled
-                  className="rounded-sm bg-slate-50"
+                  className="rounded-sm bg-slate-50 font-bold"
                 />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="input-label">Odómetro *</Label>
+                <Label className="input-label">Odómetro (km) *</Label>
                 <Input
                   type="number"
                   value={loadForm.odometer}
                   onChange={(e) => setLoadForm({ ...loadForm, odometer: e.target.value })}
                   className="rounded-sm"
+                  placeholder="125000"
                 />
               </div>
               <div className="space-y-2">
-                <Label className="input-label">Proveedor *</Label>
+                <Label className="input-label">Proveedor/Grifo</Label>
                 <Input
                   value={loadForm.provider}
                   onChange={(e) => setLoadForm({ ...loadForm, provider: e.target.value })}
-                  placeholder="Nombre del grifo"
                   className="rounded-sm"
+                  placeholder="Repsol Km 45"
                 />
               </div>
             </div>
+            
+            {/* Photo capture */}
+            <div className="space-y-2">
+              <Label className="input-label">Foto del Recibo/Grifo</Label>
+              <div className="flex gap-2">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => cameraInputRef.current?.click()}
+                  disabled={uploadingPhoto}
+                >
+                  {uploadingPhoto ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Camera className="w-4 h-4 mr-2" />}
+                  Tomar Foto
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingPhoto}
+                >
+                  <Image className="w-4 h-4 mr-2" />
+                  Seleccionar
+                </Button>
+              </div>
+              {capturedPhoto && (
+                <div className="mt-2 relative">
+                  <img src={capturedPhoto} alt="Recibo" className="w-full max-h-48 object-contain rounded-sm border" />
+                  <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full p-1">
+                    <Check className="w-4 h-4" />
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowLoadDialog(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => { resetLoadForm(); setShowLoadDialog(false); }}>Cancelar</Button>
             <Button 
               className="btn-action" 
-              onClick={handleCreateLoad}
-              disabled={!loadForm.vehicle_id || !loadForm.liters || !loadForm.price_per_liter || !loadForm.odometer || !loadForm.provider || saving}
+              onClick={handleSaveLoad}
+              disabled={!loadForm.vehicle_id || !loadForm.liters || !loadForm.price_per_liter || !loadForm.odometer || saving}
             >
               {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Registrar Carga
+              {editingLoad ? 'Actualizar Carga' : 'Registrar Carga'}
             </Button>
           </DialogFooter>
         </DialogContent>
