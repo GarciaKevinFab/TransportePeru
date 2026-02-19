@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { vehiclesApi } from '../services/api';
+import api from '../services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -48,9 +49,13 @@ import {
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu';
 import { toast } from 'sonner';
+import { useAuth } from '../context/AuthContext';
 
 const VehiclesPage = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'owner' || user?.role === 'admin';
+  
   const [loading, setLoading] = useState(true);
   const [vehicles, setVehicles] = useState([]);
   const [filteredVehicles, setFilteredVehicles] = useState([]);
@@ -60,6 +65,7 @@ const VehiclesPage = () => {
   
   // Dialog states
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -75,6 +81,7 @@ const VehiclesPage = () => {
     color: '',
     fuel_capacity: '',
     tire_config: '6',
+    status: 'disponible',
   });
 
   const fetchVehicles = async () => {
