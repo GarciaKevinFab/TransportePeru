@@ -69,7 +69,7 @@ export const AuthProvider = ({ children }) => {
   const loginDriver = useCallback(async (dni, pin) => {
     try {
       setError(null);
-      const response = await axios.post(`${API_URL}/api/auth/login-driver`, { dni, pin });
+      const response = await axios.post(`${API_URL}/api/auth/login`, { dni, pin });
       const { access_token, refresh_token, user: userData } = response.data;
       
       localStorage.setItem('access_token', access_token);
