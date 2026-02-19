@@ -721,7 +721,7 @@ const FuelPage = () => {
               </div>
               <div className="space-y-2">
                 <Label className="input-label">Viaje (Opcional)</Label>
-                <Select value={voucherForm.trip_id || ""} onValueChange={(v) => setVoucherForm({ ...voucherForm, trip_id: v })}>
+                <Select value={voucherForm.trip_id || "none"} onValueChange={(v) => setVoucherForm({ ...voucherForm, trip_id: v === "none" ? "" : v })}>
                   <SelectTrigger className="rounded-sm">
                     <SelectValue placeholder="Sin asignar" />
                   </SelectTrigger>
