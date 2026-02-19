@@ -216,17 +216,7 @@ const MainLayout = ({ children }) => {
 
           <div className="flex items-center gap-4">
             {/* Notifications */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="relative"
-              data-testid="notifications-btn"
-            >
-              <Bell className="w-5 h-5" />
-              <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 bg-red-500 text-white text-xs">
-                3
-              </Badge>
-            </Button>
+            <NotificationsPopover />
 
             {/* User Menu */}
             <DropdownMenu>
