@@ -28,7 +28,7 @@ const MobileLayout = ({ children }) => {
   useEffect(() => {
     const fetchAlerts = async () => {
       try {
-        const res = await alertsApi.getAll({ resolved: false });
+        const res = await api.get('/alerts', { params: { resolved: false } });
         setAlertCount(res.data.length);
       } catch (e) {
         console.log('Error fetching alerts');
