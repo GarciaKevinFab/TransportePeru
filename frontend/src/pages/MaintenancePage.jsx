@@ -378,6 +378,12 @@ const MaintenancePage = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          {isAdmin && order.status !== 'completada' && (
+                            <DropdownMenuItem onClick={() => handleEditOrder(order)}>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Editar
+                            </DropdownMenuItem>
+                          )}
                           {order.status === 'abierta' && (
                             <DropdownMenuItem onClick={() => handleStartOrder(order.id)}>
                               <Play className="w-4 h-4 mr-2" />
@@ -391,6 +397,15 @@ const MaintenancePage = () => {
                             }}>
                               <CheckCircle className="w-4 h-4 mr-2" />
                               Completar
+                            </DropdownMenuItem>
+                          )}
+                          {isAdmin && order.status === 'abierta' && (
+                            <DropdownMenuItem 
+                              onClick={() => handleDeleteOrder(order.id)}
+                              className="text-red-600"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Eliminar
                             </DropdownMenuItem>
                           )}
                         </DropdownMenuContent>
