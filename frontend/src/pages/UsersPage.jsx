@@ -171,6 +171,52 @@ const UsersPage = () => {
       license_number: '',
       phone: '',
     });
+    setSelectedUser(null);
+  };
+
+  const handleEditUser = (userItem) => {
+    setSelectedUser(userItem);
+    setFormData({
+      name: userItem.name || '',
+      email: userItem.email || '',
+      dni: userItem.dni || '',
+      role: userItem.role || 'chofer',
+      password: '',
+      pin: '',
+      license_number: userItem.license_number || '',
+      phone: userItem.phone || '',
+    });
+    setShowEditDialog(true);
+  };
+
+  const handleUpdateUser = async () => {
+    if (!selectedUser) return;
+    setSaving(true);
+    try {
+      const updateData = { ...formData };
+      if (!updateData.password) delete updateData.password;
+      if (!updateData.pin) delete updateData.pin;
+      
+      await api.put(`/users/${selectedUser.id}`, updateData);
+      toast.success('Usuario actualizado');
+      setShowEditDialog(false);
+      resetForm();
+      fetchUsers();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Error al actualizar usuario');
+    }
+    setSaving(false);
+  };
+
+  const handleDeleteUser = async (userId) => {
+    if (!confirm('¿Eliminar este usuario?')) return;
+    try {
+      await api.delete(`/users/${userId}`);
+      toast.success('Usuario eliminado');
+      fetchUsers();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Error al eliminar usuario');
+    }
   };
 
   const getRoleBadge = (role) => {
