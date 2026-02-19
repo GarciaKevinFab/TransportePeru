@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { maintenanceApi, vehiclesApi } from '../services/api';
+import api from '../services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -38,6 +39,8 @@ import {
   Clock,
   AlertTriangle,
   MoreVertical,
+  Edit,
+  Trash2,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -48,14 +51,19 @@ import {
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useAuth } from '../context/AuthContext';
 
 const MaintenancePage = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'owner' || user?.role === 'admin' || user?.role === 'mantenimiento';
+  
   const [loading, setLoading] = useState(true);
   const [workOrders, setWorkOrders] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [statusFilter, setStatusFilter] = useState('all');
   
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -66,6 +74,7 @@ const MaintenancePage = () => {
     priority: 'normal',
     description: '',
     workshop: '',
+    status: 'abierta',
   });
   
   const [completeData, setCompleteData] = useState({
