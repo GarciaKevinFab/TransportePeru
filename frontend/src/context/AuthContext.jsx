@@ -62,7 +62,26 @@ export const AuthProvider = ({ children }) => {
     } catch (err) {
       const message = err.response?.data?.detail || 'Error al iniciar sesión';
       setError(message);
-      return { success: false, error: message };
+      throw err;
+    }
+  }, []);
+
+  const loginDriver = useCallback(async (dni, pin) => {
+    try {
+      setError(null);
+      const response = await axios.post(`${API_URL}/api/auth/login-driver`, { dni, pin });
+      const { access_token, refresh_token, user: userData } = response.data;
+      
+      localStorage.setItem('access_token', access_token);
+      localStorage.setItem('refresh_token', refresh_token);
+      axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+      
+      setUser(userData);
+      return { success: true, user: userData };
+    } catch (err) {
+      const message = err.response?.data?.detail || 'DNI o PIN incorrecto';
+      setError(message);
+      throw err;
     }
   }, []);
 
