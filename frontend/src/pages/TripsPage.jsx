@@ -182,7 +182,56 @@ const TripsPage = () => {
       cargo_weight: '',
       scheduled_date: '',
       notes: '',
+      status: 'programado',
     });
+    setSelectedTrip(null);
+  };
+
+  const handleEditTrip = (trip) => {
+    setSelectedTrip(trip);
+    setFormData({
+      tracto_id: trip.tracto_id || '',
+      carreta_id: trip.carreta_id || '',
+      driver_id: trip.driver_id || '',
+      route_id: trip.route_id || '',
+      client_name: trip.client_name || '',
+      cargo_description: trip.cargo_description || '',
+      cargo_weight: trip.cargo_weight?.toString() || '',
+      scheduled_date: trip.scheduled_date ? trip.scheduled_date.substring(0, 16) : '',
+      notes: trip.notes || '',
+      status: trip.status || 'programado',
+    });
+    setShowEditDialog(true);
+  };
+
+  const handleUpdateTrip = async () => {
+    if (!selectedTrip) return;
+    setSaving(true);
+    try {
+      await api.put(`/trips/${selectedTrip.id}`, {
+        ...formData,
+        cargo_weight: formData.cargo_weight ? parseFloat(formData.cargo_weight) : null,
+        scheduled_date: formData.scheduled_date ? new Date(formData.scheduled_date).toISOString() : null,
+      });
+      toast.success('Viaje actualizado');
+      setShowEditDialog(false);
+      resetForm();
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Error al actualizar viaje');
+    }
+    setSaving(false);
+  };
+
+  const handleDeleteTrip = async (tripId) => {
+    if (!confirm('¿Eliminar este viaje?')) return;
+    try {
+      await api.delete(`/trips/${tripId}`);
+      toast.success('Viaje eliminado');
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Error al eliminar viaje');
+    }
   };
 
   const getStatusBadge = (status) => {
