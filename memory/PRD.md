@@ -181,8 +181,8 @@ Cada empresa tiene su propio `company_id` que se utiliza para aislar todos los d
 
 ## 8. URLs del Sistema
 
-- **Frontend**: https://flota-peru.preview.emergentagent.com
-- **API**: https://flota-peru.preview.emergentagent.com/api
+- **Frontend**: https://fleet-manager-pe.preview.emergentagent.com
+- **API**: https://fleet-manager-pe.preview.emergentagent.com/api
 
 ## 9. Estructura de Archivos
 
