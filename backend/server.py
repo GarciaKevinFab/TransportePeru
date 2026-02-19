@@ -3546,6 +3546,91 @@ async def get_fuel_kpis(
     
     return {"vehicle_kpis": kpis}
 
+# ============== OCR ENDPOINT FOR FUEL VOUCHERS ==============
+@api_router.post("/fuel/ocr")
+async def extract_fuel_voucher_data(request: dict, current_user: dict = Depends(get_current_user)):
+    """
+    Extract data from fuel voucher photo using AI vision
+    Accepts base64 image data and returns extracted fields
+    """
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+        
+        image_data = request.get("image_base64", "")
+        if not image_data:
+            raise HTTPException(status_code=400, detail="Se requiere imagen en base64")
+        
+        # Clean base64 data
+        if "base64," in image_data:
+            image_data = image_data.split("base64,")[1]
+        
+        api_key = os.environ.get("EMERGENT_LLM_KEY", "")
+        if not api_key:
+            raise HTTPException(status_code=500, detail="API key no configurada")
+        
+        # Initialize chat with Gemini for vision
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=f"ocr-{uuid.uuid4()}",
+            system_message="""Eres un asistente especializado en extraer datos de vales y recibos de combustible peruanos.
+Analiza la imagen del vale de combustible y extrae la siguiente información en formato JSON:
+{
+    "voucher_number": "número del vale o comprobante",
+    "provider": "nombre del grifo/estación de servicio",
+    "liters": número de litros (solo número),
+    "price_per_liter": precio por litro (solo número),
+    "total_amount": monto total (solo número),
+    "date": "fecha en formato YYYY-MM-DD si es visible",
+    "vehicle_plate": "placa del vehículo si aparece",
+    "odometer": número del odómetro si aparece (solo número),
+    "fuel_type": "tipo de combustible (diesel, gasolina, etc)"
+}
+Si algún campo no es legible o no aparece, devuelve null para ese campo.
+Devuelve SOLO el JSON sin explicaciones adicionales."""
+        ).with_model("gemini", "gemini-2.5-flash")
+        
+        # Create image content
+        image_content = ImageContent(image_base64=image_data)
+        
+        # Send message with image
+        user_message = UserMessage(
+            text="Extrae los datos del siguiente vale de combustible:",
+            image_contents=[image_content]
+        )
+        
+        response = await chat.send_message(user_message)
+        
+        # Try to parse JSON from response
+        import json
+        import re
+        
+        # Clean response - remove markdown code blocks if present
+        cleaned_response = response.strip()
+        if cleaned_response.startswith("```"):
+            cleaned_response = re.sub(r'^```(?:json)?\n?', '', cleaned_response)
+            cleaned_response = re.sub(r'\n?```$', '', cleaned_response)
+        
+        try:
+            extracted_data = json.loads(cleaned_response)
+        except json.JSONDecodeError:
+            # Try to find JSON in response
+            json_match = re.search(r'\{[^{}]*\}', cleaned_response, re.DOTALL)
+            if json_match:
+                extracted_data = json.loads(json_match.group())
+            else:
+                extracted_data = {"raw_response": response, "parse_error": True}
+        
+        return {
+            "success": True,
+            "extracted_data": extracted_data
+        }
+        
+    except ImportError:
+        raise HTTPException(status_code=500, detail="Módulo de IA no disponible")
+    except Exception as e:
+        logging.error(f"OCR error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al procesar imagen: {str(e)}")
+
 # ============== DASHBOARD/REPORTS ROUTES ==============
 @api_router.get("/dashboard/kpis")
 async def get_dashboard_kpis(current_user: dict = Depends(get_current_user)):
