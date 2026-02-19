@@ -1205,6 +1205,117 @@ async def delete_user(user_id: str, current_user: dict = Depends(get_current_use
     
     return {"message": "Usuario eliminado"}
 
+# ============== MULTI-TENANT / COMPANY ROUTES ==============
+@api_router.get("/companies")
+async def get_companies(current_user: dict = Depends(get_current_user)):
+    """Get all companies (owner only) or current company"""
+    if current_user["role"] == "owner":
+        companies = await db.companies.find({}, {"_id": 0}).to_list(100)
+        return [serialize_doc(c) for c in companies]
+    else:
+        company = await db.companies.find_one({"id": current_user["company_id"]}, {"_id": 0})
+        return [serialize_doc(company)] if company else []
+
+@api_router.get("/companies/{company_id}")
+async def get_company(company_id: str, current_user: dict = Depends(get_current_user)):
+    """Get company details"""
+    if current_user["role"] != "owner" and current_user["company_id"] != company_id:
+        raise HTTPException(status_code=403, detail="No autorizado")
+    
+    company = await db.companies.find_one({"id": company_id}, {"_id": 0})
+    if not company:
+        raise HTTPException(status_code=404, detail="Empresa no encontrada")
+    return serialize_doc(company)
+
+@api_router.post("/companies")
+async def create_company(request: dict, current_user: dict = Depends(get_current_user)):
+    """Create new company (owner only)"""
+    if current_user["role"] != "owner":
+        raise HTTPException(status_code=403, detail="Solo el super admin puede crear empresas")
+    
+    company_id = str(uuid.uuid4())
+    company = {
+        "id": company_id,
+        "name": request["name"],
+        "ruc": request.get("ruc", ""),
+        "address": request.get("address"),
+        "phone": request.get("phone"),
+        "email": request.get("email"),
+        "config": request.get("config", {}),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    
+    await db.companies.insert_one(company)
+    
+    # Create default admin user for the company
+    if request.get("admin_email") and request.get("admin_password"):
+        admin_user = {
+            "id": str(uuid.uuid4()),
+            "company_id": company_id,
+            "email": request["admin_email"],
+            "name": request.get("admin_name", "Administrador"),
+            "role": "admin",
+            "password_hash": hash_password(request["admin_password"]),
+            "is_active": True,
+            "failed_attempts": 0,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        await db.users.insert_one(admin_user)
+    
+    return {"id": company_id, "message": "Empresa creada exitosamente"}
+
+@api_router.put("/companies/{company_id}")
+async def update_company(company_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+    """Update company (owner or admin of that company)"""
+    if current_user["role"] != "owner" and current_user["company_id"] != company_id:
+        raise HTTPException(status_code=403, detail="No autorizado")
+    
+    if current_user["role"] != "owner" and current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores pueden editar la empresa")
+    
+    request.pop("id", None)
+    request["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    result = await db.companies.update_one({"id": company_id}, {"$set": request})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Empresa no encontrada")
+    
+    return {"message": "Empresa actualizada"}
+
+@api_router.delete("/companies/{company_id}")
+async def delete_company(company_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete company and all its data (owner only)"""
+    if current_user["role"] != "owner":
+        raise HTTPException(status_code=403, detail="Solo el super admin puede eliminar empresas")
+    
+    # Delete all company data
+    collections = ["users", "vehicles", "trips", "documents", "work_orders", "issues", 
+                   "fuel_vouchers", "fuel_loads", "tires", "inventory_items", "alerts"]
+    
+    for collection in collections:
+        await db[collection].delete_many({"company_id": company_id})
+    
+    await db.companies.delete_one({"id": company_id})
+    
+    return {"message": "Empresa y todos sus datos eliminados"}
+
+@api_router.get("/companies/{company_id}/stats")
+async def get_company_stats(company_id: str, current_user: dict = Depends(get_current_user)):
+    """Get company statistics (owner or admin)"""
+    if current_user["role"] != "owner" and current_user["company_id"] != company_id:
+        raise HTTPException(status_code=403, detail="No autorizado")
+    
+    stats = {
+        "users": await db.users.count_documents({"company_id": company_id}),
+        "vehicles": await db.vehicles.count_documents({"company_id": company_id}),
+        "trips": await db.trips.count_documents({"company_id": company_id}),
+        "active_trips": await db.trips.count_documents({"company_id": company_id, "status": "en_curso"}),
+        "work_orders": await db.work_orders.count_documents({"company_id": company_id}),
+        "open_work_orders": await db.work_orders.count_documents({"company_id": company_id, "status": {"$ne": "completada"}}),
+    }
+    return stats
+
 # ============== VEHICLE ROUTES ==============
 @api_router.get("/vehicles")
 async def get_vehicles(
