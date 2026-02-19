@@ -20,6 +20,7 @@ import SettlementsPage from './pages/SettlementsPage';
 import ChecklistWizardPage from './pages/ChecklistWizardPage';
 import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
+import CompaniesPage from './pages/CompaniesPage';
 import OfflineIndicator from './components/OfflineIndicator';
 // Driver Mobile App Pages
 import DriverLoginPage from './pages/driver/DriverLoginPage';
