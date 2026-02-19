@@ -970,7 +970,7 @@ const FuelPage = () => {
                     <Check className="w-4 h-4" />
                   </div>
                 </div>
-              )}}
+              )}
             </div>
           </div>
           <DialogFooter>
