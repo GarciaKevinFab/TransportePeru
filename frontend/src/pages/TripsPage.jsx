@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { tripsApi, vehiclesApi, usersApi, routesApi } from '../services/api';
+import api from '../services/api';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -43,6 +44,8 @@ import {
   User,
   Calendar,
   MapPin,
+  Edit,
+  Trash2,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -53,9 +56,13 @@ import {
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useAuth } from '../context/AuthContext';
 
 const TripsPage = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'owner' || user?.role === 'admin';
+  
   const [loading, setLoading] = useState(true);
   const [trips, setTrips] = useState([]);
   const [filteredTrips, setFilteredTrips] = useState([]);
@@ -67,6 +74,8 @@ const TripsPage = () => {
   
   // Dialog states
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [selectedTrip, setSelectedTrip] = useState(null);
   const [saving, setSaving] = useState(false);
   
   // Form state
