@@ -158,6 +158,57 @@ const MaintenancePage = () => {
     setSaving(false);
   };
 
+  const resetForm = () => {
+    setFormData({
+      vehicle_id: '',
+      order_type: 'correctivo',
+      priority: 'normal',
+      description: '',
+      workshop: '',
+      status: 'abierta',
+    });
+    setSelectedOrder(null);
+  };
+
+  const handleEditOrder = (order) => {
+    setSelectedOrder(order);
+    setFormData({
+      vehicle_id: order.vehicle_id || '',
+      order_type: order.order_type || 'correctivo',
+      priority: order.priority || 'normal',
+      description: order.description || '',
+      workshop: order.workshop || '',
+      status: order.status || 'abierta',
+    });
+    setShowEditDialog(true);
+  };
+
+  const handleUpdateOrder = async () => {
+    if (!selectedOrder) return;
+    setSaving(true);
+    try {
+      await api.put(`/maintenance/work-orders/${selectedOrder.id}`, formData);
+      toast.success('Orden actualizada');
+      setShowEditDialog(false);
+      resetForm();
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Error al actualizar orden');
+    }
+    setSaving(false);
+  };
+
+  const handleDeleteOrder = async (orderId) => {
+    if (!confirm('¿Eliminar esta orden de trabajo?')) return;
+    try {
+      await api.delete(`/maintenance/work-orders/${orderId}`);
+      toast.success('Orden eliminada');
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Error al eliminar orden');
+    }
+  };
+
   const getVehiclePlate = (id) => {
     const v = vehicles.find(v => v.id === id);
     return v?.plate || '-';
