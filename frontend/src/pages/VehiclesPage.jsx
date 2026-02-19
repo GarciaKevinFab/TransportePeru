@@ -573,6 +573,140 @@ const VehiclesPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={(open) => { if (!open) resetForm(); setShowEditDialog(open); }}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
+              Editar Vehículo
+            </DialogTitle>
+            <DialogDescription>
+              Modifica los datos del vehículo {selectedVehicle?.plate}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="input-label">Placa *</Label>
+                <Input
+                  value={formData.plate}
+                  onChange={(e) => setFormData({ ...formData, plate: e.target.value.toUpperCase() })}
+                  placeholder="ABC-123"
+                  className="rounded-sm uppercase"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="input-label">Tipo *</Label>
+                <Select
+                  value={formData.vehicle_type}
+                  onValueChange={(v) => setFormData({ ...formData, vehicle_type: v })}
+                >
+                  <SelectTrigger className="rounded-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="tracto">Tracto</SelectItem>
+                    <SelectItem value="carreta">Carreta</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="input-label">Marca</Label>
+                <Input
+                  value={formData.brand}
+                  onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                  placeholder="Volvo, Scania, etc."
+                  className="rounded-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="input-label">Modelo</Label>
+                <Input
+                  value={formData.model}
+                  onChange={(e) => setFormData({ ...formData, model: e.target.value })}
+                  placeholder="FH16, R500, etc."
+                  className="rounded-sm"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label className="input-label">Año</Label>
+                <Input
+                  type="number"
+                  value={formData.year}
+                  onChange={(e) => setFormData({ ...formData, year: e.target.value })}
+                  placeholder="2024"
+                  className="rounded-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="input-label">Color</Label>
+                <Input
+                  value={formData.color}
+                  onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                  placeholder="Blanco"
+                  className="rounded-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="input-label">Cap. Combustible</Label>
+                <Input
+                  type="number"
+                  value={formData.fuel_capacity}
+                  onChange={(e) => setFormData({ ...formData, fuel_capacity: e.target.value })}
+                  placeholder="400"
+                  className="rounded-sm"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="input-label">VIN</Label>
+                <Input
+                  value={formData.vin}
+                  onChange={(e) => setFormData({ ...formData, vin: e.target.value.toUpperCase() })}
+                  placeholder="VIN"
+                  className="rounded-sm uppercase font-mono"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="input-label">Estado</Label>
+                <Select
+                  value={formData.status}
+                  onValueChange={(v) => setFormData({ ...formData, status: v })}
+                >
+                  <SelectTrigger className="rounded-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="disponible">Disponible</SelectItem>
+                    <SelectItem value="en_viaje">En Viaje</SelectItem>
+                    <SelectItem value="en_mantenimiento">En Mantenimiento</SelectItem>
+                    <SelectItem value="fuera_servicio">Fuera de Servicio</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { resetForm(); setShowEditDialog(false); }}>
+              Cancelar
+            </Button>
+            <Button
+              className="btn-action"
+              onClick={handleUpdateVehicle}
+              disabled={!formData.plate || saving}
+            >
+              {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Actualizar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
