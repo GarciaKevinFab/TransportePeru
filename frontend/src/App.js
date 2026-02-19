@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Toaster } from './components/ui/sonner';
 import MainLayout from './layouts/MainLayout';
+import MobileLayout from './layouts/MobileLayout';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import VehiclesPage from './pages/VehiclesPage';
@@ -20,6 +21,12 @@ import ChecklistWizardPage from './pages/ChecklistWizardPage';
 import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
 import OfflineIndicator from './components/OfflineIndicator';
+// Driver Mobile App Pages
+import DriverLoginPage from './pages/driver/DriverLoginPage';
+import DriverHomePage from './pages/driver/DriverHomePage';
+import DriverTripPage from './pages/driver/DriverTripPage';
+import DriverFuelPage from './pages/driver/DriverFuelPage';
+import DriverIssuesPage from './pages/driver/DriverIssuesPage';
 import './App.css';
 
 // Protected Route Component
