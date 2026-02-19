@@ -2441,6 +2441,22 @@ async def update_work_order(order_id: str, request: dict, current_user: dict = D
     
     return {"message": "Orden actualizada"}
 
+@api_router.delete("/maintenance/work-orders/{order_id}")
+async def delete_work_order(order_id: str, current_user: dict = Depends(get_current_user)):
+    if current_user["role"] not in ["owner", "admin", "mantenimiento"]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+    
+    order = await db.work_orders.find_one({"id": order_id, "company_id": current_user["company_id"]})
+    if not order:
+        raise HTTPException(status_code=404, detail="Orden no encontrada")
+    
+    if order.get("status") != "abierta":
+        raise HTTPException(status_code=400, detail="Solo se pueden eliminar órdenes abiertas")
+    
+    await db.work_orders.delete_one({"id": order_id, "company_id": current_user["company_id"]})
+    
+    return {"message": "Orden eliminada"}
+
 # ============== ISSUE ROUTES ==============
 @api_router.get("/issues")
 async def get_issues(
