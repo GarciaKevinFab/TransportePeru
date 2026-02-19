@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { usersApi } from '../services/api';
+import api from '../services/api';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -39,6 +40,7 @@ import {
   User,
   Truck,
   Shield,
+  Trash2,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -47,6 +49,7 @@ import {
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu';
 import { toast } from 'sonner';
+import { useAuth } from '../context/AuthContext';
 
 const ROLES = [
   { value: 'admin', label: 'Administrador', icon: Shield, color: 'bg-purple-100 text-purple-800' },
@@ -59,6 +62,9 @@ const ROLES = [
 ];
 
 const UsersPage = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'owner' || user?.role === 'admin';
+  
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
@@ -67,6 +73,7 @@ const UsersPage = () => {
   
   // Dialog states
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const [showResetPinDialog, setShowResetPinDialog] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [saving, setSaving] = useState(false);
