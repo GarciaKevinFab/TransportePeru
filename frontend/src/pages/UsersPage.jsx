@@ -347,19 +347,30 @@ const UsersPage = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <Edit className="w-4 h-4 mr-2" />
-                            Editar
-                          </DropdownMenuItem>
-                          {user.role === 'chofer' && (
+                          {isAdmin && (
+                            <DropdownMenuItem onClick={() => handleEditUser(userItem)}>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Editar
+                            </DropdownMenuItem>
+                          )}
+                          {userItem.role === 'chofer' && (
                             <DropdownMenuItem
                               onClick={() => {
-                                setSelectedUser(user);
+                                setSelectedUser(userItem);
                                 setShowResetPinDialog(true);
                               }}
                             >
                               <Key className="w-4 h-4 mr-2" />
                               Resetear PIN
+                            </DropdownMenuItem>
+                          )}
+                          {isAdmin && userItem.role !== 'owner' && (
+                            <DropdownMenuItem
+                              onClick={() => handleDeleteUser(userItem.id)}
+                              className="text-red-600"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Eliminar
                             </DropdownMenuItem>
                           )}
                         </DropdownMenuContent>
