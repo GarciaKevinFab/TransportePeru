@@ -1185,6 +1185,26 @@ async def reset_user_pin(user_id: str, request: dict, current_user: dict = Depen
     
     return {"message": "PIN reseteado. El usuario deberá cambiarlo en su próximo inicio de sesión."}
 
+@api_router.delete("/users/{user_id}")
+async def delete_user(user_id: str, current_user: dict = Depends(get_current_user)):
+    if current_user["role"] not in ["owner", "admin"]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+    
+    # Cannot delete owner users or self
+    target_user = await db.users.find_one({"id": user_id, "company_id": current_user["company_id"]})
+    if not target_user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    if target_user.get("role") == "owner":
+        raise HTTPException(status_code=400, detail="No se puede eliminar al propietario")
+    
+    if user_id == current_user["id"]:
+        raise HTTPException(status_code=400, detail="No puede eliminarse a sí mismo")
+    
+    await db.users.delete_one({"id": user_id, "company_id": current_user["company_id"]})
+    
+    return {"message": "Usuario eliminado"}
+
 # ============== VEHICLE ROUTES ==============
 @api_router.get("/vehicles")
 async def get_vehicles(
