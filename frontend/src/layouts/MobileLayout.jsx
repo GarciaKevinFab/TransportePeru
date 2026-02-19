@@ -17,7 +17,7 @@ import {
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { useState, useEffect } from 'react';
-import { alertsApi } from '../services/api';
+import api from '../services/api';
 
 const MobileLayout = ({ children }) => {
   const { user, logout } = useAuth();
