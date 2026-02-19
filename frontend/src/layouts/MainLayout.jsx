@@ -35,6 +35,7 @@ import NotificationsPopover from '../components/NotificationsPopover';
 
 const menuItems = [
   { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', roles: ['owner', 'admin', 'operaciones', 'flota', 'mantenimiento', 'almacen', 'contabilidad'] },
+  { path: '/companies', icon: Building2, label: 'Empresas', roles: ['owner'] },
   { path: '/vehicles', icon: Truck, label: 'Vehículos', roles: ['owner', 'admin', 'operaciones', 'flota', 'mantenimiento'] },
   { path: '/documents', icon: FileText, label: 'Documentos', roles: ['owner', 'admin', 'flota'] },
   { path: '/trips', icon: Route, label: 'Viajes', roles: ['owner', 'admin', 'operaciones', 'contabilidad', 'chofer'] },
