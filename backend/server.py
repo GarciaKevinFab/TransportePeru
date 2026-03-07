@@ -3718,25 +3718,23 @@ async def extract_fuel_voucher_data(request: dict, current_user: dict = Depends(
     Accepts base64 image data and returns extracted fields
     """
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
-        
+        from google import genai
+
         image_data = request.get("image_base64", "")
         if not image_data:
             raise HTTPException(status_code=400, detail="Se requiere imagen en base64")
-        
+
         # Clean base64 data
         if "base64," in image_data:
             image_data = image_data.split("base64,")[1]
-        
-        api_key = os.environ.get("EMERGENT_LLM_KEY", "")
+
+        api_key = os.environ.get("GOOGLE_API_KEY", "")
         if not api_key:
             raise HTTPException(status_code=500, detail="API key no configurada")
-        
-        # Initialize chat with Gemini for vision
-        chat = LlmChat(
-            api_key=api_key,
-            session_id=f"ocr-{uuid.uuid4()}",
-            system_message="""Eres un asistente especializado en extraer datos de vales y recibos de combustible peruanos.
+
+        client = genai.Client(api_key=api_key)
+
+        system_message = """Eres un asistente especializado en extraer datos de vales y recibos de combustible peruanos.
 Analiza la imagen del vale de combustible y extrae la siguiente información en formato JSON:
 {
     "voucher_number": "número del vale o comprobante",
@@ -3751,18 +3749,21 @@ Analiza la imagen del vale de combustible y extrae la siguiente información en 
 }
 Si algún campo no es legible o no aparece, devuelve null para ese campo.
 Devuelve SOLO el JSON sin explicaciones adicionales."""
-        ).with_model("gemini", "gemini-2.5-flash")
-        
-        # Create image content
-        image_content = ImageContent(image_base64=image_data)
-        
-        # Send message with image
-        user_message = UserMessage(
-            text="Extrae los datos del siguiente vale de combustible:",
-            image_contents=[image_content]
+
+        import base64
+        image_bytes = base64.b64decode(image_data)
+
+        result = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=[
+                {"role": "user", "parts": [
+                    {"text": system_message + "\n\nExtrae los datos del siguiente vale de combustible:"},
+                    {"inline_data": {"mime_type": "image/jpeg", "data": image_data}}
+                ]}
+            ]
         )
-        
-        response = await chat.send_message(user_message)
+
+        response = result.text
         
         # Try to parse JSON from response
         import json

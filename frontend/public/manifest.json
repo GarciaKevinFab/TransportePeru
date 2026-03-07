@@ -1,7 +1,7 @@
 {
-  "name": "TransportePeru",
-  "short_name": "TransPeru",
-  "description": "Sistema de Gestión de Flota y Transporte",
+  "name": "G&E Transporta S.A.C",
+  "short_name": "G&E Transporta",
+  "description": "Sistema de Gestion de Flota y Transporte",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f172a",

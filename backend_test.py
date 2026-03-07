@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 
 class TransportePeruAPITester:
-    def __init__(self, base_url: str = "https://fleet-manager-pe.preview.emergentagent.com"):
+    def __init__(self, base_url: str = "http://localhost:8001"):
         self.base_url = base_url
         self.admin_token = None
         self.driver_token = None

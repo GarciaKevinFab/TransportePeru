@@ -4,7 +4,7 @@
 - **Nombre:** TransportePeru SaaS
 - **Descripción:** Sistema de Gestión de Transportes y Flota para empresas de transporte en Perú
 - **Tecnologías:** FastAPI (Backend), React (Frontend), MongoDB (Database), TailwindCSS + shadcn/ui (Styling)
-- **Preview URL:** https://fleet-manager-pe.preview.emergentagent.com
+- **URL Local:** http://localhost:3000 (frontend) / http://localhost:8001 (backend)
 
 ## Credenciales de Prueba
 - **Admin:** admin@transperu.com / admin123
@@ -87,7 +87,7 @@
 
 ### ✅ OCR con Gemini Vision
 - Extracción automática de datos de vales de combustible
-- Usa emergentintegrations con EMERGENT_LLM_KEY
+- Usa google-genai con GOOGLE_API_KEY
 
 ### 🟡 AWS S3 (Preparado)
 - boto3 instalado
