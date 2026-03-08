@@ -25,7 +25,6 @@ services:
   - type: web
     name: ge-transporta-web
     runtime: static
-    region: oregon
     rootDir: frontend
     buildCommand: yarn install && yarn build
     staticPublishPath: build
