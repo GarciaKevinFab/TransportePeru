@@ -239,6 +239,7 @@ export const dashboardApi = {
 // Seed API
 export const seedApi = {
   seed: () => api.post('/seed'),
+  bootstrap: () => api.post('/bootstrap'),
 };
 
 // Upload API

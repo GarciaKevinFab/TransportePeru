@@ -5,7 +5,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Truck, User, Lock, AlertCircle, Loader2 } from 'lucide-react';
+import { Truck, User, Lock, AlertCircle, Loader2, Shield } from 'lucide-react';
 import { seedApi } from '../services/api';
 import { toast } from 'sonner';
 
@@ -13,7 +13,8 @@ const LoginPage = () => {
   const { login, error } = useAuth();
   const [loading, setLoading] = useState(false);
   const [seeding, setSeeding] = useState(false);
-  
+  const [bootstrapping, setBootstrapping] = useState(false);
+
   // Admin form state
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
@@ -40,6 +41,26 @@ const LoginPage = () => {
     if (!result.success) {
       toast.error(result.error);
     }
+  };
+
+  const handleBootstrap = async () => {
+    setBootstrapping(true);
+    try {
+      const response = await seedApi.bootstrap();
+      const creds = response.data.credentials;
+      toast.success('Super Admin (Owner) creado exitosamente');
+      toast.info(`Email: ${creds.email}`);
+      toast.info(`Password: ${creds.password}`);
+      setAdminEmail(creds.email);
+      setAdminPassword(creds.password);
+    } catch (err) {
+      if (err.response?.data?.detail?.includes('Ya existe')) {
+        toast.info('Ya existe un usuario Owner. Use sus credenciales para acceder.');
+      } else {
+        toast.error('Error al crear Super Admin');
+      }
+    }
+    setBootstrapping(false);
   };
 
   const handleSeedData = async () => {
@@ -71,9 +92,9 @@ const LoginPage = () => {
               <Truck className="w-10 h-10 text-white" />
             </div>
             <h1 className="font-heading text-4xl font-black text-white tracking-tight uppercase">
-              TransportePeru
+              G&E Transporta
             </h1>
-            <p className="text-slate-400 mt-2">Sistema de Gestión de Flota</p>
+            <p className="text-slate-400 mt-2">Sistema de Gestion de Flota</p>
           </div>
 
           {/* Login Card */}
@@ -213,8 +234,23 @@ const LoginPage = () => {
                 </div>
               )}
 
-              {/* Seed Data Button */}
-              <div className="mt-6 pt-6 border-t border-slate-200">
+              {/* Setup Buttons */}
+              <div className="mt-6 pt-6 border-t border-slate-200 space-y-3">
+                <Button
+                  type="button"
+                  variant="default"
+                  className="w-full rounded-sm text-xs uppercase tracking-wide bg-orange-500 hover:bg-orange-600"
+                  onClick={handleBootstrap}
+                  disabled={bootstrapping}
+                  data-testid="bootstrap-btn"
+                >
+                  {bootstrapping ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Shield className="w-4 h-4 mr-2" />
+                  )}
+                  Crear Super Admin (Owner)
+                </Button>
                 <Button
                   type="button"
                   variant="outline"
@@ -229,7 +265,7 @@ const LoginPage = () => {
                   Crear Datos de Demostración
                 </Button>
                 <p className="text-xs text-slate-500 text-center mt-2">
-                  Crea usuarios, vehículos y datos de prueba
+                  Super Admin gestiona empresas. Demo crea datos de prueba.
                 </p>
               </div>
             </CardContent>
@@ -237,7 +273,7 @@ const LoginPage = () => {
 
           {/* Footer */}
           <p className="text-center text-slate-400 text-sm mt-6">
-            © 2026 TransportePeru. Todos los derechos reservados.
+            © 2026 G&E Transporta S.A.C. — by Star Insights IT
           </p>
         </div>
       </div>

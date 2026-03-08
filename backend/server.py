@@ -4244,6 +4244,67 @@ async def generate_alerts(current_user: dict = Depends(get_current_user)):
     
     return {"message": f"{alerts_created} alertas generadas"}
 
+# ============== BOOTSTRAP: CREATE FIRST OWNER (SUPER ADMIN) ==============
+@api_router.post("/bootstrap")
+async def bootstrap_owner():
+    """
+    Create the first owner (super admin) user.
+    Only works when NO owner user exists in the system.
+    This is the entry point for multi-tenancy management.
+    """
+    # Check if any owner already exists
+    existing_owner = await db.users.find_one({"role": "owner"})
+    if existing_owner:
+        raise HTTPException(
+            status_code=400,
+            detail="Ya existe un usuario owner. Use las credenciales de owner para acceder."
+        )
+
+    # Create the owner's company (Star Insights IT as system company)
+    owner_company = Company(
+        name="Star Insights IT",
+        ruc="00000000000",
+        address="Sistema",
+        phone="",
+        email="owner@starinsights.pe",
+        config={
+            "lockout_minutes": 15,
+            "max_failed_attempts": 5,
+            "tire_critical_depth": 3,
+            "tire_warning_depth": 5
+        }
+    )
+    company_doc = owner_company.model_dump()
+    for key, value in company_doc.items():
+        if isinstance(value, datetime):
+            company_doc[key] = value.isoformat()
+    await db.companies.insert_one(company_doc)
+
+    # Create owner user
+    owner_user = User(
+        company_id=owner_company.id,
+        email="owner@starinsights.pe",
+        name="Super Administrador",
+        role=UserRole.OWNER,
+        password_hash=hash_password("owner2025")
+    )
+    owner_doc = owner_user.model_dump()
+    for key, value in owner_doc.items():
+        if isinstance(value, datetime):
+            owner_doc[key] = value.isoformat()
+    await db.users.insert_one(owner_doc)
+
+    return {
+        "message": "Owner (Super Admin) creado exitosamente",
+        "credentials": {
+            "email": "owner@starinsights.pe",
+            "password": "owner2025",
+            "role": "owner"
+        },
+        "company_id": owner_company.id,
+        "instructions": "Inicie sesion con estas credenciales. Luego vaya a Empresas para crear las empresas clientes."
+    }
+
 # ============== SEED DATA ROUTE (FOR DEMO) ==============
 @api_router.post("/seed")
 async def seed_demo_data():
