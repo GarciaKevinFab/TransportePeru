@@ -4244,6 +4244,17 @@ async def generate_alerts(current_user: dict = Depends(get_current_user)):
     
     return {"message": f"{alerts_created} alertas generadas"}
 
+# ============== SYSTEM STATUS (public, no auth) ==============
+@api_router.get("/system/status")
+async def system_status():
+    """Check if the system has been initialized (owner exists)"""
+    owner_exists = await db.users.find_one({"role": "owner"}) is not None
+    company_count = await db.companies.count_documents({})
+    return {
+        "initialized": owner_exists,
+        "companies": company_count
+    }
+
 # ============== BOOTSTRAP: CREATE FIRST OWNER (SUPER ADMIN) ==============
 @api_router.post("/bootstrap")
 async def bootstrap_owner():

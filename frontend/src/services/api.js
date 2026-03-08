@@ -236,10 +236,11 @@ export const dashboardApi = {
   getRecentActivity: () => api.get('/dashboard/recent-activity'),
 };
 
-// Seed API
+// Seed & System API
 export const seedApi = {
   seed: () => api.post('/seed'),
   bootstrap: () => api.post('/bootstrap'),
+  systemStatus: () => api.get('/system/status'),
 };
 
 // Upload API

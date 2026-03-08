@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -14,10 +14,24 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [seeding, setSeeding] = useState(false);
   const [bootstrapping, setBootstrapping] = useState(false);
+  const [systemInitialized, setSystemInitialized] = useState(true); // default hidden
 
   // Admin form state
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
+
+  // Check if system is already initialized
+  useEffect(() => {
+    const checkSystem = async () => {
+      try {
+        const res = await seedApi.systemStatus();
+        setSystemInitialized(res.data.initialized);
+      } catch {
+        setSystemInitialized(false); // Show buttons if backend not reachable (first setup)
+      }
+    };
+    checkSystem();
+  }, []);
   
   // Driver form state
   const [driverDni, setDriverDni] = useState('');
@@ -234,40 +248,42 @@ const LoginPage = () => {
                 </div>
               )}
 
-              {/* Setup Buttons */}
-              <div className="mt-6 pt-6 border-t border-slate-200 space-y-3">
-                <Button
-                  type="button"
-                  variant="default"
-                  className="w-full rounded-sm text-xs uppercase tracking-wide bg-orange-500 hover:bg-orange-600"
-                  onClick={handleBootstrap}
-                  disabled={bootstrapping}
-                  data-testid="bootstrap-btn"
-                >
-                  {bootstrapping ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Shield className="w-4 h-4 mr-2" />
-                  )}
-                  Crear Super Admin (Owner)
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full rounded-sm text-xs uppercase tracking-wide"
-                  onClick={handleSeedData}
-                  disabled={seeding}
-                  data-testid="seed-data-btn"
-                >
-                  {seeding ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : null}
-                  Crear Datos de Demostración
-                </Button>
-                <p className="text-xs text-slate-500 text-center mt-2">
-                  Super Admin gestiona empresas. Demo crea datos de prueba.
-                </p>
-              </div>
+              {/* Setup Buttons - only show when system is not initialized */}
+              {!systemInitialized && (
+                <div className="mt-6 pt-6 border-t border-slate-200 space-y-3">
+                  <Button
+                    type="button"
+                    variant="default"
+                    className="w-full rounded-sm text-xs uppercase tracking-wide bg-orange-500 hover:bg-orange-600"
+                    onClick={handleBootstrap}
+                    disabled={bootstrapping}
+                    data-testid="bootstrap-btn"
+                  >
+                    {bootstrapping ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Shield className="w-4 h-4 mr-2" />
+                    )}
+                    Crear Super Admin (Owner)
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full rounded-sm text-xs uppercase tracking-wide"
+                    onClick={handleSeedData}
+                    disabled={seeding}
+                    data-testid="seed-data-btn"
+                  >
+                    {seeding ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : null}
+                    Crear Datos de Demostración
+                  </Button>
+                  <p className="text-xs text-slate-500 text-center mt-2">
+                    Super Admin gestiona empresas. Demo crea datos de prueba.
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
