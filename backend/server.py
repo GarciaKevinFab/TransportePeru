@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Query
+from fastapi import FastAPI, APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Query, Body
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -1155,7 +1155,7 @@ async def create_user(request: CreateUserRequest, current_user: dict = Depends(g
     return {"id": user.id, "message": "Usuario creado exitosamente"}
 
 @api_router.put("/users/{user_id}")
-async def update_user(user_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+async def update_user(user_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     if current_user["role"] not in ["owner", "admin"] and current_user["id"] != user_id:
         raise HTTPException(status_code=403, detail="No autorizado")
     
@@ -1178,7 +1178,7 @@ async def update_user(user_id: str, request: dict, current_user: dict = Depends(
     return {"message": "Usuario actualizado"}
 
 @api_router.post("/users/{user_id}/reset-pin")
-async def reset_user_pin(user_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+async def reset_user_pin(user_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     if current_user["role"] not in ["owner", "admin"]:
         raise HTTPException(status_code=403, detail="No autorizado")
     
@@ -1241,7 +1241,7 @@ async def get_company(company_id: str, current_user: dict = Depends(get_current_
     return serialize_doc(company)
 
 @api_router.post("/companies")
-async def create_company(request: dict, current_user: dict = Depends(get_current_user)):
+async def create_company(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """Create new company (owner only)"""
     if current_user["role"] != "owner":
         raise HTTPException(status_code=403, detail="Solo el super admin puede crear empresas")
@@ -1279,7 +1279,7 @@ async def create_company(request: dict, current_user: dict = Depends(get_current
     return {"id": company_id, "message": "Empresa creada exitosamente"}
 
 @api_router.put("/companies/{company_id}")
-async def update_company(company_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+async def update_company(company_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """Update company (owner or admin of that company)"""
     if current_user["role"] != "owner" and current_user["company_id"] != company_id:
         raise HTTPException(status_code=403, detail="No autorizado")
@@ -1391,7 +1391,7 @@ async def create_vehicle(request: CreateVehicleRequest, current_user: dict = Dep
     return {"id": vehicle.id, "message": "Vehículo creado exitosamente"}
 
 @api_router.put("/vehicles/{vehicle_id}")
-async def update_vehicle(vehicle_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+async def update_vehicle(vehicle_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     if current_user["role"] not in ["owner", "admin", "flota"]:
         raise HTTPException(status_code=403, detail="No autorizado")
     
@@ -1429,7 +1429,7 @@ async def delete_vehicle(vehicle_id: str, current_user: dict = Depends(get_curre
 
 # ============== VEHICLE DRIVER ASSIGNMENT ==============
 @api_router.post("/vehicles/{vehicle_id}/assign-driver")
-async def assign_driver_to_vehicle(vehicle_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+async def assign_driver_to_vehicle(vehicle_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     if current_user["role"] not in ["owner", "admin", "operaciones"]:
         raise HTTPException(status_code=403, detail="No autorizado")
 
@@ -1482,7 +1482,7 @@ async def get_vehicle_equipment(vehicle_id: str, current_user: dict = Depends(ge
     return serialize_doc(doc)
 
 @api_router.put("/vehicles/{vehicle_id}/equipment")
-async def update_vehicle_equipment(vehicle_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+async def update_vehicle_equipment(vehicle_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     if current_user["role"] not in ["owner", "admin", "flota", "almacen"]:
         raise HTTPException(status_code=403, detail="No autorizado")
 
@@ -1512,7 +1512,7 @@ async def update_vehicle_equipment(vehicle_id: str, request: dict, current_user:
 
 # ============== VIÁTICOS BUDGET ==============
 @api_router.post("/trips/{trip_id}/viatico-budget")
-async def set_viatico_budget(trip_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+async def set_viatico_budget(trip_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     if current_user["role"] not in ["owner", "admin", "operaciones", "contabilidad"]:
         raise HTTPException(status_code=403, detail="No autorizado")
 
@@ -1541,7 +1541,7 @@ async def set_viatico_budget(trip_id: str, request: dict, current_user: dict = D
 
 # ============== COUPLING ROUTES ==============
 @api_router.post("/couplings")
-async def create_coupling(request: dict, current_user: dict = Depends(get_current_user)):
+async def create_coupling(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     coupling = CouplingHistory(
         company_id=current_user["company_id"],
         tracto_id=request["tracto_id"],
@@ -1582,7 +1582,7 @@ async def get_document_types(
     return [serialize_doc(t) for t in types]
 
 @api_router.post("/document-types")
-async def create_document_type(request: dict, current_user: dict = Depends(get_current_user)):
+async def create_document_type(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     if current_user["role"] not in ["owner", "admin"]:
         raise HTTPException(status_code=403, detail="No autorizado")
     
@@ -1654,7 +1654,7 @@ async def create_document(request: CreateDocumentRequest, current_user: dict = D
     return {"id": document.id, "message": "Documento creado"}
 
 @api_router.put("/documents/{document_id}")
-async def update_document(document_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+async def update_document(document_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     request.pop("id", None)
     request.pop("company_id", None)
     request["updated_at"] = datetime.now(timezone.utc).isoformat()
@@ -1780,7 +1780,7 @@ async def get_blocks(
     return [serialize_doc(b) for b in blocks]
 
 @api_router.post("/blocks/{block_id}/resolve")
-async def resolve_block(block_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+async def resolve_block(block_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     if current_user["role"] not in ["owner", "admin", "flota", "operaciones"]:
         raise HTTPException(status_code=403, detail="No autorizado")
     
@@ -1804,7 +1804,7 @@ async def get_routes(current_user: dict = Depends(get_current_user)):
     return [serialize_doc(r) for r in routes]
 
 @api_router.post("/routes")
-async def create_route(request: dict, current_user: dict = Depends(get_current_user)):
+async def create_route(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     if current_user["role"] not in ["owner", "admin", "operaciones"]:
         raise HTTPException(status_code=403, detail="No autorizado")
     
@@ -1911,7 +1911,7 @@ async def create_trip(request: CreateTripRequest, current_user: dict = Depends(g
     return {"id": trip.id, "message": "Viaje creado"}
 
 @api_router.put("/trips/{trip_id}")
-async def update_trip(trip_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+async def update_trip(trip_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     request.pop("id", None)
     request.pop("company_id", None)
     request["updated_at"] = datetime.now(timezone.utc).isoformat()
@@ -1944,7 +1944,7 @@ async def delete_trip(trip_id: str, current_user: dict = Depends(get_current_use
     return {"message": "Viaje eliminado"}
 
 @api_router.post("/trips/{trip_id}/start")
-async def start_trip(trip_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+async def start_trip(trip_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     trip = await db.trips.find_one({"id": trip_id, "company_id": current_user["company_id"]})
     if not trip:
         raise HTTPException(status_code=404, detail="Viaje no encontrado")
@@ -1991,7 +1991,7 @@ async def start_trip(trip_id: str, request: dict, current_user: dict = Depends(g
     return {"message": "Viaje iniciado"}
 
 @api_router.post("/trips/{trip_id}/complete")
-async def complete_trip(trip_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+async def complete_trip(trip_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     trip = await db.trips.find_one({"id": trip_id, "company_id": current_user["company_id"]})
     if not trip:
         raise HTTPException(status_code=404, detail="Viaje no encontrado")
@@ -2035,7 +2035,7 @@ async def get_trip_advances(trip_id: str, current_user: dict = Depends(get_curre
     return [serialize_doc(a) for a in advances]
 
 @api_router.post("/trips/{trip_id}/advances")
-async def create_trip_advance(trip_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+async def create_trip_advance(trip_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     if current_user["role"] not in ["owner", "admin", "contabilidad"]:
         raise HTTPException(status_code=403, detail="No autorizado")
     
@@ -2072,7 +2072,7 @@ async def get_trip_expenses(trip_id: str, current_user: dict = Depends(get_curre
     return [serialize_doc(e) for e in expenses]
 
 @api_router.post("/trips/{trip_id}/expenses")
-async def create_trip_expense(trip_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+async def create_trip_expense(trip_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     expense = TripExpense(
         company_id=current_user["company_id"],
         trip_id=trip_id,
@@ -2114,7 +2114,7 @@ async def get_checklists(
     return [serialize_doc(c) for c in checklists]
 
 @api_router.post("/checklists")
-async def create_checklist(request: dict, current_user: dict = Depends(get_current_user)):
+async def create_checklist(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     checklist = Checklist(
         company_id=current_user["company_id"],
         trip_id=request["trip_id"],
@@ -2156,7 +2156,7 @@ async def get_fuel_vouchers(
     return [serialize_doc(v) for v in vouchers]
 
 @api_router.post("/fuel/vouchers")
-async def create_fuel_voucher(request: dict, current_user: dict = Depends(get_current_user)):
+async def create_fuel_voucher(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     if current_user["role"] not in ["owner", "admin", "operaciones"]:
         raise HTTPException(status_code=403, detail="No autorizado")
     
@@ -2197,7 +2197,7 @@ async def get_fuel_loads(
     return [serialize_doc(l) for l in loads]
 
 @api_router.post("/fuel/loads")
-async def create_fuel_load(request: dict, current_user: dict = Depends(get_current_user)):
+async def create_fuel_load(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     load = FuelLoad(
         company_id=current_user["company_id"],
         vehicle_id=request["vehicle_id"],
@@ -2235,7 +2235,7 @@ async def create_fuel_load(request: dict, current_user: dict = Depends(get_curre
     return {"id": load.id, "message": "Cargue registrado"}
 
 @api_router.put("/fuel/vouchers/{voucher_id}")
-async def update_fuel_voucher(voucher_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+async def update_fuel_voucher(voucher_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """Update a fuel voucher - Admin only"""
     if current_user["role"] not in ["owner", "admin"]:
         raise HTTPException(status_code=403, detail="Solo administradores pueden editar vales")
@@ -2271,7 +2271,7 @@ async def delete_fuel_voucher(voucher_id: str, current_user: dict = Depends(get_
     return {"message": "Vale eliminado"}
 
 @api_router.put("/fuel/loads/{load_id}")
-async def update_fuel_load(load_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+async def update_fuel_load(load_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """Update a fuel load - Admin only"""
     if current_user["role"] not in ["owner", "admin"]:
         raise HTTPException(status_code=403, detail="Solo administradores pueden editar cargas")
@@ -2408,7 +2408,7 @@ async def mount_tire(request: MountTireRequest, current_user: dict = Depends(get
     return {"id": mount.id, "message": "Llanta montada"}
 
 @api_router.post("/tires/{tire_id}/unmount")
-async def unmount_tire(tire_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+async def unmount_tire(tire_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     if current_user["role"] not in ["owner", "admin", "mantenimiento", "flota"]:
         raise HTTPException(status_code=403, detail="No autorizado")
     
@@ -2558,7 +2558,7 @@ async def get_maintenance_plans(current_user: dict = Depends(get_current_user)):
     return [serialize_doc(p) for p in plans]
 
 @api_router.post("/maintenance/plans")
-async def create_maintenance_plan(request: dict, current_user: dict = Depends(get_current_user)):
+async def create_maintenance_plan(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     if current_user["role"] not in ["owner", "admin", "mantenimiento"]:
         raise HTTPException(status_code=403, detail="No autorizado")
     
@@ -2595,7 +2595,7 @@ async def get_work_orders(
     return [serialize_doc(o) for o in orders]
 
 @api_router.post("/maintenance/work-orders")
-async def create_work_order(request: dict, current_user: dict = Depends(get_current_user)):
+async def create_work_order(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     if current_user["role"] not in ["owner", "admin", "mantenimiento", "flota"]:
         raise HTTPException(status_code=403, detail="No autorizado")
     
@@ -2644,7 +2644,7 @@ async def create_work_order(request: dict, current_user: dict = Depends(get_curr
     return {"id": order.id, "order_number": order_number, "message": "Orden de trabajo creada"}
 
 @api_router.put("/maintenance/work-orders/{order_id}")
-async def update_work_order(order_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+async def update_work_order(order_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     request.pop("id", None)
     request.pop("company_id", None)
     request["updated_at"] = datetime.now(timezone.utc).isoformat()
@@ -2710,7 +2710,7 @@ async def get_issues(
     return [serialize_doc(i) for i in issues]
 
 @api_router.post("/issues")
-async def create_issue(request: dict, current_user: dict = Depends(get_current_user)):
+async def create_issue(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     issue = Issue(
         company_id=current_user["company_id"],
         trip_id=request.get("trip_id"),
@@ -2735,7 +2735,7 @@ async def create_issue(request: dict, current_user: dict = Depends(get_current_u
     return {"id": issue.id, "message": "Incidente registrado"}
 
 @api_router.put("/issues/{issue_id}")
-async def update_issue(issue_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+async def update_issue(issue_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     request.pop("id", None)
     request.pop("company_id", None)
     request["updated_at"] = datetime.now(timezone.utc).isoformat()
@@ -2763,7 +2763,7 @@ async def get_checklist_templates(
     return [serialize_doc(t) for t in templates]
 
 @api_router.post("/checklist-templates")
-async def create_checklist_template(request: dict, current_user: dict = Depends(get_current_user)):
+async def create_checklist_template(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     if current_user["role"] not in ["owner", "admin"]:
         raise HTTPException(status_code=403, detail="No autorizado")
     
@@ -2781,7 +2781,7 @@ async def create_checklist_template(request: dict, current_user: dict = Depends(
     return {"id": template.id, "message": "Plantilla creada"}
 
 @api_router.put("/checklist-templates/{template_id}")
-async def update_checklist_template(template_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+async def update_checklist_template(template_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     if current_user["role"] not in ["owner", "admin"]:
         raise HTTPException(status_code=403, detail="No autorizado")
     
@@ -2804,7 +2804,7 @@ async def get_checklist_by_trip(trip_id: str, current_user: dict = Depends(get_c
     return serialize_doc(checklist) if checklist else None
 
 @api_router.post("/checklists/start")
-async def start_checklist(request: dict, current_user: dict = Depends(get_current_user)):
+async def start_checklist(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """Start a new checklist for a trip"""
     trip_id = request["trip_id"]
     
@@ -2854,7 +2854,7 @@ async def start_checklist(request: dict, current_user: dict = Depends(get_curren
     return {"id": checklist.id, "message": "Checklist iniciado"}
 
 @api_router.post("/checklists/{checklist_id}/submit")
-async def submit_checklist(checklist_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+async def submit_checklist(checklist_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """Submit a completed checklist"""
     checklist = await db.checklist_runs.find_one({
         "id": checklist_id,
@@ -2957,7 +2957,7 @@ async def submit_checklist(checklist_id: str, request: dict, current_user: dict 
     }
 
 @api_router.post("/trip/{trip_id}/checklist")
-async def submit_trip_checklist(trip_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+async def submit_trip_checklist(trip_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """Submit a complete checklist for a trip (combines start and submit)"""
     # Get trip
     trip = await db.trips.find_one({"id": trip_id, "company_id": current_user["company_id"]})
@@ -3077,7 +3077,7 @@ async def get_trip_settlement(trip_id: str, current_user: dict = Depends(get_cur
     return serialize_doc(settlement) if settlement else None
 
 @api_router.post("/trips/{trip_id}/settlement")
-async def create_or_update_settlement(trip_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+async def create_or_update_settlement(trip_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """Create or update settlement for a trip"""
     trip = await db.trips.find_one({"id": trip_id, "company_id": current_user["company_id"]})
     if not trip:
@@ -3140,7 +3140,7 @@ async def create_or_update_settlement(trip_id: str, request: dict, current_user:
         return {"id": settlement.id, "message": "Liquidación creada"}
 
 @api_router.post("/settlements/{settlement_id}/close")
-async def close_settlement(settlement_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+async def close_settlement(settlement_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """Close a settlement"""
     if current_user["role"] not in ["owner", "admin", "contabilidad"]:
         raise HTTPException(status_code=403, detail="No autorizado")
@@ -3203,7 +3203,7 @@ async def get_inventory_items(
     return [serialize_doc(i) for i in items]
 
 @api_router.post("/inventory/items")
-async def create_inventory_item(request: dict, current_user: dict = Depends(get_current_user)):
+async def create_inventory_item(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     if current_user["role"] not in ["owner", "admin", "almacen"]:
         raise HTTPException(status_code=403, detail="No autorizado")
     
@@ -3228,7 +3228,7 @@ async def create_inventory_item(request: dict, current_user: dict = Depends(get_
     return {"id": item.id, "message": "Item creado"}
 
 @api_router.post("/inventory/moves")
-async def create_stock_move(request: dict, current_user: dict = Depends(get_current_user)):
+async def create_stock_move(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """Create a stock movement (entry/exit/adjustment)"""
     if current_user["role"] not in ["owner", "admin", "almacen", "mantenimiento"]:
         raise HTTPException(status_code=403, detail="No autorizado")
@@ -3312,7 +3312,7 @@ async def get_suppliers(current_user: dict = Depends(get_current_user)):
     return [serialize_doc(s) for s in suppliers]
 
 @api_router.post("/suppliers")
-async def create_supplier(request: dict, current_user: dict = Depends(get_current_user)):
+async def create_supplier(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     if current_user["role"] not in ["owner", "admin", "almacen"]:
         raise HTTPException(status_code=403, detail="No autorizado")
     
@@ -3345,7 +3345,7 @@ async def get_purchase_orders(
     return [serialize_doc(o) for o in orders]
 
 @api_router.post("/purchase-orders")
-async def create_purchase_order(request: dict, current_user: dict = Depends(get_current_user)):
+async def create_purchase_order(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     if current_user["role"] not in ["owner", "admin", "almacen"]:
         raise HTTPException(status_code=403, detail="No autorizado")
     
@@ -3377,7 +3377,7 @@ async def create_purchase_order(request: dict, current_user: dict = Depends(get_
     return {"id": order.id, "order_number": order_number, "message": "Orden de compra creada"}
 
 @api_router.post("/purchase-orders/{order_id}/receive")
-async def receive_purchase_order(order_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+async def receive_purchase_order(order_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """Receive a purchase order and update inventory"""
     if current_user["role"] not in ["owner", "admin", "almacen"]:
         raise HTTPException(status_code=403, detail="No autorizado")
@@ -3430,7 +3430,7 @@ async def receive_purchase_order(order_id: str, request: dict, current_user: dic
 
 # ============== EXTENDED WORK ORDER ROUTES ==============
 @api_router.post("/maintenance/work-orders/{order_id}/start")
-async def start_work_order(order_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+async def start_work_order(order_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """Start a work order"""
     if current_user["role"] not in ["owner", "admin", "mantenimiento"]:
         raise HTTPException(status_code=403, detail="No autorizado")
@@ -3473,7 +3473,7 @@ async def start_work_order(order_id: str, request: dict, current_user: dict = De
     return {"message": "Orden iniciada"}
 
 @api_router.post("/maintenance/work-orders/{order_id}/complete")
-async def complete_work_order(order_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+async def complete_work_order(order_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """Complete a work order"""
     if current_user["role"] not in ["owner", "admin", "mantenimiento"]:
         raise HTTPException(status_code=403, detail="No autorizado")
@@ -3567,7 +3567,7 @@ async def complete_work_order(order_id: str, request: dict, current_user: dict =
 
 # ============== TIRE EXTENDED ROUTES ==============
 @api_router.post("/tires/rotate")
-async def rotate_tires(request: dict, current_user: dict = Depends(get_current_user)):
+async def rotate_tires(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """Rotate tires on a vehicle"""
     if current_user["role"] not in ["owner", "admin", "mantenimiento", "flota"]:
         raise HTTPException(status_code=403, detail="No autorizado")
@@ -3608,7 +3608,7 @@ async def rotate_tires(request: dict, current_user: dict = Depends(get_current_u
     return {"id": rotation.id, "message": "Rotación realizada"}
 
 @api_router.post("/tires/align")
-async def record_alignment(request: dict, current_user: dict = Depends(get_current_user)):
+async def record_alignment(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """Record an alignment service"""
     if current_user["role"] not in ["owner", "admin", "mantenimiento", "flota"]:
         raise HTTPException(status_code=403, detail="No autorizado")
@@ -3837,7 +3837,7 @@ async def get_fuel_kpis(
 
 # ============== OCR ENDPOINT FOR FUEL VOUCHERS ==============
 @api_router.post("/fuel/ocr")
-async def extract_fuel_voucher_data(request: dict, current_user: dict = Depends(get_current_user)):
+async def extract_fuel_voucher_data(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """
     Extract data from fuel voucher photo using AI vision
     Accepts base64 image data and returns extracted fields
@@ -4090,7 +4090,7 @@ async def upload_file(
     return {"url": relative_url, "filename": filename, "storage": "local"}
 
 @api_router.post("/upload/base64")
-async def upload_base64(request: dict, current_user: dict = Depends(get_current_user)):
+async def upload_base64(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """Upload base64 encoded image (for camera captures)"""
     data = request.get("data", "")
     entity_type = request.get("entity_type", "general")
@@ -4142,7 +4142,7 @@ async def upload_base64(request: dict, current_user: dict = Depends(get_current_
 
 # ============== PUSH NOTIFICATIONS ==============
 @api_router.post("/notifications/subscribe")
-async def subscribe_push(request: dict, current_user: dict = Depends(get_current_user)):
+async def subscribe_push(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """Subscribe to push notifications"""
     subscription = request.get("subscription", {})
     
@@ -4188,7 +4188,7 @@ async def get_notifications(
     return [serialize_doc(n) for n in notifications]
 
 @api_router.post("/notifications")
-async def create_notification(request: dict, current_user: dict = Depends(get_current_user)):
+async def create_notification(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """Create a notification (admin only)"""
     if current_user["role"] not in ["owner", "admin"]:
         raise HTTPException(status_code=403, detail="No autorizado")
@@ -5020,7 +5020,7 @@ async def get_document_types_config(current_user: dict = Depends(get_current_use
     return [serialize_doc(dt) for dt in doc_types]
 
 @api_router.post("/config/document-types")
-async def create_document_type_config(request: dict, current_user: dict = Depends(get_current_user)):
+async def create_document_type_config(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """Create new document type"""
     if current_user["role"] not in ["owner", "admin"]:
         raise HTTPException(status_code=403, detail="No autorizado")
@@ -5042,7 +5042,7 @@ async def create_document_type_config(request: dict, current_user: dict = Depend
     return {"id": doc_type.id, "message": "Tipo de documento creado"}
 
 @api_router.put("/config/document-types/{doc_type_id}")
-async def update_document_type_config(doc_type_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+async def update_document_type_config(doc_type_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """Update document type"""
     if current_user["role"] not in ["owner", "admin"]:
         raise HTTPException(status_code=403, detail="No autorizado")
@@ -5098,7 +5098,7 @@ async def get_checklist_templates_config(current_user: dict = Depends(get_curren
     return [serialize_doc(t) for t in templates]
 
 @api_router.post("/config/checklist-templates")
-async def create_checklist_template_config(request: dict, current_user: dict = Depends(get_current_user)):
+async def create_checklist_template_config(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """Create checklist template"""
     if current_user["role"] not in ["owner", "admin"]:
         raise HTTPException(status_code=403, detail="No autorizado")
@@ -5119,7 +5119,7 @@ async def create_checklist_template_config(request: dict, current_user: dict = D
     return {"id": template.id, "message": "Plantilla creada"}
 
 @api_router.put("/config/checklist-templates/{template_id}")
-async def update_checklist_template_config(template_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+async def update_checklist_template_config(template_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """Update checklist template"""
     if current_user["role"] not in ["owner", "admin"]:
         raise HTTPException(status_code=403, detail="No autorizado")
@@ -5151,7 +5151,7 @@ async def get_company_config(current_user: dict = Depends(get_current_user)):
     return serialize_doc(company)
 
 @api_router.put("/config/company")
-async def update_company_config(request: dict, current_user: dict = Depends(get_current_user)):
+async def update_company_config(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """Update company configuration"""
     if current_user["role"] not in ["owner", "admin"]:
         raise HTTPException(status_code=403, detail="No autorizado")
