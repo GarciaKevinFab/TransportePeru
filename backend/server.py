@@ -192,10 +192,20 @@ class Vehicle(BaseModel):
     odometer: int = 0
     fuel_capacity: Optional[float] = None
     tire_config: str = "6"  # Number of tires
+    assigned_driver_id: Optional[str] = None
     photo_url: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     created_by: Optional[str] = None
+
+class VehicleEquipment(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    company_id: str
+    vehicle_id: str
+    items: List[Dict[str, Any]] = []  # [{name, quantity, condition, expiry_date}]
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_by: Optional[str] = None
 
 class CouplingHistory(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -300,6 +310,9 @@ class Trip(BaseModel):
     total_advance: float = 0
     total_expenses: float = 0
     settlement_status: str = "pending"
+    viatico_budget: Optional[float] = None
+    viatico_days: Optional[int] = None
+    viatico_daily: Optional[float] = None
     notes: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -1413,6 +1426,118 @@ async def delete_vehicle(vehicle_id: str, current_user: dict = Depends(get_curre
         raise HTTPException(status_code=404, detail="Vehículo no encontrado")
     
     return {"message": "Vehículo eliminado"}
+
+# ============== VEHICLE DRIVER ASSIGNMENT ==============
+@api_router.post("/vehicles/{vehicle_id}/assign-driver")
+async def assign_driver_to_vehicle(vehicle_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+    if current_user["role"] not in ["owner", "admin", "operaciones"]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+
+    driver_id = request.get("driver_id")
+
+    # If assigning (not unassigning), validate driver exists
+    if driver_id:
+        driver = await db.users.find_one({"id": driver_id, "company_id": current_user["company_id"], "role": "chofer"})
+        if not driver:
+            raise HTTPException(status_code=404, detail="Chofer no encontrado")
+
+        # Remove this driver from any other vehicle
+        await db.vehicles.update_many(
+            {"company_id": current_user["company_id"], "assigned_driver_id": driver_id},
+            {"$set": {"assigned_driver_id": None}}
+        )
+
+    result = await db.vehicles.update_one(
+        {"id": vehicle_id, "company_id": current_user["company_id"]},
+        {"$set": {"assigned_driver_id": driver_id, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Vehículo no encontrado")
+
+    return {"message": "Chofer asignado" if driver_id else "Chofer desasignado"}
+
+# ============== VEHICLE EQUIPMENT (EPP) ==============
+@api_router.get("/vehicles/{vehicle_id}/equipment")
+async def get_vehicle_equipment(vehicle_id: str, current_user: dict = Depends(get_current_user)):
+    doc = await db.vehicle_equipment.find_one(
+        {"vehicle_id": vehicle_id, "company_id": current_user["company_id"]},
+        {"_id": 0}
+    )
+    if not doc:
+        # Return default EPP items
+        return {
+            "vehicle_id": vehicle_id,
+            "items": [
+                {"name": "botiquin", "label": "Botiquín", "quantity": 0, "condition": "pendiente", "expiry_date": None},
+                {"name": "extintor", "label": "Extintor", "quantity": 0, "condition": "pendiente", "expiry_date": None},
+                {"name": "chaleco", "label": "Chalecos Reflectivos", "quantity": 0, "condition": "pendiente", "expiry_date": None},
+                {"name": "casco", "label": "Cascos", "quantity": 0, "condition": "pendiente", "expiry_date": None},
+                {"name": "guantes", "label": "Guantes", "quantity": 0, "condition": "pendiente", "expiry_date": None},
+                {"name": "lentes", "label": "Lentes de Seguridad", "quantity": 0, "condition": "pendiente", "expiry_date": None},
+                {"name": "conos", "label": "Conos/Triángulos", "quantity": 0, "condition": "pendiente", "expiry_date": None},
+                {"name": "linterna", "label": "Linterna", "quantity": 0, "condition": "pendiente", "expiry_date": None},
+            ]
+        }
+    return serialize_doc(doc)
+
+@api_router.put("/vehicles/{vehicle_id}/equipment")
+async def update_vehicle_equipment(vehicle_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+    if current_user["role"] not in ["owner", "admin", "flota", "almacen"]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+
+    items = request.get("items", [])
+
+    existing = await db.vehicle_equipment.find_one(
+        {"vehicle_id": vehicle_id, "company_id": current_user["company_id"]}
+    )
+
+    if existing:
+        await db.vehicle_equipment.update_one(
+            {"vehicle_id": vehicle_id, "company_id": current_user["company_id"]},
+            {"$set": {"items": items, "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": current_user["id"]}}
+        )
+    else:
+        equipment = VehicleEquipment(
+            company_id=current_user["company_id"],
+            vehicle_id=vehicle_id,
+            items=items,
+            updated_by=current_user["id"]
+        )
+        doc = equipment.model_dump()
+        doc["updated_at"] = doc["updated_at"].isoformat()
+        await db.vehicle_equipment.insert_one(doc)
+
+    return {"message": "Equipamiento actualizado"}
+
+# ============== VIÁTICOS BUDGET ==============
+@api_router.post("/trips/{trip_id}/viatico-budget")
+async def set_viatico_budget(trip_id: str, request: dict, current_user: dict = Depends(get_current_user)):
+    if current_user["role"] not in ["owner", "admin", "operaciones", "contabilidad"]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+
+    budget = float(request.get("budget", 0))
+    if budget < 0:
+        raise HTTPException(status_code=400, detail="El presupuesto debe ser positivo")
+    days = int(request.get("days", 1))
+    if days < 1:
+        days = 1
+    daily = round(budget / days, 2)
+
+    result = await db.trips.update_one(
+        {"id": trip_id, "company_id": current_user["company_id"]},
+        {"$set": {
+            "viatico_budget": budget,
+            "viatico_days": days,
+            "viatico_daily": daily,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Viaje no encontrado")
+
+    return {"message": "Presupuesto de viáticos asignado", "daily": daily}
 
 # ============== COUPLING ROUTES ==============
 @api_router.post("/couplings")

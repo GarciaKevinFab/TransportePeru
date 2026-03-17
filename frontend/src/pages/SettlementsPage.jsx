@@ -82,6 +82,12 @@ const SettlementsPage = () => {
     notes: '',
   });
 
+  const [showBudgetDialog, setShowBudgetDialog] = useState(false);
+  const [budgetForm, setBudgetForm] = useState({
+    budget: '',
+    days: '',
+  });
+
   const expenseCategories = [
     { value: 'alimentacion', label: 'Alimentación', icon: '🍽️' },
     { value: 'hospedaje', label: 'Hospedaje', icon: '🏨' },
@@ -223,6 +229,39 @@ const SettlementsPage = () => {
       toast.error(error.response?.data?.detail || 'Error al cerrar liquidación');
     }
     setSaving(false);
+  };
+
+  const handleSetBudget = async () => {
+    if (!selectedTrip || !budgetForm.budget || !budgetForm.days) return;
+    setSaving(true);
+    try {
+      await api.post(`/trips/${selectedTrip.id}/viatico-budget`, {
+        budget: parseFloat(budgetForm.budget),
+        days: parseInt(budgetForm.days),
+      });
+      toast.success('Presupuesto de viáticos asignado');
+      setShowBudgetDialog(false);
+      // Update selectedTrip locally first
+      setSelectedTrip(prev => ({
+        ...prev,
+        viatico_budget: parseFloat(budgetForm.budget),
+        viatico_days: parseInt(budgetForm.days),
+        viatico_daily: Math.round(parseFloat(budgetForm.budget) / parseInt(budgetForm.days) * 100) / 100,
+      }));
+      setBudgetForm({ budget: '', days: '' });
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Error al asignar presupuesto');
+    }
+    setSaving(false);
+  };
+
+  const handleOpenBudget = (trip) => {
+    setBudgetForm({
+      budget: trip.viatico_budget?.toString() || '',
+      days: trip.viatico_days?.toString() || '',
+    });
+    setShowBudgetDialog(true);
   };
 
   const getDriverName = (id) => drivers.find(d => d.id === id)?.name || '-';
@@ -436,6 +475,45 @@ const SettlementsPage = () => {
                   <p className="font-medium">{getDriverName(selectedTrip.driver_id)}</p>
                 </div>
               </div>
+
+              {/* Viáticos Budget */}
+              {selectedTrip.viatico_budget ? (
+                <div className="mb-4 p-4 bg-indigo-50 rounded-sm border border-indigo-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs uppercase font-bold text-indigo-700 tracking-widest">Presupuesto de Viáticos</p>
+                    {selectedTrip.settlement_status !== 'cerrado' && (
+                      <Button size="sm" variant="outline" onClick={() => handleOpenBudget(selectedTrip)} className="h-7 text-xs">
+                        Editar
+                      </Button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <p className="text-xs text-indigo-600">Total Asignado</p>
+                      <p className="font-heading text-xl font-bold text-indigo-700">S/ {selectedTrip.viatico_budget?.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-indigo-600">Días</p>
+                      <p className="font-heading text-xl font-bold text-indigo-700">{selectedTrip.viatico_days}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-indigo-600">Por Día</p>
+                      <p className="font-heading text-xl font-bold text-indigo-700">S/ {selectedTrip.viatico_daily?.toFixed(2)}</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="mb-4">
+                  <Button
+                    variant="outline"
+                    className="w-full border-dashed border-indigo-300 text-indigo-600 hover:bg-indigo-50"
+                    onClick={() => handleOpenBudget(selectedTrip)}
+                  >
+                    <Calculator className="w-4 h-4 mr-2" />
+                    Asignar Presupuesto de Viáticos
+                  </Button>
+                </div>
+              )}
 
               {/* Summary Cards */}
               <div className="grid grid-cols-3 gap-4 mb-4">
@@ -747,6 +825,59 @@ const SettlementsPage = () => {
             >
               {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Registrar Anticipo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Budget Dialog */}
+      <Dialog open={showBudgetDialog} onOpenChange={setShowBudgetDialog}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
+              Presupuesto de Viáticos
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label className="input-label">Monto Total (S/) *</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={budgetForm.budget}
+                onChange={(e) => setBudgetForm({ ...budgetForm, budget: e.target.value })}
+                className="rounded-sm"
+                placeholder="Ej: 2700"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="input-label">Cantidad de Días *</Label>
+              <Input
+                type="number"
+                min="1"
+                value={budgetForm.days}
+                onChange={(e) => setBudgetForm({ ...budgetForm, days: e.target.value })}
+                className="rounded-sm"
+                placeholder="Ej: 5"
+              />
+            </div>
+            {budgetForm.budget && budgetForm.days && parseInt(budgetForm.days) > 0 && (
+              <div className="p-4 bg-indigo-50 rounded-sm border border-indigo-200">
+                <p className="text-xs uppercase font-bold text-indigo-700 mb-1">Cálculo por día</p>
+                <p className="font-heading text-2xl font-bold text-indigo-700">
+                  S/ {(parseFloat(budgetForm.budget) / parseInt(budgetForm.days)).toFixed(2)} / día
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBudgetDialog(false)}>Cancelar</Button>
+            <Button
+              className="btn-action"
+              onClick={handleSetBudget}
+              disabled={!budgetForm.budget || !budgetForm.days || saving}
+            >
+              {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Asignar Presupuesto
             </Button>
           </DialogFooter>
         </DialogContent>

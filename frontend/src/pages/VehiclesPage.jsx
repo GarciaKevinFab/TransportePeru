@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { vehiclesApi } from '../services/api';
+import { vehiclesApi, usersApi } from '../services/api';
 import api from '../services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -41,6 +41,9 @@ import {
   Trash2,
   Loader2,
   CircleDot,
+  UserCheck,
+  Shield,
+  User,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -58,16 +61,22 @@ const VehiclesPage = () => {
   
   const [loading, setLoading] = useState(true);
   const [vehicles, setVehicles] = useState([]);
+  const [drivers, setDrivers] = useState([]);
   const [filteredVehicles, setFilteredVehicles] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  
+
   // Dialog states
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showAssignDriverDialog, setShowAssignDriverDialog] = useState(false);
+  const [showEquipmentDialog, setShowEquipmentDialog] = useState(false);
+  const [showDetailDialog, setShowDetailDialog] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
+  const [selectedDriverId, setSelectedDriverId] = useState('');
+  const [equipmentItems, setEquipmentItems] = useState([]);
   const [saving, setSaving] = useState(false);
   
   // Form state
@@ -87,9 +96,13 @@ const VehiclesPage = () => {
   const fetchVehicles = async () => {
     setLoading(true);
     try {
-      const response = await vehiclesApi.getAll();
-      setVehicles(response.data);
-      setFilteredVehicles(response.data);
+      const [vehiclesRes, driversRes] = await Promise.all([
+        vehiclesApi.getAll(),
+        usersApi.getAll({ role: 'chofer' }),
+      ]);
+      setVehicles(vehiclesRes.data);
+      setFilteredVehicles(vehiclesRes.data);
+      setDrivers(driversRes.data);
     } catch (error) {
       toast.error('Error al cargar vehículos');
     }
@@ -208,6 +221,75 @@ const VehiclesPage = () => {
     setSaving(false);
   };
 
+  const handleViewDetail = async (vehicle) => {
+    setSelectedVehicle(vehicle);
+    try {
+      const res = await vehiclesApi.getEquipment(vehicle.id);
+      setEquipmentItems(res.data.items || []);
+    } catch {
+      setEquipmentItems([]);
+    }
+    setShowDetailDialog(true);
+  };
+
+  const getDriverName = (driverId) => {
+    if (!driverId) return null;
+    const driver = drivers.find(d => d.id === driverId);
+    return driver?.name || null;
+  };
+
+  const handleOpenAssignDriver = (vehicle) => {
+    setSelectedVehicle(vehicle);
+    setSelectedDriverId(vehicle.assigned_driver_id || 'none');
+    setShowAssignDriverDialog(true);
+  };
+
+  const handleAssignDriver = async () => {
+    if (!selectedVehicle) return;
+    setSaving(true);
+    const driverId = selectedDriverId === 'none' ? null : selectedDriverId;
+    try {
+      await vehiclesApi.assignDriver(selectedVehicle.id, driverId);
+      toast.success(driverId ? 'Chofer asignado exitosamente' : 'Chofer desasignado');
+      setShowAssignDriverDialog(false);
+      setSelectedDriverId('none');
+      fetchVehicles();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Error al asignar chofer');
+    }
+    setSaving(false);
+  };
+
+  const handleOpenEquipment = async (vehicle) => {
+    setSelectedVehicle(vehicle);
+    try {
+      const res = await vehiclesApi.getEquipment(vehicle.id);
+      setEquipmentItems(res.data.items || []);
+    } catch {
+      setEquipmentItems([]);
+    }
+    setShowEquipmentDialog(true);
+  };
+
+  const handleSaveEquipment = async () => {
+    if (!selectedVehicle) return;
+    setSaving(true);
+    try {
+      await vehiclesApi.updateEquipment(selectedVehicle.id, { items: equipmentItems });
+      toast.success('Equipamiento actualizado');
+      setShowEquipmentDialog(false);
+    } catch (error) {
+      toast.error('Error al guardar equipamiento');
+    }
+    setSaving(false);
+  };
+
+  const updateEquipmentItem = (index, field, value) => {
+    const updated = [...equipmentItems];
+    updated[index] = { ...updated[index], [field]: value };
+    setEquipmentItems(updated);
+  };
+
   const getStatusBadge = (status) => {
     const styles = {
       disponible: 'bg-green-100 text-green-800 border-green-200',
@@ -323,6 +405,7 @@ const VehiclesPage = () => {
                   <TableHead>Tipo</TableHead>
                   <TableHead>Marca / Modelo</TableHead>
                   <TableHead>Año</TableHead>
+                  <TableHead>Chofer Asignado</TableHead>
                   <TableHead>Odómetro</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
@@ -343,6 +426,16 @@ const VehiclesPage = () => {
                         <p className="text-xs text-slate-500">{vehicle.model || '-'}</p>
                       </div>
                     </TableCell>
+                    <TableCell>
+                      {getDriverName(vehicle.assigned_driver_id) ? (
+                        <div className="flex items-center gap-1">
+                          <User className="w-3 h-3 text-green-600" />
+                          <span className="text-sm">{getDriverName(vehicle.assigned_driver_id)}</span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-400">Sin asignar</span>
+                      )}
+                    </TableCell>
                     <TableCell>{vehicle.year || '-'}</TableCell>
                     <TableCell>
                       <span className="font-mono">
@@ -358,7 +451,7 @@ const VehiclesPage = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => navigate(`/vehicles/${vehicle.id}`)}>
+                          <DropdownMenuItem onClick={() => handleViewDetail(vehicle)}>
                             <Eye className="w-4 h-4 mr-2" />
                             Ver Detalles
                           </DropdownMenuItem>
@@ -371,6 +464,16 @@ const VehiclesPage = () => {
                           <DropdownMenuItem onClick={() => navigate(`/vehicles/${vehicle.id}/tires`)}>
                             <CircleDot className="w-4 h-4 mr-2" />
                             Ver Llantas
+                          </DropdownMenuItem>
+                          {isAdmin && (
+                            <DropdownMenuItem onClick={() => handleOpenAssignDriver(vehicle)}>
+                              <UserCheck className="w-4 h-4 mr-2" />
+                              Asignar Chofer
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem onClick={() => handleOpenEquipment(vehicle)}>
+                            <Shield className="w-4 h-4 mr-2" />
+                            Equipamiento EPP
                           </DropdownMenuItem>
                           {isAdmin && (
                             <DropdownMenuItem
@@ -703,6 +806,223 @@ const VehiclesPage = () => {
             >
               {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Actualizar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Vehicle Detail Dialog */}
+      <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
+        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
+              Detalle del Vehículo
+            </DialogTitle>
+            <DialogDescription>
+              {selectedVehicle?.plate} - {selectedVehicle?.vehicle_type === 'tracto' ? 'Tracto' : 'Carreta'}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedVehicle && (
+            <div className="py-4 space-y-4">
+              {/* Vehicle Info */}
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <p className="text-xs uppercase text-slate-500 font-bold">Placa</p>
+                  <p className="font-mono font-bold text-lg">{selectedVehicle.plate}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase text-slate-500 font-bold">Marca / Modelo</p>
+                  <p className="font-medium">{selectedVehicle.brand || '-'} {selectedVehicle.model || ''}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase text-slate-500 font-bold">Año</p>
+                  <p className="font-medium">{selectedVehicle.year || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase text-slate-500 font-bold">VIN</p>
+                  <p className="font-mono text-sm">{selectedVehicle.vin || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase text-slate-500 font-bold">Odómetro</p>
+                  <p className="font-mono">{selectedVehicle.odometer?.toLocaleString() || 0} km</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase text-slate-500 font-bold">Estado</p>
+                  {getStatusBadge(selectedVehicle.status)}
+                </div>
+              </div>
+
+              {/* Assigned Driver */}
+              <div className="p-3 bg-slate-50 rounded-sm">
+                <p className="text-xs uppercase text-slate-500 font-bold mb-1">Chofer Asignado</p>
+                {getDriverName(selectedVehicle.assigned_driver_id) ? (
+                  <div className="flex items-center gap-2">
+                    <User className="w-4 h-4 text-green-600" />
+                    <span className="font-medium">{getDriverName(selectedVehicle.assigned_driver_id)}</span>
+                  </div>
+                ) : (
+                  <span className="text-slate-400">Sin chofer asignado</span>
+                )}
+              </div>
+
+              {/* EPP Summary */}
+              <div>
+                <p className="text-xs uppercase text-slate-500 font-bold mb-2">Equipamiento EPP</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {equipmentItems.map((item) => (
+                    <div key={item.name} className={`flex items-center justify-between p-2 rounded-sm text-sm ${
+                      item.condition === 'bueno' ? 'bg-green-50 border border-green-200' :
+                      item.condition === 'regular' ? 'bg-yellow-50 border border-yellow-200' :
+                      item.condition === 'malo' || item.condition === 'vencido' ? 'bg-red-50 border border-red-200' :
+                      'bg-slate-50 border border-slate-200'
+                    }`}>
+                      <span>{item.label || item.name}</span>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs">{item.quantity}</Badge>
+                        <span className={`text-xs capitalize ${
+                          item.condition === 'bueno' ? 'text-green-600' :
+                          item.condition === 'regular' ? 'text-yellow-600' :
+                          item.condition === 'malo' || item.condition === 'vencido' ? 'text-red-600' :
+                          'text-slate-400'
+                        }`}>{item.condition}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => {
+              setShowDetailDialog(false);
+              if (selectedVehicle) navigate(`/vehicles/${selectedVehicle.id}/tires`);
+            }}>
+              <CircleDot className="w-4 h-4 mr-2" />
+              Ver Llantas
+            </Button>
+            <Button variant="outline" onClick={() => {
+              setShowDetailDialog(false);
+              if (selectedVehicle) handleOpenEquipment(selectedVehicle);
+            }}>
+              <Shield className="w-4 h-4 mr-2" />
+              Editar EPP
+            </Button>
+            <Button variant="outline" onClick={() => setShowDetailDialog(false)}>Cerrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assign Driver Dialog */}
+      <Dialog open={showAssignDriverDialog} onOpenChange={setShowAssignDriverDialog}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
+              Asignar Chofer
+            </DialogTitle>
+            <DialogDescription>
+              Vehículo: {selectedVehicle?.plate}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label className="input-label">Chofer</Label>
+              <Select value={selectedDriverId} onValueChange={setSelectedDriverId}>
+                <SelectTrigger className="rounded-sm">
+                  <SelectValue placeholder="Seleccionar chofer..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin asignar</SelectItem>
+                  {drivers.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.name} {d.license_number ? `(${d.license_number})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAssignDriverDialog(false)}>Cancelar</Button>
+            <Button
+              className="btn-action"
+              onClick={handleAssignDriver}
+              disabled={saving}
+            >
+              {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Equipment EPP Dialog */}
+      <Dialog open={showEquipmentDialog} onOpenChange={setShowEquipmentDialog}>
+        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
+              Equipamiento EPP
+            </DialogTitle>
+            <DialogDescription>
+              Vehículo: {selectedVehicle?.plate} - {selectedVehicle?.brand} {selectedVehicle?.model}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Table>
+              <TableHeader>
+                <TableRow className="table-dense">
+                  <TableHead>Elemento</TableHead>
+                  <TableHead className="w-20">Cant.</TableHead>
+                  <TableHead className="w-32">Estado</TableHead>
+                  <TableHead className="w-36">Vencimiento</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {equipmentItems.map((item, index) => (
+                  <TableRow key={item.name} className="table-dense">
+                    <TableCell className="font-medium">{item.label || item.name}</TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={item.quantity}
+                        onChange={(e) => updateEquipmentItem(index, 'quantity', parseInt(e.target.value) || 0)}
+                        className="rounded-sm h-8 w-16"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Select
+                        value={item.condition}
+                        onValueChange={(v) => updateEquipmentItem(index, 'condition', v)}
+                      >
+                        <SelectTrigger className="rounded-sm h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pendiente">Pendiente</SelectItem>
+                          <SelectItem value="bueno">Bueno</SelectItem>
+                          <SelectItem value="regular">Regular</SelectItem>
+                          <SelectItem value="malo">Malo</SelectItem>
+                          <SelectItem value="vencido">Vencido</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="date"
+                        value={item.expiry_date || ''}
+                        onChange={(e) => updateEquipmentItem(index, 'expiry_date', e.target.value || null)}
+                        className="rounded-sm h-8"
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEquipmentDialog(false)}>Cancelar</Button>
+            <Button className="btn-action" onClick={handleSaveEquipment} disabled={saving}>
+              {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Guardar Equipamiento
             </Button>
           </DialogFooter>
         </DialogContent>

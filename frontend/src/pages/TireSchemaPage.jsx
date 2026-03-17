@@ -49,7 +49,8 @@ const TRACTO_CONFIG = {
       { code: 'T-2L1', label: '2L1' }, { code: 'T-2L2', label: '2L2' },
       { code: 'T-2R1', label: '2R1' }, { code: 'T-2R2', label: '2R2' }
     ], dual: true },
-  ]
+  ],
+  spare: [{ code: 'T-SP', label: 'Repuesto' }]
 };
 
 const CARRETA_CONFIG = {
@@ -57,7 +58,8 @@ const CARRETA_CONFIG = {
     { name: 'Eje A', positions: [{ code: 'C-A-L', label: 'AL' }, { code: 'C-A-R', label: 'AR' }], dual: false },
     { name: 'Eje B', positions: [{ code: 'C-B-L', label: 'BL' }, { code: 'C-B-R', label: 'BR' }], dual: false },
     { name: 'Eje C', positions: [{ code: 'C-C-L', label: 'CL' }, { code: 'C-C-R', label: 'CR' }], dual: false },
-  ]
+  ],
+  spare: [{ code: 'C-SP', label: 'Repuesto' }]
 };
 
 const TireSchemaPage = () => {
@@ -357,6 +359,18 @@ const TireSchemaPage = () => {
                 </div>
               </div>
             </div>
+
+            {/* Spare Tire */}
+            {config.spare && (
+              <div className="mt-6 pt-4 border-t-2 border-dashed border-slate-300">
+                <span className="text-xs font-bold text-slate-500 mb-2 block text-center">Llanta de Repuesto</span>
+                <div className="flex justify-center gap-4">
+                  {config.spare.map((pos) => (
+                    <TirePosition key={pos.code} position={pos} />
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Legend */}
             <div className="flex gap-6 mt-8">

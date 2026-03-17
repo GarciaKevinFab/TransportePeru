@@ -85,6 +85,9 @@ export const vehiclesApi = {
   create: (data) => api.post('/vehicles', data),
   update: (id, data) => api.put(`/vehicles/${id}`, data),
   delete: (id) => api.delete(`/vehicles/${id}`),
+  assignDriver: (id, driverId) => api.post(`/vehicles/${id}/assign-driver`, { driver_id: driverId }),
+  getEquipment: (id) => api.get(`/vehicles/${id}/equipment`),
+  updateEquipment: (id, data) => api.put(`/vehicles/${id}/equipment`, data),
 };
 
 // Couplings API
@@ -138,6 +141,7 @@ export const tripsApi = {
   createAdvance: (tripId, data) => api.post(`/trips/${tripId}/advances`, data),
   getExpenses: (tripId) => api.get(`/trips/${tripId}/expenses`),
   createExpense: (tripId, data) => api.post(`/trips/${tripId}/expenses`, data),
+  setViaticoBudget: (tripId, data) => api.post(`/trips/${tripId}/viatico-budget`, data),
 };
 
 // Checklists API
