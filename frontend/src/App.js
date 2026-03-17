@@ -21,6 +21,7 @@ import ChecklistWizardPage from './pages/ChecklistWizardPage';
 import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
 import CompaniesPage from './pages/CompaniesPage';
+import EquipmentPage from './pages/EquipmentPage';
 import OfflineIndicator from './components/OfflineIndicator';
 // Driver Mobile App Pages
 import DriverLoginPage from './pages/driver/DriverLoginPage';
@@ -123,6 +124,15 @@ function AppRoutes() {
         }
       />
       
+      <Route
+        path="/equipment"
+        element={
+          <ProtectedRoute allowedRoles={['owner', 'admin', 'flota', 'almacen', 'operaciones']}>
+            <EquipmentPage />
+          </ProtectedRoute>
+        }
+      />
+
       <Route
         path="/documents"
         element={

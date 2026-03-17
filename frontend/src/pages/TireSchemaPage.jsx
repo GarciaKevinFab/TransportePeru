@@ -102,11 +102,14 @@ const TireSchemaPage = () => {
       const [vehicleRes, tiresRes, availableRes] = await Promise.all([
         vehiclesApi.getById(vehicleId),
         tiresApi.getByVehicle(vehicleId),
-        tiresApi.getAll({ status: 'nuevo' }),
+        tiresApi.getAll(),
       ]);
       setVehicle(vehicleRes.data);
       setTires(tiresRes.data);
-      setAvailableTires(availableRes.data.filter(t => !t.current_vehicle_id));
+      // Show tires that are not mounted on any vehicle (nuevo, almacen, reencauche)
+      setAvailableTires(availableRes.data.filter(t =>
+        !t.current_vehicle_id && t.status !== 'en_uso' && t.status !== 'baja'
+      ));
     } catch (error) {
       toast.error('Error al cargar datos');
       navigate('/vehicles');

@@ -1,0 +1,437 @@
+import React, { useState, useEffect } from 'react';
+import { vehiclesApi, usersApi } from '../services/api';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Badge } from '../components/ui/badge';
+import { Label } from '../components/ui/label';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select';
+import {
+  Shield,
+  Loader2,
+  Search,
+  Truck,
+  AlertTriangle,
+  CheckCircle,
+  UserCheck,
+} from 'lucide-react';
+import { toast } from 'sonner';
+import { useAuth } from '../context/AuthContext';
+
+const EquipmentPage = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'owner' || user?.role === 'admin';
+
+  const [loading, setLoading] = useState(true);
+  const [vehicles, setVehicles] = useState([]);
+  const [drivers, setDrivers] = useState([]);
+  const [equipmentMap, setEquipmentMap] = useState({});
+  const [searchTerm, setSearchTerm] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  // Dialog states
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showAssignDialog, setShowAssignDialog] = useState(false);
+  const [selectedVehicle, setSelectedVehicle] = useState(null);
+  const [equipmentItems, setEquipmentItems] = useState([]);
+  const [selectedDriverId, setSelectedDriverId] = useState('none');
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [vehiclesRes, driversRes] = await Promise.all([
+        vehiclesApi.getAll(),
+        usersApi.getAll({ role: 'chofer' }),
+      ]);
+      setVehicles(vehiclesRes.data);
+      setDrivers(driversRes.data);
+
+      // Fetch equipment for all vehicles
+      const eqMap = {};
+      await Promise.all(
+        vehiclesRes.data.map(async (v) => {
+          try {
+            const res = await vehiclesApi.getEquipment(v.id);
+            eqMap[v.id] = res.data.items || [];
+          } catch {
+            eqMap[v.id] = [];
+          }
+        })
+      );
+      setEquipmentMap(eqMap);
+    } catch (error) {
+      toast.error('Error al cargar datos');
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const getDriverName = (driverId) => {
+    if (!driverId) return null;
+    return drivers.find(d => d.id === driverId)?.name || null;
+  };
+
+  const getEquipmentStatus = (items) => {
+    if (!items || items.length === 0) return { label: 'Sin datos', color: 'bg-slate-100 text-slate-600' };
+    const total = items.length;
+    const good = items.filter(i => i.condition === 'bueno' && i.quantity > 0).length;
+    const bad = items.filter(i => i.condition === 'malo' || i.condition === 'vencido').length;
+    const pending = items.filter(i => i.condition === 'pendiente' || i.quantity === 0).length;
+
+    if (bad > 0) return { label: `${bad} con problemas`, color: 'bg-red-100 text-red-700' };
+    if (pending > 0) return { label: `${pending} pendientes`, color: 'bg-yellow-100 text-yellow-700' };
+    if (good === total) return { label: 'Completo', color: 'bg-green-100 text-green-700' };
+    return { label: `${good}/${total}`, color: 'bg-blue-100 text-blue-700' };
+  };
+
+  const handleOpenEdit = async (vehicle) => {
+    setSelectedVehicle(vehicle);
+    try {
+      const res = await vehiclesApi.getEquipment(vehicle.id);
+      setEquipmentItems(res.data.items || []);
+    } catch {
+      setEquipmentItems([]);
+    }
+    setShowEditDialog(true);
+  };
+
+  const handleSaveEquipment = async () => {
+    if (!selectedVehicle) return;
+    setSaving(true);
+    try {
+      await vehiclesApi.updateEquipment(selectedVehicle.id, { items: equipmentItems });
+      toast.success('Equipamiento actualizado');
+      setShowEditDialog(false);
+      // Update local map
+      setEquipmentMap(prev => ({ ...prev, [selectedVehicle.id]: equipmentItems }));
+    } catch (error) {
+      toast.error('Error al guardar equipamiento');
+    }
+    setSaving(false);
+  };
+
+  const handleOpenAssign = (vehicle) => {
+    setSelectedVehicle(vehicle);
+    setSelectedDriverId(vehicle.assigned_driver_id || 'none');
+    setShowAssignDialog(true);
+  };
+
+  const handleAssignDriver = async () => {
+    if (!selectedVehicle) return;
+    setSaving(true);
+    const driverId = selectedDriverId === 'none' ? null : selectedDriverId;
+    try {
+      await vehiclesApi.assignDriver(selectedVehicle.id, driverId);
+      toast.success(driverId ? 'Chofer asignado' : 'Chofer desasignado');
+      setShowAssignDialog(false);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Error al asignar chofer');
+    }
+    setSaving(false);
+  };
+
+  const updateEquipmentItem = (index, field, value) => {
+    const updated = [...equipmentItems];
+    updated[index] = { ...updated[index], [field]: value };
+    setEquipmentItems(updated);
+  };
+
+  const filteredVehicles = vehicles.filter(v =>
+    v.plate.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    v.brand?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Stats
+  const totalVehicles = vehicles.length;
+  const completeEPP = vehicles.filter(v => {
+    const items = equipmentMap[v.id] || [];
+    return items.length > 0 && items.every(i => i.condition === 'bueno' && i.quantity > 0);
+  }).length;
+  const pendingEPP = totalVehicles - completeEPP;
+  const assignedDrivers = vehicles.filter(v => v.assigned_driver_id).length;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-slate-900">
+          Equipamiento y Asignaciones
+        </h1>
+        <p className="text-slate-500 mt-1">
+          Gestión de EPP por vehículo y asignación de choferes
+        </p>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card className="bg-white border-l-4 border-l-blue-500">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Vehículos</p>
+                <p className="font-heading text-3xl font-bold text-blue-600 mt-1">{totalVehicles}</p>
+              </div>
+              <Truck className="w-8 h-8 text-blue-500" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-white border-l-4 border-l-green-500">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">EPP Completo</p>
+                <p className="font-heading text-3xl font-bold text-green-600 mt-1">{completeEPP}</p>
+              </div>
+              <CheckCircle className="w-8 h-8 text-green-500" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-white border-l-4 border-l-yellow-500">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">EPP Pendiente</p>
+                <p className="font-heading text-3xl font-bold text-yellow-600 mt-1">{pendingEPP}</p>
+              </div>
+              <AlertTriangle className="w-8 h-8 text-yellow-500" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-white border-l-4 border-l-orange-500">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Con Chofer</p>
+                <p className="font-heading text-3xl font-bold text-orange-600 mt-1">{assignedDrivers}</p>
+              </div>
+              <UserCheck className="w-8 h-8 text-orange-500" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Search */}
+      <Card className="bg-white">
+        <CardContent className="py-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Input
+              placeholder="Buscar por placa o marca..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 rounded-sm"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Table */}
+      <Card className="bg-white">
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow className="table-dense">
+                <TableHead>Placa</TableHead>
+                <TableHead>Tipo</TableHead>
+                <TableHead>Marca / Modelo</TableHead>
+                <TableHead>Chofer Asignado</TableHead>
+                <TableHead>Estado EPP</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredVehicles.map((vehicle) => {
+                const eqStatus = getEquipmentStatus(equipmentMap[vehicle.id]);
+                const driverName = getDriverName(vehicle.assigned_driver_id);
+                return (
+                  <TableRow key={vehicle.id} className="table-dense hover:bg-orange-50">
+                    <TableCell className="font-mono font-bold">{vehicle.plate}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={vehicle.vehicle_type === 'tracto' ? 'border-orange-300 text-orange-700 bg-orange-50' : 'border-slate-300 text-slate-700 bg-slate-50'}>
+                        {vehicle.vehicle_type === 'tracto' ? 'Tracto' : 'Carreta'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{vehicle.brand || '-'} {vehicle.model || ''}</TableCell>
+                    <TableCell>
+                      {driverName ? (
+                        <span className="text-green-700 font-medium">{driverName}</span>
+                      ) : (
+                        <span className="text-slate-400">Sin asignar</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={eqStatus.color}>{eqStatus.label}</Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        {isAdmin && (
+                          <Button size="sm" variant="outline" onClick={() => handleOpenAssign(vehicle)}>
+                            <UserCheck className="w-4 h-4 mr-1" />
+                            Chofer
+                          </Button>
+                        )}
+                        <Button size="sm" className="btn-action" onClick={() => handleOpenEdit(vehicle)}>
+                          <Shield className="w-4 h-4 mr-1" />
+                          EPP
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Edit Equipment Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
+              Equipamiento EPP
+            </DialogTitle>
+            <DialogDescription>
+              Vehículo: {selectedVehicle?.plate} - {selectedVehicle?.brand} {selectedVehicle?.model}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Table>
+              <TableHeader>
+                <TableRow className="table-dense">
+                  <TableHead>Elemento</TableHead>
+                  <TableHead className="w-20">Cant.</TableHead>
+                  <TableHead className="w-32">Estado</TableHead>
+                  <TableHead className="w-36">Vencimiento</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {equipmentItems.map((item, index) => (
+                  <TableRow key={item.name} className="table-dense">
+                    <TableCell className="font-medium">{item.label || item.name}</TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={item.quantity}
+                        onChange={(e) => updateEquipmentItem(index, 'quantity', parseInt(e.target.value) || 0)}
+                        className="rounded-sm h-8 w-16"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Select
+                        value={item.condition}
+                        onValueChange={(v) => updateEquipmentItem(index, 'condition', v)}
+                      >
+                        <SelectTrigger className="rounded-sm h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pendiente">Pendiente</SelectItem>
+                          <SelectItem value="bueno">Bueno</SelectItem>
+                          <SelectItem value="regular">Regular</SelectItem>
+                          <SelectItem value="malo">Malo</SelectItem>
+                          <SelectItem value="vencido">Vencido</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="date"
+                        value={item.expiry_date || ''}
+                        onChange={(e) => updateEquipmentItem(index, 'expiry_date', e.target.value || null)}
+                        className="rounded-sm h-8"
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditDialog(false)}>Cancelar</Button>
+            <Button className="btn-action" onClick={handleSaveEquipment} disabled={saving}>
+              {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assign Driver Dialog */}
+      <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
+              Asignar Chofer
+            </DialogTitle>
+            <DialogDescription>
+              Vehículo: {selectedVehicle?.plate}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label className="input-label">Chofer</Label>
+              <Select value={selectedDriverId} onValueChange={setSelectedDriverId}>
+                <SelectTrigger className="rounded-sm">
+                  <SelectValue placeholder="Seleccionar chofer..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin asignar</SelectItem>
+                  {drivers.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.name} {d.license_number ? `(${d.license_number})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAssignDialog(false)}>Cancelar</Button>
+            <Button className="btn-action" onClick={handleAssignDriver} disabled={saving}>
+              {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+export default EquipmentPage;

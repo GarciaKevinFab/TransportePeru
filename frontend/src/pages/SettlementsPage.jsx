@@ -391,6 +391,7 @@ const SettlementsPage = () => {
                   <TableHead>Vehículo</TableHead>
                   <TableHead>Chofer</TableHead>
                   <TableHead>Cliente/Carga</TableHead>
+                  <TableHead>Viático/Día</TableHead>
                   <TableHead>Anticipo</TableHead>
                   <TableHead>Gastos</TableHead>
                   <TableHead>Saldo</TableHead>
@@ -411,6 +412,23 @@ const SettlementsPage = () => {
                       <TableCell className="max-w-[200px]">
                         <p className="font-medium truncate">{trip.client_name || '-'}</p>
                         <p className="text-xs text-slate-500 truncate">{trip.cargo_description || '-'}</p>
+                      </TableCell>
+                      <TableCell>
+                        {trip.viatico_daily ? (
+                          <div>
+                            <span className="font-bold text-indigo-600">S/ {trip.viatico_daily.toFixed(2)}</span>
+                            <p className="text-[10px] text-slate-400">{trip.viatico_days}d / S/{trip.viatico_budget?.toFixed(0)}</p>
+                          </div>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-indigo-500 h-7 text-xs px-2"
+                            onClick={() => { setSelectedTrip(trip); handleOpenBudget(trip); }}
+                          >
+                            + Asignar
+                          </Button>
+                        )}
                       </TableCell>
                       <TableCell className="text-green-600 font-medium">
                         S/ {(trip.total_advance || 0).toFixed(2)}
