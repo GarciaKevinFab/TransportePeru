@@ -57,7 +57,7 @@ const driverMenuItems = [
   { path: '/driver/trips', icon: Route, label: 'Mis Viajes', roles: ['chofer'] },
   { path: '/driver/checklist', icon: FileText, label: 'Checklist', roles: ['chofer'] },
   { path: '/driver/fuel', icon: Fuel, label: 'Combustible', roles: ['chofer'] },
-  { path: '/driver/expenses', icon: Package, label: 'Gastos', roles: ['chofer'] },
+  { path: '/driver/expenses', icon: Receipt, label: 'Gastos/Viáticos', roles: ['chofer'] },
   { path: '/driver/issues', icon: AlertTriangle, label: 'Reportar Incidente', roles: ['chofer'] },
 ];
 

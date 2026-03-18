@@ -2082,6 +2082,7 @@ async def create_trip_expense(trip_id: str, request: dict = Body(...), current_u
         provider=request.get("provider"),
         ruc=request.get("ruc"),
         has_igv=request.get("has_igv", False),
+        receipt_url=request.get("receipt_url"),
         created_by=current_user["id"]
     )
     
@@ -5179,6 +5180,327 @@ async def update_company_config(request: dict = Body(...), current_user: dict = 
 
 # Include router
 app.include_router(api_router)
+
+# ============== GUÍAS DE TRANSPORTISTA Y FACTURAS (SUNAT) ==============
+class GuiaTransportistaStatus(str, Enum):
+    BORRADOR = "borrador"
+    EMITIDA = "emitida"
+    ANULADA = "anulada"
+    ERROR = "error"
+
+class FacturaStatus(str, Enum):
+    BORRADOR = "borrador"
+    EMITIDA = "emitida"
+    PAGADA = "pagada"
+    ANULADA = "anulada"
+    ERROR = "error"
+
+class GuiaTransportista(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    company_id: str
+    trip_id: Optional[str] = None
+    serie: str = "T001"
+    numero: Optional[int] = None
+    fecha_emision: Optional[str] = None
+    # Remitente
+    remitente_ruc: Optional[str] = None
+    remitente_razon_social: Optional[str] = None
+    # Destinatario
+    destinatario_ruc: Optional[str] = None
+    destinatario_razon_social: Optional[str] = None
+    # Transportista
+    transportista_ruc: Optional[str] = None
+    transportista_razon_social: Optional[str] = None
+    # Ruta
+    punto_partida: Optional[str] = None
+    punto_partida_ubigeo: Optional[str] = None
+    punto_llegada: Optional[str] = None
+    punto_llegada_ubigeo: Optional[str] = None
+    # Vehículo / Conductor
+    vehiculo_placa: Optional[str] = None
+    conductor_dni: Optional[str] = None
+    conductor_nombre: Optional[str] = None
+    conductor_licencia: Optional[str] = None
+    # Carga
+    descripcion_carga: Optional[str] = None
+    peso_bruto: Optional[float] = None
+    unidad_peso: str = "KGM"
+    num_bultos: Optional[int] = None
+    # SUNAT
+    sunat_response: Optional[Dict[str, Any]] = None
+    sunat_ticket: Optional[str] = None
+    sunat_cdr: Optional[str] = None
+    pdf_url: Optional[str] = None
+    status: GuiaTransportistaStatus = GuiaTransportistaStatus.BORRADOR
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_by: Optional[str] = None
+
+class Factura(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    company_id: str
+    trip_id: Optional[str] = None
+    serie: str = "F001"
+    numero: Optional[int] = None
+    fecha_emision: Optional[str] = None
+    # Cliente
+    cliente_ruc: Optional[str] = None
+    cliente_razon_social: Optional[str] = None
+    cliente_direccion: Optional[str] = None
+    # Detalle
+    items: List[Dict[str, Any]] = []  # [{descripcion, cantidad, precio_unitario, igv, total}]
+    subtotal: float = 0
+    igv: float = 0
+    total: float = 0
+    moneda: str = "PEN"
+    # SUNAT
+    sunat_response: Optional[Dict[str, Any]] = None
+    sunat_ticket: Optional[str] = None
+    sunat_cdr: Optional[str] = None
+    pdf_url: Optional[str] = None
+    status: FacturaStatus = FacturaStatus.BORRADOR
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_by: Optional[str] = None
+
+# --- Guía Endpoints ---
+@api_router.get("/guias")
+async def get_guias(
+    trip_id: Optional[str] = None,
+    status: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    query = {"company_id": current_user["company_id"]}
+    if trip_id:
+        query["trip_id"] = trip_id
+    if status:
+        query["status"] = status
+    guias = await db.guias_transportista.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return [serialize_doc(g) for g in guias]
+
+@api_router.get("/guias/{guia_id}")
+async def get_guia(guia_id: str, current_user: dict = Depends(get_current_user)):
+    guia = await db.guias_transportista.find_one(
+        {"id": guia_id, "company_id": current_user["company_id"]}, {"_id": 0}
+    )
+    if not guia:
+        raise HTTPException(status_code=404, detail="Guía no encontrada")
+    return serialize_doc(guia)
+
+@api_router.post("/guias")
+async def create_guia(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
+    if current_user["role"] not in ["owner", "admin", "operaciones", "contabilidad"]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+
+    # Auto-increment numero
+    last = await db.guias_transportista.find_one(
+        {"company_id": current_user["company_id"], "serie": request.get("serie", "T001")},
+        sort=[("numero", -1)]
+    )
+    next_num = (last.get("numero", 0) + 1) if last else 1
+
+    guia = GuiaTransportista(
+        company_id=current_user["company_id"],
+        trip_id=request.get("trip_id"),
+        serie=request.get("serie", "T001"),
+        numero=next_num,
+        fecha_emision=request.get("fecha_emision", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
+        remitente_ruc=request.get("remitente_ruc"),
+        remitente_razon_social=request.get("remitente_razon_social"),
+        destinatario_ruc=request.get("destinatario_ruc"),
+        destinatario_razon_social=request.get("destinatario_razon_social"),
+        transportista_ruc=request.get("transportista_ruc"),
+        transportista_razon_social=request.get("transportista_razon_social"),
+        punto_partida=request.get("punto_partida"),
+        punto_partida_ubigeo=request.get("punto_partida_ubigeo"),
+        punto_llegada=request.get("punto_llegada"),
+        punto_llegada_ubigeo=request.get("punto_llegada_ubigeo"),
+        vehiculo_placa=request.get("vehiculo_placa"),
+        conductor_dni=request.get("conductor_dni"),
+        conductor_nombre=request.get("conductor_nombre"),
+        conductor_licencia=request.get("conductor_licencia"),
+        descripcion_carga=request.get("descripcion_carga"),
+        peso_bruto=request.get("peso_bruto"),
+        num_bultos=request.get("num_bultos"),
+        created_by=current_user["id"]
+    )
+
+    doc = guia.model_dump()
+    for key, value in doc.items():
+        if isinstance(value, datetime):
+            doc[key] = value.isoformat()
+    await db.guias_transportista.insert_one(doc)
+
+    return {"id": guia.id, "numero": f"{guia.serie}-{next_num:08d}", "message": "Guía creada"}
+
+@api_router.post("/guias/{guia_id}/emit")
+async def emit_guia_sunat(guia_id: str, current_user: dict = Depends(get_current_user)):
+    """Emit guía to SUNAT - requires SUNAT API credentials in company config"""
+    if current_user["role"] not in ["owner", "admin", "contabilidad"]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+
+    guia = await db.guias_transportista.find_one(
+        {"id": guia_id, "company_id": current_user["company_id"]}, {"_id": 0}
+    )
+    if not guia:
+        raise HTTPException(status_code=404, detail="Guía no encontrada")
+
+    # Get company SUNAT config
+    company = await db.companies.find_one({"id": current_user["company_id"]})
+    sunat_config = company.get("sunat_config", {}) if company else {}
+
+    if not sunat_config.get("api_token"):
+        raise HTTPException(
+            status_code=400,
+            detail="Configuración SUNAT no encontrada. Configure su token API en Configuración > SUNAT"
+        )
+
+    # TODO: Integrate with SUNAT API (Nubefact, PSE, or direct SUNAT)
+    # This is the placeholder for the actual SUNAT API call
+    # The structure supports: Nubefact, Efact, SUNAT directly
+    #
+    # Example with Nubefact:
+    # response = requests.post(
+    #     sunat_config["api_url"],
+    #     headers={"Authorization": f"Bearer {sunat_config['api_token']}"},
+    #     json=build_guia_payload(guia)
+    # )
+
+    await db.guias_transportista.update_one(
+        {"id": guia_id},
+        {"$set": {
+            "status": "emitida",
+            "sunat_response": {"message": "Pendiente integración SUNAT API"},
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+
+    return {"message": "Guía marcada como emitida. Configure la API SUNAT para emisión electrónica."}
+
+# --- Factura Endpoints ---
+@api_router.get("/facturas")
+async def get_facturas(
+    trip_id: Optional[str] = None,
+    status: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    query = {"company_id": current_user["company_id"]}
+    if trip_id:
+        query["trip_id"] = trip_id
+    if status:
+        query["status"] = status
+    facturas = await db.facturas.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return [serialize_doc(f) for f in facturas]
+
+@api_router.post("/facturas")
+async def create_factura(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
+    if current_user["role"] not in ["owner", "admin", "contabilidad"]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+
+    # Auto-increment numero
+    last = await db.facturas.find_one(
+        {"company_id": current_user["company_id"], "serie": request.get("serie", "F001")},
+        sort=[("numero", -1)]
+    )
+    next_num = (last.get("numero", 0) + 1) if last else 1
+
+    items = request.get("items", [])
+    subtotal = sum(i.get("cantidad", 0) * i.get("precio_unitario", 0) for i in items)
+    igv = round(subtotal * 0.18, 2)
+    total = round(subtotal + igv, 2)
+
+    factura = Factura(
+        company_id=current_user["company_id"],
+        trip_id=request.get("trip_id"),
+        serie=request.get("serie", "F001"),
+        numero=next_num,
+        fecha_emision=request.get("fecha_emision", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
+        cliente_ruc=request.get("cliente_ruc"),
+        cliente_razon_social=request.get("cliente_razon_social"),
+        cliente_direccion=request.get("cliente_direccion"),
+        items=items,
+        subtotal=subtotal,
+        igv=igv,
+        total=total,
+        created_by=current_user["id"]
+    )
+
+    doc = factura.model_dump()
+    for key, value in doc.items():
+        if isinstance(value, datetime):
+            doc[key] = value.isoformat()
+    await db.facturas.insert_one(doc)
+
+    return {"id": factura.id, "numero": f"{factura.serie}-{next_num:08d}", "total": total, "message": "Factura creada"}
+
+@api_router.post("/facturas/{factura_id}/emit")
+async def emit_factura_sunat(factura_id: str, current_user: dict = Depends(get_current_user)):
+    """Emit factura to SUNAT"""
+    if current_user["role"] not in ["owner", "admin", "contabilidad"]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+
+    factura = await db.facturas.find_one(
+        {"id": factura_id, "company_id": current_user["company_id"]}, {"_id": 0}
+    )
+    if not factura:
+        raise HTTPException(status_code=404, detail="Factura no encontrada")
+
+    company = await db.companies.find_one({"id": current_user["company_id"]})
+    sunat_config = company.get("sunat_config", {}) if company else {}
+
+    if not sunat_config.get("api_token"):
+        raise HTTPException(
+            status_code=400,
+            detail="Configuración SUNAT no encontrada. Configure su token API en Configuración > SUNAT"
+        )
+
+    # TODO: SUNAT API integration placeholder
+    await db.facturas.update_one(
+        {"id": factura_id},
+        {"$set": {
+            "status": "emitida",
+            "sunat_response": {"message": "Pendiente integración SUNAT API"},
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+
+    return {"message": "Factura marcada como emitida. Configure la API SUNAT para emisión electrónica."}
+
+# --- SUNAT Config ---
+@api_router.get("/config/sunat")
+async def get_sunat_config(current_user: dict = Depends(get_current_user)):
+    if current_user["role"] not in ["owner", "admin"]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+    company = await db.companies.find_one({"id": current_user["company_id"]})
+    config = company.get("sunat_config", {}) if company else {}
+    # Mask token
+    if config.get("api_token"):
+        config["api_token_masked"] = config["api_token"][:8] + "..." + config["api_token"][-4:]
+        del config["api_token"]
+    return config
+
+@api_router.put("/config/sunat")
+async def update_sunat_config(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
+    if current_user["role"] not in ["owner", "admin"]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+
+    sunat_config = {
+        "ruc": request.get("ruc"),
+        "razon_social": request.get("razon_social"),
+        "api_provider": request.get("api_provider", "nubefact"),  # nubefact, efact, sunat
+        "api_url": request.get("api_url"),
+        "api_token": request.get("api_token"),
+        "certificate_password": request.get("certificate_password"),
+        "production": request.get("production", False),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+
+    await db.companies.update_one(
+        {"id": current_user["company_id"]},
+        {"$set": {"sunat_config": sunat_config}}
+    )
+
+    return {"message": "Configuración SUNAT actualizada"}
 
 # Serve uploaded files
 from fastapi.staticfiles import StaticFiles

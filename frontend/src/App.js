@@ -29,6 +29,7 @@ import DriverHomePage from './pages/driver/DriverHomePage';
 import DriverTripPage from './pages/driver/DriverTripPage';
 import DriverFuelPage from './pages/driver/DriverFuelPage';
 import DriverIssuesPage from './pages/driver/DriverIssuesPage';
+import DriverExpensesPage from './pages/driver/DriverExpensesPage';
 import './App.css';
 
 // Protected Route Component
@@ -292,6 +293,15 @@ function AppRoutes() {
         }
       />
       
+      <Route
+        path="/driver/expenses"
+        element={
+          <ProtectedRoute allowedRoles={['chofer']}>
+            <MobileLayout><DriverExpensesPage /></MobileLayout>
+          </ProtectedRoute>
+        }
+      />
+
       <Route
         path="/driver/issues"
         element={
