@@ -22,6 +22,7 @@ import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
 import CompaniesPage from './pages/CompaniesPage';
 import EquipmentPage from './pages/EquipmentPage';
+import BillingPage from './pages/BillingPage';
 import OfflineIndicator from './components/OfflineIndicator';
 // Driver Mobile App Pages
 import DriverLoginPage from './pages/driver/DriverLoginPage';
@@ -202,6 +203,15 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={['owner', 'admin', 'contabilidad', 'operaciones']}>
             <SettlementsPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/billing"
+        element={
+          <ProtectedRoute allowedRoles={['owner', 'admin', 'contabilidad']}>
+            <BillingPage />
           </ProtectedRoute>
         }
       />

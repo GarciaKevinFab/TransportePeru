@@ -47,6 +47,7 @@ const menuItems = [
   { path: '/maintenance', icon: Wrench, label: 'Mantenimiento', roles: ['owner', 'admin', 'mantenimiento'] },
   { path: '/inventory', icon: Package, label: 'Inventario', roles: ['owner', 'admin', 'almacen'] },
   { path: '/issues', icon: AlertTriangle, label: 'Incidentes', roles: ['owner', 'admin', 'operaciones', 'chofer'] },
+  { path: '/billing', icon: FileText, label: 'Facturación', roles: ['owner', 'admin', 'contabilidad'] },
   { path: '/reports', icon: BarChart3, label: 'Reportes', roles: ['owner', 'admin', 'contabilidad'] },
   { path: '/users', icon: Users, label: 'Usuarios', roles: ['owner', 'admin'] },
   { path: '/settings', icon: Settings, label: 'Configuración', roles: ['owner', 'admin'] },
