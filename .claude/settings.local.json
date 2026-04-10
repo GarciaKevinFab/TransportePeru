@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx craco:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

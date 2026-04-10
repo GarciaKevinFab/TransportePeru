@@ -1,0 +1,77 @@
+name: Deploy Backend to Windows Server
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-backend.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, Windows, X64]
+    defaults:
+      run:
+        working-directory: backend
+        shell: powershell
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          if (!(Test-Path "venv")) {
+            python -m venv venv
+          }
+          .\venv\Scripts\Activate.ps1
+          pip install -r requirements.txt
+
+      - name: Write .env file
+        run: |
+          @"
+          MONGO_URL=${{ secrets.MONGO_URL }}
+          DB_NAME=${{ secrets.DB_NAME }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          CORS_ORIGINS=${{ secrets.CORS_ORIGINS }}
+          GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}
+          "@ | Set-Content -Path .env -Encoding UTF8
+
+      - name: Restart backend service
+        run: |
+          $serviceName = "TransportePeru-API"
+          $serviceExists = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
+          if ($serviceExists) {
+            Write-Host "Restarting service $serviceName..."
+            nssm restart $serviceName
+            Start-Sleep -Seconds 5
+            $svc = Get-Service -Name $serviceName
+            Write-Host "Service status: $($svc.Status)"
+            if ($svc.Status -ne 'Running') {
+              throw "Service failed to restart!"
+            }
+          } else {
+            Write-Host "Service not found. Starting uvicorn directly..."
+            .\venv\Scripts\Activate.ps1
+            Start-Process -FilePath ".\venv\Scripts\uvicorn.exe" `
+              -ArgumentList "server:app --host 0.0.0.0 --port 8000 --workers 2" `
+              -WorkingDirectory $PWD -NoNewWindow
+          }
+
+      - name: Health check
+        run: |
+          Start-Sleep -Seconds 3
+          try {
+            $response = Invoke-WebRequest -Uri "http://localhost:8000/api/system/status" -TimeoutSec 10
+            Write-Host "Health check passed: $($response.StatusCode)"
+          } catch {
+            Write-Host "WARNING: Health check failed - service may still be starting"
+          }
