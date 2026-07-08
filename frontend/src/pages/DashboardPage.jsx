@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { dashboardApi, alertsApi, vehiclesApi, tripsApi } from '../services/api';
+import { dashboardApi, alertsApi, tripsApi } from '../services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
@@ -15,13 +15,10 @@ import {
   TrendingDown,
   Clock,
   CheckCircle,
-  XCircle,
   ArrowRight,
   Loader2,
   RefreshCw,
   Fuel,
-  CircleDot,
-  MapPin,
   Calendar,
   DollarSign,
   Package,

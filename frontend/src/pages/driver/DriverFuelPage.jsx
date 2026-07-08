@@ -24,7 +24,6 @@ import {
   Fuel,
   Camera,
   Image,
-  Check,
   Loader2,
   Plus,
   TrendingUp,

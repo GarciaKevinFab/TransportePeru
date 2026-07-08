@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import { Button } from './ui/button';
-import { Badge } from './ui/badge';
 import { ScrollArea } from './ui/scroll-area';
 import {
   Popover,

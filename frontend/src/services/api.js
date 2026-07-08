@@ -119,12 +119,6 @@ export const authApi = {
   getMe: () => api.get('/auth/me'),
 };
 
-// Company API
-export const companyApi = {
-  getCurrent: () => api.get('/company'),
-  getAll: () => api.get('/companies'),
-};
-
 // Users API
 export const usersApi = {
   getAll: (params) => api.get('/users', { params }),
@@ -180,12 +174,6 @@ export const documentsApi = {
 export const alertsApi = {
   getAll: (params) => api.get('/alerts', { params }),
   resolve: (id) => api.post(`/alerts/${id}/resolve`),
-};
-
-// Blocks API
-export const blocksApi = {
-  getAll: (params) => api.get('/blocks', { params }),
-  resolve: (id, data) => api.post(`/blocks/${id}/resolve`, data),
 };
 
 // Routes API
@@ -247,10 +235,7 @@ export const tiresApi = {
   updateInspection: (inspectionId, data) => api.put(`/tires/inspections/${inspectionId}`, data),
   rotate: (data) => api.post('/tires/rotate', data),
   align: (data) => api.post('/tires/align', data),
-  alignAxle: (data) => api.post('/tires/align', data),
-  // Kept for backwards-compat (no params); prefer `requiredReport` for the shared contract.
   getRequiredReport: (params) => api.get('/tires/reports/required', { params }),
-  requiredReport: (params) => api.get('/tires/reports/required', { params }),
   getHistory: (tireId) => api.get(`/tires/${tireId}/history`),
   getDiagnostics: (vehicleId, params) => api.get(`/tires/vehicle/${vehicleId}/diagnostics`, { params }),
   retread: (id, data) => api.post(`/tires/${id}/retread`, data),
@@ -307,18 +292,6 @@ export const suppliersApi = {
   create: (data) => api.post('/suppliers', data),
 };
 
-// Purchase Orders API
-export const purchaseOrdersApi = {
-  getAll: (params) => api.get('/purchase-orders', { params }),
-  create: (data) => api.post('/purchase-orders', data),
-  receive: (id, data) => api.post(`/purchase-orders/${id}/receive`, data),
-};
-
-// Audit Logs API
-export const auditLogsApi = {
-  getAll: (params) => api.get('/audit-logs', { params }),
-};
-
 // Issues API
 export const issuesApi = {
   getAll: (params) => api.get('/issues', { params }),
@@ -337,20 +310,12 @@ export const reportsApi = {
   costPerKm: (params) => api.get('/reports/cost-per-km', { params }),
   documentsExpiring: (params) => api.get('/reports/documents-expiring', { params }),
   viaticos: (params) => api.get('/reports/viaticos', { params }),
-  tiresRequired: (params) => api.get('/tires/reports/required', { params }),
 };
 
 // Dashboard API
 export const dashboardApi = {
   getKPIs: () => api.get('/dashboard/kpis'),
   getRecentActivity: () => api.get('/dashboard/recent-activity'),
-};
-
-// Seed & System API
-export const seedApi = {
-  seed: () => api.post('/seed'),
-  bootstrap: () => api.post('/bootstrap'),
-  systemStatus: () => api.get('/system/status'),
 };
 
 // Upload API

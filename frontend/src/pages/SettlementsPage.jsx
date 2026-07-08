@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { tripsApi, usersApi, vehiclesApi } from '../services/api';
 import api from '../services/api';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
@@ -37,10 +37,7 @@ import {
   Search,
   DollarSign,
   CheckCircle,
-  AlertCircle,
-  FileText,
   Truck,
-  User,
   ArrowUpCircle,
   ArrowDownCircle,
   Calculator,

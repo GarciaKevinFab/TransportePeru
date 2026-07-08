@@ -3,7 +3,6 @@ import api from '../services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { Badge } from '../components/ui/badge';
 import { Label } from '../components/ui/label';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -12,7 +11,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '../components/ui/dialog';
 import {
-  Building2, Plus, Loader2, Users, Truck, Route, MoreVertical, Edit, Trash2, Eye, BarChart3, ArrowRightLeft,
+  Building2, Plus, Loader2, Users, Truck, Route, MoreVertical, Edit, Trash2, BarChart3, ArrowRightLeft,
 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,

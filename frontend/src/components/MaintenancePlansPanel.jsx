@@ -1,17 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { maintenanceApi } from '../services/api';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { Label } from './ui/label';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from './ui/dialog';
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from './ui/select';
-import {
-  FileSpreadsheet, Upload, Loader2, Eye, Trash2, BookOpen, Clock, Calendar,
+  FileSpreadsheet, Upload, Loader2, Eye, Trash2, BookOpen, Clock,
   Wrench, Filter, Droplet, CircleDot, AlertTriangle, Truck, Link2,
 } from 'lucide-react';
 import { toast } from 'sonner';

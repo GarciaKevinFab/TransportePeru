@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
-import { Textarea } from '../components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import {
   Table,
@@ -31,7 +30,6 @@ import {
 } from '../components/ui/select';
 import { Switch } from '../components/ui/switch';
 import {
-  Settings,
   Plus,
   Loader2,
   FileText,
@@ -44,7 +42,6 @@ import {
   Save,
   Upload,
   Image,
-  Palette,
 } from 'lucide-react';
 import { toast } from 'sonner';
 

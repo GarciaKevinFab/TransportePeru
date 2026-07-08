@@ -33,7 +33,6 @@ import {
   FileText,
   Plus,
   Loader2,
-  Calendar,
   AlertTriangle,
   CheckCircle,
   Clock,
@@ -45,7 +44,6 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, differenceInDays } from 'date-fns';
-import { es } from 'date-fns/locale';
 
 // Los archivos locales se sirven en `${BACKEND_URL}/uploads/...` (URL relativa);
 // los de S3 ya vienen como URL absoluta.

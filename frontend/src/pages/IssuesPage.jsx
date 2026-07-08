@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { issuesApi, vehiclesApi, usersApi, tripsApi } from '../services/api';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
@@ -33,9 +33,7 @@ import {
   Plus,
   Loader2,
   Search,
-  Filter,
   CheckCircle,
-  XCircle,
   AlertCircle,
   Car,
   User,

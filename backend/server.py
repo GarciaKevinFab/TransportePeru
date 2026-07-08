@@ -6,14 +6,13 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict, EmailStr
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timezone, timedelta
 import bcrypt
 import jwt
 from enum import Enum
-import shutil
 import re
 import secrets
 import asyncio
@@ -523,25 +522,6 @@ class MaintenanceMatrixPlan(BaseModel):
     # Sections: [{code:"A", name:"MOTOR", tasks:[{n:1, description:"...", component_type:"FILTRO", quantity:1, actions:{"M1":"C","M2":"C"}}]}]
     sections: List[Dict[str, Any]] = Field(default_factory=list)
     notes: Optional[str] = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    created_by: Optional[str] = None
-
-class WorkOrder(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    company_id: str
-    vehicle_id: str
-    order_number: str
-    order_type: str  # preventivo, correctivo
-    priority: str = "normal"  # baja, normal, alta, critica
-    status: str = "abierta"  # abierta, en_proceso, completada, cancelada
-    description: str
-    items: List[Dict[str, Any]] = Field(default_factory=list)
-    total_cost: float = 0
-    workshop: Optional[str] = None
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     created_by: Optional[str] = None
@@ -3526,7 +3506,6 @@ async def import_matrix_plan_excel(file: UploadFile = File(...), current_user: d
         pass
 
     # Parse sections and tasks (rows 10+)
-    import re
     sections = []
     current_section = None
     section_pattern = re.compile(r"^[A-Z]$")
@@ -5178,8 +5157,7 @@ Devuelve SOLO el JSON sin explicaciones adicionales."""
         
         # Try to parse JSON from response
         import json
-        import re
-        
+
         # Clean response - remove markdown code blocks if present
         cleaned_response = response.strip()
         if cleaned_response.startswith("```"):

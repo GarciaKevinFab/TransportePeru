@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
-import { vehiclesApi, usersApi, reportsApi } from '../services/api';
+import { vehiclesApi, usersApi, reportsApi, tiresApi } from '../services/api';
 import {
   BarChart,
   Bar,
@@ -34,17 +34,12 @@ import {
 } from '../components/ui/select';
 import {
   BarChart3,
-  Download,
   FileSpreadsheet,
   FileText,
   Loader2,
-  Truck,
   Fuel,
   Wrench,
   Route,
-  Calendar,
-  TrendingUp,
-  DollarSign,
   CircleDot,
   Wallet,
   Gauge,
@@ -52,8 +47,6 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 
 const ReportsPage = () => {
   const [loading, setLoading] = useState(false);
@@ -151,7 +144,7 @@ const ReportsPage = () => {
   const fetchTiresReport = async () => {
     setLoading(true);
     try {
-      const res = await reportsApi.tiresRequired();
+      const res = await tiresApi.getRequiredReport();
       setTiresReport(res.data || {});
     } catch (error) {
       toast.error('Error al cargar reporte de llantas');

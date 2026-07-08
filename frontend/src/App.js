@@ -16,7 +16,6 @@ import TireSchemaPage from './pages/TireSchemaPage';
 import TiresPage from './pages/TiresPage';
 import FuelPage from './pages/FuelPage';
 import MaintenancePage from './pages/MaintenancePage';
-import MaintenancePlansPage from './pages/MaintenancePlansPage';
 import InventoryPage from './pages/InventoryPage';
 import IssuesPage from './pages/IssuesPage';
 import SettlementsPage from './pages/SettlementsPage';
@@ -98,16 +97,6 @@ const PushRegistrar = () => {
   if (loading || !isAuthenticated) return null;
   return <PushHook />;
 };
-
-// Placeholder pages for routes not yet implemented
-const PlaceholderPage = ({ title }) => (
-  <div className="flex flex-col items-center justify-center h-96 text-slate-400">
-    <h2 className="font-heading text-2xl font-bold uppercase tracking-tight text-slate-900 mb-2">
-      {title}
-    </h2>
-    <p>Esta sección está en desarrollo</p>
-  </div>
-);
 
 const SuspenseFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -261,15 +250,6 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={['owner', 'admin', 'mantenimiento']}>
             <MaintenancePage />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/maintenance/plans"
-        element={
-          <ProtectedRoute allowedRoles={['owner', 'admin', 'flota', 'mantenimiento']}>
-            <MaintenancePlansPage />
           </ProtectedRoute>
         }
       />
