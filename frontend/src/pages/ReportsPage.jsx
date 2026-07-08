@@ -186,7 +186,7 @@ const ReportsPage = () => {
   const getDriverName = (id) => drivers.find(d => d.id === id)?.name || '-';
 
   return (
-    <div className="space-y-6" data-testid="reports-page">
+    <div className="space-y-6 page-fade-in" data-testid="reports-page">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -217,9 +217,9 @@ const ReportsPage = () => {
         </TabsList>
 
         {/* Filters */}
-        <Card className="bg-white mt-4">
+        <Card className="bg-white mt-4 section-enter">
           <CardContent className="py-4">
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">Fecha Inicio</Label>
                 <Input
@@ -271,7 +271,7 @@ const ReportsPage = () => {
                 </div>
               )}
               <div className="flex items-end gap-2">
-                <Button className="btn-action" onClick={handleGenerateReport} disabled={loading}>
+                <Button className="btn-action btn-press" onClick={handleGenerateReport} disabled={loading}>
                   {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                   <BarChart3 className="w-4 h-4 mr-2" />
                   Generar
@@ -292,7 +292,7 @@ const ReportsPage = () => {
           {tripsReport && (
             <>
               {/* Stats */}
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
                 <Card className="bg-white border-l-4 border-l-blue-500">
                   <CardContent className="py-4">
                     <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Total Viajes</p>
@@ -328,8 +328,8 @@ const ReportsPage = () => {
               </div>
 
               {/* Table */}
-              <Card className="bg-white">
-                <CardContent className="p-0">
+              <Card className="bg-white section-enter">
+                <CardContent className="p-0 overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow className="table-dense">
@@ -384,7 +384,7 @@ const ReportsPage = () => {
         <TabsContent value="fuel" className="mt-4">
           {fuelReport && (
             <>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                 <Card className="bg-white border-l-4 border-l-blue-500">
                   <CardContent className="py-4">
                     <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Total Cargas</p>
@@ -411,8 +411,8 @@ const ReportsPage = () => {
                 </Card>
               </div>
 
-              <Card className="bg-white">
-                <CardContent className="p-0">
+              <Card className="bg-white section-enter">
+                <CardContent className="p-0 overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow className="table-dense">
@@ -457,7 +457,7 @@ const ReportsPage = () => {
         <TabsContent value="maintenance" className="mt-4">
           {maintenanceReport && (
             <>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                 <Card className="bg-white border-l-4 border-l-blue-500">
                   <CardContent className="py-4">
                     <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Total OTs</p>
@@ -484,8 +484,8 @@ const ReportsPage = () => {
                 </Card>
               </div>
 
-              <Card className="bg-white">
-                <CardContent className="p-0">
+              <Card className="bg-white section-enter">
+                <CardContent className="p-0 overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow className="table-dense">

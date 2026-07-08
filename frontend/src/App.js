@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Toaster } from './components/ui/sonner';
@@ -31,6 +31,12 @@ import DriverTripPage from './pages/driver/DriverTripPage';
 import DriverFuelPage from './pages/driver/DriverFuelPage';
 import DriverIssuesPage from './pages/driver/DriverIssuesPage';
 import DriverExpensesPage from './pages/driver/DriverExpensesPage';
+// Tire feature pages (created by other agents) — lazy loaded
+const RotateTiresPage = lazy(() => import('./pages/RotateTiresPage'));
+const AlignTiresPage = lazy(() => import('./pages/AlignTiresPage'));
+const TireGraphsPage = lazy(() => import('./pages/TireGraphsPage'));
+const TireDimensionReportPage = lazy(() => import('./pages/TireDimensionReportPage'));
+const TireLifecyclePage = lazy(() => import('./pages/TireLifecyclePage'));
 import './App.css';
 
 // Protected Route Component
@@ -85,8 +91,15 @@ const PlaceholderPage = ({ title }) => (
   </div>
 );
 
+const SuspenseFallback = () => (
+  <div className="min-h-screen flex items-center justify-center bg-slate-50">
+    <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
+  </div>
+);
+
 function AppRoutes() {
   return (
+    <Suspense fallback={<SuspenseFallback />}>
     <Routes>
       {/* Public Routes */}
       <Route
@@ -125,7 +138,52 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
-      
+
+      <Route
+        path="/vehicles/:vehicleId/tires/rotate"
+        element={
+          <ProtectedRoute allowedRoles={['owner', 'admin', 'flota', 'mantenimiento']}>
+            <RotateTiresPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/vehicles/:vehicleId/tires/align"
+        element={
+          <ProtectedRoute allowedRoles={['owner', 'admin', 'flota', 'mantenimiento']}>
+            <AlignTiresPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/vehicles/:vehicleId/tires/graphs"
+        element={
+          <ProtectedRoute allowedRoles={['owner', 'admin', 'flota', 'mantenimiento']}>
+            <TireGraphsPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/tires/required-by-dimension"
+        element={
+          <ProtectedRoute allowedRoles={['owner', 'admin', 'flota', 'mantenimiento']}>
+            <TireDimensionReportPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/tires/lifecycle"
+        element={
+          <ProtectedRoute allowedRoles={['owner', 'admin', 'flota', 'mantenimiento']}>
+            <TireLifecyclePage />
+          </ProtectedRoute>
+        }
+      />
+
       <Route
         path="/equipment"
         element={
@@ -179,7 +237,7 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
-      
+
       <Route
         path="/inventory"
         element={
@@ -255,7 +313,7 @@ function AppRoutes() {
       <Route
         path="/companies"
         element={
-          <ProtectedRoute allowedRoles={['owner']}>
+          <ProtectedRoute allowedRoles={['superadmin', 'owner']}>
             <CompaniesPage />
           </ProtectedRoute>
         }
@@ -325,6 +383,7 @@ function AppRoutes() {
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
+    </Suspense>
   );
 }
 
@@ -333,7 +392,7 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <AppRoutes />
-        <Toaster position="top-right" richColors />
+        <Toaster />
         <OfflineIndicator />
       </AuthProvider>
     </BrowserRouter>

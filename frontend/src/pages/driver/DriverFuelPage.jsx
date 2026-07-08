@@ -30,29 +30,39 @@ import {
   TrendingUp,
   DollarSign,
   Droplet,
+  X,
+  Receipt,
+  FileText,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { useOffline } from '../../hooks/useOffline';
 
 const DriverFuelPage = () => {
   const { user } = useAuth();
+  const { saveFuelLoadOffline } = useOffline();
   const [loading, setLoading] = useState(true);
   const [vehicles, setVehicles] = useState([]);
   const [loads, setLoads] = useState([]);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [saving, setSaving] = useState(false);
   const [extractingOCR, setExtractingOCR] = useState(false);
-  const [capturedPhoto, setCapturedPhoto] = useState(null);
-  
-  const cameraInputRef = useRef(null);
-  const fileInputRef = useRef(null);
+
+  const voucherCamRef = useRef(null);
+  const voucherFileRef = useRef(null);
+  const invoiceCamRef = useRef(null);
+  const invoiceFileRef = useRef(null);
 
   const [formData, setFormData] = useState({
     vehicle_id: '',
+    voucher_number: '',
+    invoice_number: '',
     liters: '',
     price_per_liter: '',
     odometer: '',
     provider: '',
+    voucher_photo_url: '',
+    invoice_photo_url: '',
   });
 
   const fetchData = async () => {
@@ -75,38 +85,47 @@ const DriverFuelPage = () => {
     fetchData();
   }, []);
 
-  const handlePhotoCapture = async (event) => {
+  const handlePhotoCapture = (slot) => async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('La imagen debe ser menor a 5MB');
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = async (e) => {
       const base64Data = e.target.result;
-      setCapturedPhoto(base64Data);
-      
-      // Try OCR extraction
-      setExtractingOCR(true);
-      try {
-        toast.info('Extrayendo datos del recibo...');
-        const ocrResponse = await api.post('/fuel/ocr', { image_base64: base64Data });
-        
-        if (ocrResponse.data.success && ocrResponse.data.extracted_data) {
-          const extracted = ocrResponse.data.extracted_data;
-          setFormData(prev => ({
-            ...prev,
-            liters: extracted.liters?.toString() || prev.liters,
-            price_per_liter: extracted.price_per_liter?.toString() || prev.price_per_liter,
-            odometer: extracted.odometer?.toString() || prev.odometer,
-            provider: extracted.provider || prev.provider,
-          }));
-          toast.success('¡Datos extraídos automáticamente!');
+      const field = slot === 'voucher' ? 'voucher_photo_url' : 'invoice_photo_url';
+      setFormData(prev => ({ ...prev, [field]: base64Data }));
+
+      // OCR only on invoice photo (factura tiene más datos)
+      if (slot === 'invoice') {
+        setExtractingOCR(true);
+        try {
+          toast.info('Extrayendo datos de la factura...');
+          const ocrResponse = await api.post('/fuel/ocr', { image_base64: base64Data });
+
+          if (ocrResponse.data.success && ocrResponse.data.extracted_data) {
+            const extracted = ocrResponse.data.extracted_data;
+            setFormData(prev => ({
+              ...prev,
+              liters: extracted.liters?.toString() || prev.liters,
+              price_per_liter: extracted.price_per_liter?.toString() || prev.price_per_liter,
+              odometer: extracted.odometer?.toString() || prev.odometer,
+              provider: extracted.provider || prev.provider,
+              invoice_number: extracted.invoice_number || prev.invoice_number,
+            }));
+            toast.success('¡Datos extraídos!');
+          }
+        } catch (error) {
+          console.log('OCR failed:', error);
         }
-      } catch (error) {
-        console.log('OCR failed:', error);
+        setExtractingOCR(false);
       }
-      setExtractingOCR(false);
     };
     reader.readAsDataURL(file);
+    event.target.value = '';
   };
 
   const handleSaveLoad = async () => {
@@ -114,35 +133,65 @@ const DriverFuelPage = () => {
       toast.error('Complete todos los campos requeridos');
       return;
     }
+    if (!formData.voucher_photo_url && !formData.invoice_photo_url) {
+      toast.error('Suba al menos una foto (vale o factura)');
+      return;
+    }
 
     setSaving(true);
-    try {
-      // Upload photo first if exists
-      let photoUrl = null;
-      if (capturedPhoto) {
-        const uploadRes = await api.post('/upload/base64', {
-          data: capturedPhoto,
-          entity_type: 'fuel',
-          entity_id: 'loads',
-        });
-        photoUrl = uploadRes.data.url;
+    const liters = parseFloat(formData.liters);
+    const price = parseFloat(formData.price_per_liter);
+    const payload = {
+      vehicle_id: formData.vehicle_id,
+      voucher_number: formData.voucher_number || null,
+      invoice_number: formData.invoice_number || null,
+      liters,
+      price_per_liter: price,
+      total_amount: liters * price,
+      odometer: parseInt(formData.odometer),
+      provider: formData.provider || 'Sin proveedor',
+      voucher_photo_url: formData.voucher_photo_url || null,
+      invoice_photo_url: formData.invoice_photo_url || null,
+      receipt_url: formData.invoice_photo_url || formData.voucher_photo_url || null,
+      driver_id: user?.id,
+    };
+
+    // Offline shortcut
+    if (!navigator.onLine) {
+      const ok = await saveFuelLoadOffline(payload);
+      if (ok) {
+        toast.success('Guardado offline. Se enviará al reconectar');
+        setShowAddDialog(false);
+        resetForm();
+      } else {
+        toast.error('No se pudo guardar offline');
       }
+      setSaving(false);
+      return;
+    }
 
-      await api.post('/fuel/loads', {
-        ...formData,
-        liters: parseFloat(formData.liters),
-        price_per_liter: parseFloat(formData.price_per_liter),
-        odometer: parseInt(formData.odometer),
-        photo_url: photoUrl,
-        driver_id: user?.id,
-      });
+    try {
+      await api.post('/fuel/loads', payload);
 
-      toast.success('Carga registrada');
+      toast.success('Carga registrada exitosamente');
       setShowAddDialog(false);
       resetForm();
       fetchData();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Error al guardar');
+      // Network failure: fall back to offline queue
+      const isNetworkErr = !error.response;
+      if (isNetworkErr) {
+        const ok = await saveFuelLoadOffline(payload);
+        if (ok) {
+          toast.success('Guardado offline. Se enviará al reconectar');
+          setShowAddDialog(false);
+          resetForm();
+        } else {
+          toast.error('No se pudo guardar offline');
+        }
+      } else {
+        toast.error(error.response?.data?.detail || 'Error al guardar');
+      }
     }
     setSaving(false);
   };
@@ -150,12 +199,20 @@ const DriverFuelPage = () => {
   const resetForm = () => {
     setFormData({
       vehicle_id: '',
+      voucher_number: '',
+      invoice_number: '',
       liters: '',
       price_per_liter: '',
       odometer: '',
       provider: '',
+      voucher_photo_url: '',
+      invoice_photo_url: '',
     });
-    setCapturedPhoto(null);
+  };
+
+  const removePhoto = (slot) => {
+    const field = slot === 'voucher' ? 'voucher_photo_url' : 'invoice_photo_url';
+    setFormData(prev => ({ ...prev, [field]: '' }));
   };
 
   const totalLiters = loads.reduce((sum, l) => sum + (l.liters || 0), 0);
@@ -245,74 +302,82 @@ const DriverFuelPage = () => {
           </DialogHeader>
           
           {/* Hidden inputs for camera/file */}
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            ref={cameraInputRef}
-            onChange={handlePhotoCapture}
-            className="hidden"
-          />
-          <input
-            type="file"
-            accept="image/*"
-            ref={fileInputRef}
-            onChange={handlePhotoCapture}
-            className="hidden"
-          />
+          <input type="file" accept="image/*" capture="environment" ref={voucherCamRef} onChange={handlePhotoCapture('voucher')} className="hidden" />
+          <input type="file" accept="image/*" ref={voucherFileRef} onChange={handlePhotoCapture('voucher')} className="hidden" />
+          <input type="file" accept="image/*" capture="environment" ref={invoiceCamRef} onChange={handlePhotoCapture('invoice')} className="hidden" />
+          <input type="file" accept="image/*" ref={invoiceFileRef} onChange={handlePhotoCapture('invoice')} className="hidden" />
 
-          <div className="space-y-4 py-2">
-            {/* Photo capture */}
-            <div className="space-y-2">
-              <Label>Foto del Recibo</Label>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => cameraInputRef.current?.click()}
-                  disabled={extractingOCR}
-                >
-                  {extractingOCR ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Camera className="w-4 h-4 mr-2" />
-                  )}
-                  Tomar Foto
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={extractingOCR}
-                >
-                  <Image className="w-4 h-4" />
-                </Button>
-              </div>
-              {capturedPhoto && (
-                <div className="relative mt-2">
-                  <img 
-                    src={capturedPhoto} 
-                    alt="Recibo" 
-                    className="w-full h-32 object-cover rounded-lg"
-                  />
-                  <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full p-1">
-                    <Check className="w-4 h-4" />
-                  </div>
+          <div className="space-y-4 py-2 max-h-[70vh] overflow-y-auto">
+            {/* VOUCHER PHOTO */}
+            <div className="space-y-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <Label className="flex items-center gap-2 text-blue-900 font-semibold">
+                <Receipt className="w-4 h-4" /> Vale de Combustible
+              </Label>
+              <Input
+                value={formData.voucher_number}
+                onChange={(e) => setFormData({ ...formData, voucher_number: e.target.value })}
+                placeholder="N° de vale"
+                className="bg-white"
+              />
+              {formData.voucher_photo_url ? (
+                <div className="relative">
+                  <img src={formData.voucher_photo_url} alt="Vale" className="w-full h-32 object-cover rounded-lg" />
+                  <button onClick={() => removePhoto('voucher')} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1">
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" className="flex-1 bg-white" onClick={() => voucherCamRef.current?.click()}>
+                    <Camera className="w-4 h-4 mr-2" />Tomar Foto
+                  </Button>
+                  <Button type="button" variant="outline" className="bg-white" onClick={() => voucherFileRef.current?.click()}>
+                    <Image className="w-4 h-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {/* INVOICE PHOTO */}
+            <div className="space-y-2 p-3 bg-orange-50 rounded-lg border border-orange-200">
+              <Label className="flex items-center gap-2 text-orange-900 font-semibold">
+                <FileText className="w-4 h-4" /> Factura
+              </Label>
+              <Input
+                value={formData.invoice_number}
+                onChange={(e) => setFormData({ ...formData, invoice_number: e.target.value })}
+                placeholder="N° de factura"
+                className="bg-white"
+              />
+              {formData.invoice_photo_url ? (
+                <div className="relative">
+                  <img src={formData.invoice_photo_url} alt="Factura" className="w-full h-32 object-cover rounded-lg" />
+                  <button onClick={() => removePhoto('invoice')} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1">
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" className="flex-1 bg-white" onClick={() => invoiceCamRef.current?.click()} disabled={extractingOCR}>
+                    {extractingOCR ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Camera className="w-4 h-4 mr-2" />}
+                    Tomar Foto
+                  </Button>
+                  <Button type="button" variant="outline" className="bg-white" onClick={() => invoiceFileRef.current?.click()} disabled={extractingOCR}>
+                    <Image className="w-4 h-4" />
+                  </Button>
                 </div>
               )}
               {extractingOCR && (
-                <p className="text-sm text-blue-600 flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4" />
-                  Extrayendo datos con IA...
+                <p className="text-xs text-blue-700 flex items-center gap-1">
+                  <TrendingUp className="w-3 h-3" /> Extrayendo datos con IA...
                 </p>
               )}
             </div>
 
             <div className="space-y-2">
               <Label>Vehículo *</Label>
-              <Select 
-                value={formData.vehicle_id} 
+              <Select
+                value={formData.vehicle_id}
                 onValueChange={(v) => setFormData({ ...formData, vehicle_id: v })}
               >
                 <SelectTrigger>
@@ -331,51 +396,30 @@ const DriverFuelPage = () => {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Litros *</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={formData.liters}
-                  onChange={(e) => setFormData({ ...formData, liters: e.target.value })}
-                  placeholder="0.00"
-                />
+                <Input type="number" step="0.01" value={formData.liters} onChange={(e) => setFormData({ ...formData, liters: e.target.value })} placeholder="0.00" />
               </div>
               <div className="space-y-2">
                 <Label>Precio/Litro *</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={formData.price_per_liter}
-                  onChange={(e) => setFormData({ ...formData, price_per_liter: e.target.value })}
-                  placeholder="0.00"
-                />
+                <Input type="number" step="0.01" value={formData.price_per_liter} onChange={(e) => setFormData({ ...formData, price_per_liter: e.target.value })} placeholder="0.00" />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Odómetro *</Label>
-                <Input
-                  type="number"
-                  value={formData.odometer}
-                  onChange={(e) => setFormData({ ...formData, odometer: e.target.value })}
-                  placeholder="km"
-                />
+                <Input type="number" value={formData.odometer} onChange={(e) => setFormData({ ...formData, odometer: e.target.value })} placeholder="km" />
               </div>
               <div className="space-y-2">
                 <Label>Grifo</Label>
-                <Input
-                  value={formData.provider}
-                  onChange={(e) => setFormData({ ...formData, provider: e.target.value })}
-                  placeholder="Nombre"
-                />
+                <Input value={formData.provider} onChange={(e) => setFormData({ ...formData, provider: e.target.value })} placeholder="Nombre" />
               </div>
             </div>
 
             {/* Total */}
             {formData.liters && formData.price_per_liter && (
-              <div className="p-3 bg-orange-50 rounded-lg">
-                <p className="text-sm text-slate-500">Total:</p>
-                <p className="text-xl font-bold text-orange-600">
+              <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                <p className="text-sm text-slate-600">Total:</p>
+                <p className="text-2xl font-bold text-green-700">
                   S/ {(parseFloat(formData.liters) * parseFloat(formData.price_per_liter)).toFixed(2)}
                 </p>
               </div>

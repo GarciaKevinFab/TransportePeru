@@ -1,0 +1,8 @@
+{
+  "buildCommand": "env CI=false craco build",
+  "outputDirectory": "build",
+  "framework": null,
+  "rewrites": [
+    { "source": "/((?!static|favicon|manifest|logo|robots).*)", "destination": "/index.html" }
+  ]
+}

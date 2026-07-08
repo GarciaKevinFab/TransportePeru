@@ -23,6 +23,7 @@ import {
   MapPin,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useOffline } from '../../hooks/useOffline';
 
 const ISSUE_TYPES = [
   { value: 'averia', label: 'Avería Mecánica', icon: '🔧' },
@@ -37,6 +38,7 @@ const ISSUE_TYPES = [
 
 const DriverIssuesPage = () => {
   const { user } = useAuth();
+  const { saveIssueOffline } = useOffline();
   const [saving, setSaving] = useState(false);
   const [capturedPhotos, setCapturedPhotos] = useState([]);
   const [location, setLocation] = useState(null);
@@ -98,6 +100,38 @@ const DriverIssuesPage = () => {
     }
 
     setSaving(true);
+
+    const resetAll = () => {
+      setFormData({
+        issue_type: '',
+        description: '',
+        severity: 'medium',
+      });
+      setCapturedPhotos([]);
+      setLocation(null);
+    };
+
+    // Offline path: queue with base64 photos inline
+    if (!navigator.onLine) {
+      const payload = {
+        ...formData,
+        photos: [],
+        photos_base64: capturedPhotos, // sync layer can re-upload these
+        location,
+        reporter_id: user?.id,
+        reporter_name: user?.name,
+      };
+      const ok = await saveIssueOffline(payload);
+      if (ok) {
+        toast.success('Guardado offline. Se enviará al reconectar');
+        resetAll();
+      } else {
+        toast.error('No se pudo guardar offline');
+      }
+      setSaving(false);
+      return;
+    }
+
     try {
       // Upload photos
       const photoUrls = [];
@@ -119,17 +153,28 @@ const DriverIssuesPage = () => {
       });
 
       toast.success('Incidente reportado correctamente');
-      
-      // Reset form
-      setFormData({
-        issue_type: '',
-        description: '',
-        severity: 'medium',
-      });
-      setCapturedPhotos([]);
-      setLocation(null);
+      resetAll();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Error al reportar');
+      const isNetworkErr = !error.response;
+      if (isNetworkErr) {
+        const payload = {
+          ...formData,
+          photos: [],
+          photos_base64: capturedPhotos,
+          location,
+          reporter_id: user?.id,
+          reporter_name: user?.name,
+        };
+        const ok = await saveIssueOffline(payload);
+        if (ok) {
+          toast.success('Guardado offline. Se enviará al reconectar');
+          resetAll();
+        } else {
+          toast.error('No se pudo guardar offline');
+        }
+      } else {
+        toast.error(error.response?.data?.detail || 'Error al reportar');
+      }
     }
     setSaving(false);
   };

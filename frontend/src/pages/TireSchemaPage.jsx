@@ -22,45 +22,38 @@ import {
   SelectValue,
 } from '../components/ui/select';
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '../components/ui/tooltip';
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../components/ui/table';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '../components/ui/collapsible';
 import {
   ArrowLeft,
-  Plus,
   CircleDot,
-  AlertTriangle,
-  CheckCircle,
   Loader2,
-  Wrench,
-  RotateCw,
   Eye,
-  Truck,
+  Settings2,
+  RotateCw,
+  Move,
+  BarChart3,
+  Pencil,
+  AlertTriangle,
+  ChevronDown,
+  History,
 } from 'lucide-react';
 import { toast } from 'sonner';
-
-// Tire position configurations
-const TRACTO_CONFIG = {
-  axles: [
-    { name: 'Eje Direccional', positions: [{ code: 'T-1L', label: '1L' }, { code: 'T-1R', label: '1R' }], dual: false },
-    { name: 'Eje Tracción', positions: [
-      { code: 'T-2L1', label: '2L1' }, { code: 'T-2L2', label: '2L2' },
-      { code: 'T-2R1', label: '2R1' }, { code: 'T-2R2', label: '2R2' }
-    ], dual: true },
-  ],
-  spare: [{ code: 'T-SP', label: 'Repuesto' }]
-};
-
-const CARRETA_CONFIG = {
-  axles: [
-    { name: 'Eje A', positions: [{ code: 'C-A-L', label: 'AL' }, { code: 'C-A-R', label: 'AR' }], dual: false },
-    { name: 'Eje B', positions: [{ code: 'C-B-L', label: 'BL' }, { code: 'C-B-R', label: 'BR' }], dual: false },
-    { name: 'Eje C', positions: [{ code: 'C-C-L', label: 'CL' }, { code: 'C-C-R', label: 'CR' }], dual: false },
-  ],
-  spare: [{ code: 'C-SP', label: 'Repuesto' }]
-};
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import TruckSchema from '../components/tires/TruckSchema';
+import AxleConfigDialog from '../components/tires/AxleConfigDialog';
+import { getRenderConfig, deriveAxleConfig } from '../components/tires/tireSchema';
 
 const TireSchemaPage = () => {
   const { vehicleId } = useParams();
@@ -71,12 +64,17 @@ const TireSchemaPage = () => {
   const [availableTires, setAvailableTires] = useState([]);
   const [selectedPosition, setSelectedPosition] = useState(null);
   const [selectedTire, setSelectedTire] = useState(null);
-  
+  const [diagnostics, setDiagnostics] = useState(null);
+
   // Dialog states
   const [showMountDialog, setShowMountDialog] = useState(false);
   const [showInspectionDialog, setShowInspectionDialog] = useState(false);
   const [showTireDetailsDialog, setShowTireDetailsDialog] = useState(false);
+  const [showAxleConfigDialog, setShowAxleConfigDialog] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [savingAxles, setSavingAxles] = useState(false);
+  // Inspection id being edited (null = creating a new inspection).
+  const [editingInspectionId, setEditingInspectionId] = useState(null);
   
   // Mount form
   const [mountForm, setMountForm] = useState({
@@ -117,8 +115,19 @@ const TireSchemaPage = () => {
     setLoading(false);
   };
 
+  // Diagnostics are optional: never block the page if the endpoint fails.
+  const fetchDiagnostics = async () => {
+    try {
+      const res = await tiresApi.getDiagnostics(vehicleId);
+      setDiagnostics(res.data);
+    } catch (error) {
+      setDiagnostics(null);
+    }
+  };
+
   useEffect(() => {
     fetchData();
+    fetchDiagnostics();
   }, [vehicleId]);
 
   const getTireByPosition = (positionCode) => {
@@ -193,8 +202,8 @@ const TireSchemaPage = () => {
       const depths = [inspectionForm.depth1, inspectionForm.depth2, inspectionForm.depth3]
         .filter(d => d)
         .map(d => parseFloat(d));
-      
-      await tiresApi.createInspection({
+
+      const payload = {
         tire_id: selectedTire.id,
         vehicle_id: vehicleId,
         position_code: selectedTire.current_position,
@@ -204,82 +213,145 @@ const TireSchemaPage = () => {
         wear_type: inspectionForm.wear_type || null,
         odometer: parseInt(inspectionForm.odometer) || vehicle?.odometer || 0,
         notes: inspectionForm.notes || null,
-      });
-      toast.success('Inspección registrada');
+      };
+
+      if (editingInspectionId) {
+        await tiresApi.updateInspection(editingInspectionId, payload);
+        toast.success('Inspección actualizada');
+      } else {
+        await tiresApi.createInspection(payload);
+        toast.success('Inspección registrada');
+      }
       setShowInspectionDialog(false);
+      setEditingInspectionId(null);
       setInspectionForm({
         depth1: '', depth2: '', depth3: '', pressure: '',
         irregular_wear: false, wear_type: '', odometer: '', notes: '',
       });
       fetchData();
+      fetchDiagnostics();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Error al crear inspección');
+      toast.error(error.response?.data?.detail || 'Error al guardar inspección');
     }
     setSaving(false);
   };
 
   const openInspectionDialog = () => {
+    setEditingInspectionId(null);
     setInspectionForm({
-      ...inspectionForm,
+      depth1: '', depth2: '', depth3: '', pressure: '',
+      irregular_wear: false, wear_type: '',
       odometer: vehicle?.odometer?.toString() || '0',
+      notes: '',
     });
     setShowTireDetailsDialog(false);
     setShowInspectionDialog(true);
   };
 
-  const config = vehicle?.vehicle_type === 'tracto' ? TRACTO_CONFIG : CARRETA_CONFIG;
-
-  const TirePosition = ({ position }) => {
-    const tire = getTireByPosition(position.code);
-    const status = getTireStatus(tire);
-    
-    const statusStyles = {
-      good: 'bg-green-100 border-green-500 text-green-700 hover:bg-green-200',
-      warning: 'bg-yellow-100 border-yellow-500 text-yellow-700 hover:bg-yellow-200',
-      critical: 'bg-red-100 border-red-500 text-red-700 hover:bg-red-200 pulse-alert',
-      empty: 'bg-slate-100 border-slate-300 text-slate-400 border-dashed hover:bg-slate-200',
-    };
-
-    return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={() => handlePositionClick(position)}
-              className={`tire-position ${statusStyles[status]} transition-all duration-200`}
-              data-testid={`tire-${position.code}`}
-            >
-              {tire ? (
-                <div className="text-center">
-                  <CircleDot className="w-5 h-5 mx-auto mb-1" />
-                  <span className="text-[10px] font-bold">{position.label}</span>
-                </div>
-              ) : (
-                <div className="text-center">
-                  <Plus className="w-5 h-5 mx-auto mb-1" />
-                  <span className="text-[10px]">{position.label}</span>
-                </div>
-              )}
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>
-            {tire ? (
-              <div className="text-xs">
-                <p className="font-bold">{tire.serial}</p>
-                <p>{tire.brand} {tire.model}</p>
-                <p>{tire.dimension}</p>
-                {tire.last_inspection && (
-                  <p>Prof: {Math.min(...tire.last_inspection.depths).toFixed(1)}mm</p>
-                )}
-              </div>
-            ) : (
-              <p>Posición vacía - Click para montar</p>
-            )}
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    );
+  // Load the tire's last inspection into the form for editing. The inspection id
+  // usually arrives in tire.last_inspection.id; if not, fall back to getInspections.
+  const openEditInspectionDialog = async () => {
+    if (!selectedTire) return;
+    let insp = selectedTire.last_inspection;
+    let inspId = insp?.id;
+    if (!inspId) {
+      try {
+        const res = await tiresApi.getInspections(selectedTire.id);
+        const list = res.data || [];
+        insp = list[0] || insp;
+        inspId = insp?.id;
+      } catch (error) {
+        // ignore — handled below
+      }
+    }
+    if (!inspId) {
+      toast.error('No hay inspección previa para editar');
+      return;
+    }
+    const depths = insp?.depths || [];
+    setEditingInspectionId(inspId);
+    setInspectionForm({
+      depth1: depths[0] != null ? String(depths[0]) : '',
+      depth2: depths[1] != null ? String(depths[1]) : '',
+      depth3: depths[2] != null ? String(depths[2]) : '',
+      pressure: insp?.pressure != null ? String(insp.pressure) : '',
+      irregular_wear: !!insp?.irregular_wear,
+      wear_type: insp?.wear_type || '',
+      odometer: insp?.odometer != null ? String(insp.odometer) : (vehicle?.odometer?.toString() || '0'),
+      notes: insp?.notes || '',
+    });
+    setShowTireDetailsDialog(false);
+    setShowInspectionDialog(true);
   };
+
+  const handleSaveAxleConfig = async (axleConfig) => {
+    setSavingAxles(true);
+    try {
+      await vehiclesApi.update(vehicleId, { axle_config: axleConfig });
+      toast.success('Configuración de ejes guardada');
+      setShowAxleConfigDialog(false);
+      await fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Error al guardar configuración de ejes');
+    }
+    setSavingAxles(false);
+  };
+
+  const config = getRenderConfig(vehicle);
+  const isTracto = vehicle?.vehicle_type === 'tracto';
+
+  // Formatting helpers: null/undefined -> "—".
+  const dash = (v) => (v === null || v === undefined || v === '' ? '—' : v);
+  const fmtNum = (v, digits = 0) =>
+    v === null || v === undefined || Number.isNaN(Number(v))
+      ? '—'
+      : Number(v).toLocaleString('es-PE', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  const fmtMoney = (v) =>
+    v === null || v === undefined || Number.isNaN(Number(v))
+      ? '—'
+      : `S/ ${Number(v).toLocaleString('es-PE', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`;
+  const fmtDate = (v) => {
+    if (!v) return '—';
+    try {
+      return format(new Date(v), 'dd/MM/yyyy', { locale: es });
+    } catch {
+      return '—';
+    }
+  };
+  const minDepth = (tire) => {
+    const depths = tire?.last_inspection?.depths;
+    if (!depths || !depths.length) return null;
+    return Math.min(...depths);
+  };
+  const statusStyles = {
+    critical: 'bg-red-100 text-red-700',
+    warning: 'bg-yellow-100 text-yellow-700',
+    good: 'bg-green-100 text-green-700',
+    empty: 'bg-slate-100 text-slate-500',
+  };
+  const statusLabels = {
+    critical: 'Crítica',
+    warning: 'Alerta',
+    good: 'OK',
+    empty: '—',
+  };
+  const severityStyles = {
+    critical: 'bg-red-100 text-red-700 border-red-200',
+    alta: 'bg-red-100 text-red-700 border-red-200',
+    high: 'bg-red-100 text-red-700 border-red-200',
+    warning: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+    media: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+    medium: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+    info: 'bg-blue-100 text-blue-700 border-blue-200',
+    baja: 'bg-blue-100 text-blue-700 border-blue-200',
+    low: 'bg-blue-100 text-blue-700 border-blue-200',
+  };
+  const severityClass = (sev) => severityStyles[String(sev || '').toLowerCase()] || 'bg-slate-100 text-slate-600 border-slate-200';
+
+  const suggestions = diagnostics?.suggestions || [];
+  const axleIssues = diagnostics?.axle_issues || [];
+  const hasDiagnostics = suggestions.length > 0 || axleIssues.length > 0;
+  const axleHistory = vehicle?.axle_config_history || [];
 
   if (loading) {
     return (
@@ -310,6 +382,40 @@ const TireSchemaPage = () => {
             </span>
           </div>
         </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => navigate(`/vehicles/${vehicleId}/tires/rotate`)}
+            data-testid="rotate-tires-btn"
+          >
+            <RotateCw className="w-4 h-4 mr-2" />
+            Rotar
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => navigate(`/vehicles/${vehicleId}/tires/align`)}
+            data-testid="align-tires-btn"
+          >
+            <Move className="w-4 h-4 mr-2" />
+            Alinear
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => navigate(`/vehicles/${vehicleId}/tires/graphs`)}
+            data-testid="tire-graphs-btn"
+          >
+            <BarChart3 className="w-4 h-4 mr-2" />
+            Gráficas
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setShowAxleConfigDialog(true)}
+            data-testid="configure-axles-btn"
+          >
+            <Settings2 className="w-4 h-4 mr-2" />
+            Configurar ejes
+          </Button>
+        </div>
       </div>
 
       {/* Tire Schema */}
@@ -320,83 +426,115 @@ const TireSchemaPage = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col items-center py-8">
-            {/* Vehicle representation */}
-            <div className="relative">
-              {/* Chassis representation */}
-              <div className="bg-slate-200 rounded-lg px-8 py-4 relative">
-                {vehicle?.vehicle_type === 'tracto' && (
-                  <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 w-20 h-8 bg-slate-300 rounded-t-lg flex items-center justify-center">
-                    <Truck className="w-6 h-6 text-slate-600" />
-                  </div>
-                )}
-                
-                <div className="space-y-8">
-                  {config.axles.map((axle, idx) => (
-                    <div key={idx} className="flex flex-col items-center">
-                      <span className="text-xs font-bold text-slate-500 mb-2">{axle.name}</span>
-                      <div className="flex justify-center gap-24">
-                        {/* Left side */}
-                        <div className={`flex ${axle.dual ? 'gap-1' : ''}`}>
-                          {axle.positions
-                            .filter((_, i) => i < (axle.dual ? 2 : 1))
-                            .map((pos) => (
-                              <TirePosition key={pos.code} position={pos} />
-                            ))}
-                        </div>
-                        
-                        {/* Axle line */}
-                        <div className="w-16 h-1 bg-slate-400 self-center" />
-                        
-                        {/* Right side */}
-                        <div className={`flex ${axle.dual ? 'gap-1' : ''}`}>
-                          {axle.positions
-                            .filter((_, i) => i >= (axle.dual ? 2 : 1))
-                            .map((pos) => (
-                              <TirePosition key={pos.code} position={pos} />
-                            ))}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Spare Tire */}
-            {config.spare && (
-              <div className="mt-6 pt-4 border-t-2 border-dashed border-slate-300">
-                <span className="text-xs font-bold text-slate-500 mb-2 block text-center">Llanta de Repuesto</span>
-                <div className="flex justify-center gap-4">
-                  {config.spare.map((pos) => (
-                    <TirePosition key={pos.code} position={pos} />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Legend */}
-            <div className="flex gap-6 mt-8">
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded bg-green-100 border-2 border-green-500" />
-                <span className="text-xs text-slate-600">Buena condición</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded bg-yellow-100 border-2 border-yellow-500" />
-                <span className="text-xs text-slate-600">Requiere atención</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded bg-red-100 border-2 border-red-500" />
-                <span className="text-xs text-slate-600">Crítico</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded bg-slate-100 border-2 border-slate-300 border-dashed" />
-                <span className="text-xs text-slate-600">Sin llanta</span>
-              </div>
-            </div>
-          </div>
+          <TruckSchema
+            config={config}
+            isTracto={isTracto}
+            getTireByPosition={getTireByPosition}
+            getTireStatus={getTireStatus}
+            onPositionClick={handlePositionClick}
+          />
         </CardContent>
       </Card>
+
+      {/* Diagnostics Panel */}
+      {hasDiagnostics && (
+        <Card className="bg-white" data-testid="tire-diagnostics-panel">
+          <CardHeader>
+            <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-orange-500" />
+              Diagnósticos
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {suggestions.length > 0 && (
+              <div className="space-y-2">
+                {suggestions.map((s, idx) => (
+                  <div
+                    key={idx}
+                    className={`flex items-start gap-3 p-3 rounded-sm border ${severityClass(s.severity)}`}
+                  >
+                    <div className="flex-1">
+                      <p className="font-bold text-sm">{s.action || s.title || 'Recomendación'}</p>
+                      {s.description && (
+                        <p className="text-xs mt-0.5 opacity-90">{s.description}</p>
+                      )}
+                      {s.position_code && (
+                        <p className="text-xs mt-0.5 font-mono opacity-75">Pos: {s.position_code}</p>
+                      )}
+                    </div>
+                    {s.severity && (
+                      <Badge variant="outline" className="uppercase text-[10px]">
+                        {s.severity}
+                      </Badge>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            {axleIssues.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-bold uppercase text-slate-400 tracking-widest">
+                  Problemas por eje
+                </p>
+                {axleIssues.map((ai, idx) => (
+                  <div
+                    key={idx}
+                    className={`flex items-start gap-3 p-3 rounded-sm border ${severityClass(ai.severity)}`}
+                  >
+                    <div className="flex-1">
+                      <p className="font-bold text-sm">
+                        {ai.axle || ai.axle_name || `Eje ${ai.axle_index ?? ''}`}
+                      </p>
+                      {ai.description && (
+                        <p className="text-xs mt-0.5 opacity-90">{ai.description}</p>
+                      )}
+                    </div>
+                    {ai.severity && (
+                      <Badge variant="outline" className="uppercase text-[10px]">
+                        {ai.severity}
+                      </Badge>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Axle config history */}
+      {axleHistory.length > 0 && (
+        <Collapsible>
+          <Card className="bg-white">
+            <CollapsibleTrigger className="w-full text-left" data-testid="axle-history-trigger">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest flex items-center gap-2">
+                  <History className="w-4 h-4" />
+                  Histórico de esquema ({axleHistory.length})
+                </CardTitle>
+                <ChevronDown className="w-4 h-4 text-slate-400" />
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent>
+                <ul className="space-y-2">
+                  {axleHistory.map((h, idx) => (
+                    <li key={idx} className="flex items-center gap-3 text-sm border-b border-slate-100 pb-2 last:border-0">
+                      <span className="font-mono text-xs text-slate-500 w-24 shrink-0">
+                        {fmtDate(h.date || h.changed_at || h.created_at)}
+                      </span>
+                      <span className="text-slate-700">
+                        {h.changed_by_name || h.changed_by || h.user || 'Usuario'}
+                      </span>
+                      {h.note && <span className="text-slate-400 text-xs">— {h.note}</span>}
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
+      )}
 
       {/* Tires List */}
       <Card className="bg-white">
@@ -405,48 +543,67 @@ const TireSchemaPage = () => {
             Llantas Montadas ({tires.length})
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0 overflow-x-auto">
           {tires.length === 0 ? (
             <div className="text-center py-8 text-slate-400">
               <CircleDot className="w-12 h-12 mx-auto mb-2" />
               <p>No hay llantas montadas</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {tires.map((tire) => {
-                const status = getTireStatus(tire);
-                return (
-                  <div
-                    key={tire.id}
-                    className={`p-4 rounded-sm border-l-4 ${
-                      status === 'critical'
-                        ? 'border-l-red-500 bg-red-50'
-                        : status === 'warning'
-                        ? 'border-l-yellow-500 bg-yellow-50'
-                        : 'border-l-green-500 bg-green-50'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="font-mono font-bold text-slate-900">{tire.serial}</p>
-                        <p className="text-sm text-slate-600">{tire.brand} {tire.model}</p>
-                        <p className="text-xs text-slate-500">{tire.dimension}</p>
-                      </div>
-                      <Badge variant="outline">{tire.current_position}</Badge>
-                    </div>
-                    {tire.last_inspection && (
-                      <div className="mt-3 pt-3 border-t border-slate-200">
-                        <div className="flex items-center gap-2 text-xs text-slate-600">
-                          <span>Prof: {Math.min(...tire.last_inspection.depths).toFixed(1)}mm</span>
-                          <span>•</span>
-                          <span>Presión: {tire.last_inspection.pressure} PSI</span>
+            <Table>
+              <TableHeader>
+                <TableRow className="table-dense">
+                  <TableHead>Pos</TableHead>
+                  <TableHead>Cód</TableHead>
+                  <TableHead>Llanta</TableHead>
+                  <TableHead>Cód Vida</TableHead>
+                  <TableHead>Fecha Montaje</TableHead>
+                  <TableHead>Prof. (mm)</TableHead>
+                  <TableHead>km Recorridos</TableHead>
+                  <TableHead>Costo/km</TableHead>
+                  <TableHead>Estado</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {tires.map((tire) => {
+                  const status = getTireStatus(tire);
+                  const md = minDepth(tire);
+                  return (
+                    <TableRow
+                      key={tire.id}
+                      className="table-dense cursor-pointer hover:bg-slate-50"
+                      onClick={() => {
+                        setSelectedTire(tire);
+                        setShowTireDetailsDialog(true);
+                      }}
+                    >
+                      <TableCell>
+                        <Badge variant="outline" className="font-mono">
+                          {dash(tire.current_position)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-mono font-bold">{dash(tire.serial)}</TableCell>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium">{tire.brand} {tire.model}</p>
+                          <p className="text-xs text-slate-500">{dash(tire.dimension)}</p>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">{dash(tire.cod_vida)}</TableCell>
+                      <TableCell className="text-xs">{fmtDate(tire.mount_date)}</TableCell>
+                      <TableCell className="font-mono">
+                        {md === null ? '—' : `${md.toFixed(1)}`}
+                      </TableCell>
+                      <TableCell className="font-mono">{fmtNum(tire.km_recorridos)}</TableCell>
+                      <TableCell className="font-mono">{fmtMoney(tire.cost_per_km)}</TableCell>
+                      <TableCell>
+                        <Badge className={statusStyles[status]}>{statusLabels[status]}</Badge>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>
@@ -566,10 +723,20 @@ const TireSchemaPage = () => {
             )}
           </div>
           <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button variant="outline" onClick={openInspectionDialog}>
+            <Button variant="outline" onClick={openInspectionDialog} data-testid="new-inspection-btn">
               <Eye className="w-4 h-4 mr-2" />
               Nueva Inspección
             </Button>
+            {selectedTire?.last_inspection && (
+              <Button
+                variant="outline"
+                onClick={openEditInspectionDialog}
+                data-testid="edit-inspection-btn"
+              >
+                <Pencil className="w-4 h-4 mr-2" />
+                Editar última inspección
+              </Button>
+            )}
             <Button
               variant="destructive"
               onClick={handleUnmountTire}
@@ -583,11 +750,17 @@ const TireSchemaPage = () => {
       </Dialog>
 
       {/* Inspection Dialog */}
-      <Dialog open={showInspectionDialog} onOpenChange={setShowInspectionDialog}>
+      <Dialog
+        open={showInspectionDialog}
+        onOpenChange={(open) => {
+          setShowInspectionDialog(open);
+          if (!open) setEditingInspectionId(null);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="font-heading font-bold uppercase">
-              Nueva Inspección
+              {editingInspectionId ? 'Editar Inspección' : 'Nueva Inspección'}
             </DialogTitle>
             <DialogDescription>
               Llanta: {selectedTire?.serial} - Posición: {selectedTire?.current_position}
@@ -688,11 +861,20 @@ const TireSchemaPage = () => {
               data-testid="save-inspection-btn"
             >
               {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Guardar Inspección
+              {editingInspectionId ? 'Actualizar Inspección' : 'Guardar Inspección'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Axle Config Dialog */}
+      <AxleConfigDialog
+        open={showAxleConfigDialog}
+        onOpenChange={setShowAxleConfigDialog}
+        initialAxles={deriveAxleConfig(vehicle)}
+        saving={savingAxles}
+        onSave={handleSaveAxleConfig}
+      />
     </div>
   );
 };

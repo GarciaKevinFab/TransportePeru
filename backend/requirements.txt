@@ -10,34 +10,30 @@ motor>=3.3.0,<4.0.0
 pymongo>=4.5.0,<5.0.0
 
 # Authentication & Security
+# JWT: se usa PyJWT (`import jwt`). python-jose no se importa en el código -> eliminado.
 PyJWT>=2.8.0,<3.0.0
 bcrypt>=4.1.0,<5.0.0
-python-jose>=3.3.0,<4.0.0
-passlib>=1.7.4,<2.0.0
 cryptography>=41.0.0
+
+# Rate limiting (login)
+slowapi>=0.1.9
 
 # Data Validation
 pydantic>=2.5.0,<3.0.0
 email-validator>=2.0.0
 
 # Google AI (OCR)
+# Se usa `from google import genai` (paquete google-genai).
+# google-generativeai no se importa -> eliminado.
 google-genai>=1.0.0
-google-generativeai>=0.8.0
 
 # AWS S3
 boto3>=1.34.0
-
-# Payments
-stripe>=8.0.0
 
 # HTTP Client
 httpx>=0.27.0
 requests>=2.31.0
 aiohttp>=3.9.0
-
-# AI/ML (optional)
-openai>=1.30.0
-litellm>=1.0.0
 
 # Data Processing
 pandas>=2.1.0

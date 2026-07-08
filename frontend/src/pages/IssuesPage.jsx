@@ -211,7 +211,7 @@ const IssuesPage = () => {
   const totalCost = issues.reduce((a, b) => a + (b.cost || 0), 0);
 
   return (
-    <div className="space-y-6" data-testid="issues-page">
+    <div className="space-y-6 page-fade-in" data-testid="issues-page">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -222,15 +222,15 @@ const IssuesPage = () => {
             Gestión de incidentes, multas y siniestros
           </p>
         </div>
-        <Button className="btn-action" onClick={() => setShowCreateDialog(true)} data-testid="new-issue-btn">
+        <Button className="btn-action btn-press" onClick={() => setShowCreateDialog(true)} data-testid="new-issue-btn">
           <Plus className="w-4 h-4 mr-2" />
           Nuevo Incidente
         </Button>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="bg-white border-l-4 border-l-yellow-500">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="bg-white border-l-4 border-l-yellow-500 card-enter card-stagger-1">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
@@ -241,7 +241,7 @@ const IssuesPage = () => {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-red-500">
+        <Card className="bg-white border-l-4 border-l-red-500 card-enter card-stagger-2">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
@@ -252,7 +252,7 @@ const IssuesPage = () => {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-green-500">
+        <Card className="bg-white border-l-4 border-l-green-500 card-enter card-stagger-3">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
@@ -265,7 +265,7 @@ const IssuesPage = () => {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-orange-500">
+        <Card className="bg-white border-l-4 border-l-orange-500 card-enter card-stagger-4">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
@@ -280,7 +280,7 @@ const IssuesPage = () => {
       </div>
 
       {/* Filters */}
-      <Card className="bg-white">
+      <Card className="bg-white section-enter">
         <CardContent className="py-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
@@ -293,46 +293,48 @@ const IssuesPage = () => {
                 data-testid="issue-search-input"
               />
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[150px] rounded-sm">
-                <SelectValue placeholder="Estado" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                {statuses.map(s => (
-                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={severityFilter} onValueChange={setSeverityFilter}>
-              <SelectTrigger className="w-[150px] rounded-sm">
-                <SelectValue placeholder="Severidad" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
-                {severities.map(s => (
-                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-[150px] rounded-sm">
-                <SelectValue placeholder="Tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                {issueTypes.map(t => (
-                  <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full sm:w-[150px] rounded-sm">
+                  <SelectValue placeholder="Estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {statuses.map(s => (
+                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={severityFilter} onValueChange={setSeverityFilter}>
+                <SelectTrigger className="w-full sm:w-[150px] rounded-sm">
+                  <SelectValue placeholder="Severidad" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  {severities.map(s => (
+                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="w-full sm:w-[150px] rounded-sm">
+                  <SelectValue placeholder="Tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {issueTypes.map(t => (
+                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Issues Table */}
-      <Card className="bg-white">
-        <CardContent className="p-0">
+      <Card className="bg-white section-enter section-stagger-1">
+        <CardContent className="p-0 overflow-x-auto">
           {loading ? (
             <div className="flex items-center justify-center h-64">
               <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
@@ -434,14 +436,14 @@ const IssuesPage = () => {
 
       {/* Create Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
               Nuevo Incidente
             </DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">Tipo de Incidente *</Label>
                 <Select value={formData.issue_type} onValueChange={(v) => setFormData({ ...formData, issue_type: v })}>
@@ -490,7 +492,7 @@ const IssuesPage = () => {
                 data-testid="issue-description-input"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">Vehículo</Label>
                 <Select value={formData.vehicle_id} onValueChange={(v) => setFormData({ ...formData, vehicle_id: v })}>
@@ -518,7 +520,7 @@ const IssuesPage = () => {
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">Viaje Relacionado</Label>
                 <Select value={formData.trip_id || "none"} onValueChange={(v) => setFormData({ ...formData, trip_id: v === "none" ? "" : v })}>
@@ -563,7 +565,7 @@ const IssuesPage = () => {
 
       {/* Detail/Resolve Dialog */}
       <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
               {selectedIssue?.issue_number} - {selectedIssue?.title}

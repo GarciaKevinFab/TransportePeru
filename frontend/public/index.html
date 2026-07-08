@@ -57,75 +57,139 @@
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
     <!-- ═══════════════════════════════════════
-         Star Insights IT — Brand Badge
+         Star Insights IT — Brand Badge (modernized)
     ════════════════════════════════════════ -->
-    <a id="brand-badge" href="https://sisac.pe/" target="_blank" rel="noreferrer" style="
-           position: fixed !important;
-           bottom: 20px !important;
-           right: 20px !important;
-           z-index: 9999 !important;
-           display: inline-flex !important;
-           align-items: center !important;
-           gap: 10px !important;
-           padding: 7px 14px 7px 7px !important;
-           border-radius: 14px !important;
-           background: rgba(255,255,255,0.06) !important;
-           border: 1px solid rgba(255,255,255,0.12) !important;
-           box-shadow: 0 4px 24px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.07) !important;
-           backdrop-filter: blur(16px) !important;
-           -webkit-backdrop-filter: blur(16px) !important;
-           text-decoration: none !important;
-           color: #fff !important;
-           font-family: 'DM Sans', system-ui, sans-serif !important;
-           transition: transform .2s ease, box-shadow .2s ease, background .2s ease !important;
-       "
-        onmouseover="this.style.transform='translateY(-2px) scale(1.02)'; this.style.background='rgba(255,255,255,0.10)'; this.style.boxShadow='0 8px 32px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.12)';"
-        onmouseout="this.style.transform=''; this.style.background='rgba(255,255,255,0.06)'; this.style.boxShadow='0 4px 24px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.07)';">
-        <!-- Logo chip -->
-        <span style="
-            width: 36px !important;
-            height: 36px !important;
-            border-radius: 9px !important;
-            background: #727272 !important;
-            display: inline-flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            overflow: hidden !important;
-            border: 1px solid rgba(255,255,255,0.08) !important;
-            flex-shrink: 0 !important;
-        ">
-            <img src="%PUBLIC_URL%/logo.png" alt="Star Insights IT" style="
-                    width: 30px !important;
-                    height: 30px !important;
-                    object-fit: contain !important;
-                    display: block !important;
-                " />
+    <style>
+        @keyframes brand-pulse {
+            0%,100% { box-shadow: 0 0 0 0 rgba(74,222,128,0.45); }
+            50%    { box-shadow: 0 0 0 6px rgba(74,222,128,0); }
+        }
+        @keyframes brand-shine {
+            0%   { transform: translateX(-150%) skewX(-20deg); }
+            100% { transform: translateX(250%) skewX(-20deg); }
+        }
+        @keyframes brand-float-in {
+            from { opacity: 0; transform: translateY(20px) scale(0.9); }
+            to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        #brand-badge {
+            position: fixed;
+            bottom: 18px;
+            right: 18px;
+            z-index: 9999;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 14px 6px 6px;
+            border-radius: 16px;
+            background: linear-gradient(135deg, rgba(15,23,42,0.92) 0%, rgba(30,41,59,0.88) 100%);
+            border: 1px solid rgba(255,255,255,0.10);
+            box-shadow:
+                0 10px 30px rgba(0,0,0,0.35),
+                0 2px 8px rgba(0,0,0,0.2),
+                inset 0 1px 0 rgba(255,255,255,0.08);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            text-decoration: none;
+            color: #fff;
+            font-family: 'Inter', system-ui, sans-serif;
+            transition: transform .35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow .3s ease;
+            transform-style: preserve-3d;
+            perspective: 800px;
+            overflow: hidden;
+            animation: brand-float-in 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        #brand-badge::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 40%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+            transform: translateX(-150%) skewX(-20deg);
+            pointer-events: none;
+        }
+        #brand-badge:hover {
+            transform: translateY(-4px) scale(1.03) rotateX(-2deg);
+            box-shadow:
+                0 20px 50px rgba(0,0,0,0.5),
+                0 4px 14px rgba(249,115,22,0.18),
+                inset 0 1px 0 rgba(255,255,255,0.14);
+        }
+        #brand-badge:hover::before {
+            animation: brand-shine 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        #brand-badge:active { transform: translateY(-1px) scale(0.99); }
+        #brand-badge-logo {
+            position: relative;
+            width: 38px; height: 38px;
+            border-radius: 11px;
+            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            box-shadow:
+                0 4px 12px rgba(249,115,22,0.4),
+                inset 0 1px 0 rgba(255,255,255,0.25),
+                inset 0 -1px 0 rgba(0,0,0,0.15);
+            flex-shrink: 0;
+            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        #brand-badge:hover #brand-badge-logo {
+            transform: rotateY(360deg) scale(1.05);
+        }
+        #brand-badge-logo img {
+            width: 30px; height: 30px;
+            object-fit: contain;
+            display: block;
+            filter: drop-shadow(0 1px 2px rgba(0,0,0,0.25));
+        }
+        #brand-badge-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #ffffff;
+            letter-spacing: 0.2px;
+            line-height: 1.1;
+            background: linear-gradient(180deg, #ffffff 0%, #cbd5e1 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        #brand-badge-sub {
+            font-size: 10px;
+            font-weight: 500;
+            color: rgba(255,255,255,0.55);
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+            margin-top: 2px;
+            line-height: 1;
+        }
+        #brand-badge-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: #4ade80;
+            box-shadow: 0 0 0 0 rgba(74,222,128,0.45);
+            flex-shrink: 0;
+            animation: brand-pulse 1.8s ease-in-out infinite;
+            margin-left: 2px;
+        }
+        @media (max-width: 480px) {
+            #brand-badge { bottom: 12px; right: 12px; padding: 5px 11px 5px 5px; gap: 8px; }
+            #brand-badge-logo { width: 32px; height: 32px; border-radius: 9px; }
+            #brand-badge-logo img { width: 24px; height: 24px; }
+            #brand-badge-title { font-size: 12px; }
+            #brand-badge-sub { font-size: 9px; }
+        }
+    </style>
+    <a id="brand-badge" href="https://sisac.pe/" target="_blank" rel="noreferrer">
+        <span id="brand-badge-logo">
+            <img src="%PUBLIC_URL%/logo.png" alt="Star Insights IT" />
         </span>
-        <!-- Texto -->
-        <span style="
-            display: flex !important;
-            flex-direction: column !important;
-            gap: 2px !important;
-            line-height: 1 !important;
-        ">
-            <span
-                style="font-size: 13px !important; font-weight: 700 !important; color: #000000 !important; letter-spacing: 0.3px !important;">
-                G&E Transporta
-            </span>
-            <span
-                style="font-size: 10.5px !important; font-weight: 500 !important; color: rgba(0, 0, 0, 0.5) !important; letter-spacing: 0.1px !important;">
-                by Star Insights IT
-            </span>
+        <span style="display: flex; flex-direction: column; line-height: 1;">
+            <span id="brand-badge-title">G&amp;E Transporta</span>
+            <span id="brand-badge-sub">by Star Insights IT</span>
         </span>
-        <!-- Status dot (animado via CSS) -->
-        <span id="brand-badge-dot" style="
-            width: 7px !important;
-            height: 7px !important;
-            border-radius: 50% !important;
-            background: #4ade80 !important;
-            box-shadow: 0 0 0 3px rgba(74,222,128,0.2) !important;
-            flex-shrink: 0 !important;
-        "></span>
+        <span id="brand-badge-dot"></span>
     </a>
     <!-- Service Worker Registration -->
     <script>

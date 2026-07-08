@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Query, Body
+from fastapi import FastAPI, APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Query, Body, Request, Header
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -14,6 +14,27 @@ import bcrypt
 import jwt
 from enum import Enum
 import shutil
+import re
+import secrets
+
+# Rate limiting (slowapi). Add "slowapi" to backend/requirements.txt.
+try:
+    from slowapi import Limiter, _rate_limit_exceeded_handler
+    from slowapi.util import get_remote_address
+    from slowapi.errors import RateLimitExceeded
+    limiter = Limiter(key_func=get_remote_address)
+    SLOWAPI_AVAILABLE = True
+except ImportError:
+    # slowapi no instalado: limiter no-op para que el server siga arrancando
+    SLOWAPI_AVAILABLE = False
+
+    class _NoopLimiter:
+        def limit(self, *args, **kwargs):
+            def decorator(func):
+                return func
+            return decorator
+
+    limiter = _NoopLimiter()
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -24,7 +45,11 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
 # JWT Settings
-JWT_SECRET = os.environ.get('JWT_SECRET', 'transporteperu-secret-key-change-in-production')
+JWT_SECRET = os.environ.get("JWT_SECRET")
+if not JWT_SECRET:
+    if os.environ.get("ENV", "development").lower() == "production":
+        raise RuntimeError("JWT_SECRET no configurado en producción")
+    JWT_SECRET = "dev-only-insecure-secret"  # solo desarrollo
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 REFRESH_TOKEN_EXPIRE_DAYS = 7
@@ -36,6 +61,11 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 # Create the main app
 app = FastAPI(title="TransportePeru SaaS API", version="1.0.0")
 
+# Register rate limiter (no-op si slowapi no está instalado)
+if SLOWAPI_AVAILABLE:
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # Create router with /api prefix
 api_router = APIRouter(prefix="/api")
 
@@ -44,6 +74,7 @@ security = HTTPBearer()
 
 # ============== ENUMS ==============
 class UserRole(str, Enum):
+    SUPERADMIN = "superadmin"
     OWNER = "owner"
     ADMIN = "admin"
     OPERACIONES = "operaciones"
@@ -152,6 +183,8 @@ class Company(BaseModel):
     address: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
+    logo_url: Optional[str] = None
+    brand_color: str = "#f97316"
     config: Dict[str, Any] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -173,6 +206,9 @@ class User(BaseModel):
     license_number: Optional[str] = None
     license_expiry: Optional[datetime] = None
     phone: Optional[str] = None
+    # EPP (Equipo de Protección Personal) - solo para choferes
+    # Estructura: {"casco": {"assigned": true, "date": "2024-01-15", "condition": "bueno", "size": "M"}, ...}
+    epp: Dict[str, Any] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     created_by: Optional[str] = None
@@ -192,6 +228,9 @@ class Vehicle(BaseModel):
     odometer: int = 0
     fuel_capacity: Optional[float] = None
     tire_config: str = "6"  # Number of tires
+    # Configuración de ejes: [{"name": str, "type": "direccional"|"traccion"|"muerto"|"levantable", "dual": bool, "is_spare": bool}]
+    axle_config: Optional[List[Dict[str, Any]]] = None
+    axle_config_history: Optional[List[Dict[str, Any]]] = None
     assigned_driver_id: Optional[str] = None
     photo_url: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -375,6 +414,9 @@ class FuelVoucher(BaseModel):
     valid_until: datetime
     is_used: bool = False
     approved_by: Optional[str] = None
+    voucher_photo_url: Optional[str] = None
+    invoice_photo_url: Optional[str] = None
+    invoice_number: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class FuelLoad(BaseModel):
@@ -384,12 +426,16 @@ class FuelLoad(BaseModel):
     vehicle_id: str
     voucher_id: Optional[str] = None
     trip_id: Optional[str] = None
+    voucher_number: Optional[str] = None
+    invoice_number: Optional[str] = None
     liters: float
     price_per_liter: float
     total_amount: float
     odometer: int
     provider: str
     receipt_url: Optional[str] = None
+    voucher_photo_url: Optional[str] = None
+    invoice_photo_url: Optional[str] = None
     location: Optional[Dict[str, float]] = None
     load_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -403,11 +449,13 @@ class Tire(BaseModel):
     brand: str
     model: Optional[str] = None
     dimension: str
+    position_type: Optional[str] = "toda_posicion"  # direccional|traccion|toda_posicion|mixto
     purchase_cost: float = 0
     purchase_date: Optional[datetime] = None
     supplier: Optional[str] = None
     status: TireStatus = TireStatus.NUEVO
     life_number: int = 1  # VN=1, R1=2, R2=3...
+    initial_depth: Optional[float] = None  # baseline mm at current life (for cost_per_mm / desgaste)
     current_vehicle_id: Optional[str] = None
     current_position: Optional[str] = None
     total_km: int = 0
@@ -457,6 +505,23 @@ class MaintenancePlan(BaseModel):
     interval_hours: Optional[int] = None
     tasks: List[str] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class MaintenanceMatrixPlan(BaseModel):
+    """Matrix-based maintenance plan (intervals x tasks like E MAX 540 plan)"""
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    company_id: str
+    name: str  # "E MAX 540 MT"
+    vehicle_model: Optional[str] = None
+    applies_to_vehicle_ids: List[str] = Field(default_factory=list)
+    # Intervals: [{code:"M1", hours:500, km:30, labor_hours:4}, ...]
+    intervals: List[Dict[str, Any]] = Field(default_factory=list)
+    # Sections: [{code:"A", name:"MOTOR", tasks:[{n:1, description:"...", component_type:"FILTRO", quantity:1, actions:{"M1":"C","M2":"C"}}]}]
+    sections: List[Dict[str, Any]] = Field(default_factory=list)
+    notes: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_by: Optional[str] = None
 
 class WorkOrder(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -754,6 +819,7 @@ class CreateVehicleRequest(BaseModel):
     color: Optional[str] = None
     fuel_capacity: Optional[float] = None
     tire_config: str = "6"
+    axle_config: Optional[List[Dict[str, Any]]] = None
 
 class CreateTripRequest(BaseModel):
     tracto_id: str
@@ -780,9 +846,11 @@ class CreateTireRequest(BaseModel):
     brand: str
     model: Optional[str] = None
     dimension: str
+    position_type: Optional[str] = "toda_posicion"  # direccional|traccion|toda_posicion|mixto
     purchase_cost: float = 0
     purchase_date: Optional[datetime] = None
     supplier: Optional[str] = None
+    initial_depth: Optional[float] = None
 
 class MountTireRequest(BaseModel):
     tire_id: str
@@ -841,6 +909,15 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     if not user.get("is_active"):
         raise HTTPException(status_code=401, detail="Usuario desactivado")
     return user
+
+def require_roles(*roles):
+    """Dependency reutilizable para exigir uno de los roles dados.
+    superadmin siempre está autorizado."""
+    async def checker(current_user: dict = Depends(get_current_user)):
+        if current_user["role"] not in roles and current_user["role"] != "superadmin":
+            raise HTTPException(status_code=403, detail="No autorizado")
+        return current_user
+    return checker
 
 def serialize_doc(doc: dict) -> dict:
     """Remove MongoDB _id and convert datetimes to ISO strings"""
@@ -961,25 +1038,26 @@ async def create_block_for_expired_doc(company_id: str, doc_type: dict, document
 
 # ============== AUTH ROUTES ==============
 @api_router.post("/auth/login", response_model=TokenResponse)
-async def login(request: LoginRequest):
+@limiter.limit("10/minute")
+async def login(request: Request, login_data: LoginRequest):
     user = None
-    
+
     # Admin login (email + password)
-    if request.email and request.password:
-        user = await db.users.find_one({"email": request.email}, {"_id": 0})
+    if login_data.email and login_data.password:
+        user = await db.users.find_one({"email": login_data.email}, {"_id": 0})
         if not user:
             raise HTTPException(status_code=401, detail="Credenciales inválidas")
         if not user.get("password_hash"):
             raise HTTPException(status_code=401, detail="Credenciales inválidas")
-        if not verify_password(request.password, user["password_hash"]):
+        if not verify_password(login_data.password, user["password_hash"]):
             raise HTTPException(status_code=401, detail="Credenciales inválidas")
-    
+
     # Driver login (DNI + PIN)
-    elif request.dni and request.pin:
-        user = await db.users.find_one({"dni": request.dni}, {"_id": 0})
+    elif login_data.dni and login_data.pin:
+        user = await db.users.find_one({"dni": login_data.dni}, {"_id": 0})
         if not user:
             raise HTTPException(status_code=401, detail="Credenciales inválidas")
-        
+
         # Check lockout
         if user.get("locked_until"):
             locked_until = user["locked_until"]
@@ -987,11 +1065,11 @@ async def login(request: LoginRequest):
                 locked_until = datetime.fromisoformat(locked_until)
             if datetime.now(timezone.utc) < locked_until:
                 raise HTTPException(status_code=403, detail="Cuenta bloqueada temporalmente")
-        
+
         if not user.get("pin_hash"):
             raise HTTPException(status_code=401, detail="PIN no configurado")
-        
-        if not verify_password(request.pin, user["pin_hash"]):
+
+        if not verify_password(login_data.pin, user["pin_hash"]):
             # Increment failed attempts
             failed_attempts = user.get("failed_attempts", 0) + 1
             update_data = {"failed_attempts": failed_attempts}
@@ -1076,20 +1154,53 @@ async def refresh_token(request: RefreshRequest):
 
 @api_router.get("/auth/me")
 async def get_me(current_user: dict = Depends(get_current_user)):
-    return serialize_doc(current_user)
+    # Strip sensitive fields before returning
+    safe_user = {k: v for k, v in current_user.items() if k not in ("password_hash", "pin_hash", "_id")}
+    return serialize_doc(safe_user)
 
 # ============== COMPANY ROUTES ==============
 @api_router.get("/companies")
-async def get_companies(current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["owner", "admin"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
-    companies = await db.companies.find({}, {"_id": 0}).to_list(100)
+async def get_companies(current_user: dict = Depends(require_roles("superadmin", "owner", "admin"))):
+    # Superadmin sees ALL companies
+    if current_user["role"] == "superadmin":
+        companies = await db.companies.find({}, {"_id": 0}).to_list(100)
+        return [serialize_doc(c) for c in companies]
+    # Others see only their own company
+    companies = await db.companies.find(
+        {"id": current_user["company_id"]}, {"_id": 0}
+    ).to_list(100)
     return [serialize_doc(c) for c in companies]
 
 @api_router.get("/company")
 async def get_current_company(current_user: dict = Depends(get_current_user)):
     company = await db.companies.find_one({"id": current_user["company_id"]}, {"_id": 0})
     return serialize_doc(company)
+
+@api_router.post("/companies/{company_id}/switch")
+async def switch_company(company_id: str, current_user: dict = Depends(get_current_user)):
+    """Superadmin can switch to any company context to manage it"""
+    if current_user["role"] != "superadmin":
+        raise HTTPException(status_code=403, detail="Solo superadmin puede cambiar de empresa")
+
+    company = await db.companies.find_one({"id": company_id}, {"_id": 0})
+    if not company:
+        raise HTTPException(status_code=404, detail="Empresa no encontrada")
+
+    # Issue new tokens with the target company_id
+    token_data = {
+        "user_id": current_user["user_id"],
+        "company_id": company_id,
+        "role": "superadmin"
+    }
+    access_token = create_access_token(token_data)
+    refresh_token = create_refresh_token(token_data)
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "company": serialize_doc(company),
+        "message": f"Cambiado a empresa: {company.get('name', company_id)}"
+    }
 
 # ============== USER ROUTES ==============
 @api_router.get("/users")
@@ -1115,19 +1226,17 @@ async def get_user(user_id: str, current_user: dict = Depends(get_current_user))
     return serialize_doc(user)
 
 @api_router.post("/users")
-async def create_user(request: CreateUserRequest, current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["owner", "admin"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
+async def create_user(request: CreateUserRequest, current_user: dict = Depends(require_roles("owner", "admin"))):
     
-    # Check if email/dni already exists
+    # Check if email/dni already exists within same company
     if request.email:
-        existing = await db.users.find_one({"email": request.email})
+        existing = await db.users.find_one({"email": request.email, "company_id": current_user["company_id"]})
         if existing:
-            raise HTTPException(status_code=400, detail="Email ya registrado")
+            raise HTTPException(status_code=400, detail="Email ya registrado en esta empresa")
     if request.dni:
-        existing = await db.users.find_one({"dni": request.dni})
+        existing = await db.users.find_one({"dni": request.dni, "company_id": current_user["company_id"]})
         if existing:
-            raise HTTPException(status_code=400, detail="DNI ya registrado")
+            raise HTTPException(status_code=400, detail="DNI ya registrado en esta empresa")
     
     user = User(
         company_id=current_user["company_id"],
@@ -1178,9 +1287,7 @@ async def update_user(user_id: str, request: dict = Body(...), current_user: dic
     return {"message": "Usuario actualizado"}
 
 @api_router.post("/users/{user_id}/reset-pin")
-async def reset_user_pin(user_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["owner", "admin"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
+async def reset_user_pin(user_id: str, request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin"))):
     
     new_pin = request.get("pin")
     if not new_pin or len(new_pin) != 6 or not new_pin.isdigit():
@@ -1199,9 +1306,7 @@ async def reset_user_pin(user_id: str, request: dict = Body(...), current_user: 
     return {"message": "PIN reseteado. El usuario deberá cambiarlo en su próximo inicio de sesión."}
 
 @api_router.delete("/users/{user_id}")
-async def delete_user(user_id: str, current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["owner", "admin"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
+async def delete_user(user_id: str, current_user: dict = Depends(require_roles("owner", "admin"))):
     
     # Cannot delete owner users or self
     target_user = await db.users.find_one({"id": user_id, "company_id": current_user["company_id"]})
@@ -1219,16 +1324,6 @@ async def delete_user(user_id: str, current_user: dict = Depends(get_current_use
     return {"message": "Usuario eliminado"}
 
 # ============== MULTI-TENANT / COMPANY ROUTES ==============
-@api_router.get("/companies")
-async def get_companies(current_user: dict = Depends(get_current_user)):
-    """Get all companies (owner only) or current company"""
-    if current_user["role"] == "owner":
-        companies = await db.companies.find({}, {"_id": 0}).to_list(100)
-        return [serialize_doc(c) for c in companies]
-    else:
-        company = await db.companies.find_one({"id": current_user["company_id"]}, {"_id": 0})
-        return [serialize_doc(company)] if company else []
-
 @api_router.get("/companies/{company_id}")
 async def get_company(company_id: str, current_user: dict = Depends(get_current_user)):
     """Get company details"""
@@ -1241,10 +1336,8 @@ async def get_company(company_id: str, current_user: dict = Depends(get_current_
     return serialize_doc(company)
 
 @api_router.post("/companies")
-async def create_company(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
-    """Create new company (owner only)"""
-    if current_user["role"] != "owner":
-        raise HTTPException(status_code=403, detail="Solo el super admin puede crear empresas")
+async def create_company(request: dict = Body(...), current_user: dict = Depends(require_roles("superadmin", "owner"))):
+    """Create new company (superadmin/owner only)"""
     
     company_id = str(uuid.uuid4())
     company = {
@@ -1280,12 +1373,13 @@ async def create_company(request: dict = Body(...), current_user: dict = Depends
 
 @api_router.put("/companies/{company_id}")
 async def update_company(company_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
-    """Update company (owner or admin of that company)"""
-    if current_user["role"] != "owner" and current_user["company_id"] != company_id:
+    """Update company (superadmin/owner or admin of that company)"""
+    if current_user["role"] == "superadmin":
+        pass  # superadmin can edit any company
+    elif current_user["role"] in ["owner", "admin"] and current_user["company_id"] == company_id:
+        pass  # owner/admin can edit their own company
+    else:
         raise HTTPException(status_code=403, detail="No autorizado")
-    
-    if current_user["role"] != "owner" and current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Solo administradores pueden editar la empresa")
     
     request.pop("id", None)
     request["updated_at"] = datetime.now(timezone.utc).isoformat()
@@ -1297,10 +1391,8 @@ async def update_company(company_id: str, request: dict = Body(...), current_use
     return {"message": "Empresa actualizada"}
 
 @api_router.delete("/companies/{company_id}")
-async def delete_company(company_id: str, current_user: dict = Depends(get_current_user)):
-    """Delete company and all its data (owner only)"""
-    if current_user["role"] != "owner":
-        raise HTTPException(status_code=403, detail="Solo el super admin puede eliminar empresas")
+async def delete_company(company_id: str, current_user: dict = Depends(require_roles("superadmin", "owner"))):
+    """Delete company and all its data (superadmin/owner only)"""
     
     # Delete all company data
     collections = ["users", "vehicles", "trips", "documents", "work_orders", "issues", 
@@ -1356,10 +1448,7 @@ async def get_vehicle(vehicle_id: str, current_user: dict = Depends(get_current_
     return serialize_doc(vehicle)
 
 @api_router.post("/vehicles")
-async def create_vehicle(request: CreateVehicleRequest, current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["owner", "admin", "flota"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
-    
+async def create_vehicle(request: CreateVehicleRequest, current_user: dict = Depends(require_roles("owner", "admin", "flota"))):
     # Check if plate already exists
     existing = await db.vehicles.find_one({
         "plate": request.plate.upper(),
@@ -1379,6 +1468,7 @@ async def create_vehicle(request: CreateVehicleRequest, current_user: dict = Dep
         color=request.color,
         fuel_capacity=request.fuel_capacity,
         tire_config=request.tire_config,
+        axle_config=request.axle_config,
         created_by=current_user["id"]
     )
     
@@ -1391,32 +1481,42 @@ async def create_vehicle(request: CreateVehicleRequest, current_user: dict = Dep
     return {"id": vehicle.id, "message": "Vehículo creado exitosamente"}
 
 @api_router.put("/vehicles/{vehicle_id}")
-async def update_vehicle(vehicle_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["owner", "admin", "flota"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
-    
+async def update_vehicle(vehicle_id: str, request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "flota"))):
     request.pop("id", None)
     request.pop("company_id", None)
+    request.pop("axle_config_history", None)  # managed server-side
     request["updated_at"] = datetime.now(timezone.utc).isoformat()
-    
+
     if "plate" in request:
         request["plate"] = request["plate"].upper()
-    
+
+    update_ops = {"$set": request}
+
+    # Track axle_config changes in history
+    if "axle_config" in request:
+        current = await db.vehicles.find_one(
+            {"id": vehicle_id, "company_id": current_user["company_id"]},
+            {"_id": 0, "axle_config": 1}
+        )
+        if current is not None and current.get("axle_config") != request["axle_config"]:
+            update_ops["$push"] = {"axle_config_history": {
+                "axle_config": request["axle_config"],
+                "date": datetime.now(timezone.utc).isoformat(),
+                "changed_by": current_user["id"]
+            }}
+
     result = await db.vehicles.update_one(
         {"id": vehicle_id, "company_id": current_user["company_id"]},
-        {"$set": request}
+        update_ops
     )
-    
+
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Vehículo no encontrado")
-    
+
     return {"message": "Vehículo actualizado"}
 
 @api_router.delete("/vehicles/{vehicle_id}")
-async def delete_vehicle(vehicle_id: str, current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["owner", "admin"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
-    
+async def delete_vehicle(vehicle_id: str, current_user: dict = Depends(require_roles("owner", "admin"))):
     result = await db.vehicles.delete_one({
         "id": vehicle_id,
         "company_id": current_user["company_id"]
@@ -1429,10 +1529,7 @@ async def delete_vehicle(vehicle_id: str, current_user: dict = Depends(get_curre
 
 # ============== VEHICLE DRIVER ASSIGNMENT ==============
 @api_router.post("/vehicles/{vehicle_id}/assign-driver")
-async def assign_driver_to_vehicle(vehicle_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["owner", "admin", "operaciones"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
-
+async def assign_driver_to_vehicle(vehicle_id: str, request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "operaciones"))):
     driver_id = request.get("driver_id")
 
     # If assigning (not unassigning), validate driver exists
@@ -1482,10 +1579,7 @@ async def get_vehicle_equipment(vehicle_id: str, current_user: dict = Depends(ge
     return serialize_doc(doc)
 
 @api_router.put("/vehicles/{vehicle_id}/equipment")
-async def update_vehicle_equipment(vehicle_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["owner", "admin", "flota", "almacen"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
-
+async def update_vehicle_equipment(vehicle_id: str, request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "flota", "almacen"))):
     items = request.get("items", [])
 
     existing = await db.vehicle_equipment.find_one(
@@ -1512,9 +1606,7 @@ async def update_vehicle_equipment(vehicle_id: str, request: dict = Body(...), c
 
 # ============== VIÁTICOS BUDGET ==============
 @api_router.post("/trips/{trip_id}/viatico-budget")
-async def set_viatico_budget(trip_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["owner", "admin", "operaciones", "contabilidad"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
+async def set_viatico_budget(trip_id: str, request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "operaciones", "contabilidad"))):
 
     budget = float(request.get("budget", 0))
     if budget < 0:
@@ -1582,10 +1674,7 @@ async def get_document_types(
     return [serialize_doc(t) for t in types]
 
 @api_router.post("/document-types")
-async def create_document_type(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["owner", "admin"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
-    
+async def create_document_type(request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin"))):
     doc_type = DocumentType(
         company_id=current_user["company_id"],
         name=request["name"],
@@ -1670,10 +1759,7 @@ async def update_document(document_id: str, request: dict = Body(...), current_u
     return {"message": "Documento actualizado"}
 
 @api_router.post("/documents/{document_id}/approve")
-async def approve_document(document_id: str, current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["owner", "admin", "flota"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
-    
+async def approve_document(document_id: str, current_user: dict = Depends(require_roles("owner", "admin", "flota"))):
     await db.documents.update_one(
         {"id": document_id, "company_id": current_user["company_id"]},
         {"$set": {
@@ -1780,9 +1866,7 @@ async def get_blocks(
     return [serialize_doc(b) for b in blocks]
 
 @api_router.post("/blocks/{block_id}/resolve")
-async def resolve_block(block_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["owner", "admin", "flota", "operaciones"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
+async def resolve_block(block_id: str, request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "flota", "operaciones"))):
     
     await db.blocks.update_one(
         {"id": block_id, "company_id": current_user["company_id"]},
@@ -1804,9 +1888,7 @@ async def get_routes(current_user: dict = Depends(get_current_user)):
     return [serialize_doc(r) for r in routes]
 
 @api_router.post("/routes")
-async def create_route(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["owner", "admin", "operaciones"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
+async def create_route(request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "operaciones"))):
     
     route = Route(
         company_id=current_user["company_id"],
@@ -1855,9 +1937,7 @@ async def get_trip(trip_id: str, current_user: dict = Depends(get_current_user))
     return serialize_doc(trip)
 
 @api_router.post("/trips")
-async def create_trip(request: CreateTripRequest, current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["owner", "admin", "operaciones"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
+async def create_trip(request: CreateTripRequest, current_user: dict = Depends(require_roles("owner", "admin", "operaciones"))):
     
     # Validate all blocks using helper function
     validation = await validate_trip_can_be_assigned(
@@ -1927,9 +2007,7 @@ async def update_trip(trip_id: str, request: dict = Body(...), current_user: dic
     return {"message": "Viaje actualizado"}
 
 @api_router.delete("/trips/{trip_id}")
-async def delete_trip(trip_id: str, current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["owner", "admin"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
+async def delete_trip(trip_id: str, current_user: dict = Depends(require_roles("owner", "admin"))):
     
     # Check if trip is in progress
     trip = await db.trips.find_one({"id": trip_id, "company_id": current_user["company_id"]})
@@ -2035,9 +2113,7 @@ async def get_trip_advances(trip_id: str, current_user: dict = Depends(get_curre
     return [serialize_doc(a) for a in advances]
 
 @api_router.post("/trips/{trip_id}/advances")
-async def create_trip_advance(trip_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["owner", "admin", "contabilidad"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
+async def create_trip_advance(trip_id: str, request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "contabilidad"))):
     
     advance = TripAdvance(
         company_id=current_user["company_id"],
@@ -2157,9 +2233,7 @@ async def get_fuel_vouchers(
     return [serialize_doc(v) for v in vouchers]
 
 @api_router.post("/fuel/vouchers")
-async def create_fuel_voucher(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["owner", "admin", "operaciones"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
+async def create_fuel_voucher(request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "operaciones"))):
     
     voucher = FuelVoucher(
         company_id=current_user["company_id"],
@@ -2236,11 +2310,8 @@ async def create_fuel_load(request: dict = Body(...), current_user: dict = Depen
     return {"id": load.id, "message": "Cargue registrado"}
 
 @api_router.put("/fuel/vouchers/{voucher_id}")
-async def update_fuel_voucher(voucher_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
+async def update_fuel_voucher(voucher_id: str, request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin"))):
     """Update a fuel voucher - Admin only"""
-    if current_user["role"] not in ["owner", "admin"]:
-        raise HTTPException(status_code=403, detail="Solo administradores pueden editar vales")
-    
     voucher = await db.fuel_vouchers.find_one({"id": voucher_id, "company_id": current_user["company_id"]})
     if not voucher:
         raise HTTPException(status_code=404, detail="Vale no encontrado")
@@ -2255,16 +2326,13 @@ async def update_fuel_voucher(voucher_id: str, request: dict = Body(...), curren
                 update_data[field] = request[field]
     
     if update_data:
-        await db.fuel_vouchers.update_one({"id": voucher_id}, {"$set": update_data})
+        await db.fuel_vouchers.update_one({"id": voucher_id, "company_id": current_user["company_id"]}, {"$set": update_data})
     
     return {"message": "Vale actualizado"}
 
 @api_router.delete("/fuel/vouchers/{voucher_id}")
-async def delete_fuel_voucher(voucher_id: str, current_user: dict = Depends(get_current_user)):
+async def delete_fuel_voucher(voucher_id: str, current_user: dict = Depends(require_roles("owner", "admin"))):
     """Delete a fuel voucher - Admin only"""
-    if current_user["role"] not in ["owner", "admin"]:
-        raise HTTPException(status_code=403, detail="Solo administradores pueden eliminar vales")
-    
     result = await db.fuel_vouchers.delete_one({"id": voucher_id, "company_id": current_user["company_id"]})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Vale no encontrado")
@@ -2272,11 +2340,8 @@ async def delete_fuel_voucher(voucher_id: str, current_user: dict = Depends(get_
     return {"message": "Vale eliminado"}
 
 @api_router.put("/fuel/loads/{load_id}")
-async def update_fuel_load(load_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
+async def update_fuel_load(load_id: str, request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin"))):
     """Update a fuel load - Admin only"""
-    if current_user["role"] not in ["owner", "admin"]:
-        raise HTTPException(status_code=403, detail="Solo administradores pueden editar cargas")
-    
     load = await db.fuel_loads.find_one({"id": load_id, "company_id": current_user["company_id"]})
     if not load:
         raise HTTPException(status_code=404, detail="Carga no encontrada")
@@ -2294,16 +2359,13 @@ async def update_fuel_load(load_id: str, request: dict = Body(...), current_user
         update_data["total_amount"] = liters * price
     
     if update_data:
-        await db.fuel_loads.update_one({"id": load_id}, {"$set": update_data})
+        await db.fuel_loads.update_one({"id": load_id, "company_id": current_user["company_id"]}, {"$set": update_data})
     
     return {"message": "Carga actualizada"}
 
 @api_router.delete("/fuel/loads/{load_id}")
-async def delete_fuel_load(load_id: str, current_user: dict = Depends(get_current_user)):
+async def delete_fuel_load(load_id: str, current_user: dict = Depends(require_roles("owner", "admin"))):
     """Delete a fuel load - Admin only"""
-    if current_user["role"] not in ["owner", "admin"]:
-        raise HTTPException(status_code=403, detail="Solo administradores pueden eliminar cargas")
-    
     result = await db.fuel_loads.delete_one({"id": load_id, "company_id": current_user["company_id"]})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Carga no encontrada")
@@ -2337,9 +2399,7 @@ async def get_tire(tire_id: str, current_user: dict = Depends(get_current_user))
     return serialize_doc(tire)
 
 @api_router.post("/tires")
-async def create_tire(request: CreateTireRequest, current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["owner", "admin", "mantenimiento", "flota"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
+async def create_tire(request: CreateTireRequest, current_user: dict = Depends(require_roles("owner", "admin", "mantenimiento", "flota"))):
     
     tire = Tire(
         company_id=current_user["company_id"],
@@ -2347,9 +2407,11 @@ async def create_tire(request: CreateTireRequest, current_user: dict = Depends(g
         brand=request.brand,
         model=request.model,
         dimension=request.dimension,
+        position_type=request.position_type or "toda_posicion",
         purchase_cost=request.purchase_cost,
         purchase_date=request.purchase_date,
-        supplier=request.supplier
+        supplier=request.supplier,
+        initial_depth=request.initial_depth
     )
     
     doc = tire.model_dump()
@@ -2360,18 +2422,79 @@ async def create_tire(request: CreateTireRequest, current_user: dict = Depends(g
     await db.tires.insert_one(doc)
     return {"id": tire.id, "message": "Llanta creada"}
 
+@api_router.put("/tires/{tire_id}")
+async def update_tire(tire_id: str, request: dict = Body(...), current_user: dict = Depends(require_roles("superadmin", "owner", "admin", "mantenimiento", "flota"))):
+    """Update tire details (admin/flota/mantenimiento)"""
+    tire = await db.tires.find_one({"id": tire_id, "company_id": current_user["company_id"]})
+    if not tire:
+        raise HTTPException(status_code=404, detail="Llanta no encontrada")
+
+    # Allowed editable fields
+    allowed = ["serial", "brand", "model", "dimension", "position_type", "purchase_cost", "purchase_date",
+               "supplier", "status", "life_number", "current_position", "total_km", "initial_depth"]
+    update_data = {}
+    for field in allowed:
+        if field in request:
+            update_data[field] = request[field]
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+    await db.tires.update_one({"id": tire_id, "company_id": current_user["company_id"]}, {"$set": update_data})
+    return {"message": "Llanta actualizada"}
+
+@api_router.delete("/tires/{tire_id}")
+async def delete_tire(tire_id: str, current_user: dict = Depends(require_roles("superadmin", "owner", "admin", "flota"))):
+    """Delete a tire (only if not mounted)"""
+    tire = await db.tires.find_one({"id": tire_id, "company_id": current_user["company_id"]})
+    if not tire:
+        raise HTTPException(status_code=404, detail="Llanta no encontrada")
+    if tire.get("current_vehicle_id"):
+        raise HTTPException(status_code=400, detail="No se puede eliminar una llanta montada. Desmonte primero.")
+
+    await db.tires.delete_one({"id": tire_id, "company_id": current_user["company_id"]})
+    return {"message": "Llanta eliminada"}
+
+# ============== TIRE / AXLE HELPERS ==============
+def _axle_num_from_position(position_code: Optional[str]) -> Optional[int]:
+    """Deriva el número de eje (1-based) desde un position_code tipo 'EJE2-IZQ-EXT'."""
+    if not position_code:
+        return None
+    m = re.search(r'(\d+)', str(position_code))
+    return int(m.group(1)) if m else None
+
+def _axle_for_position(vehicle: Optional[dict], position_code: str) -> Optional[dict]:
+    """Devuelve el dict del eje de axle_config que corresponde a un position_code, o None."""
+    if not vehicle:
+        return None
+    axle_config = vehicle.get("axle_config")
+    if not axle_config:
+        return None
+    num = _axle_num_from_position(position_code)
+    if not num or num < 1 or num > len(axle_config):
+        return None
+    return axle_config[num - 1]
+
+def _tire_axle_compatible(position_type: Optional[str], axle_type: Optional[str]) -> bool:
+    """toda_posicion/mixto en cualquier eje; direccional solo en direccional; traccion solo en traccion."""
+    pt = (position_type or "toda_posicion").lower()
+    at = (axle_type or "").lower()
+    if pt in ("toda_posicion", "mixto"):
+        return True
+    if pt == "direccional":
+        return at == "direccional"
+    if pt == "traccion":
+        return at == "traccion"
+    return True
+
 @api_router.post("/tires/mount")
-async def mount_tire(request: MountTireRequest, current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["owner", "admin", "mantenimiento", "flota"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
-    
+async def mount_tire(request: MountTireRequest, current_user: dict = Depends(require_roles("owner", "admin", "mantenimiento", "flota"))):
+
     # Check if tire exists and is available
     tire = await db.tires.find_one({"id": request.tire_id, "company_id": current_user["company_id"]})
     if not tire:
         raise HTTPException(status_code=404, detail="Llanta no encontrada")
     if tire.get("current_vehicle_id"):
         raise HTTPException(status_code=400, detail="Llanta ya está montada en otro vehículo")
-    
+
     # Check if position is available
     existing = await db.tires.find_one({
         "current_vehicle_id": request.vehicle_id,
@@ -2379,7 +2502,14 @@ async def mount_tire(request: MountTireRequest, current_user: dict = Depends(get
     })
     if existing:
         raise HTTPException(status_code=400, detail="Posición ya ocupada")
-    
+
+    # Validate tire/axle compatibility (only if the vehicle declares axle_config)
+    vehicle = await db.vehicles.find_one({"id": request.vehicle_id, "company_id": current_user["company_id"]})
+    axle = _axle_for_position(vehicle, request.position_code)
+    if axle and axle.get("type"):
+        if not _tire_axle_compatible(tire.get("position_type"), axle.get("type")):
+            raise HTTPException(status_code=400, detail="Tipo de llanta incompatible con el eje")
+
     # Create mount record
     mount = TireMount(
         company_id=current_user["company_id"],
@@ -2409,9 +2539,7 @@ async def mount_tire(request: MountTireRequest, current_user: dict = Depends(get
     return {"id": mount.id, "message": "Llanta montada"}
 
 @api_router.post("/tires/{tire_id}/unmount")
-async def unmount_tire(tire_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["owner", "admin", "mantenimiento", "flota"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
+async def unmount_tire(tire_id: str, request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "mantenimiento", "flota"))):
     
     tire = await db.tires.find_one({"id": tire_id, "company_id": current_user["company_id"]})
     if not tire:
@@ -2454,8 +2582,13 @@ async def get_vehicle_tires(vehicle_id: str, current_user: dict = Depends(get_cu
         {"current_vehicle_id": vehicle_id, "company_id": current_user["company_id"]},
         {"_id": 0}
     ).to_list(20)
-    
-    # Get latest inspection for each tire
+
+    vehicle = await db.vehicles.find_one(
+        {"id": vehicle_id, "company_id": current_user["company_id"]}, {"_id": 0}
+    )
+    vehicle_odometer = vehicle.get("odometer") if vehicle else None
+
+    # Get latest inspection for each tire + computed fields
     result = []
     for tire in tires:
         tire_data = serialize_doc(tire)
@@ -2465,14 +2598,50 @@ async def get_vehicle_tires(vehicle_id: str, current_user: dict = Depends(get_cu
             sort=[("inspection_date", -1)]
         )
         tire_data["last_inspection"] = serialize_doc(inspection) if inspection else None
+
+        # Active mount record (montada = current_vehicle_id set)
+        mount = await db.tire_mounts.find_one(
+            {"tire_id": tire["id"], "vehicle_id": vehicle_id, "unmount_date": None},
+            {"_id": 0}, sort=[("mount_date", -1)]
+        )
+        mount_odometer = mount.get("mount_odometer") if mount else None
+
+        # km_recorridos
+        km = None
+        if vehicle_odometer is not None and mount_odometer is not None:
+            diff = vehicle_odometer - mount_odometer
+            km = diff if diff >= 0 else None
+        tire_data["km_recorridos"] = km
+
+        # cod_vida (VN, R1, R2...)
+        life = tire.get("life_number", 1) or 1
+        tire_data["cod_vida"] = "VN" if life <= 1 else f"R{life - 1}"
+
+        # costo de compra
+        costo = tire.get("purchase_cost")
+
+        # cost_per_km
+        cost_per_km = None
+        if costo and km and km > 0:
+            cost_per_km = round(costo / km, 4)
+        tire_data["cost_per_km"] = cost_per_km
+
+        # cost_per_mm (profundidad inicial - profundidad actual)
+        cost_per_mm = None
+        initial_depth = tire.get("initial_depth")
+        if costo and initial_depth is not None and inspection and inspection.get("depths"):
+            current_depth = min(inspection["depths"])
+            worn = initial_depth - current_depth
+            if worn > 0:
+                cost_per_mm = round(costo / worn, 4)
+        tire_data["cost_per_mm"] = cost_per_mm
+
         result.append(tire_data)
-    
+
     return result
 
 @api_router.post("/tires/inspect")
-async def create_tire_inspection(request: CreateInspectionRequest, current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["owner", "admin", "mantenimiento", "flota", "chofer"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
+async def create_tire_inspection(request: CreateInspectionRequest, current_user: dict = Depends(require_roles("owner", "admin", "mantenimiento", "flota", "chofer"))):
     
     inspection = TireInspection(
         company_id=current_user["company_id"],
@@ -2495,7 +2664,7 @@ async def create_tire_inspection(request: CreateInspectionRequest, current_user:
     
     # Check for alerts
     min_depth = min(request.depths) if request.depths else 0
-    tire = await db.tires.find_one({"id": request.tire_id})
+    tire = await db.tires.find_one({"id": request.tire_id, "company_id": current_user["company_id"]})
     
     # Alert thresholds (mm)
     critical_depth = 3  # Below this is critical
@@ -2559,9 +2728,7 @@ async def get_maintenance_plans(current_user: dict = Depends(get_current_user)):
     return [serialize_doc(p) for p in plans]
 
 @api_router.post("/maintenance/plans")
-async def create_maintenance_plan(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["owner", "admin", "mantenimiento"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
+async def create_maintenance_plan(request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "mantenimiento"))):
     
     plan = MaintenancePlan(
         company_id=current_user["company_id"],
@@ -2580,6 +2747,169 @@ async def create_maintenance_plan(request: dict = Body(...), current_user: dict 
     await db.maintenance_plans.insert_one(doc)
     return {"id": plan.id, "message": "Plan creado"}
 
+# ============== MATRIX MAINTENANCE PLANS (E MAX 540 style) ==============
+@api_router.get("/maintenance/matrix-plans")
+async def list_matrix_plans(current_user: dict = Depends(get_current_user)):
+    plans = await db.maintenance_matrix_plans.find(
+        {"company_id": current_user["company_id"]},
+        {"_id": 0}
+    ).to_list(100)
+    return [serialize_doc(p) for p in plans]
+
+@api_router.get("/maintenance/matrix-plans/{plan_id}")
+async def get_matrix_plan(plan_id: str, current_user: dict = Depends(get_current_user)):
+    plan = await db.maintenance_matrix_plans.find_one(
+        {"id": plan_id, "company_id": current_user["company_id"]},
+        {"_id": 0}
+    )
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan no encontrado")
+    return serialize_doc(plan)
+
+@api_router.post("/maintenance/matrix-plans")
+async def create_matrix_plan(request: dict = Body(...), current_user: dict = Depends(require_roles("superadmin", "owner", "admin", "mantenimiento"))):
+
+    plan = MaintenanceMatrixPlan(
+        company_id=current_user["company_id"],
+        name=request["name"],
+        vehicle_model=request.get("vehicle_model"),
+        applies_to_vehicle_ids=request.get("applies_to_vehicle_ids", []),
+        intervals=request.get("intervals", []),
+        sections=request.get("sections", []),
+        notes=request.get("notes"),
+        created_by=current_user.get("user_id") or current_user.get("id"),
+    )
+    doc = plan.model_dump()
+    for k, v in doc.items():
+        if isinstance(v, datetime):
+            doc[k] = v.isoformat()
+    await db.maintenance_matrix_plans.insert_one(doc)
+    return {"id": plan.id, "message": "Plan creado"}
+
+@api_router.put("/maintenance/matrix-plans/{plan_id}")
+async def update_matrix_plan(plan_id: str, request: dict = Body(...), current_user: dict = Depends(require_roles("superadmin", "owner", "admin", "mantenimiento"))):
+
+    plan = await db.maintenance_matrix_plans.find_one({"id": plan_id, "company_id": current_user["company_id"]})
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan no encontrado")
+
+    allowed = ["name", "vehicle_model", "applies_to_vehicle_ids", "intervals", "sections", "notes"]
+    update_data = {k: request[k] for k in allowed if k in request}
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    await db.maintenance_matrix_plans.update_one({"id": plan_id}, {"$set": update_data})
+    return {"message": "Plan actualizado"}
+
+@api_router.delete("/maintenance/matrix-plans/{plan_id}")
+async def delete_matrix_plan(plan_id: str, current_user: dict = Depends(require_roles("superadmin", "owner", "admin"))):
+    await db.maintenance_matrix_plans.delete_one({"id": plan_id, "company_id": current_user["company_id"]})
+    return {"message": "Plan eliminado"}
+
+@api_router.post("/maintenance/matrix-plans/import-excel")
+async def import_matrix_plan_excel(file: UploadFile = File(...), current_user: dict = Depends(require_roles("superadmin", "owner", "admin", "mantenimiento"))):
+    """Import a maintenance plan from Excel file (E MAX 540 format)"""
+
+    try:
+        import pandas as pd
+        import io
+        content = await file.read()
+        df = pd.read_excel(io.BytesIO(content), header=None)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error al leer Excel: {str(e)}")
+
+    # Parse intervals from row 7 (codes), row 8 (hours), row 9 (km)
+    # Cols 5..17 typically hold intervals
+    intervals = []
+    try:
+        codes_row = df.iloc[7]
+        hours_row = df.iloc[8]
+        km_row = df.iloc[9]
+        for col in range(5, 18):
+            code = codes_row[col]
+            hrs = hours_row[col]
+            km = km_row[col]
+            if pd.notna(code) and pd.notna(hrs):
+                intervals.append({
+                    "code": str(code).strip(),
+                    "hours": int(hrs) if pd.notna(hrs) else None,
+                    "km": int(km) * 1000 if pd.notna(km) else None,
+                })
+    except Exception:
+        pass
+
+    # Parse sections and tasks (rows 10+)
+    import re
+    sections = []
+    current_section = None
+    section_pattern = re.compile(r"^[A-Z]$")
+
+    for idx in range(10, len(df)):
+        row = df.iloc[idx]
+        code_or_n = row[1] if pd.notna(row[1]) else None
+        desc = row[2] if pd.notna(row[2]) else None
+
+        if code_or_n is None and desc is None:
+            continue
+
+        code_str = str(code_or_n).strip() if code_or_n is not None else ""
+
+        # Section header (single uppercase letter A-H)
+        if section_pattern.match(code_str):
+            if current_section:
+                sections.append(current_section)
+            current_section = {
+                "code": code_str,
+                "name": str(desc).strip() if desc else "",
+                "tasks": []
+            }
+            continue
+
+        # Task row
+        if current_section is not None and desc is not None:
+            actions = {}
+            for i, interval in enumerate(intervals):
+                col_idx = 5 + i
+                if col_idx < len(row):
+                    val = row[col_idx]
+                    if pd.notna(val) and str(val).strip():
+                        actions[interval["code"] + "_" + str(i)] = str(val).strip()
+
+            task = {
+                "n": str(code_or_n).strip() if code_or_n else "",
+                "description": str(desc).strip(),
+                "component_type": str(row[3]).strip() if pd.notna(row[3]) else None,
+                "quantity": float(row[4]) if pd.notna(row[4]) else None,
+                "actions": actions,
+            }
+            current_section["tasks"].append(task)
+
+    if current_section:
+        sections.append(current_section)
+
+    # Get plan name from filename
+    plan_name = file.filename.replace(".xlsx", "").replace(".xls", "").replace("Plan de mantenimiento ", "").strip()
+
+    plan = MaintenanceMatrixPlan(
+        company_id=current_user["company_id"],
+        name=plan_name,
+        intervals=intervals,
+        sections=sections,
+        created_by=current_user.get("user_id") or current_user.get("id"),
+    )
+    doc = plan.model_dump()
+    for k, v in doc.items():
+        if isinstance(v, datetime):
+            doc[k] = v.isoformat()
+    await db.maintenance_matrix_plans.insert_one(doc)
+
+    return {
+        "id": plan.id,
+        "name": plan_name,
+        "intervals_count": len(intervals),
+        "sections_count": len(sections),
+        "tasks_count": sum(len(s["tasks"]) for s in sections),
+        "message": "Plan importado exitosamente"
+    }
+
 @api_router.get("/maintenance/work-orders")
 async def get_work_orders(
     vehicle_id: Optional[str] = None,
@@ -2596,9 +2926,7 @@ async def get_work_orders(
     return [serialize_doc(o) for o in orders]
 
 @api_router.post("/maintenance/work-orders")
-async def create_work_order(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["owner", "admin", "mantenimiento", "flota"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
+async def create_work_order(request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "mantenimiento", "flota"))):
     
     # Generate order number
     count = await db.work_orders.count_documents({"company_id": current_user["company_id"]})
@@ -2638,10 +2966,10 @@ async def create_work_order(request: dict = Body(...), current_user: dict = Depe
         
         # Update vehicle status
         await db.vehicles.update_one(
-            {"id": request["vehicle_id"]},
+            {"id": request["vehicle_id"], "company_id": current_user["company_id"]},
             {"$set": {"status": VehicleStatus.EN_MANTENIMIENTO.value}}
         )
-    
+
     return {"id": order.id, "order_number": order_number, "message": "Orden de trabajo creada"}
 
 @api_router.put("/maintenance/work-orders/{order_id}")
@@ -2652,15 +2980,15 @@ async def update_work_order(order_id: str, request: dict = Body(...), current_us
     
     # If completing order, set vehicle to available
     if request.get("status") == "completada":
-        order = await db.work_orders.find_one({"id": order_id})
+        order = await db.work_orders.find_one({"id": order_id, "company_id": current_user["company_id"]})
         if order:
             await db.vehicles.update_one(
-                {"id": order["vehicle_id"]},
+                {"id": order["vehicle_id"], "company_id": current_user["company_id"]},
                 {"$set": {"status": VehicleStatus.DISPONIBLE.value}}
             )
             # Resolve any blocks
             await db.blocks.update_many(
-                {"entity_id": order["vehicle_id"], "is_active": True},
+                {"entity_id": order["vehicle_id"], "is_active": True, "company_id": current_user["company_id"]},
                 {"$set": {
                     "is_active": False,
                     "resolved_at": datetime.now(timezone.utc).isoformat(),
@@ -2679,10 +3007,7 @@ async def update_work_order(order_id: str, request: dict = Body(...), current_us
     return {"message": "Orden actualizada"}
 
 @api_router.delete("/maintenance/work-orders/{order_id}")
-async def delete_work_order(order_id: str, current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["owner", "admin", "mantenimiento"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
-    
+async def delete_work_order(order_id: str, current_user: dict = Depends(require_roles("owner", "admin", "mantenimiento"))):
     order = await db.work_orders.find_one({"id": order_id, "company_id": current_user["company_id"]})
     if not order:
         raise HTTPException(status_code=404, detail="Orden no encontrada")
@@ -2764,9 +3089,7 @@ async def get_checklist_templates(
     return [serialize_doc(t) for t in templates]
 
 @api_router.post("/checklist-templates")
-async def create_checklist_template(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["owner", "admin"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
+async def create_checklist_template(request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin"))):
     
     template = ChecklistTemplate(
         company_id=current_user["company_id"],
@@ -2782,9 +3105,7 @@ async def create_checklist_template(request: dict = Body(...), current_user: dic
     return {"id": template.id, "message": "Plantilla creada"}
 
 @api_router.put("/checklist-templates/{template_id}")
-async def update_checklist_template(template_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["owner", "admin"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
+async def update_checklist_template(template_id: str, request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin"))):
     
     request.pop("id", None)
     request.pop("company_id", None)
@@ -3141,10 +3462,8 @@ async def create_or_update_settlement(trip_id: str, request: dict = Body(...), c
         return {"id": settlement.id, "message": "Liquidación creada"}
 
 @api_router.post("/settlements/{settlement_id}/close")
-async def close_settlement(settlement_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
+async def close_settlement(settlement_id: str, request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "contabilidad"))):
     """Close a settlement"""
-    if current_user["role"] not in ["owner", "admin", "contabilidad"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
     
     settlement = await db.settlements.find_one({
         "id": settlement_id,
@@ -3204,9 +3523,7 @@ async def get_inventory_items(
     return [serialize_doc(i) for i in items]
 
 @api_router.post("/inventory/items")
-async def create_inventory_item(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["owner", "admin", "almacen"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
+async def create_inventory_item(request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "almacen"))):
     
     item = InventoryItem(
         company_id=current_user["company_id"],
@@ -3229,10 +3546,8 @@ async def create_inventory_item(request: dict = Body(...), current_user: dict = 
     return {"id": item.id, "message": "Item creado"}
 
 @api_router.post("/inventory/moves")
-async def create_stock_move(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
+async def create_stock_move(request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "almacen", "mantenimiento"))):
     """Create a stock movement (entry/exit/adjustment)"""
-    if current_user["role"] not in ["owner", "admin", "almacen", "mantenimiento"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
     
     item_id = request["item_id"]
     move_type = request["move_type"]
@@ -3313,9 +3628,7 @@ async def get_suppliers(current_user: dict = Depends(get_current_user)):
     return [serialize_doc(s) for s in suppliers]
 
 @api_router.post("/suppliers")
-async def create_supplier(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["owner", "admin", "almacen"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
+async def create_supplier(request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "almacen"))):
     
     supplier = Supplier(
         company_id=current_user["company_id"],
@@ -3346,9 +3659,7 @@ async def get_purchase_orders(
     return [serialize_doc(o) for o in orders]
 
 @api_router.post("/purchase-orders")
-async def create_purchase_order(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["owner", "admin", "almacen"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
+async def create_purchase_order(request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "almacen"))):
     
     count = await db.purchase_orders.count_documents({"company_id": current_user["company_id"]})
     order_number = f"OC-{count + 1:05d}"
@@ -3378,10 +3689,8 @@ async def create_purchase_order(request: dict = Body(...), current_user: dict = 
     return {"id": order.id, "order_number": order_number, "message": "Orden de compra creada"}
 
 @api_router.post("/purchase-orders/{order_id}/receive")
-async def receive_purchase_order(order_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
+async def receive_purchase_order(order_id: str, request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "almacen"))):
     """Receive a purchase order and update inventory"""
-    if current_user["role"] not in ["owner", "admin", "almacen"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
     
     order = await db.purchase_orders.find_one({
         "id": order_id,
@@ -3431,10 +3740,8 @@ async def receive_purchase_order(order_id: str, request: dict = Body(...), curre
 
 # ============== EXTENDED WORK ORDER ROUTES ==============
 @api_router.post("/maintenance/work-orders/{order_id}/start")
-async def start_work_order(order_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
+async def start_work_order(order_id: str, request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "mantenimiento"))):
     """Start a work order"""
-    if current_user["role"] not in ["owner", "admin", "mantenimiento"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
     
     order = await db.work_orders.find_one({
         "id": order_id,
@@ -3474,10 +3781,8 @@ async def start_work_order(order_id: str, request: dict = Body(...), current_use
     return {"message": "Orden iniciada"}
 
 @api_router.post("/maintenance/work-orders/{order_id}/complete")
-async def complete_work_order(order_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
+async def complete_work_order(order_id: str, request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "mantenimiento"))):
     """Complete a work order"""
-    if current_user["role"] not in ["owner", "admin", "mantenimiento"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
     
     order = await db.work_orders.find_one({
         "id": order_id,
@@ -3568,10 +3873,8 @@ async def complete_work_order(order_id: str, request: dict = Body(...), current_
 
 # ============== TIRE EXTENDED ROUTES ==============
 @api_router.post("/tires/rotate")
-async def rotate_tires(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
+async def rotate_tires(request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "mantenimiento", "flota"))):
     """Rotate tires on a vehicle"""
-    if current_user["role"] not in ["owner", "admin", "mantenimiento", "flota"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
     
     vehicle_id = request["vehicle_id"]
     changes = request.get("changes", [])  # [{from_position, to_position, tire_id}]
@@ -3609,10 +3912,8 @@ async def rotate_tires(request: dict = Body(...), current_user: dict = Depends(g
     return {"id": rotation.id, "message": "Rotación realizada"}
 
 @api_router.post("/tires/align")
-async def record_alignment(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
+async def record_alignment(request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "mantenimiento", "flota"))):
     """Record an alignment service"""
-    if current_user["role"] not in ["owner", "admin", "mantenimiento", "flota"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
     
     alignment = AlignmentRecord(
         company_id=current_user["company_id"],
@@ -3714,6 +4015,277 @@ async def get_tire_history(tire_id: str, current_user: dict = Depends(get_curren
         "life_events": [serialize_doc(e) for e in life_events]
     }
 
+@api_router.get("/tires/vehicle/{vehicle_id}/diagnostics")
+async def get_vehicle_tire_diagnostics(
+    vehicle_id: str,
+    max_depth_diff: float = 1.5,
+    current_user: dict = Depends(get_current_user)
+):
+    """Motor de diagnóstico por eje: diferencias de profundidad y desgaste irregular."""
+    company_id = current_user["company_id"]
+    vehicle = await db.vehicles.find_one({"id": vehicle_id, "company_id": company_id}, {"_id": 0})
+    if not vehicle:
+        raise HTTPException(status_code=404, detail="Vehículo no encontrado")
+
+    axle_config = vehicle.get("axle_config") or []
+    tires = await db.tires.find(
+        {"current_vehicle_id": vehicle_id, "company_id": company_id}, {"_id": 0}
+    ).to_list(50)
+
+    critical_depth = 3.0
+    axle_groups: Dict[str, List[Dict[str, Any]]] = {}
+    suggestions: List[Dict[str, Any]] = []
+
+    for tire in tires:
+        position = tire.get("current_position") or ""
+        num = _axle_num_from_position(position)
+        # Nombre del eje: usa axle_config si existe, si no "EJE{n}"
+        if num and 1 <= num <= len(axle_config) and axle_config[num - 1].get("name"):
+            axle_name = axle_config[num - 1]["name"]
+        elif num:
+            axle_name = f"EJE{num}"
+        else:
+            axle_name = "SIN_EJE"
+
+        inspection = await db.tire_inspections.find_one(
+            {"tire_id": tire["id"]}, {"_id": 0}, sort=[("inspection_date", -1)]
+        )
+        depths = inspection.get("depths") if inspection else None
+        min_depth = min(depths) if depths else None
+        irregular = bool(inspection.get("irregular_wear")) if inspection else False
+
+        axle_groups.setdefault(axle_name, []).append({
+            "tire_id": tire["id"], "position": position,
+            "min_depth": min_depth, "irregular": irregular
+        })
+
+        if irregular:
+            suggestions.append({
+                "tire_id": tire["id"], "position": position, "action": "revisar_alineacion",
+                "description": f"Desgaste irregular detectado en posición {position}. Revisar alineación.",
+                "severity": "warning"
+            })
+        if min_depth is not None and min_depth <= critical_depth:
+            suggestions.append({
+                "tire_id": tire["id"], "position": position, "action": "reemplazar",
+                "description": f"Profundidad crítica ({min_depth}mm) en posición {position}.",
+                "severity": "critical"
+            })
+
+    axle_issues: List[Dict[str, Any]] = []
+    for axle_name, items in axle_groups.items():
+        measured = [i for i in items if i["min_depth"] is not None]
+        if len(measured) >= 2:
+            depths_vals = [i["min_depth"] for i in measured]
+            diff = max(depths_vals) - min(depths_vals)
+            if diff > max_depth_diff:
+                axle_issues.append({
+                    "axle": axle_name, "type": "diferencia_profundidad",
+                    "description": f"Diferencia de profundidad de {round(diff, 2)}mm en {axle_name} (umbral {max_depth_diff}mm)."
+                })
+                lowest = min(measured, key=lambda i: i["min_depth"])
+                suggestions.append({
+                    "tire_id": lowest["tire_id"], "position": lowest["position"], "action": "rotar",
+                    "description": f"Rotar llanta en {lowest['position']} por desbalance de profundidad en {axle_name}.",
+                    "severity": "critical" if lowest["min_depth"] <= critical_depth else "warning"
+                })
+        if any(i["irregular"] for i in items):
+            axle_issues.append({
+                "axle": axle_name, "type": "desalineado",
+                "description": f"Desgaste irregular en {axle_name}. Posible desalineación."
+            })
+
+    return {"axle_issues": axle_issues, "suggestions": suggestions}
+
+@api_router.put("/tires/inspections/{inspection_id}")
+async def update_tire_inspection(
+    inspection_id: str,
+    request: dict = Body(...),
+    current_user: dict = Depends(require_roles("owner", "admin", "mantenimiento", "flota"))
+):
+    """Modifica una inspección existente y recalcula last_depth si es la más reciente."""
+    company_id = current_user["company_id"]
+    inspection = await db.tire_inspections.find_one({"id": inspection_id, "company_id": company_id})
+    if not inspection:
+        raise HTTPException(status_code=404, detail="Inspección no encontrada")
+
+    allowed = ["depths", "pressure", "irregular_wear", "wear_type", "notes"]
+    update_data = {k: request[k] for k in allowed if k in request}
+    if update_data:
+        await db.tire_inspections.update_one(
+            {"id": inspection_id, "company_id": company_id}, {"$set": update_data}
+        )
+
+    # Recalcular last_depth de la llanta si esta inspección es la más reciente
+    latest = await db.tire_inspections.find_one(
+        {"tire_id": inspection["tire_id"], "company_id": company_id},
+        {"_id": 0}, sort=[("inspection_date", -1)]
+    )
+    if latest and latest.get("id") == inspection_id:
+        depths = update_data.get("depths", inspection.get("depths") or [])
+        if depths:
+            await db.tires.update_one(
+                {"id": inspection["tire_id"], "company_id": company_id},
+                {"$set": {"last_depth": min(depths), "updated_at": datetime.now(timezone.utc).isoformat()}}
+            )
+
+    return {"message": "Inspección actualizada"}
+
+@api_router.post("/tires/{tire_id}/retread")
+async def retread_tire(
+    tire_id: str,
+    request: dict = Body(...),
+    current_user: dict = Depends(require_roles("owner", "admin", "mantenimiento", "flota"))
+):
+    """Reencauche: incrementa life_number, reinicia baseline de profundidad, deja la llanta en almacén."""
+    company_id = current_user["company_id"]
+    tire = await db.tires.find_one({"id": tire_id, "company_id": company_id})
+    if not tire:
+        raise HTTPException(status_code=404, detail="Llanta no encontrada")
+    if tire.get("current_vehicle_id"):
+        raise HTTPException(status_code=400, detail="Desmonte la llanta antes de reencaucharla")
+
+    new_life = (tire.get("life_number", 1) or 1) + 1
+    new_baseline = request.get("new_depth")  # profundidad inicial del reencauche (opcional)
+
+    await db.tires.update_one(
+        {"id": tire_id, "company_id": company_id},
+        {"$set": {
+            "life_number": new_life,
+            "initial_depth": new_baseline,
+            "last_depth": new_baseline,
+            "band_brand": request.get("band_brand"),
+            "band_model": request.get("band_model"),
+            "status": TireStatus.ALMACEN.value,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+
+    event = TireLifeEvent(
+        company_id=company_id, tire_id=tire_id, life_number=new_life,
+        event_type="reencauche", cost=request.get("cost", 0) or 0,
+        supplier=request.get("band_brand"),
+        notes=f"Reencauche R{new_life - 1} banda={request.get('band_brand')} {request.get('band_model') or ''}".strip(),
+        created_by=current_user["id"]
+    )
+    doc = event.model_dump()
+    doc["event_date"] = doc["event_date"].isoformat()
+    if request.get("date"):
+        doc["event_date"] = request["date"]
+    doc["odometer"] = request.get("odometer")
+    await db.tire_life_events.insert_one(doc)
+
+    return {"id": event.id, "message": "Reencauche registrado", "life_number": new_life}
+
+@api_router.post("/tires/{tire_id}/regroove")
+async def regroove_tire(
+    tire_id: str,
+    request: dict = Body(...),
+    current_user: dict = Depends(require_roles("owner", "admin", "mantenimiento", "flota"))
+):
+    """Reesculturado/regrabado: registra el evento sin cambiar life_number."""
+    company_id = current_user["company_id"]
+    tire = await db.tires.find_one({"id": tire_id, "company_id": company_id})
+    if not tire:
+        raise HTTPException(status_code=404, detail="Llanta no encontrada")
+
+    event = TireLifeEvent(
+        company_id=company_id, tire_id=tire_id,
+        life_number=tire.get("life_number", 1) or 1,
+        event_type="regroove", cost=request.get("cost", 0) or 0,
+        notes=request.get("notes"),
+        created_by=current_user["id"]
+    )
+    doc = event.model_dump()
+    doc["event_date"] = doc["event_date"].isoformat()
+    if request.get("date"):
+        doc["event_date"] = request["date"]
+    await db.tire_life_events.insert_one(doc)
+
+    return {"id": event.id, "message": "Reesculturado registrado"}
+
+@api_router.post("/tires/{tire_id}/scrap")
+async def scrap_tire(
+    tire_id: str,
+    request: dict = Body(...),
+    current_user: dict = Depends(require_roles("owner", "admin", "mantenimiento", "flota"))
+):
+    """Baja / fin de vida de la llanta."""
+    company_id = current_user["company_id"]
+    tire = await db.tires.find_one({"id": tire_id, "company_id": company_id})
+    if not tire:
+        raise HTTPException(status_code=404, detail="Llanta no encontrada")
+
+    await db.tires.update_one(
+        {"id": tire_id, "company_id": company_id},
+        {"$set": {
+            "status": TireStatus.BAJA.value,
+            "current_vehicle_id": None,
+            "current_position": None,
+            "scrap_reason": request.get("reason"),
+            "scrap_date": request.get("date") or datetime.now(timezone.utc).isoformat(),
+            "scrap_odometer": request.get("odometer"),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+
+    event = TireLifeEvent(
+        company_id=company_id, tire_id=tire_id,
+        life_number=tire.get("life_number", 1) or 1,
+        event_type="baja", notes=request.get("reason"),
+        created_by=current_user["id"]
+    )
+    doc = event.model_dump()
+    doc["event_date"] = request.get("date") or doc["event_date"].isoformat()
+    doc["odometer"] = request.get("odometer")
+    await db.tire_life_events.insert_one(doc)
+
+    return {"message": "Llanta dada de baja"}
+
+@api_router.get("/tires/reports/scrap-pile")
+async def get_scrap_pile_report(current_user: dict = Depends(get_current_user)):
+    """Listado de llantas dadas de baja con análisis por motivo y marca."""
+    company_id = current_user["company_id"]
+    tires = await db.tires.find(
+        {"company_id": company_id, "status": TireStatus.BAJA.value}, {"_id": 0}
+    ).to_list(1000)
+
+    by_reason: Dict[str, Dict[str, Any]] = {}
+    by_brand: Dict[str, Dict[str, Any]] = {}
+
+    for tire in tires:
+        km = tire.get("total_km") or 0
+        reason = tire.get("scrap_reason") or "sin_motivo"
+        brand = tire.get("brand") or "Desconocida"
+
+        r = by_reason.setdefault(reason, {"count": 0, "km_total": 0, "km_count": 0})
+        r["count"] += 1
+        if km > 0:
+            r["km_total"] += km
+            r["km_count"] += 1
+
+        b = by_brand.setdefault(brand, {"count": 0, "km_total": 0, "km_count": 0})
+        b["count"] += 1
+        if km > 0:
+            b["km_total"] += km
+            b["km_count"] += 1
+
+    def _finish(groups):
+        out = {}
+        for key, v in groups.items():
+            out[key] = {
+                "count": v["count"],
+                "avg_km": round(v["km_total"] / v["km_count"], 1) if v["km_count"] else None
+            }
+        return out
+
+    return {
+        "tires": [serialize_doc(t) for t in tires],
+        "total": len(tires),
+        "by_reason": _finish(by_reason),
+        "by_brand": _finish(by_brand)
+    }
+
 # ============== AUDIT LOG ROUTES ==============
 @api_router.get("/audit-logs")
 async def get_audit_logs(
@@ -3721,11 +4293,8 @@ async def get_audit_logs(
     entity_id: Optional[str] = None,
     action: Optional[str] = None,
     limit: int = 100,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_roles("owner", "admin"))
 ):
-    if current_user["role"] not in ["owner", "admin"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
-    
     query = {"company_id": current_user["company_id"]}
     if entity_type:
         query["entity_type"] = entity_type
@@ -3819,7 +4388,7 @@ async def get_fuel_kpis(
                 km_per_gallon = km_per_liter * 3.78541  # Convert to gallons
                 cost_per_km = data["total_amount"] / km_traveled
                 
-                vehicle = await db.vehicles.find_one({"id": vid}, {"_id": 0})
+                vehicle = await db.vehicles.find_one({"id": vid, "company_id": current_user["company_id"]}, {"_id": 0})
                 kpis.append({
                     "vehicle_id": vid,
                     "plate": vehicle.get("plate") if vehicle else "Unknown",
@@ -4041,6 +4610,32 @@ def get_s3_client():
         )
     return None
 
+# ============== UPLOAD VALIDATION ==============
+MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB
+ALLOWED_UPLOAD_EXTENSIONS = {".jpg", ".jpeg", ".png", ".pdf", ".webp", ".heic"}
+ALLOWED_UPLOAD_CONTENT_TYPES = {
+    "image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "application/pdf"
+}
+_ENTITY_TYPE_RE = re.compile(r"^[a-z_]+$")
+_ENTITY_ID_RE = re.compile(r"^[0-9a-fA-F-]{36}$")
+
+
+def validate_entity_path(entity_type: str, entity_id: str):
+    """Sanitiza entity_type/entity_id contra path traversal (whitelist)."""
+    if not entity_type or not _ENTITY_TYPE_RE.match(entity_type):
+        raise HTTPException(status_code=400, detail="entity inválido")
+    if not entity_id or not _ENTITY_ID_RE.match(entity_id):
+        raise HTTPException(status_code=400, detail="entity inválido")
+
+
+def safe_upload_filename(original_filename: str) -> str:
+    """Devuelve un nombre de archivo seguro validando la extensión (whitelist)."""
+    base = os.path.basename(original_filename or "")
+    ext = Path(base).suffix.lower()
+    if ext not in ALLOWED_UPLOAD_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="Extensión de archivo no permitida")
+    return f"{uuid.uuid4()}{ext}"
+
 @api_router.post("/upload")
 async def upload_file(
     file: UploadFile = File(...),
@@ -4049,14 +4644,21 @@ async def upload_file(
     current_user: dict = Depends(get_current_user)
 ):
     """Upload file to S3 or local storage"""
-    # Generate unique filename
-    ext = Path(file.filename).suffix
-    filename = f"{uuid.uuid4()}{ext}"
+    # Sanitizar entity_type/entity_id (path traversal) y filename
+    validate_entity_path(entity_type, entity_id)
+    filename = safe_upload_filename(file.filename)
+
+    # Validar content-type
+    if file.content_type not in ALLOWED_UPLOAD_CONTENT_TYPES:
+        raise HTTPException(status_code=400, detail="Tipo de contenido no permitido")
+
     file_key = f"{entity_type}/{entity_id}/{filename}"
-    
-    # Read file content
+
+    # Read file content y validar tamaño
     file_content = await file.read()
-    
+    if len(file_content) > MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=413, detail="Archivo demasiado grande")
+
     # Try S3 first
     s3_client = get_s3_client()
     bucket_name = os.environ.get('S3_BUCKET_NAME', '')
@@ -4096,16 +4698,23 @@ async def upload_base64(request: dict = Body(...), current_user: dict = Depends(
     data = request.get("data", "")
     entity_type = request.get("entity_type", "general")
     entity_id = request.get("entity_id", "general")
-    
+
+    # Sanitizar segmentos de path contra traversal (whitelist de caracteres)
+    entity_type = re.sub(r"[^0-9a-zA-Z_-]", "", str(entity_type)) or "general"
+    entity_id = re.sub(r"[^0-9a-zA-Z_-]", "", str(entity_id)) or "general"
+
     # Parse base64 data
     if "base64," in data:
         data = data.split("base64,")[1]
-    
+
     try:
         file_content = base64.b64decode(data)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid base64 data")
-    
+
+    if len(file_content) > MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=413, detail="Archivo demasiado grande")
+
     filename = f"{uuid.uuid4()}.jpg"
     file_key = f"{entity_type}/{entity_id}/{filename}"
     
@@ -4189,10 +4798,8 @@ async def get_notifications(
     return [serialize_doc(n) for n in notifications]
 
 @api_router.post("/notifications")
-async def create_notification(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
+async def create_notification(request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin"))):
     """Create a notification (admin only)"""
-    if current_user["role"] not in ["owner", "admin"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
     
     notification = {
         "id": str(uuid.uuid4()),
@@ -4294,11 +4901,8 @@ async def send_push_notifications(company_id: str, title: str, message: str, tar
 
 # ============== ALERTS AUTO-GENERATION ==============
 @api_router.post("/alerts/generate")
-async def generate_alerts(current_user: dict = Depends(get_current_user)):
+async def generate_alerts(current_user: dict = Depends(require_roles("owner", "admin"))):
     """Generate alerts for expiring documents and other issues"""
-    if current_user["role"] not in ["owner", "admin"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
-    
     company_id = current_user["company_id"]
     alerts_created = 0
     
@@ -4327,12 +4931,13 @@ async def generate_alerts(current_user: dict = Depends(get_current_user)):
                 existing = await db.alerts.find_one({
                     "entity_id": doc["id"],
                     "alert_type": "document_expiry",
-                    "resolved": False
+                    "resolved": False,
+                    "company_id": company_id
                 })
-                
+
                 if not existing:
-                    doc_type = await db.document_types.find_one({"id": doc["document_type_id"]})
-                    entity = await db.vehicles.find_one({"id": doc["entity_id"]}) or await db.users.find_one({"id": doc["entity_id"]})
+                    doc_type = await db.document_types.find_one({"id": doc["document_type_id"], "company_id": company_id})
+                    entity = await db.vehicles.find_one({"id": doc["entity_id"], "company_id": company_id}) or await db.users.find_one({"id": doc["entity_id"], "company_id": company_id})
                     
                     severity = "critical" if days_until <= 0 else "warning" if days_until <= 7 else "info"
                     
@@ -4381,74 +4986,92 @@ async def system_status():
         "companies": company_count
     }
 
-# ============== BOOTSTRAP: CREATE FIRST OWNER (SUPER ADMIN) ==============
-@api_router.post("/bootstrap")
-async def bootstrap_owner():
+# ============== INSTALL TOKEN GUARD ==============
+async def require_install_token(x_install_token: Optional[str] = Header(None)):
+    """Protege endpoints de instalación (bootstrap/seed).
+    - Si INSTALL_TOKEN está seteado, exige que el header X-Install-Token coincida.
+    - Si no está seteado, solo permite en el primer arranque (cuando no existe superadmin todavía).
     """
-    Create the first owner (super admin) user.
-    Only works when NO owner user exists in the system.
+    configured = os.environ.get("INSTALL_TOKEN")
+    if configured:
+        if not x_install_token or not secrets.compare_digest(str(x_install_token), configured):
+            raise HTTPException(status_code=403, detail="Token de instalación inválido")
+    else:
+        existing = await db.users.find_one({"role": "superadmin"})
+        if existing:
+            raise HTTPException(
+                status_code=403,
+                detail="Instalación deshabilitada: configure INSTALL_TOKEN para permitir esta operación"
+            )
+    return True
+
+# ============== BOOTSTRAP: CREATE SUPERADMIN ==============
+@api_router.post("/bootstrap")
+async def bootstrap_superadmin(_: bool = Depends(require_install_token)):
+    """
+    Create the first superadmin user.
+    Only works when NO superadmin user exists in the system.
     This is the entry point for multi-tenancy management.
     """
-    # Check if any owner already exists
-    existing_owner = await db.users.find_one({"role": "owner"})
-    if existing_owner:
+    existing = await db.users.find_one({"role": "superadmin"})
+    if existing:
         raise HTTPException(
             status_code=400,
-            detail="Ya existe un usuario owner. Use las credenciales de owner para acceder."
+            detail="Ya existe un superadmin. Use las credenciales de superadmin para acceder."
         )
 
-    # Create the owner's company (Star Insights IT as system company)
-    owner_company = Company(
+    # Create the system company for superadmin
+    system_company = Company(
         name="Star Insights IT",
         ruc="00000000000",
         address="Sistema",
         phone="",
-        email="owner@starinsights.pe",
-        config={
-            "lockout_minutes": 15,
-            "max_failed_attempts": 5,
-            "tire_critical_depth": 3,
-            "tire_warning_depth": 5
-        }
+        email="admin@starinsights.pe",
+        config={}
     )
-    company_doc = owner_company.model_dump()
+    company_doc = system_company.model_dump()
     for key, value in company_doc.items():
         if isinstance(value, datetime):
             company_doc[key] = value.isoformat()
     await db.companies.insert_one(company_doc)
 
-    # Create owner user
-    owner_user = User(
-        company_id=owner_company.id,
-        email="owner@starinsights.pe",
+    # Generar password aleatorio (se muestra UNA sola vez)
+    generated_password = secrets.token_urlsafe(12)
+
+    # Create superadmin user
+    superadmin = User(
+        company_id=system_company.id,
+        email="superadmin@starinsights.pe",
         name="Super Administrador",
-        role=UserRole.OWNER,
-        password_hash=hash_password("owner2025")
+        role=UserRole.SUPERADMIN,
+        password_hash=hash_password(generated_password),
+        force_password_change=True,
     )
-    owner_doc = owner_user.model_dump()
-    for key, value in owner_doc.items():
+    sa_doc = superadmin.model_dump()
+    for key, value in sa_doc.items():
         if isinstance(value, datetime):
-            owner_doc[key] = value.isoformat()
-    await db.users.insert_one(owner_doc)
+            sa_doc[key] = value.isoformat()
+    await db.users.insert_one(sa_doc)
 
     return {
-        "message": "Owner (Super Admin) creado exitosamente",
+        "message": "SuperAdmin creado exitosamente",
         "credentials": {
-            "email": "owner@starinsights.pe",
-            "password": "owner2025",
-            "role": "owner"
+            "email": "superadmin@starinsights.pe",
+            "password": generated_password,
+            "role": "superadmin"
         },
-        "company_id": owner_company.id,
-        "instructions": "Inicie sesion con estas credenciales. Luego vaya a Empresas para crear las empresas clientes."
+        "company_id": system_company.id,
+        "instructions": "Guarde esta contraseña ahora; no se volverá a mostrar. Deberá cambiarla en el primer inicio de sesión."
     }
 
 # ============== SEED DATA ROUTE (FOR DEMO) ==============
 @api_router.post("/seed")
-async def seed_demo_data():
+async def seed_demo_data(_: bool = Depends(require_install_token)):
     """Create demo data for testing"""
     # Check if company already exists
     existing = await db.companies.find_one({"ruc": "20123456789"})
     if existing:
+        # No devolver credenciales si ya existía
         return {"message": "Demo data already exists", "company_id": existing["id"]}
     
     # Create company
@@ -4471,13 +5094,15 @@ async def seed_demo_data():
             company_doc[key] = value.isoformat()
     await db.companies.insert_one(company_doc)
     
-    # Create admin user
+    # Create admin user con password aleatorio (se muestra UNA sola vez)
+    admin_password = secrets.token_urlsafe(12)
     admin = User(
         company_id=company.id,
         email="admin@transperu.com",
         name="Administrador Principal",
         role=UserRole.ADMIN,
-        password_hash=hash_password("admin123")
+        password_hash=hash_password(admin_password),
+        force_password_change=True,
     )
     admin_doc = admin.model_dump()
     for key, value in admin_doc.items():
@@ -4658,7 +5283,8 @@ async def seed_demo_data():
         "message": "Demo data created successfully",
         "company_id": company.id,
         "admin_email": "admin@transperu.com",
-        "admin_password": "admin123",
+        "admin_password": admin_password,
+        "instructions": "Guarde esta contraseña ahora; no se volverá a mostrar. Deberá cambiarla en el primer inicio de sesión.",
         "sample_driver": {
             "dni": "12345678",
             "pin": "123456"
@@ -4804,8 +5430,8 @@ async def export_settlement_pdf(trip_id: str, current_user: dict = Depends(get_c
     if not trip:
         raise HTTPException(status_code=404, detail="Viaje no encontrado")
     
-    driver = await db.users.find_one({"id": trip.get("driver_id")}, {"_id": 0})
-    tracto = await db.vehicles.find_one({"id": trip.get("tracto_id")}, {"_id": 0})
+    driver = await db.users.find_one({"id": trip.get("driver_id"), "company_id": current_user["company_id"]}, {"_id": 0})
+    tracto = await db.vehicles.find_one({"id": trip.get("tracto_id"), "company_id": current_user["company_id"]}, {"_id": 0})
     advances = await db.trip_advances.find({"trip_id": trip_id}, {"_id": 0}).to_list(100)
     expenses = await db.trip_expenses.find({"trip_id": trip_id}, {"_id": 0}).to_list(100)
     
@@ -5021,10 +5647,8 @@ async def get_document_types_config(current_user: dict = Depends(get_current_use
     return [serialize_doc(dt) for dt in doc_types]
 
 @api_router.post("/config/document-types")
-async def create_document_type_config(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
+async def create_document_type_config(request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin"))):
     """Create new document type"""
-    if current_user["role"] not in ["owner", "admin"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
     
     doc_type = DocumentType(
         company_id=current_user["company_id"],
@@ -5043,10 +5667,8 @@ async def create_document_type_config(request: dict = Body(...), current_user: d
     return {"id": doc_type.id, "message": "Tipo de documento creado"}
 
 @api_router.put("/config/document-types/{doc_type_id}")
-async def update_document_type_config(doc_type_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
+async def update_document_type_config(doc_type_id: str, request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin"))):
     """Update document type"""
-    if current_user["role"] not in ["owner", "admin"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
     
     update_data = {}
     if "name" in request:
@@ -5068,10 +5690,8 @@ async def update_document_type_config(doc_type_id: str, request: dict = Body(...
     return {"message": "Tipo de documento actualizado"}
 
 @api_router.delete("/config/document-types/{doc_type_id}")
-async def delete_document_type_config(doc_type_id: str, current_user: dict = Depends(get_current_user)):
+async def delete_document_type_config(doc_type_id: str, current_user: dict = Depends(require_roles("owner", "admin"))):
     """Delete document type"""
-    if current_user["role"] not in ["owner", "admin"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
     
     # Check if any documents use this type
     docs_count = await db.documents.count_documents({
@@ -5099,10 +5719,8 @@ async def get_checklist_templates_config(current_user: dict = Depends(get_curren
     return [serialize_doc(t) for t in templates]
 
 @api_router.post("/config/checklist-templates")
-async def create_checklist_template_config(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
+async def create_checklist_template_config(request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin"))):
     """Create checklist template"""
-    if current_user["role"] not in ["owner", "admin"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
     
     template = ChecklistTemplate(
         company_id=current_user["company_id"],
@@ -5120,10 +5738,8 @@ async def create_checklist_template_config(request: dict = Body(...), current_us
     return {"id": template.id, "message": "Plantilla creada"}
 
 @api_router.put("/config/checklist-templates/{template_id}")
-async def update_checklist_template_config(template_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
+async def update_checklist_template_config(template_id: str, request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin"))):
     """Update checklist template"""
-    if current_user["role"] not in ["owner", "admin"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
     
     update_data = {}
     if "name" in request:
@@ -5152,22 +5768,13 @@ async def get_company_config(current_user: dict = Depends(get_current_user)):
     return serialize_doc(company)
 
 @api_router.put("/config/company")
-async def update_company_config(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
+async def update_company_config(request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin"))):
     """Update company configuration"""
-    if current_user["role"] not in ["owner", "admin"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
     
     update_data = {}
-    if "name" in request:
-        update_data["name"] = request["name"]
-    if "address" in request:
-        update_data["address"] = request["address"]
-    if "phone" in request:
-        update_data["phone"] = request["phone"]
-    if "email" in request:
-        update_data["email"] = request["email"]
-    if "config" in request:
-        update_data["config"] = request["config"]
+    for field in ["name", "address", "phone", "email", "logo_url", "brand_color", "config"]:
+        if field in request:
+            update_data[field] = request[field]
     
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     
@@ -5288,9 +5895,7 @@ async def get_guia(guia_id: str, current_user: dict = Depends(get_current_user))
     return serialize_doc(guia)
 
 @api_router.post("/guias")
-async def create_guia(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["owner", "admin", "operaciones", "contabilidad"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
+async def create_guia(request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "operaciones", "contabilidad"))):
 
     # Auto-increment numero
     last = await db.guias_transportista.find_one(
@@ -5334,10 +5939,8 @@ async def create_guia(request: dict = Body(...), current_user: dict = Depends(ge
     return {"id": guia.id, "numero": f"{guia.serie}-{next_num:08d}", "message": "Guía creada"}
 
 @api_router.post("/guias/{guia_id}/emit")
-async def emit_guia_sunat(guia_id: str, current_user: dict = Depends(get_current_user)):
+async def emit_guia_sunat(guia_id: str, current_user: dict = Depends(require_roles("owner", "admin", "contabilidad"))):
     """Emit guía to SUNAT - requires SUNAT API credentials in company config"""
-    if current_user["role"] not in ["owner", "admin", "contabilidad"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
 
     guia = await db.guias_transportista.find_one(
         {"id": guia_id, "company_id": current_user["company_id"]}, {"_id": 0}
@@ -5393,9 +5996,7 @@ async def get_facturas(
     return [serialize_doc(f) for f in facturas]
 
 @api_router.post("/facturas")
-async def create_factura(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["owner", "admin", "contabilidad"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
+async def create_factura(request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "contabilidad"))):
 
     # Auto-increment numero
     last = await db.facturas.find_one(
@@ -5434,10 +6035,8 @@ async def create_factura(request: dict = Body(...), current_user: dict = Depends
     return {"id": factura.id, "numero": f"{factura.serie}-{next_num:08d}", "total": total, "message": "Factura creada"}
 
 @api_router.post("/facturas/{factura_id}/emit")
-async def emit_factura_sunat(factura_id: str, current_user: dict = Depends(get_current_user)):
+async def emit_factura_sunat(factura_id: str, current_user: dict = Depends(require_roles("owner", "admin", "contabilidad"))):
     """Emit factura to SUNAT"""
-    if current_user["role"] not in ["owner", "admin", "contabilidad"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
 
     factura = await db.facturas.find_one(
         {"id": factura_id, "company_id": current_user["company_id"]}, {"_id": 0}
@@ -5468,9 +6067,7 @@ async def emit_factura_sunat(factura_id: str, current_user: dict = Depends(get_c
 
 # --- SUNAT Config ---
 @api_router.get("/config/sunat")
-async def get_sunat_config(current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["owner", "admin"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
+async def get_sunat_config(current_user: dict = Depends(require_roles("owner", "admin"))):
     company = await db.companies.find_one({"id": current_user["company_id"]})
     config = company.get("sunat_config", {}) if company else {}
     # Mask token
@@ -5480,9 +6077,7 @@ async def get_sunat_config(current_user: dict = Depends(get_current_user)):
     return config
 
 @api_router.put("/config/sunat")
-async def update_sunat_config(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["owner", "admin"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
+async def update_sunat_config(request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin"))):
 
     sunat_config = {
         "ruc": request.get("ruc"),
@@ -5504,14 +6099,46 @@ async def update_sunat_config(request: dict = Body(...), current_user: dict = De
 
 # Serve uploaded files
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
+# Serve React frontend build
+FRONTEND_BUILD = ROOT_DIR.parent / "frontend" / "build"
+if FRONTEND_BUILD.exists():
+    app.mount("/static", StaticFiles(directory=str(FRONTEND_BUILD / "static")), name="react-static")
+
+    @app.get("/{full_path:path}")
+    async def serve_react(full_path: str):
+        """Serve React SPA - all non-API routes return index.html"""
+        if full_path.startswith("api/") or full_path.startswith("uploads/"):
+            raise HTTPException(status_code=404, detail="Not found")
+        file_path = FRONTEND_BUILD / full_path
+        if full_path and file_path.exists() and file_path.is_file():
+            return FileResponse(str(file_path))
+        return FileResponse(str(FRONTEND_BUILD / "index.html"))
+
 # CORS
-_cors_raw = os.environ.get('CORS_ORIGINS', '*').strip()
-_cors_origins = ["*"] if _cors_raw == "*" else [o.strip() for o in _cors_raw.split(',') if o.strip()]
+_env = os.environ.get("ENV", "development").lower()
+_cors_raw = os.environ.get("CORS_ORIGINS", "").strip()
+# Lista explícita solo si NO es "*" (comodín inseguro junto a credenciales)
+_cors_explicit = [o.strip() for o in _cors_raw.split(",") if o.strip() and o.strip() != "*"]
+if _cors_explicit:
+    _cors_origins = _cors_explicit
+elif _env == "production":
+    # En producción CORS_ORIGINS es obligatorio y no puede ser "*"
+    raise RuntimeError("CORS_ORIGINS no configurado (o '*') en producción")
+else:
+    # Desarrollo: permitir localhost por defecto
+    _cors_origins = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
+# Nunca allow_origins=["*"] junto con allow_credentials=True
 app.add_middleware(
     CORSMiddleware,
-    allow_credentials=(_cors_raw != "*"),
+    allow_credentials=True,
     allow_origins=_cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -5523,6 +6150,20 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+@app.on_event("startup")
+async def create_indexes():
+    """Crea índices idempotentes en background para consultas multi-tenant frecuentes."""
+    try:
+        await db.users.create_index([("company_id", 1), ("email", 1)], background=True)
+        await db.users.create_index([("dni", 1)], background=True)
+        await db.vehicles.create_index([("company_id", 1), ("plate", 1)], background=True)
+        await db.trips.create_index([("company_id", 1), ("status", 1)], background=True)
+        await db.tires.create_index([("company_id", 1), ("current_vehicle_id", 1)], background=True)
+        await db.documents.create_index([("company_id", 1), ("entity_id", 1)], background=True)
+        logger.info("Índices de MongoDB verificados/creados")
+    except Exception as e:
+        logger.error(f"Error creando índices MongoDB: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():

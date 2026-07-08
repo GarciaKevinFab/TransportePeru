@@ -284,7 +284,7 @@ const BillingPage = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 page-fade-in">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -296,7 +296,7 @@ const BillingPage = () => {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowConfigDialog(true)}>
+          <Button variant="outline" className="btn-press" onClick={() => setShowConfigDialog(true)}>
             <Settings className="w-4 h-4 mr-2" />
             Config SUNAT
           </Button>
@@ -320,22 +320,22 @@ const BillingPage = () => {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="bg-white border-l-4 border-l-blue-500">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="bg-white border-l-4 border-l-blue-500 card-enter card-stagger-1">
           <CardContent className="py-4">
             <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Guías</p>
             <p className="font-heading text-3xl font-bold text-blue-600 mt-1">{guias.length}</p>
             <p className="text-xs text-slate-400">{guiasEmitidas} emitidas</p>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-green-500">
+        <Card className="bg-white border-l-4 border-l-green-500 card-enter card-stagger-2">
           <CardContent className="py-4">
             <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Facturas</p>
             <p className="font-heading text-3xl font-bold text-green-600 mt-1">{facturas.length}</p>
             <p className="text-xs text-slate-400">{facturasEmitidas} emitidas</p>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-orange-500 col-span-2">
+        <Card className="bg-white border-l-4 border-l-orange-500 col-span-2 card-enter card-stagger-3">
           <CardContent className="py-4">
             <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Total Facturado</p>
             <p className="font-heading text-3xl font-bold text-orange-600 mt-1">
@@ -359,12 +359,12 @@ const BillingPage = () => {
         {/* Guías Tab */}
         <TabsContent value="guias" className="space-y-4">
           <div className="flex justify-end">
-            <Button className="btn-action" onClick={() => setShowGuiaDialog(true)}>
+            <Button className="btn-action btn-press" onClick={() => setShowGuiaDialog(true)}>
               <Plus className="w-4 h-4 mr-2" /> Nueva Guía
             </Button>
           </div>
-          <Card className="bg-white">
-            <CardContent className="p-0">
+          <Card className="bg-white section-enter">
+            <CardContent className="p-0 overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="table-dense">
@@ -419,12 +419,12 @@ const BillingPage = () => {
         {/* Facturas Tab */}
         <TabsContent value="facturas" className="space-y-4">
           <div className="flex justify-end">
-            <Button className="btn-action" onClick={() => setShowFacturaDialog(true)}>
+            <Button className="btn-action btn-press" onClick={() => setShowFacturaDialog(true)}>
               <Plus className="w-4 h-4 mr-2" /> Nueva Factura
             </Button>
           </div>
-          <Card className="bg-white">
-            <CardContent className="p-0">
+          <Card className="bg-white section-enter">
+            <CardContent className="p-0 overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="table-dense">
@@ -478,7 +478,7 @@ const BillingPage = () => {
 
       {/* Nueva Guía Dialog */}
       <Dialog open={showGuiaDialog} onOpenChange={setShowGuiaDialog}>
-        <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
               Nueva Guía de Transportista
@@ -502,7 +502,7 @@ const BillingPage = () => {
               </Select>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="input-label font-bold text-blue-700">Remitente</Label>
                 <Input placeholder="RUC" value={guiaForm.remitente_ruc} onChange={e => setGuiaForm({...guiaForm, remitente_ruc: e.target.value})} className="rounded-sm" />
@@ -515,7 +515,7 @@ const BillingPage = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">Punto de Partida</Label>
                 <Input value={guiaForm.punto_partida} onChange={e => setGuiaForm({...guiaForm, punto_partida: e.target.value})} className="rounded-sm" placeholder="Ciudad / Dirección" />
@@ -528,7 +528,7 @@ const BillingPage = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">Descripción Carga</Label>
                 <Input value={guiaForm.descripcion_carga} onChange={e => setGuiaForm({...guiaForm, descripcion_carga: e.target.value})} className="rounded-sm" />
@@ -555,7 +555,7 @@ const BillingPage = () => {
 
       {/* Nueva Factura Dialog */}
       <Dialog open={showFacturaDialog} onOpenChange={setShowFacturaDialog}>
-        <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
               Nueva Factura Electrónica
@@ -580,7 +580,7 @@ const BillingPage = () => {
             </div>
 
             {/* Cliente */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">RUC Cliente *</Label>
                 <Input value={facturaForm.cliente_ruc} onChange={e => setFacturaForm({...facturaForm, cliente_ruc: e.target.value})} className="rounded-sm" placeholder="20xxxxxxxxx" maxLength={11} />
@@ -669,7 +669,7 @@ const BillingPage = () => {
 
       {/* Config SUNAT Dialog */}
       <Dialog open={showConfigDialog} onOpenChange={setShowConfigDialog}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
               Configuración SUNAT
@@ -679,7 +679,7 @@ const BillingPage = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">RUC de la Empresa</Label>
                 <Input value={configForm.ruc} onChange={e => setConfigForm({...configForm, ruc: e.target.value})} className="rounded-sm" placeholder="20xxxxxxxxx" maxLength={11} />

@@ -42,6 +42,9 @@ import {
   AlertTriangle,
   CheckCircle,
   Save,
+  Upload,
+  Image,
+  Palette,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -82,8 +85,11 @@ const SettingsPage = () => {
     address: '',
     phone: '',
     email: '',
+    logo_url: '',
+    brand_color: '#f97316',
     config: {},
   });
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   
   const [newChecklistItem, setNewChecklistItem] = useState({
     category: '',
@@ -122,6 +128,8 @@ const SettingsPage = () => {
         address: companyRes.data?.address || '',
         phone: companyRes.data?.phone || '',
         email: companyRes.data?.email || '',
+        logo_url: companyRes.data?.logo_url || '',
+        brand_color: companyRes.data?.brand_color || '#f97316',
         config: companyRes.data?.config || {},
       });
       setDocumentTypes(docTypesRes.data);
@@ -138,10 +146,43 @@ const SettingsPage = () => {
       await api.put('/config/company', companyForm);
       toast.success('Configuración guardada');
       fetchData();
+      // Notify sidebar to refresh branding
+      window.dispatchEvent(new Event('company-brand-updated'));
     } catch (error) {
       toast.error('Error al guardar configuración');
     }
     setSaving(false);
+  };
+
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Solo se permiten imágenes');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('La imagen debe ser menor a 2MB');
+      return;
+    }
+    setUploadingLogo(true);
+    try {
+      // Convert to base64 so it works everywhere (no ngrok/CORS issues)
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64Url = reader.result; // data:image/png;base64,...
+        setCompanyForm(prev => ({ ...prev, logo_url: base64Url }));
+        await api.put('/config/company', { logo_url: base64Url });
+        toast.success('Logo actualizado');
+        fetchData();
+        window.dispatchEvent(new Event('company-brand-updated'));
+        setUploadingLogo(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      toast.error('Error al subir logo');
+      setUploadingLogo(false);
+    }
   };
 
   const handleSaveDocType = async () => {
@@ -274,7 +315,7 @@ const SettingsPage = () => {
   }
 
   return (
-    <div className="space-y-6" data-testid="settings-page">
+    <div className="space-y-6 page-fade-in" data-testid="settings-page">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -306,12 +347,84 @@ const SettingsPage = () => {
 
         {/* Company Tab */}
         <TabsContent value="company" className="mt-4">
-          <Card className="bg-white">
+          <Card className="bg-white card-3d shadow-card-hover smooth-appear">
             <CardHeader>
               <CardTitle className="font-heading uppercase text-lg">Datos de la Empresa</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              {/* Logo & Branding */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-4 border-b">
+                <div className="space-y-3">
+                  <Label className="input-label">Logo de la Empresa</Label>
+                  <div className="flex items-center gap-4">
+                    <div className="w-24 h-24 rounded-lg border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden bg-slate-50 shrink-0">
+                      {companyForm.logo_url ? (
+                        <img
+                          src={companyForm.logo_url}
+                          alt="Logo"
+                          className="w-full h-full object-contain p-1"
+                          onError={(e) => { e.target.style.display = 'none'; }}
+                        />
+                      ) : (
+                        <div className="text-center">
+                          <Image className="w-8 h-8 text-slate-300 mx-auto" />
+                          <span className="text-xs text-slate-400 mt-1">Sin logo</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <label className="cursor-pointer">
+                        <input type="file" accept="image/png,image/jpeg,image/svg+xml" className="hidden" onChange={handleLogoUpload} />
+                        <div className="btn-action inline-flex items-center px-4 py-2 text-sm rounded-sm cursor-pointer">
+                          {uploadingLogo ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+                          {uploadingLogo ? 'Subiendo...' : 'Subir Logo'}
+                        </div>
+                      </label>
+                      <p className="text-xs text-slate-500">PNG, JPG o SVG. Máx 2MB</p>
+                      {companyForm.logo_url && (
+                        <button
+                          className="text-xs text-red-500 hover:text-red-700 underline"
+                          onClick={() => setCompanyForm({ ...companyForm, logo_url: '' })}
+                        >
+                          Quitar logo
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <Label className="input-label">Color de Marca</Label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={companyForm.brand_color || '#f97316'}
+                      onChange={(e) => setCompanyForm({ ...companyForm, brand_color: e.target.value })}
+                      className="w-12 h-12 rounded-lg cursor-pointer border border-slate-300 p-1"
+                    />
+                    <div className="space-y-1">
+                      <Input
+                        value={companyForm.brand_color || '#f97316'}
+                        onChange={(e) => setCompanyForm({ ...companyForm, brand_color: e.target.value })}
+                        className="rounded-sm w-28 font-mono text-sm"
+                        maxLength={7}
+                      />
+                      <p className="text-xs text-slate-500">Se usa en sidebar y botones</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-2">
+                    {['#f97316', '#3b82f6', '#10b981', '#ef4444', '#8b5cf6', '#06b6d4'].map(color => (
+                      <button
+                        key={color}
+                        className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${companyForm.brand_color === color ? 'border-slate-900 scale-110' : 'border-transparent'}`}
+                        style={{ backgroundColor: color }}
+                        onClick={() => setCompanyForm({ ...companyForm, brand_color: color })}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="input-label">Nombre de la Empresa</Label>
                   <Input
@@ -333,7 +446,7 @@ const SettingsPage = () => {
                   className="rounded-sm"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="input-label">Teléfono</Label>
                   <Input
@@ -411,7 +524,7 @@ const SettingsPage = () => {
 
         {/* Documents Tab */}
         <TabsContent value="documents" className="mt-4">
-          <Card className="bg-white">
+          <Card className="bg-white card-3d shadow-card-hover smooth-appear">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="font-heading uppercase text-lg">Tipos de Documento</CardTitle>
               <Button className="btn-action" onClick={() => {
@@ -429,7 +542,7 @@ const SettingsPage = () => {
                 Nuevo Tipo
               </Button>
             </CardHeader>
-            <CardContent className="p-0">
+            <CardContent className="p-0 overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="table-dense">
@@ -487,7 +600,7 @@ const SettingsPage = () => {
 
         {/* Checklists Tab */}
         <TabsContent value="checklists" className="mt-4">
-          <Card className="bg-white">
+          <Card className="bg-white card-3d shadow-card-hover smooth-appear">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="font-heading uppercase text-lg">Plantillas de Checklist</CardTitle>
               <Button className="btn-action" onClick={() => {
@@ -504,7 +617,7 @@ const SettingsPage = () => {
                 Nueva Plantilla
               </Button>
             </CardHeader>
-            <CardContent className="p-0">
+            <CardContent className="p-0 overflow-x-auto">
               {checklistTemplates.length === 0 ? (
                 <div className="py-12 text-center text-slate-400">
                   <ClipboardList className="w-12 h-12 mx-auto mb-2" />
@@ -550,7 +663,7 @@ const SettingsPage = () => {
 
       {/* Document Type Dialog */}
       <Dialog open={showDocTypeDialog} onOpenChange={setShowDocTypeDialog}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
               {editingDocType ? 'Editar Tipo de Documento' : 'Nuevo Tipo de Documento'}
@@ -624,14 +737,14 @@ const SettingsPage = () => {
 
       {/* Checklist Template Dialog */}
       <Dialog open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
               {editingTemplate ? 'Editar Plantilla' : 'Nueva Plantilla de Checklist'}
             </DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">Nombre *</Label>
                 <Input

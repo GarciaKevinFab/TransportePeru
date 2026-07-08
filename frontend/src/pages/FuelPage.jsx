@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { fuelApi, vehiclesApi, tripsApi } from '../services/api';
+import { fuelApi, vehiclesApi, tripsApi, usersApi } from '../services/api';
 import api from '../services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -65,6 +65,8 @@ const FuelPage = () => {
   const [kpis, setKpis] = useState(null);
   const [vehicles, setVehicles] = useState([]);
   const [trips, setTrips] = useState([]);
+  const [drivers, setDrivers] = useState([]);
+  const [photoPreview, setPhotoPreview] = useState({ open: false, url: '', title: '' });
   
   const [showVoucherDialog, setShowVoucherDialog] = useState(false);
   const [showLoadDialog, setShowLoadDialog] = useState(false);
@@ -85,8 +87,11 @@ const FuelPage = () => {
     valid_from: '',
     valid_until: '',
     photo_url: '',
+    voucher_photo_url: '',
+    invoice_photo_url: '',
+    invoice_number: '',
   });
-  
+
   const [loadForm, setLoadForm] = useState({
     vehicle_id: '',
     voucher_id: '',
@@ -96,25 +101,36 @@ const FuelPage = () => {
     odometer: '',
     provider: '',
     photo_url: '',
+    voucher_photo_url: '',
+    invoice_photo_url: '',
+    invoice_number: '',
   });
+
+  // Refs for new photo slots (voucher + invoice) — base64-based
+  const voucherFileInputRef = useRef(null);
+  const voucherCameraInputRef = useRef(null);
+  const invoiceFileInputRef = useRef(null);
+  const invoiceCameraInputRef = useRef(null);
 
   const isAdmin = user?.role === 'owner' || user?.role === 'admin';
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [vouchersRes, loadsRes, kpisRes, vehiclesRes, tripsRes] = await Promise.all([
+      const [vouchersRes, loadsRes, kpisRes, vehiclesRes, tripsRes, driversRes] = await Promise.all([
         fuelApi.getVouchers(),
         fuelApi.getLoads(),
         fuelApi.getKpis(),
         vehiclesApi.getAll(),
         tripsApi.getAll(),
+        usersApi.getAll({ role: 'chofer' }),
       ]);
       setVouchers(vouchersRes.data);
       setLoads(loadsRes.data);
       setKpis(kpisRes.data);
       setVehicles(vehiclesRes.data);
       setTrips(tripsRes.data.filter(t => t.status === 'en_curso' || t.status === 'programado'));
+      setDrivers(driversRes.data);
     } catch (error) {
       console.error('Error:', error);
     }
@@ -136,6 +152,9 @@ const FuelPage = () => {
       valid_from: '',
       valid_until: '',
       photo_url: '',
+      voucher_photo_url: '',
+      invoice_photo_url: '',
+      invoice_number: '',
     });
     setEditingVoucher(null);
     setCapturedPhoto(null);
@@ -151,6 +170,9 @@ const FuelPage = () => {
       odometer: '',
       provider: '',
       photo_url: '',
+      voucher_photo_url: '',
+      invoice_photo_url: '',
+      invoice_number: '',
     });
     setEditingLoad(null);
     setCapturedPhoto(null);
@@ -168,6 +190,9 @@ const FuelPage = () => {
       valid_from: voucher.valid_from?.substring(0, 10) || '',
       valid_until: voucher.valid_until?.substring(0, 10) || '',
       photo_url: voucher.photo_url || '',
+      voucher_photo_url: voucher.voucher_photo_url || voucher.photo_url || '',
+      invoice_photo_url: voucher.invoice_photo_url || '',
+      invoice_number: voucher.invoice_number || '',
     });
     setCapturedPhoto(voucher.photo_url);
     setShowVoucherDialog(true);
@@ -184,6 +209,9 @@ const FuelPage = () => {
       odometer: load.odometer?.toString() || '',
       provider: load.provider || '',
       photo_url: load.photo_url || '',
+      voucher_photo_url: load.voucher_photo_url || load.photo_url || '',
+      invoice_photo_url: load.invoice_photo_url || '',
+      invoice_number: load.invoice_number || '',
     });
     setCapturedPhoto(load.photo_url);
     setShowLoadDialog(true);
@@ -283,6 +311,33 @@ const FuelPage = () => {
     }
   };
 
+  // New base64-based handler for voucher/invoice photo slots (avoids ngrok URL issues)
+  const handleSlotPhotoCapture = (slot) => (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploadingPhoto(true);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64 = e.target.result;
+      const field = slot === 'invoice' ? 'invoice_photo_url' : 'voucher_photo_url';
+      if (showVoucherDialog) {
+        setVoucherForm(prev => ({ ...prev, [field]: base64 }));
+      } else if (showLoadDialog) {
+        setLoadForm(prev => ({ ...prev, [field]: base64 }));
+      }
+      toast.success(slot === 'invoice' ? 'Foto de factura cargada' : 'Foto de vale cargada');
+      setUploadingPhoto(false);
+      // reset input value so picking same file twice still triggers change
+      event.target.value = '';
+    };
+    reader.onerror = () => {
+      toast.error('Error al leer la imagen');
+      setUploadingPhoto(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
   // Dedicated OCR function for manual extraction
   const handleExtractDataFromPhoto = async () => {
     if (!capturedPhoto) {
@@ -353,9 +408,12 @@ const FuelPage = () => {
         ...voucherForm,
         limit_liters: parseFloat(voucherForm.limit_liters) || null,
         limit_amount: parseFloat(voucherForm.limit_amount) || null,
-        photo_url: capturedPhoto || voucherForm.photo_url,
+        photo_url: voucherForm.voucher_photo_url || capturedPhoto || voucherForm.photo_url,
+        voucher_photo_url: voucherForm.voucher_photo_url || null,
+        invoice_photo_url: voucherForm.invoice_photo_url || null,
+        invoice_number: voucherForm.invoice_number || null,
       };
-      
+
       if (editingVoucher) {
         await api.put(`/fuel/vouchers/${editingVoucher.id}`, data);
         toast.success('Vale actualizado');
@@ -386,9 +444,12 @@ const FuelPage = () => {
         liters: parseFloat(loadForm.liters),
         price_per_liter: parseFloat(loadForm.price_per_liter),
         odometer: parseInt(loadForm.odometer),
-        photo_url: capturedPhoto || loadForm.photo_url,
+        photo_url: loadForm.voucher_photo_url || capturedPhoto || loadForm.photo_url,
+        voucher_photo_url: loadForm.voucher_photo_url || null,
+        invoice_photo_url: loadForm.invoice_photo_url || null,
+        invoice_number: loadForm.invoice_number || null,
       };
-      
+
       if (editingLoad) {
         await api.put(`/fuel/loads/${editingLoad.id}`, data);
         toast.success('Carga actualizada');
@@ -407,6 +468,12 @@ const FuelPage = () => {
   };
 
   const getVehiclePlate = (id) => vehicles.find(v => v.id === id)?.plate || '-';
+  const getDriverName = (id) => {
+    if (!id) return '-';
+    const d = drivers.find(u => u.id === id);
+    return d ? d.name : '-';
+  };
+  const openPhoto = (url, title) => setPhotoPreview({ open: true, url, title });
 
   const totalLiters = loads.reduce((sum, l) => sum + (l.liters || 0), 0);
   const totalAmount = loads.reduce((sum, l) => sum + (l.total_amount || 0), 0);
@@ -414,8 +481,8 @@ const FuelPage = () => {
   const avgPrice = totalLiters > 0 ? totalAmount / totalLiters : 0;
 
   return (
-    <div className="space-y-6" data-testid="fuel-page">
-      {/* Hidden file inputs */}
+    <div className="space-y-6 page-fade-in" data-testid="fuel-page">
+      {/* Hidden file inputs (legacy) */}
       <input
         type="file"
         ref={fileInputRef}
@@ -431,6 +498,37 @@ const FuelPage = () => {
         className="hidden"
         onChange={handlePhotoCapture}
       />
+      {/* Hidden file inputs (voucher + invoice base64) */}
+      <input
+        type="file"
+        ref={voucherFileInputRef}
+        accept="image/*"
+        className="hidden"
+        onChange={handleSlotPhotoCapture('voucher')}
+      />
+      <input
+        type="file"
+        ref={voucherCameraInputRef}
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={handleSlotPhotoCapture('voucher')}
+      />
+      <input
+        type="file"
+        ref={invoiceFileInputRef}
+        accept="image/*"
+        className="hidden"
+        onChange={handleSlotPhotoCapture('invoice')}
+      />
+      <input
+        type="file"
+        ref={invoiceCameraInputRef}
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={handleSlotPhotoCapture('invoice')}
+      />
 
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -442,12 +540,12 @@ const FuelPage = () => {
             Gestión de vales y cargas de combustible
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => { resetVoucherForm(); setShowVoucherDialog(true); }}>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Button variant="outline" className="btn-press" onClick={() => { resetVoucherForm(); setShowVoucherDialog(true); }}>
             <Ticket className="w-4 h-4 mr-2" />
             Nuevo Vale
           </Button>
-          <Button className="btn-action" onClick={() => { resetLoadForm(); setShowLoadDialog(true); }}>
+          <Button className="btn-action btn-press" onClick={() => { resetLoadForm(); setShowLoadDialog(true); }}>
             <Plus className="w-4 h-4 mr-2" />
             Registrar Carga
           </Button>
@@ -455,8 +553,8 @@ const FuelPage = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="bg-white border-l-4 border-l-blue-500">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="bg-white border-l-4 border-l-blue-500 card-enter card-stagger-1">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
@@ -467,7 +565,7 @@ const FuelPage = () => {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-green-500">
+        <Card className="bg-white border-l-4 border-l-green-500 card-enter card-stagger-2">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
@@ -478,7 +576,7 @@ const FuelPage = () => {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-orange-500">
+        <Card className="bg-white border-l-4 border-l-orange-500 card-enter card-stagger-3">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
@@ -489,7 +587,7 @@ const FuelPage = () => {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-slate-500">
+        <Card className="bg-white border-l-4 border-l-slate-500 card-enter card-stagger-4">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
@@ -514,8 +612,8 @@ const FuelPage = () => {
 
         {/* Vouchers Tab */}
         <TabsContent value="vouchers" className="mt-4">
-          <Card className="bg-white">
-            <CardContent className="p-0">
+          <Card className="bg-white section-enter">
+            <CardContent className="p-0 overflow-x-auto">
               {loading ? (
                 <div className="flex items-center justify-center h-64">
                   <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
@@ -558,13 +656,22 @@ const FuelPage = () => {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          {voucher.photo_url ? (
-                            <Button size="sm" variant="ghost" onClick={() => window.open(voucher.photo_url, '_blank')}>
-                              <Image className="w-4 h-4 text-blue-500" />
-                            </Button>
-                          ) : (
-                            <span className="text-slate-400">-</span>
-                          )}
+                          <div className="flex items-center gap-1">
+                            {(voucher.voucher_photo_url || voucher.photo_url) ? (
+                              <button onClick={() => openPhoto(voucher.voucher_photo_url || voucher.photo_url, `Vale ${voucher.voucher_number}`)} className="border-2 border-blue-300 rounded p-0.5 hover:border-blue-500" title="Foto del vale">
+                                <img src={voucher.voucher_photo_url || voucher.photo_url} alt="vale" className="w-8 h-8 object-cover rounded" />
+                              </button>
+                            ) : (
+                              <div className="w-9 h-9 border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-slate-300 text-[10px]">V</div>
+                            )}
+                            {voucher.invoice_photo_url ? (
+                              <button onClick={() => openPhoto(voucher.invoice_photo_url, `Factura ${voucher.invoice_number || ''}`)} className="border-2 border-orange-300 rounded p-0.5 hover:border-orange-500" title="Foto de factura">
+                                <img src={voucher.invoice_photo_url} alt="factura" className="w-8 h-8 object-cover rounded" />
+                              </button>
+                            ) : (
+                              <div className="w-9 h-9 border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-slate-300 text-[10px]">F</div>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="text-right">
                           {isAdmin && (
@@ -598,8 +705,8 @@ const FuelPage = () => {
 
         {/* Loads Tab */}
         <TabsContent value="loads" className="mt-4">
-          <Card className="bg-white">
-            <CardContent className="p-0">
+          <Card className="bg-white section-enter">
+            <CardContent className="p-0 overflow-x-auto">
               {loading ? (
                 <div className="flex items-center justify-center h-64">
                   <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
@@ -614,36 +721,50 @@ const FuelPage = () => {
                   <TableHeader>
                     <TableRow className="table-dense">
                       <TableHead>Fecha</TableHead>
+                      <TableHead>Chofer</TableHead>
                       <TableHead>Vehículo</TableHead>
-                      <TableHead>Proveedor</TableHead>
+                      <TableHead>N° Vale</TableHead>
+                      <TableHead>N° Factura</TableHead>
                       <TableHead>Litros</TableHead>
-                      <TableHead>Precio/L</TableHead>
                       <TableHead>Total</TableHead>
                       <TableHead>Odómetro</TableHead>
-                      <TableHead>Foto</TableHead>
+                      <TableHead className="text-center">Fotos</TableHead>
                       <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {loads.map((load) => (
+                    {loads.map((load) => {
+                      const voucherPhoto = load.voucher_photo_url || (load.voucher_id ? null : load.photo_url);
+                      const invoicePhoto = load.invoice_photo_url;
+                      return (
                       <TableRow key={load.id} className="table-dense">
                         <TableCell className="text-sm">
                           {format(new Date(load.load_date || load.created_at), 'dd/MM/yy HH:mm', { locale: es })}
                         </TableCell>
+                        <TableCell className="text-sm font-medium">{getDriverName(load.driver_id)}</TableCell>
                         <TableCell className="font-mono">{getVehiclePlate(load.vehicle_id)}</TableCell>
-                        <TableCell>{load.provider || '-'}</TableCell>
-                        <TableCell className="font-bold">{load.liters?.toFixed(2)}</TableCell>
-                        <TableCell>S/ {load.price_per_liter?.toFixed(2)}</TableCell>
+                        <TableCell className="font-mono text-xs">{load.voucher_number || '-'}</TableCell>
+                        <TableCell className="font-mono text-xs">{load.invoice_number || '-'}</TableCell>
+                        <TableCell className="font-bold">{load.liters?.toFixed(2)} L</TableCell>
                         <TableCell className="font-bold text-green-600">S/ {load.total_amount?.toFixed(2)}</TableCell>
                         <TableCell>{load.odometer?.toLocaleString()} km</TableCell>
                         <TableCell>
-                          {load.photo_url ? (
-                            <Button size="sm" variant="ghost" onClick={() => window.open(load.photo_url, '_blank')}>
-                              <Image className="w-4 h-4 text-blue-500" />
-                            </Button>
-                          ) : (
-                            <span className="text-slate-400">-</span>
-                          )}
+                          <div className="flex items-center justify-center gap-1">
+                            {voucherPhoto ? (
+                              <button onClick={() => openPhoto(voucherPhoto, `Vale ${load.voucher_number || ''}`)} className="border-2 border-blue-300 rounded p-0.5 hover:border-blue-500" title="Foto del vale">
+                                <img src={voucherPhoto} alt="vale" className="w-8 h-8 object-cover rounded" />
+                              </button>
+                            ) : (
+                              <div className="w-9 h-9 border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-slate-300 text-[10px]">V</div>
+                            )}
+                            {invoicePhoto ? (
+                              <button onClick={() => openPhoto(invoicePhoto, `Factura ${load.invoice_number || ''}`)} className="border-2 border-orange-300 rounded p-0.5 hover:border-orange-500" title="Foto de factura">
+                                <img src={invoicePhoto} alt="factura" className="w-8 h-8 object-cover rounded" />
+                              </button>
+                            ) : (
+                              <div className="w-9 h-9 border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-slate-300 text-[10px]">F</div>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="text-right">
                           {isAdmin && (
@@ -667,7 +788,8 @@ const FuelPage = () => {
                           )}
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               )}
@@ -676,16 +798,30 @@ const FuelPage = () => {
         </TabsContent>
       </Tabs>
 
+      {/* Photo Preview Dialog */}
+      <Dialog open={photoPreview.open} onOpenChange={(open) => setPhotoPreview(p => ({ ...p, open }))}>
+        <DialogContent className="max-w-[95vw] sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{photoPreview.title || 'Foto'}</DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center justify-center bg-slate-100 rounded p-2">
+            {photoPreview.url && (
+              <img src={photoPreview.url} alt="preview" className="max-h-[70vh] max-w-full object-contain" />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Voucher Dialog */}
       <Dialog open={showVoucherDialog} onOpenChange={(open) => { if (!open) resetVoucherForm(); setShowVoucherDialog(open); }}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
               {editingVoucher ? 'Editar Vale de Combustible' : 'Nuevo Vale de Combustible'}
             </DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">Número de Vale *</Label>
                 <Input
@@ -709,7 +845,7 @@ const FuelPage = () => {
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">Proveedor *</Label>
                 <Input
@@ -734,7 +870,7 @@ const FuelPage = () => {
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">Límite (Litros)</Label>
                 <Input
@@ -756,7 +892,7 @@ const FuelPage = () => {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">Válido Desde</Label>
                 <Input
@@ -777,44 +913,98 @@ const FuelPage = () => {
               </div>
             </div>
             
-            {/* Photo capture */}
+            {/* Invoice number */}
+            <div className="space-y-2">
+              <Label className="input-label">Número de Factura</Label>
+              <Input
+                value={voucherForm.invoice_number}
+                onChange={(e) => setVoucherForm({ ...voucherForm, invoice_number: e.target.value })}
+                className="rounded-sm"
+                placeholder="F001-12345"
+              />
+            </div>
+
+            {/* Voucher photo */}
             <div className="space-y-2">
               <Label className="input-label">Foto del Vale</Label>
               <div className="flex gap-2 flex-wrap">
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => cameraInputRef.current?.click()}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => voucherCameraInputRef.current?.click()}
                   disabled={uploadingPhoto}
                 >
                   {uploadingPhoto ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Camera className="w-4 h-4 mr-2" />}
                   Tomar Foto
                 </Button>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => fileInputRef.current?.click()}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => voucherFileInputRef.current?.click()}
                   disabled={uploadingPhoto}
                 >
                   <Image className="w-4 h-4 mr-2" />
                   Seleccionar
                 </Button>
-                {capturedPhoto && (
-                  <Button 
-                    type="button" 
-                    variant="secondary"
-                    onClick={handleExtractDataFromPhoto}
-                    disabled={uploadingPhoto}
-                    className="bg-blue-100 hover:bg-blue-200 text-blue-700"
+                {voucherForm.voucher_photo_url && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setVoucherForm({ ...voucherForm, voucher_photo_url: '' })}
+                    className="text-red-600"
                   >
-                    {uploadingPhoto ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <TrendingUp className="w-4 h-4 mr-2" />}
-                    Extraer Datos
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Quitar
                   </Button>
                 )}
               </div>
-              {capturedPhoto && (
+              {voucherForm.voucher_photo_url && (
                 <div className="mt-2 relative">
-                  <img src={capturedPhoto} alt="Vale" className="w-full max-h-48 object-contain rounded-sm border" />
+                  <img src={voucherForm.voucher_photo_url} alt="Vale" className="w-full max-h-48 object-contain rounded-sm border" />
+                  <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full p-1">
+                    <Check className="w-4 h-4" />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Invoice photo */}
+            <div className="space-y-2">
+              <Label className="input-label">Foto de la Factura</Label>
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => invoiceCameraInputRef.current?.click()}
+                  disabled={uploadingPhoto}
+                >
+                  {uploadingPhoto ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Camera className="w-4 h-4 mr-2" />}
+                  Tomar Foto
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => invoiceFileInputRef.current?.click()}
+                  disabled={uploadingPhoto}
+                >
+                  <Image className="w-4 h-4 mr-2" />
+                  Seleccionar
+                </Button>
+                {voucherForm.invoice_photo_url && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setVoucherForm({ ...voucherForm, invoice_photo_url: '' })}
+                    className="text-red-600"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Quitar
+                  </Button>
+                )}
+              </div>
+              {voucherForm.invoice_photo_url && (
+                <div className="mt-2 relative">
+                  <img src={voucherForm.invoice_photo_url} alt="Factura" className="w-full max-h-48 object-contain rounded-sm border" />
                   <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full p-1">
                     <Check className="w-4 h-4" />
                   </div>
@@ -838,14 +1028,14 @@ const FuelPage = () => {
 
       {/* Load Dialog */}
       <Dialog open={showLoadDialog} onOpenChange={(open) => { if (!open) resetLoadForm(); setShowLoadDialog(open); }}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
               {editingLoad ? 'Editar Carga de Combustible' : 'Registrar Carga de Combustible'}
             </DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">Vehículo *</Label>
                 <Select value={loadForm.vehicle_id} onValueChange={(v) => setLoadForm({ ...loadForm, vehicle_id: v })}>
@@ -874,7 +1064,7 @@ const FuelPage = () => {
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">Litros *</Label>
                 <Input
@@ -906,7 +1096,7 @@ const FuelPage = () => {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">Odómetro (km) *</Label>
                 <Input
@@ -928,44 +1118,98 @@ const FuelPage = () => {
               </div>
             </div>
             
-            {/* Photo capture */}
+            {/* Invoice number */}
             <div className="space-y-2">
-              <Label className="input-label">Foto del Recibo/Grifo</Label>
+              <Label className="input-label">Número de Factura</Label>
+              <Input
+                value={loadForm.invoice_number}
+                onChange={(e) => setLoadForm({ ...loadForm, invoice_number: e.target.value })}
+                className="rounded-sm"
+                placeholder="F001-12345"
+              />
+            </div>
+
+            {/* Voucher photo */}
+            <div className="space-y-2">
+              <Label className="input-label">Foto del Vale</Label>
               <div className="flex gap-2 flex-wrap">
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => cameraInputRef.current?.click()}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => voucherCameraInputRef.current?.click()}
                   disabled={uploadingPhoto}
                 >
                   {uploadingPhoto ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Camera className="w-4 h-4 mr-2" />}
                   Tomar Foto
                 </Button>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => fileInputRef.current?.click()}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => voucherFileInputRef.current?.click()}
                   disabled={uploadingPhoto}
                 >
                   <Image className="w-4 h-4 mr-2" />
                   Seleccionar
                 </Button>
-                {capturedPhoto && (
-                  <Button 
-                    type="button" 
-                    variant="secondary"
-                    onClick={handleExtractDataFromPhoto}
-                    disabled={uploadingPhoto}
-                    className="bg-blue-100 hover:bg-blue-200 text-blue-700"
+                {loadForm.voucher_photo_url && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setLoadForm({ ...loadForm, voucher_photo_url: '' })}
+                    className="text-red-600"
                   >
-                    {uploadingPhoto ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <TrendingUp className="w-4 h-4 mr-2" />}
-                    Extraer Datos
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Quitar
                   </Button>
                 )}
               </div>
-              {capturedPhoto && (
+              {loadForm.voucher_photo_url && (
                 <div className="mt-2 relative">
-                  <img src={capturedPhoto} alt="Recibo" className="w-full max-h-48 object-contain rounded-sm border" />
+                  <img src={loadForm.voucher_photo_url} alt="Vale" className="w-full max-h-48 object-contain rounded-sm border" />
+                  <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full p-1">
+                    <Check className="w-4 h-4" />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Invoice photo */}
+            <div className="space-y-2">
+              <Label className="input-label">Foto de la Factura</Label>
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => invoiceCameraInputRef.current?.click()}
+                  disabled={uploadingPhoto}
+                >
+                  {uploadingPhoto ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Camera className="w-4 h-4 mr-2" />}
+                  Tomar Foto
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => invoiceFileInputRef.current?.click()}
+                  disabled={uploadingPhoto}
+                >
+                  <Image className="w-4 h-4 mr-2" />
+                  Seleccionar
+                </Button>
+                {loadForm.invoice_photo_url && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setLoadForm({ ...loadForm, invoice_photo_url: '' })}
+                    className="text-red-600"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Quitar
+                  </Button>
+                )}
+              </div>
+              {loadForm.invoice_photo_url && (
+                <div className="mt-2 relative">
+                  <img src={loadForm.invoice_photo_url} alt="Factura" className="w-full max-h-48 object-contain rounded-sm border" />
                   <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full p-1">
                     <Check className="w-4 h-4" />
                   </div>

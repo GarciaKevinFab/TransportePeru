@@ -25,11 +25,13 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import SignatureCanvas from 'react-signature-canvas';
+import { useOffline } from '../hooks/useOffline';
 
 const ChecklistWizardPage = () => {
   const { tripId } = useParams();
   const navigate = useNavigate();
   const signatureRef = useRef(null);
+  const { saveChecklistOffline } = useOffline();
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -226,30 +228,55 @@ const ChecklistWizardPage = () => {
     }
     
     setSaving(true);
+    const result = calculateResult();
+    const payload = {
+      responses: responses,
+      tire_checks: tireChecks,
+      signature_url: signature,
+      location: location,
+      km_start: parseInt(kmStart),
+      notes: notes,
+      result: result,
+    };
+
+    // Offline path
+    if (!navigator.onLine) {
+      const ok = await saveChecklistOffline(tripId, payload, localStorage.getItem('access_token'));
+      if (ok) {
+        toast.success('Guardado offline. Se enviará al reconectar');
+        navigate('/trips');
+      } else {
+        toast.error('No se pudo guardar offline');
+      }
+      setSaving(false);
+      return;
+    }
+
     try {
-      const result = calculateResult();
-      
-      await api.post(`/trip/${tripId}/checklist`, {
-        responses: responses,
-        tire_checks: tireChecks,
-        signature_url: signature,
-        location: location,
-        km_start: parseInt(kmStart),
-        notes: notes,
-        result: result,
-      });
-      
+      await api.post(`/trip/${tripId}/checklist`, payload);
+
       toast.success(
-        result === 'ok' 
+        result === 'ok'
           ? '✅ Checklist aprobado. Viaje listo para iniciar.'
           : result === 'observado'
           ? '⚠️ Checklist con observaciones registrado.'
           : '❌ Checklist crítico. Se creó incidencia automática.'
       );
-      
+
       navigate('/trips');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Error al enviar checklist');
+      const isNetworkErr = !error.response;
+      if (isNetworkErr) {
+        const ok = await saveChecklistOffline(tripId, payload, localStorage.getItem('access_token'));
+        if (ok) {
+          toast.success('Guardado offline. Se enviará al reconectar');
+          navigate('/trips');
+        } else {
+          toast.error('No se pudo guardar offline');
+        }
+      } else {
+        toast.error(error.response?.data?.detail || 'Error al enviar checklist');
+      }
     }
     setSaving(false);
   };

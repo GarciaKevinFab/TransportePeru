@@ -98,11 +98,11 @@ const DriverTripPage = () => {
   };
 
   const getStatusBadge = (status) => {
-    const styles = {
-      programado: 'bg-yellow-100 text-yellow-800',
-      en_curso: 'bg-blue-100 text-blue-800',
-      completado: 'bg-green-100 text-green-800',
-      cancelado: 'bg-red-100 text-red-800',
+    const classes = {
+      programado: 'pill-warning',
+      en_curso: 'pill-info',
+      completado: 'pill-success',
+      cancelado: 'pill-danger',
     };
     const labels = {
       programado: 'Programado',
@@ -110,7 +110,7 @@ const DriverTripPage = () => {
       completado: 'Completado',
       cancelado: 'Cancelado',
     };
-    return <Badge className={styles[status]}>{labels[status]}</Badge>;
+    return <span className={classes[status] || 'pill-gradient'}>{labels[status]}</span>;
   };
 
   if (loading) {
@@ -125,22 +125,33 @@ const DriverTripPage = () => {
   const completedTrips = trips.filter(t => t.status === 'completado').slice(0, 5);
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-slate-900">Mis Viajes</h1>
+    <div className="space-y-6 page-fade-in">
+      <h1 className="font-heading text-2xl font-black uppercase tracking-tight text-slate-900">Mis Viajes</h1>
 
       {/* Active Trip */}
       {activeTrip && (
-        <Card className="bg-gradient-to-r from-blue-600 to-blue-700 text-white overflow-hidden">
-          <CardContent className="p-4">
+        <Card
+          className="text-white overflow-hidden border-0 smooth-appear card-3d glow-on-hover"
+          style={{
+            backgroundImage: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+          }}
+        >
+          <CardContent className="p-4 relative">
+            <div
+              aria-hidden
+              className="absolute -top-12 -right-10 w-44 h-44 rounded-full blur-3xl opacity-30 float-animation"
+              style={{ background: '#60a5fa' }}
+            />
+            <div className="relative">
             <div className="flex items-center justify-between mb-4">
-              <Badge className="bg-white/20 text-white border-0">
-                <Play className="w-3 h-3 mr-1 fill-current" />
+              <span className="pill-info bg-white/20 text-white border-white/20">
+                <Play className="w-3 h-3 fill-current" />
                 EN CURSO
-              </Badge>
-              <span className="text-sm font-mono">{activeTrip.tracto_plate}</span>
+              </span>
+              <span className="text-sm font-mono px-2.5 py-1 rounded-md bg-white/15 border border-white/15">{activeTrip.tracto_plate}</span>
             </div>
 
-            <h3 className="font-bold text-xl mb-2">
+            <h3 className="font-heading font-black text-xl mb-2 tracking-tight">
               {activeTrip.client_name || 'Sin cliente'}
             </h3>
             
@@ -156,15 +167,15 @@ const DriverTripPage = () => {
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <Button 
-                className="bg-white/20 hover:bg-white/30 text-white"
+              <Button
+                className="bg-white/15 hover:bg-white/25 text-white border border-white/20 backdrop-blur-sm tap-scale rounded-lg"
                 onClick={() => navigate('/driver/checklist')}
               >
                 <FileText className="w-4 h-4 mr-2" />
                 Checklist
               </Button>
-              <Button 
-                className="bg-white/20 hover:bg-white/30 text-white"
+              <Button
+                className="bg-white/15 hover:bg-white/25 text-white border border-white/20 backdrop-blur-sm tap-scale rounded-lg"
                 onClick={() => navigate('/driver/fuel')}
               >
                 <Fuel className="w-4 h-4 mr-2" />
@@ -172,8 +183,9 @@ const DriverTripPage = () => {
               </Button>
             </div>
 
-            <Button 
-              className="w-full mt-3 bg-green-500 hover:bg-green-600"
+            <Button
+              className="w-full mt-3 text-white tap-scale btn-shine rounded-lg font-semibold"
+              style={{ backgroundImage: 'linear-gradient(135deg, #10b981 0%, #047857 100%)' }}
               onClick={() => {
                 setSelectedTrip(activeTrip);
                 setShowCompleteDialog(true);
@@ -182,6 +194,7 @@ const DriverTripPage = () => {
               <CheckCircle className="w-4 h-4 mr-2" />
               Finalizar Viaje
             </Button>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -193,8 +206,8 @@ const DriverTripPage = () => {
             Viajes Programados
           </h2>
           <div className="space-y-3">
-            {scheduledTrips.map((trip) => (
-              <Card key={trip.id} className="bg-white">
+            {scheduledTrips.map((trip, idx) => (
+              <Card key={trip.id} className={`bg-white smooth-appear smooth-appear-${Math.min(idx + 1, 6)} card-3d`}>
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-3">
                     <div>
@@ -219,8 +232,8 @@ const DriverTripPage = () => {
                     </div>
                   </div>
 
-                  <Button 
-                    className="w-full bg-orange-500 hover:bg-orange-600"
+                  <Button
+                    className="w-full btn-action btn-shine tap-scale rounded-lg"
                     onClick={() => {
                       setSelectedTrip(trip);
                       setShowStartDialog(true);

@@ -6,8 +6,27 @@ const api = axios.create({
   baseURL: `${API_URL}/api`,
   headers: {
     'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': 'true',
   },
 });
+
+// Helpers to set/clear the auth token on the shared `api` instance.
+// This is the single source of truth for the Authorization header — the
+// AuthContext must use these instead of touching the global `axios` object.
+export const setAuthToken = (token) => {
+  if (token) {
+    api.defaults.headers.common.Authorization = `Bearer ${token}`;
+  } else {
+    delete api.defaults.headers.common.Authorization;
+  }
+};
+
+export const clearAuthToken = () => {
+  delete api.defaults.headers.common.Authorization;
+};
+
+// Initialize the Authorization header from any persisted token on load.
+setAuthToken(localStorage.getItem('access_token'));
 
 // Request interceptor to add auth token
 api.interceptors.request.use(
@@ -21,37 +40,74 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// --- Refresh lock + queue to avoid multiple simultaneous refresh calls ---
+let isRefreshing = false;
+let refreshQueue = [];
+
+const processQueue = (error, token = null) => {
+  refreshQueue.forEach(({ resolve, reject }) => {
+    if (error) {
+      reject(error);
+    } else {
+      resolve(token);
+    }
+  });
+  refreshQueue = [];
+};
+
 // Response interceptor for error handling
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-      
+
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
       const refreshToken = localStorage.getItem('refresh_token');
-      if (refreshToken) {
-        try {
-          const response = await axios.post(`${API_URL}/api/auth/refresh`, {
-            refresh_token: refreshToken,
-          });
-          
-          const { access_token, refresh_token: newRefresh } = response.data;
-          localStorage.setItem('access_token', access_token);
-          localStorage.setItem('refresh_token', newRefresh);
-          
-          originalRequest.headers.Authorization = `Bearer ${access_token}`;
-          return api(originalRequest);
-        } catch (refreshError) {
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
-          window.location.href = '/login';
-          return Promise.reject(refreshError);
-        }
+      if (!refreshToken) {
+        return Promise.reject(error);
+      }
+
+      // If a refresh is already in flight, queue this request until it resolves.
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          refreshQueue.push({ resolve, reject });
+        })
+          .then((token) => {
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+            return api(originalRequest);
+          })
+          .catch((err) => Promise.reject(err));
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        const response = await axios.post(`${API_URL}/api/auth/refresh`, {
+          refresh_token: refreshToken,
+        }, { headers: { 'ngrok-skip-browser-warning': 'true' } });
+
+        const { access_token, refresh_token: newRefresh } = response.data;
+        localStorage.setItem('access_token', access_token);
+        localStorage.setItem('refresh_token', newRefresh);
+        setAuthToken(access_token);
+
+        processQueue(null, access_token);
+
+        originalRequest.headers.Authorization = `Bearer ${access_token}`;
+        return api(originalRequest);
+      } catch (refreshError) {
+        processQueue(refreshError, null);
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        clearAuthToken();
+        window.location.href = '/login';
+        return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
       }
     }
-    
+
     return Promise.reject(error);
   }
 );
@@ -94,6 +150,7 @@ export const vehiclesApi = {
 export const couplingsApi = {
   getAll: (params) => api.get('/couplings', { params }),
   create: (data) => api.post('/couplings', data),
+  update: (id, data) => api.put(`/couplings/${id}`, data),
 };
 
 // Document Types API
@@ -171,15 +228,26 @@ export const tiresApi = {
   getAll: (params) => api.get('/tires', { params }),
   getById: (id) => api.get(`/tires/${id}`),
   create: (data) => api.post('/tires', data),
+  update: (id, data) => api.put(`/tires/${id}`, data),
+  delete: (id) => api.delete(`/tires/${id}`),
   mount: (data) => api.post('/tires/mount', data),
   unmount: (id, data) => api.post(`/tires/${id}/unmount`, data),
   getByVehicle: (vehicleId) => api.get(`/tires/vehicle/${vehicleId}`),
   createInspection: (data) => api.post('/tires/inspect', data),
   getInspections: (tireId) => api.get(`/tires/${tireId}/inspections`),
+  updateInspection: (inspectionId, data) => api.put(`/tires/inspections/${inspectionId}`, data),
   rotate: (data) => api.post('/tires/rotate', data),
   align: (data) => api.post('/tires/align', data),
-  getRequiredReport: () => api.get('/tires/reports/required'),
+  alignAxle: (data) => api.post('/tires/align', data),
+  // Kept for backwards-compat (no params); prefer `requiredReport` for the shared contract.
+  getRequiredReport: (params) => api.get('/tires/reports/required', { params }),
+  requiredReport: (params) => api.get('/tires/reports/required', { params }),
   getHistory: (tireId) => api.get(`/tires/${tireId}/history`),
+  getDiagnostics: (vehicleId, params) => api.get(`/tires/vehicle/${vehicleId}/diagnostics`, { params }),
+  retread: (id, data) => api.post(`/tires/${id}/retread`, data),
+  regroove: (id, data) => api.post(`/tires/${id}/regroove`, data),
+  scrap: (id, data) => api.post(`/tires/${id}/scrap`, data),
+  scrapPile: (params) => api.get('/tires/reports/scrap-pile', { params }),
 };
 
 // Maintenance API
@@ -191,6 +259,19 @@ export const maintenanceApi = {
   updateWorkOrder: (id, data) => api.put(`/maintenance/work-orders/${id}`, data),
   startWorkOrder: (id, data) => api.post(`/maintenance/work-orders/${id}/start`, data),
   completeWorkOrder: (id, data) => api.post(`/maintenance/work-orders/${id}/complete`, data),
+  // Matrix plans (Excel-based like E MAX 540)
+  getMatrixPlans: () => api.get('/maintenance/matrix-plans'),
+  getMatrixPlan: (id) => api.get(`/maintenance/matrix-plans/${id}`),
+  createMatrixPlan: (data) => api.post('/maintenance/matrix-plans', data),
+  updateMatrixPlan: (id, data) => api.put(`/maintenance/matrix-plans/${id}`, data),
+  deleteMatrixPlan: (id) => api.delete(`/maintenance/matrix-plans/${id}`),
+  importMatrixPlanExcel: (file) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return api.post('/maintenance/matrix-plans/import-excel', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
 };
 
 // Settlement API

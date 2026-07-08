@@ -41,6 +41,10 @@ import {
   Truck,
   Shield,
   Trash2,
+  HardHat,
+  CheckCircle,
+  XCircle,
+  Calendar,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -75,9 +79,18 @@ const UsersPage = () => {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showResetPinDialog, setShowResetPinDialog] = useState(false);
+  const [showEppDialog, setShowEppDialog] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [saving, setSaving] = useState(false);
   const [newPin, setNewPin] = useState('');
+  const [eppData, setEppData] = useState({
+    casco: { assigned: false, date: '', condition: 'bueno', size: '' },
+    chaleco: { assigned: false, date: '', condition: 'bueno', size: '' },
+    guantes: { assigned: false, date: '', condition: 'bueno', size: '' },
+    botines: { assigned: false, date: '', condition: 'bueno', size: '' },
+    lentes: { assigned: false, date: '', condition: 'bueno', size: '' },
+    tapones: { assigned: false, date: '', condition: 'bueno', size: '' },
+  });
   
   // Form state
   const [formData, setFormData] = useState({
@@ -174,6 +187,39 @@ const UsersPage = () => {
     setSelectedUser(null);
   };
 
+  const DEFAULT_EPP = {
+    casco: { assigned: false, date: '', condition: 'bueno', size: '' },
+    chaleco: { assigned: false, date: '', condition: 'bueno', size: '' },
+    guantes: { assigned: false, date: '', condition: 'bueno', size: '' },
+    botines: { assigned: false, date: '', condition: 'bueno', size: '' },
+    lentes: { assigned: false, date: '', condition: 'bueno', size: '' },
+    tapones: { assigned: false, date: '', condition: 'bueno', size: '' },
+  };
+
+  const openEppDialog = (userItem) => {
+    setSelectedUser(userItem);
+    const merged = { ...DEFAULT_EPP };
+    Object.keys(merged).forEach(k => {
+      if (userItem.epp?.[k]) merged[k] = { ...merged[k], ...userItem.epp[k] };
+    });
+    setEppData(merged);
+    setShowEppDialog(true);
+  };
+
+  const saveEpp = async () => {
+    if (!selectedUser) return;
+    setSaving(true);
+    try {
+      await usersApi.update(selectedUser.id, { epp: eppData });
+      toast.success('EPP actualizado');
+      setShowEppDialog(false);
+      fetchUsers();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Error al guardar');
+    }
+    setSaving(false);
+  };
+
   const handleEditUser = (userItem) => {
     setSelectedUser(userItem);
     setFormData({
@@ -232,7 +278,7 @@ const UsersPage = () => {
   const isDriver = formData.role === 'chofer';
 
   return (
-    <div className="space-y-6" data-testid="users-page">
+    <div className="space-y-6 page-fade-in" data-testid="users-page">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -243,14 +289,14 @@ const UsersPage = () => {
             Gestión de usuarios y permisos del sistema
           </p>
         </div>
-        <Button className="btn-action" onClick={() => setShowCreateDialog(true)} data-testid="new-user-btn">
+        <Button className="btn-action btn-press" onClick={() => setShowCreateDialog(true)} data-testid="new-user-btn">
           <Plus className="w-4 h-4 mr-2" />
           Nuevo Usuario
         </Button>
       </div>
 
       {/* Filters */}
-      <Card className="bg-white">
+      <Card className="bg-white section-enter card-3d shadow-card-hover">
         <CardContent className="py-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
@@ -264,7 +310,7 @@ const UsersPage = () => {
               />
             </div>
             <Select value={roleFilter} onValueChange={setRoleFilter}>
-              <SelectTrigger className="w-[180px] rounded-sm" data-testid="role-filter">
+              <SelectTrigger className="w-full sm:w-[180px] rounded-sm" data-testid="role-filter">
                 <SelectValue placeholder="Filtrar por rol" />
               </SelectTrigger>
               <SelectContent>
@@ -281,8 +327,8 @@ const UsersPage = () => {
       </Card>
 
       {/* Table */}
-      <Card className="bg-white">
-        <CardContent className="p-0">
+      <Card className="bg-white section-enter section-stagger-1">
+        <CardContent className="p-0 overflow-x-auto">
           {loading ? (
             <div className="flex items-center justify-center h-64">
               <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
@@ -333,6 +379,19 @@ const UsersPage = () => {
                       ) : (
                         <span className="text-slate-400">-</span>
                       )}
+                      {userItem.role === 'chofer' && userItem.epp && (
+                        <div className="flex flex-wrap gap-0.5 mt-1">
+                          {['casco', 'chaleco', 'guantes', 'botines'].map(k => (
+                            <span
+                              key={k}
+                              title={k}
+                              className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${userItem.epp?.[k]?.assigned ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'}`}
+                            >
+                              {k.substring(0, 3)}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Badge className={userItem.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
@@ -364,6 +423,12 @@ const UsersPage = () => {
                               Resetear PIN
                             </DropdownMenuItem>
                           )}
+                          {userItem.role === 'chofer' && isAdmin && (
+                            <DropdownMenuItem onClick={() => openEppDialog(userItem)}>
+                              <HardHat className="w-4 h-4 mr-2" />
+                              Asignar EPP
+                            </DropdownMenuItem>
+                          )}
                           {isAdmin && userItem.role !== 'owner' && (
                             <DropdownMenuItem
                               onClick={() => handleDeleteUser(userItem.id)}
@@ -385,9 +450,9 @@ const UsersPage = () => {
       </Card>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {ROLES.slice(0, 4).map((role) => (
-          <Card key={role.value} className="bg-white">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {ROLES.slice(0, 4).map((role, idx) => (
+          <Card key={role.value} className={`bg-white card-enter card-stagger-${idx + 1} card-3d shadow-card-hover`}>
             <CardContent className="py-4 text-center">
               <p className="font-heading text-3xl font-bold text-slate-900">
                 {users.filter((u) => u.role === role.value).length}
@@ -400,7 +465,7 @@ const UsersPage = () => {
 
       {/* Create Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
               Nuevo Usuario
@@ -441,7 +506,7 @@ const UsersPage = () => {
             
             {isDriver ? (
               <>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label className="input-label">DNI *</Label>
                     <Input
@@ -466,7 +531,7 @@ const UsersPage = () => {
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label className="input-label">Número de Licencia</Label>
                     <Input
@@ -542,7 +607,7 @@ const UsersPage = () => {
 
       {/* Reset PIN Dialog */}
       <Dialog open={showResetPinDialog} onOpenChange={setShowResetPinDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-[95vw] sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Resetear PIN</DialogTitle>
             <DialogDescription>
@@ -583,9 +648,93 @@ const UsersPage = () => {
         </DialogContent>
       </Dialog>
 
+      {/* EPP Dialog (drivers only) */}
+      <Dialog open={showEppDialog} onOpenChange={setShowEppDialog}>
+        <DialogContent className="max-w-[95vw] sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide flex items-center gap-2">
+              <HardHat className="w-5 h-5" />
+              EPP de {selectedUser?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Equipo de Protección Personal entregado al chofer
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-3 max-h-[60vh] overflow-y-auto">
+            {[
+              { key: 'casco', label: 'Casco de Seguridad' },
+              { key: 'chaleco', label: 'Chaleco Reflectivo' },
+              { key: 'guantes', label: 'Guantes' },
+              { key: 'botines', label: 'Botines de Seguridad' },
+              { key: 'lentes', label: 'Lentes de Seguridad' },
+              { key: 'tapones', label: 'Tapones Auditivos' },
+            ].map(({ key, label }) => {
+              const item = eppData[key] || { assigned: false };
+              return (
+                <div key={key} className={`p-3 rounded-lg border-2 transition-all ${item.assigned ? 'bg-green-50 border-green-300' : 'bg-slate-50 border-slate-200'}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="flex items-center gap-2 cursor-pointer flex-1">
+                      <input
+                        type="checkbox"
+                        checked={item.assigned || false}
+                        onChange={(e) => setEppData({ ...eppData, [key]: { ...item, assigned: e.target.checked } })}
+                        className="w-5 h-5"
+                      />
+                      <span className="font-semibold">{label}</span>
+                      {item.assigned ? <CheckCircle className="w-4 h-4 text-green-600" /> : <XCircle className="w-4 h-4 text-slate-300" />}
+                    </label>
+                  </div>
+                  {item.assigned && (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2 pl-7">
+                      <div>
+                        <Label className="text-xs">Fecha entrega</Label>
+                        <Input
+                          type="date"
+                          value={item.date || ''}
+                          onChange={(e) => setEppData({ ...eppData, [key]: { ...item, date: e.target.value } })}
+                          className="text-sm h-9"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Talla</Label>
+                        <Input
+                          value={item.size || ''}
+                          onChange={(e) => setEppData({ ...eppData, [key]: { ...item, size: e.target.value } })}
+                          placeholder="S/M/L/XL"
+                          className="text-sm h-9"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Estado</Label>
+                        <Select value={item.condition || 'bueno'} onValueChange={(v) => setEppData({ ...eppData, [key]: { ...item, condition: v } })}>
+                          <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="nuevo">Nuevo</SelectItem>
+                            <SelectItem value="bueno">Bueno</SelectItem>
+                            <SelectItem value="regular">Regular</SelectItem>
+                            <SelectItem value="malo">Malo - Reponer</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEppDialog(false)}>Cancelar</Button>
+            <Button className="btn-action btn-press" onClick={saveEpp} disabled={saving}>
+              {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Guardar EPP
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Edit User Dialog */}
       <Dialog open={showEditDialog} onOpenChange={(open) => { if (!open) resetForm(); setShowEditDialog(open); }}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
               Editar Usuario
@@ -595,7 +744,7 @@ const UsersPage = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">Nombre *</Label>
                 <Input
@@ -619,7 +768,7 @@ const UsersPage = () => {
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">Email</Label>
                 <Input
@@ -641,7 +790,7 @@ const UsersPage = () => {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">Teléfono</Label>
                 <Input
@@ -661,7 +810,7 @@ const UsersPage = () => {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">Nueva Contraseña</Label>
                 <Input

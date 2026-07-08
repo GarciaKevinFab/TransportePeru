@@ -48,9 +48,25 @@ dump.rdb
 
 # Python
 __pycache__/
+**/__pycache__/
 *pyc*
+*.pyc
 venv/
 .venv/
+
+# ---- TransportePeru specific ----
+# Uploaded files (facturas, guías, evidencias, etc.)
+backend/uploads/
+# MongoDB dumps / backups
+mongo_dump/
+# Environment files (explicit)
+.env
+backend/.env
+frontend/.env
+node_modules/
+# Keep the example env templates tracked
+!.env.example
+!**/.env.example
 
 # Development tools
 chainlit.md

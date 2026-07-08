@@ -273,7 +273,7 @@ const TripsPage = () => {
   const carretas = vehicles.filter((v) => v.vehicle_type === 'carreta' && v.status === 'disponible');
 
   return (
-    <div className="space-y-6" data-testid="trips-page">
+    <div className="space-y-6 page-fade-in" data-testid="trips-page">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -284,14 +284,14 @@ const TripsPage = () => {
             Gestión y seguimiento de viajes
           </p>
         </div>
-        <Button className="btn-action" onClick={() => setShowCreateDialog(true)} data-testid="new-trip-btn">
+        <Button className="btn-action btn-press" onClick={() => setShowCreateDialog(true)} data-testid="new-trip-btn">
           <Plus className="w-4 h-4 mr-2" />
           Nuevo Viaje
         </Button>
       </div>
 
       {/* Filters */}
-      <Card className="bg-white">
+      <Card className="bg-white section-enter">
         <CardContent className="py-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
@@ -305,7 +305,7 @@ const TripsPage = () => {
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[160px] rounded-sm" data-testid="status-filter">
+              <SelectTrigger className="w-full sm:w-[160px] rounded-sm" data-testid="status-filter">
                 <SelectValue placeholder="Estado" />
               </SelectTrigger>
               <SelectContent>
@@ -321,8 +321,8 @@ const TripsPage = () => {
       </Card>
 
       {/* Table */}
-      <Card className="bg-white">
-        <CardContent className="p-0">
+      <Card className="bg-white section-enter section-stagger-1">
+        <CardContent className="p-0 overflow-x-auto">
           {loading ? (
             <div className="flex items-center justify-center h-64">
               <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
@@ -428,7 +428,7 @@ const TripsPage = () => {
 
       {/* Create Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
               Nuevo Viaje
@@ -438,7 +438,7 @@ const TripsPage = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">Tracto *</Label>
                 <Select
@@ -597,7 +597,7 @@ const TripsPage = () => {
 
       {/* Edit Dialog */}
       <Dialog open={showEditDialog} onOpenChange={(open) => { if (!open) resetForm(); setShowEditDialog(open); }}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
               Editar Viaje

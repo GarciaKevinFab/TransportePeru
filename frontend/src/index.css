@@ -8,6 +8,7 @@
   --font-heading: 'Barlow Condensed', sans-serif;
   --font-body: 'Inter', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
+  --brand-color: #f97316;
 }
 
 body {
@@ -21,23 +22,53 @@ code {
   font-family: var(--font-mono);
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar - thin with brand color thumb */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #94a3b8;
-  border-radius: 4px;
+  background: color-mix(in srgb, var(--brand-color) 35%, #cbd5e1);
+  border-radius: 999px;
+  transition: background 0.2s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
+  background: var(--brand-color);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--brand-color) 35%, #cbd5e1) transparent;
+}
+
+/* Selection color uses brand */
+::selection {
+  background-color: color-mix(in srgb, var(--brand-color) 30%, transparent);
+  color: #0f172a;
+}
+
+/* Global focus rings using brand color */
+@layer base {
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  button:focus-visible,
+  [role="button"]:focus-visible,
+  [role="combobox"]:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px #ffffff,
+      0 0 0 4px color-mix(in srgb, var(--brand-color) 55%, transparent);
+    border-color: var(--brand-color);
+    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+  }
 }
 
 /* Barlow Condensed for headings and KPIs */
@@ -167,11 +198,39 @@ code {
 
 /* Button styles */
 .btn-primary {
-  @apply bg-slate-900 text-white hover:bg-slate-800 rounded-sm uppercase font-bold tracking-wide text-sm h-10 px-6 transition-colors;
+  @apply bg-slate-900 text-white hover:bg-slate-800 rounded-sm uppercase font-bold tracking-wide text-sm h-10 px-6 transition-all;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.btn-primary:hover {
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transform: translateY(-1px);
 }
 
 .btn-action {
-  @apply bg-orange-500 text-white hover:bg-orange-600 rounded-sm uppercase font-bold tracking-wide text-sm h-10 px-6 transition-colors;
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--brand-color) 92%, #ffffff) 0%,
+    var(--brand-color) 60%,
+    color-mix(in srgb, var(--brand-color) 88%, #000000) 100%
+  );
+  background-color: var(--brand-color);
+  @apply text-white rounded-sm uppercase font-bold tracking-wide text-sm h-10 px-6 transition-all;
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--brand-color) 35%, transparent),
+    0 4px 10px color-mix(in srgb, var(--brand-color) 18%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+.btn-action:hover {
+  filter: brightness(1.04);
+  transform: translateY(-1px);
+  box-shadow:
+    0 2px 4px color-mix(in srgb, var(--brand-color) 40%, transparent),
+    0 8px 18px color-mix(in srgb, var(--brand-color) 25%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+.btn-action:active {
+  transform: translateY(0);
+  filter: brightness(0.95);
 }
 
 /* Input styles */
@@ -181,11 +240,26 @@ code {
 
 /* Sidebar styles */
 .sidebar-item {
-  @apply flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer;
+  @apply relative flex items-center gap-3 mx-2 my-0.5 px-3 py-2.5 rounded-lg text-slate-300 cursor-pointer;
+  min-height: 42px;
+  border-left: 3px solid transparent;
+  transition: background-color 0.2s ease, color 0.2s ease, border-left-color 0.2s ease, padding-left 0.15s ease;
+}
+
+.sidebar-item:hover {
+  background-color: rgba(30, 41, 59, 0.6); /* slate-800/60 */
+  color: #ffffff;
 }
 
 .sidebar-item.active {
-  @apply bg-slate-800 text-orange-500 border-l-2 border-orange-500;
+  background-color: color-mix(in srgb, var(--brand-color) 14%, transparent);
+  color: var(--brand-color);
+  border-left-color: var(--brand-color);
+  font-weight: 600;
+}
+
+.sidebar-item.active:hover {
+  background-color: color-mix(in srgb, var(--brand-color) 20%, transparent);
 }
 
 /* Tire schema styles */
@@ -257,6 +331,114 @@ code {
 
 .pulse-alert {
   animation: pulse-orange 2s infinite;
+}
+
+/* ============================================
+   POLISHED CARD SHADOWS & UTILITIES
+   ============================================ */
+
+/* Default card depth - subtle, two-layer shadow */
+.card,
+[data-card],
+.shadow-card {
+  box-shadow:
+    0 1px 3px rgba(15, 23, 42, 0.06),
+    0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.shadow-card-hover:hover,
+.card-hover:hover {
+  box-shadow:
+    0 10px 25px -8px rgba(15, 23, 42, 0.12),
+    0 4px 10px -4px rgba(15, 23, 42, 0.06);
+}
+
+/* Glass card utility - frosted, ideal for hero/feature blocks */
+.glass-card {
+  background-color: rgba(255, 255, 255, 0.72);
+  -webkit-backdrop-filter: saturate(160%) blur(14px);
+  backdrop-filter: saturate(160%) blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.06),
+    0 8px 24px -8px rgba(15, 23, 42, 0.10);
+  border-radius: 0.75rem;
+}
+
+.glass-card-dark {
+  background-color: rgba(15, 23, 42, 0.55);
+  -webkit-backdrop-filter: saturate(160%) blur(14px);
+  backdrop-filter: saturate(160%) blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.75rem;
+}
+
+/* Metric tile - modern KPI card */
+.metric-tile {
+  position: relative;
+  background: #ffffff;
+  border: 1px solid rgb(226, 232, 240);
+  border-left: 4px solid var(--brand-color);
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  box-shadow:
+    0 1px 3px rgba(15, 23, 42, 0.05),
+    0 1px 2px rgba(15, 23, 42, 0.03);
+}
+
+.metric-tile:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 12px 28px -10px rgba(15, 23, 42, 0.14),
+    0 4px 10px -4px rgba(15, 23, 42, 0.06);
+}
+
+.metric-tile .metric-watermark {
+  position: absolute;
+  right: -8px;
+  bottom: -10px;
+  opacity: 0.06;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.metric-tile:hover .metric-watermark {
+  opacity: 0.1;
+  transform: translateY(-2px);
+}
+
+.metric-tile .metric-value {
+  @apply font-heading font-bold text-slate-900 tracking-tight;
+  font-size: clamp(1.875rem, 2vw + 1rem, 2.5rem);
+  line-height: 1.05;
+}
+
+.metric-tile .metric-label {
+  @apply text-[11px] font-bold uppercase text-slate-500 tracking-widest;
+}
+
+.metric-tile .metric-sub {
+  @apply text-xs text-slate-500 mt-1;
+}
+
+/* Trend chip */
+.trend-up {
+  @apply inline-flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-50 rounded-full px-2 py-0.5;
+}
+.trend-down {
+  @apply inline-flex items-center gap-1 text-xs font-semibold text-red-700 bg-red-50 rounded-full px-2 py-0.5;
+}
+
+/* Sidebar slide-in for mobile */
+@keyframes sidebar-slide-in {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+.sidebar-slide-in {
+  animation: sidebar-slide-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 /* Print styles */

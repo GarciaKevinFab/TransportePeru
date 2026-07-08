@@ -6,6 +6,8 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
 import { Textarea } from '../components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import MaintenancePlansPanel from '../components/MaintenancePlansPanel';
 import {
   Table,
   TableBody,
@@ -41,6 +43,9 @@ import {
   MoreVertical,
   Edit,
   Trash2,
+  X,
+  FileSpreadsheet,
+  ClipboardList,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -61,6 +66,7 @@ const MaintenancePage = () => {
   const [workOrders, setWorkOrders] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [activeTab, setActiveTab] = useState('orders');
   
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -83,6 +89,48 @@ const MaintenancePage = () => {
     odometer: '',
     notes: '',
   });
+
+  const [parts, setParts] = useState([]);
+
+  // Auto-compute parts_cost from parts list
+  const partsTotal = parts.reduce(
+    (sum, p) => sum + (parseFloat(p.quantity) || 0) * (parseFloat(p.unit_cost) || 0),
+    0
+  );
+
+  const todayISO = () => new Date().toISOString().substring(0, 10);
+
+  const addPart = () => {
+    setParts([
+      ...parts,
+      {
+        name: '',
+        quantity: 1,
+        unit_cost: 0,
+        installation_date: todayISO(),
+        warranty_months: 6,
+      },
+    ]);
+  };
+
+  const updatePart = (index, field, value) => {
+    const next = [...parts];
+    next[index] = { ...next[index], [field]: value };
+    setParts(next);
+  };
+
+  const removePart = (index) => {
+    setParts(parts.filter((_, i) => i !== index));
+  };
+
+  const computeWarrantyExpires = (installation_date, warranty_months) => {
+    if (!installation_date) return '';
+    const date = new Date(installation_date);
+    if (isNaN(date.getTime())) return '';
+    const months = parseInt(warranty_months) || 0;
+    date.setMonth(date.getMonth() + months);
+    return date.toISOString().substring(0, 10);
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -141,16 +189,34 @@ const MaintenancePage = () => {
     if (!selectedOrder) return;
     setSaving(true);
     try {
+      // Build items with derived warranty_expires_at and computed total
+      const items = parts.map(p => {
+        const qty = parseFloat(p.quantity) || 0;
+        const unit = parseFloat(p.unit_cost) || 0;
+        const months = parseInt(p.warranty_months) || 0;
+        return {
+          name: p.name,
+          quantity: qty,
+          unit_cost: unit,
+          total_cost: qty * unit,
+          installation_date: p.installation_date || todayISO(),
+          warranty_months: months,
+          warranty_expires_at: computeWarrantyExpires(p.installation_date || todayISO(), months),
+        };
+      });
+
       await maintenanceApi.completeWorkOrder(selectedOrder.id, {
         labor_cost: parseFloat(completeData.labor_cost) || 0,
-        parts_cost: parseFloat(completeData.parts_cost) || 0,
+        parts_cost: partsTotal,
         odometer: parseInt(completeData.odometer) || 0,
         notes: completeData.notes,
+        items,
       });
       toast.success('Orden completada');
       setShowCompleteDialog(false);
       setSelectedOrder(null);
       setCompleteData({ labor_cost: '', parts_cost: '', odometer: '', notes: '' });
+      setParts([]);
       fetchData();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Error al completar orden');
@@ -244,7 +310,7 @@ const MaintenancePage = () => {
   const inProgressOrders = workOrders.filter(o => o.status === 'en_proceso').length;
 
   return (
-    <div className="space-y-6" data-testid="maintenance-page">
+    <div className="space-y-6 page-fade-in" data-testid="maintenance-page">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -252,18 +318,34 @@ const MaintenancePage = () => {
             Mantenimiento
           </h1>
           <p className="text-slate-500 mt-1">
-            Órdenes de trabajo preventivas y correctivas
+            Órdenes de trabajo y planes preventivos por vehículo
           </p>
         </div>
-        <Button className="btn-action" onClick={() => setShowCreateDialog(true)} data-testid="new-workorder-btn">
-          <Plus className="w-4 h-4 mr-2" />
-          Nueva Orden
-        </Button>
+        {activeTab === 'orders' && (
+          <Button className="btn-action btn-press" onClick={() => setShowCreateDialog(true)} data-testid="new-workorder-btn">
+            <Plus className="w-4 h-4 mr-2" />
+            Nueva Orden
+          </Button>
+        )}
       </div>
 
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="bg-slate-100 rounded-sm">
+          <TabsTrigger value="orders" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
+            <ClipboardList className="w-4 h-4 mr-2" />
+            Órdenes de Trabajo
+          </TabsTrigger>
+          <TabsTrigger value="plans" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
+            <FileSpreadsheet className="w-4 h-4 mr-2" />
+            Planes Preventivos
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="orders" className="mt-4 space-y-6">
+
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="bg-white border-l-4 border-l-yellow-500">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="bg-white border-l-4 border-l-yellow-500 card-enter card-stagger-1">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
@@ -274,7 +356,7 @@ const MaintenancePage = () => {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-blue-500">
+        <Card className="bg-white border-l-4 border-l-blue-500 card-enter card-stagger-2">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
@@ -285,7 +367,7 @@ const MaintenancePage = () => {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-green-500">
+        <Card className="bg-white border-l-4 border-l-green-500 card-enter card-stagger-3">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
@@ -298,7 +380,7 @@ const MaintenancePage = () => {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-red-500">
+        <Card className="bg-white border-l-4 border-l-red-500 card-enter card-stagger-4">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
@@ -314,11 +396,11 @@ const MaintenancePage = () => {
       </div>
 
       {/* Filters */}
-      <Card className="bg-white">
+      <Card className="bg-white section-enter">
         <CardContent className="py-4">
           <div className="flex gap-4">
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px] rounded-sm">
+              <SelectTrigger className="w-full sm:w-[180px] rounded-sm">
                 <SelectValue placeholder="Filtrar por estado" />
               </SelectTrigger>
               <SelectContent>
@@ -333,8 +415,8 @@ const MaintenancePage = () => {
       </Card>
 
       {/* Work Orders Table */}
-      <Card className="bg-white">
-        <CardContent className="p-0">
+      <Card className="bg-white section-enter section-stagger-1">
+        <CardContent className="p-0 overflow-x-auto">
           {loading ? (
             <div className="flex items-center justify-center h-64">
               <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
@@ -393,6 +475,8 @@ const MaintenancePage = () => {
                           {order.status === 'en_proceso' && (
                             <DropdownMenuItem onClick={() => {
                               setSelectedOrder(order);
+                              setParts([]);
+                              setCompleteData({ labor_cost: '', parts_cost: '', odometer: '', notes: '' });
                               setShowCompleteDialog(true);
                             }}>
                               <CheckCircle className="w-4 h-4 mr-2" />
@@ -419,9 +503,16 @@ const MaintenancePage = () => {
         </CardContent>
       </Card>
 
+        </TabsContent>
+
+        <TabsContent value="plans" className="mt-4">
+          <MaintenancePlansPanel vehicles={vehicles} />
+        </TabsContent>
+      </Tabs>
+
       {/* Create Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
               Nueva Orden de Trabajo
@@ -443,7 +534,7 @@ const MaintenancePage = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">Tipo</Label>
                 <Select value={formData.order_type} onValueChange={(v) => setFormData({ ...formData, order_type: v })}>
@@ -508,14 +599,14 @@ const MaintenancePage = () => {
 
       {/* Complete Dialog */}
       <Dialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
               Completar Orden {selectedOrder?.order_number}
             </DialogTitle>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">Costo Mano de Obra</Label>
                 <Input
@@ -527,13 +618,12 @@ const MaintenancePage = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label className="input-label">Costo Repuestos</Label>
+                <Label className="input-label">Costo Repuestos (auto)</Label>
                 <Input
                   type="number"
-                  value={completeData.parts_cost}
-                  onChange={(e) => setCompleteData({ ...completeData, parts_cost: e.target.value })}
-                  placeholder="0.00"
-                  className="rounded-sm"
+                  value={partsTotal.toFixed(2)}
+                  disabled
+                  className="rounded-sm bg-slate-50 font-bold"
                 />
               </div>
             </div>
@@ -546,6 +636,108 @@ const MaintenancePage = () => {
                 className="rounded-sm"
               />
             </div>
+
+            {/* Parts list */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="input-label">Repuestos Utilizados</Label>
+                <Button type="button" size="sm" variant="outline" onClick={addPart} className="btn-press">
+                  <Plus className="w-4 h-4 mr-1" />
+                  Agregar Repuesto
+                </Button>
+              </div>
+              {parts.length === 0 ? (
+                <p className="text-xs text-slate-400 italic p-3 bg-slate-50 rounded-sm">
+                  Sin repuestos. Agregue uno con el botón superior.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {parts.map((p, index) => {
+                    const expires = computeWarrantyExpires(p.installation_date, p.warranty_months);
+                    const lineTotal = (parseFloat(p.quantity) || 0) * (parseFloat(p.unit_cost) || 0);
+                    return (
+                      <div key={index} className="p-3 bg-slate-50 rounded-sm border border-slate-200 space-y-2 card-enter">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-500 uppercase">
+                            Repuesto #{index + 1}
+                          </span>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => removePart(index)}
+                            className="h-7 px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div className="sm:col-span-2 space-y-1">
+                            <Label className="text-xs">Nombre *</Label>
+                            <Input
+                              value={p.name}
+                              onChange={(e) => updatePart(index, 'name', e.target.value)}
+                              className="rounded-sm h-8"
+                              placeholder="Filtro de aceite, batería..."
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Cantidad</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={p.quantity}
+                              onChange={(e) => updatePart(index, 'quantity', e.target.value)}
+                              className="rounded-sm h-8"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Costo Unitario (S/)</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={p.unit_cost}
+                              onChange={(e) => updatePart(index, 'unit_cost', e.target.value)}
+                              className="rounded-sm h-8"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Fecha Instalación</Label>
+                            <Input
+                              type="date"
+                              value={p.installation_date}
+                              onChange={(e) => updatePart(index, 'installation_date', e.target.value)}
+                              className="rounded-sm h-8"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Garantía (meses)</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={p.warranty_months}
+                              onChange={(e) => updatePart(index, 'warranty_months', e.target.value)}
+                              className="rounded-sm h-8"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-200">
+                          <span className="text-slate-500">
+                            Garantía vence: <strong>{expires || '-'}</strong>
+                          </span>
+                          <span className="font-bold text-slate-700">
+                            S/ {lineTotal.toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
             <div className="space-y-2">
               <Label className="input-label">Notas</Label>
               <Textarea
@@ -558,12 +750,12 @@ const MaintenancePage = () => {
             <div className="p-4 bg-slate-50 rounded-sm">
               <p className="text-sm text-slate-500">Total estimado:</p>
               <p className="font-heading text-2xl font-bold text-slate-900">
-                S/ {((parseFloat(completeData.labor_cost) || 0) + (parseFloat(completeData.parts_cost) || 0)).toFixed(2)}
+                S/ {((parseFloat(completeData.labor_cost) || 0) + partsTotal).toFixed(2)}
               </p>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCompleteDialog(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => { setShowCompleteDialog(false); setParts([]); }}>Cancelar</Button>
             <Button className="btn-action" onClick={handleCompleteOrder} disabled={saving}>
               {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Completar Orden
@@ -574,7 +766,7 @@ const MaintenancePage = () => {
 
       {/* Edit Dialog */}
       <Dialog open={showEditDialog} onOpenChange={(open) => { if (!open) resetForm(); setShowEditDialog(open); }}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
               Editar Orden de Trabajo
@@ -597,7 +789,7 @@ const MaintenancePage = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">Tipo</Label>
                 <Select value={formData.order_type} onValueChange={(v) => setFormData({ ...formData, order_type: v })}>

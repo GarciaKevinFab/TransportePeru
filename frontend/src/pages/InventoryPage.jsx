@@ -173,7 +173,7 @@ const InventoryPage = () => {
   const lowStockItems = items.filter(i => i.current_stock <= i.min_stock);
 
   return (
-    <div className="space-y-6" data-testid="inventory-page">
+    <div className="space-y-6 page-fade-in" data-testid="inventory-page">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -184,12 +184,12 @@ const InventoryPage = () => {
             Gestión de repuestos, stock y proveedores
           </p>
         </div>
-        <div className="flex gap-3">
-          <Button variant="outline" onClick={() => setShowSupplierDialog(true)}>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Button variant="outline" className="btn-press" onClick={() => setShowSupplierDialog(true)}>
             <Building className="w-4 h-4 mr-2" />
             Nuevo Proveedor
           </Button>
-          <Button className="btn-action" onClick={() => setShowItemDialog(true)} data-testid="new-item-btn">
+          <Button className="btn-action btn-press" onClick={() => setShowItemDialog(true)} data-testid="new-item-btn">
             <Plus className="w-4 h-4 mr-2" />
             Nuevo Item
           </Button>
@@ -197,20 +197,20 @@ const InventoryPage = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="bg-white border-l-4 border-l-blue-500">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="bg-white border-l-4 border-l-blue-500 card-enter card-stagger-1">
           <CardContent className="py-4">
             <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Total Items</p>
             <p className="font-heading text-3xl font-bold text-blue-600 mt-1">{items.length}</p>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-red-500">
+        <Card className="bg-white border-l-4 border-l-red-500 card-enter card-stagger-2">
           <CardContent className="py-4">
             <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Stock Bajo</p>
             <p className="font-heading text-3xl font-bold text-red-600 mt-1">{lowStockItems.length}</p>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-green-500">
+        <Card className="bg-white border-l-4 border-l-green-500 card-enter card-stagger-3">
           <CardContent className="py-4">
             <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Valor Total</p>
             <p className="font-heading text-3xl font-bold text-green-600 mt-1">
@@ -218,7 +218,7 @@ const InventoryPage = () => {
             </p>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-orange-500">
+        <Card className="bg-white border-l-4 border-l-orange-500 card-enter card-stagger-4">
           <CardContent className="py-4">
             <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Proveedores</p>
             <p className="font-heading text-3xl font-bold text-orange-600 mt-1">{suppliers.length}</p>
@@ -263,8 +263,8 @@ const InventoryPage = () => {
             </CardContent>
           </Card>
 
-          <Card className="bg-white">
-            <CardContent className="p-0">
+          <Card className="bg-white section-enter">
+            <CardContent className="p-0 overflow-x-auto">
               {loading ? (
                 <div className="flex items-center justify-center h-64">
                   <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
@@ -353,8 +353,8 @@ const InventoryPage = () => {
         </TabsContent>
 
         <TabsContent value="suppliers" className="mt-4">
-          <Card className="bg-white">
-            <CardContent className="p-0">
+          <Card className="bg-white section-enter">
+            <CardContent className="p-0 overflow-x-auto">
               {suppliers.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-64 text-slate-400">
                   <Building className="w-12 h-12 mb-2" />
@@ -393,14 +393,14 @@ const InventoryPage = () => {
 
       {/* Create Item Dialog */}
       <Dialog open={showItemDialog} onOpenChange={setShowItemDialog}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
               Nuevo Item
             </DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">Código *</Label>
                 <Input
@@ -436,7 +436,7 @@ const InventoryPage = () => {
                 data-testid="item-name-input"
               />
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">Unidad</Label>
                 <Select value={itemForm.unit} onValueChange={(v) => setItemForm({ ...itemForm, unit: v })}>
@@ -471,7 +471,7 @@ const InventoryPage = () => {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">Costo Unitario</Label>
                 <Input
@@ -510,7 +510,7 @@ const InventoryPage = () => {
 
       {/* Stock Move Dialog */}
       <Dialog open={showMoveDialog} onOpenChange={setShowMoveDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-[95vw] sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
               {moveForm.move_type === 'entrada' ? 'Entrada' : 'Salida'} de Stock
@@ -574,14 +574,14 @@ const InventoryPage = () => {
 
       {/* Supplier Dialog */}
       <Dialog open={showSupplierDialog} onOpenChange={setShowSupplierDialog}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
               Nuevo Proveedor
             </DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">Nombre *</Label>
                 <Input
@@ -599,7 +599,7 @@ const InventoryPage = () => {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">Teléfono</Label>
                 <Input

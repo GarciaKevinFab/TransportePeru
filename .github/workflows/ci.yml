@@ -1,0 +1,125 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Backend (FastAPI)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11"]
+
+    services:
+      mongodb:
+        image: mongo:6
+        ports:
+          - 27017:27017
+
+    env:
+      # --- Server runtime config (read by backend/server.py) ---
+      MONGO_URL: mongodb://localhost:27017
+      DB_NAME: transporteperu_test
+      JWT_SECRET: ci-test-secret
+      CORS_ORIGINS: "*"
+      # INSTALL_TOKEN protege /api/bootstrap y /api/seed (require_install_token).
+      # El seed se llama abajo con el header X-Install-Token = este valor.
+      INSTALL_TOKEN: ci-install-token
+      # --- URL que leen los tests de integración (backend/tests/*) ---
+      # test_api.py y test_settlements_checklist.py usan default 8001; los otros
+      # exigen que esté seteada. La fijamos al puerto donde arranca uvicorn.
+      REACT_APP_BACKEND_URL: http://localhost:8001
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Disable login rate limiting for deterministic tests
+        # server.py aplica @limiter.limit("10/minute") al login (slowapi).
+        # La suite de integración hace MUCHOS logins (fixtures class-scoped en
+        # cada archivo) desde una sola IP, lo que dispararía 429 de forma no
+        # determinista. server.py degrada a un limiter no-op si slowapi NO está
+        # instalado (try/except ImportError -> _NoopLimiter), así que lo
+        # desinstalamos solo en CI para que los tests corran sin rate limit.
+        run: pip uninstall -y slowapi
+
+      - name: Start backend server (uvicorn)
+        working-directory: backend
+        run: |
+          uvicorn server:app --host 0.0.0.0 --port 8001 > uvicorn.log 2>&1 &
+          echo "Waiting for backend to be ready..."
+          for i in $(seq 1 45); do
+            if curl -sf http://localhost:8001/docs > /dev/null; then
+              echo "Backend is up."
+              break
+            fi
+            sleep 2
+          done
+          curl -sf http://localhost:8001/docs > /dev/null || {
+            echo "Backend failed to start. Logs:";
+            cat uvicorn.log;
+            exit 1;
+          }
+
+      - name: Seed test data (protected /api/seed)
+        # Siembra el dataset demo que esperan los tests:
+        #   - empresa TransPeru Logistics S.A.C. (ruc 20123456789)
+        #   - admin  -> email admin@transperu.com (password ALEATORIO aquí)
+        #   - chofer -> dni 12345678 / pin 123456 (+ otros 2 choferes)
+        #   - 3 tractos (vehicle_type=tracto) + 3 carretas
+        #   - rutas, tipos de documento, llantas y 1 viaje programado
+        # -f hace fallar el job si el endpoint responde 4xx/5xx (p.ej. token malo).
+        run: |
+          curl -fsS -X POST http://localhost:8001/api/seed \
+            -H "X-Install-Token: ${INSTALL_TOKEN}" \
+            -H "Content-Type: application/json"
+          echo ""
+
+      - name: Post-seed fixup (fixed admin password + 2nd trip)
+        # El seed asigna al admin un password aleatorio con force_password_change;
+        # los tests entran como admin@transperu.com / admin123. Este script fija
+        # esa credencial y clona el viaje sembrado para que TestChecklist
+        # (necesita len(trips) > 1) pueda correr. Lee MONGO_URL / DB_NAME.
+        run: python backend/tests/ci_postseed.py
+
+      - name: Run tests
+        # Suite de integración completa contra el servidor vivo en :8001.
+        run: pytest backend/tests/ -v
+
+  frontend:
+    name: Frontend (React CRA)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: yarn install --frozen-lockfile
+
+      - name: Build
+        working-directory: frontend
+        # El script "build" ya usa cross-env CI=false (cross-editor Windows/Linux),
+        # así que no hace falta prefijar CI=false aquí.
+        run: yarn build

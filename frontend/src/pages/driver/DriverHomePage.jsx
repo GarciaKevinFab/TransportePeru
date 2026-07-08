@@ -56,10 +56,10 @@ const DriverHomePage = () => {
   }, [user?.id]);
 
   const quickActions = [
-    { icon: FileText, label: 'Checklist', path: '/driver/checklist', color: 'bg-blue-500' },
-    { icon: Fuel, label: 'Combustible', path: '/driver/fuel', color: 'bg-green-500' },
-    { icon: AlertTriangle, label: 'Reportar', path: '/driver/issues', color: 'bg-red-500' },
-    { icon: Truck, label: 'Mi Viaje', path: '/driver/trip', color: 'bg-orange-500' },
+    { icon: FileText, label: 'Checklist', path: '/driver/checklist', gradient: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)' },
+    { icon: Fuel, label: 'Combustible', path: '/driver/fuel', gradient: 'linear-gradient(135deg, #10b981 0%, #047857 100%)' },
+    { icon: AlertTriangle, label: 'Reportar', path: '/driver/issues', gradient: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)' },
+    { icon: Truck, label: 'Mi Viaje', path: '/driver/trip', gradient: 'linear-gradient(135deg, var(--brand-color) 0%, color-mix(in srgb, var(--brand-color) 70%, #b91c1c) 100%)' },
   ];
 
   if (loading) {
@@ -71,65 +71,97 @@ const DriverHomePage = () => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Greeting */}
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">
-          Hola, {user?.name?.split(' ')[0]}
-        </h1>
-        <p className="text-slate-500 text-sm">
-          {format(new Date(), "EEEE, d 'de' MMMM", { locale: es })}
-        </p>
+    <div className="space-y-6 page-fade-in">
+      {/* Greeting Hero Card */}
+      <div
+        className="relative overflow-hidden rounded-2xl p-5 text-white smooth-appear card-3d"
+        style={{
+          backgroundImage:
+            'linear-gradient(135deg, #0f172a 0%, #1e293b 60%, color-mix(in srgb, var(--brand-color) 30%, #1e293b) 100%)',
+        }}
+      >
+        <div aria-hidden className="absolute inset-0 pointer-events-none">
+          <div
+            className="absolute -top-12 -right-8 w-48 h-48 rounded-full blur-3xl opacity-30 float-animation"
+            style={{ background: 'var(--brand-color)' }}
+          />
+          <div className="absolute top-3 right-4 w-12 h-12 rounded-xl border border-white/15 slow-spin" />
+        </div>
+        <div className="relative z-10">
+          <p className="text-[10px] uppercase font-semibold tracking-widest text-slate-300/80">
+            {format(new Date(), "EEEE, d 'de' MMMM", { locale: es })}
+          </p>
+          <h1 className="font-heading text-2xl font-black uppercase tracking-tight mt-1">
+            Hola, <span className="gradient-text">{user?.name?.split(' ')[0]}</span>
+          </h1>
+          <p className="text-slate-300 text-sm mt-1">
+            {activeTrip ? 'Tienes un viaje activo en curso.' : scheduledTrips.length > 0 ? `${scheduledTrips.length} viaje(s) programado(s).` : 'Sin viajes asignados hoy.'}
+          </p>
+        </div>
       </div>
 
       {/* Active Trip Banner */}
       {activeTrip ? (
-        <Card className="bg-gradient-to-r from-blue-600 to-blue-700 text-white overflow-hidden">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-3">
-              <Badge className="bg-white/20 text-white border-0">
-                <Play className="w-3 h-3 mr-1" />
-                VIAJE ACTIVO
-              </Badge>
-              <Badge className="bg-white/20 text-white border-0">
-                {activeTrip.tracto_plate}
-              </Badge>
-            </div>
-            
-            <h3 className="font-bold text-lg mb-1">
-              {activeTrip.client_name || 'Sin cliente'}
-            </h3>
-            <p className="text-blue-200 text-sm mb-3">
-              {activeTrip.cargo_description || 'Sin descripción'}
-            </p>
-
-            <div className="flex items-center gap-4 text-sm text-blue-100 mb-4">
-              <div className="flex items-center gap-1">
-                <Package className="w-4 h-4" />
-                {activeTrip.cargo_weight ? `${activeTrip.cargo_weight} kg` : '-'}
+        <Card
+          className="text-white overflow-hidden border-0 smooth-appear smooth-appear-1 card-3d glow-on-hover"
+          style={{
+            backgroundImage: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+          }}
+        >
+          <CardContent className="p-4 relative">
+            <div
+              aria-hidden
+              className="absolute -top-10 -right-10 w-40 h-40 rounded-full blur-3xl opacity-30 float-animation"
+              style={{ background: '#60a5fa' }}
+            />
+            <div className="relative">
+              <div className="flex items-center justify-between mb-3">
+                <span className="pill-info bg-white/20 text-white border-white/20">
+                  <Play className="w-3 h-3 fill-current" />
+                  VIAJE ACTIVO
+                </span>
+                <span className="pill-gradient bg-white/20 text-white border-white/20 font-mono">
+                  {activeTrip.tracto_plate}
+                </span>
               </div>
-              <div className="flex items-center gap-1">
-                <MapPin className="w-4 h-4" />
-                {activeTrip.route_name || 'Sin ruta'}
-              </div>
-            </div>
 
-            <Button 
-              className="w-full bg-white text-blue-600 hover:bg-blue-50"
-              onClick={() => navigate('/driver/trip')}
-            >
-              Ver Detalles del Viaje
-              <ChevronRight className="w-4 h-4 ml-2" />
-            </Button>
+              <h3 className="font-heading font-black text-xl mb-1 tracking-tight">
+                {activeTrip.client_name || 'Sin cliente'}
+              </h3>
+              <p className="text-blue-100 text-sm mb-3">
+                {activeTrip.cargo_description || 'Sin descripción'}
+              </p>
+
+              <div className="flex items-center gap-4 text-sm text-blue-100 mb-4">
+                <div className="flex items-center gap-1.5">
+                  <Package className="w-4 h-4" />
+                  {activeTrip.cargo_weight ? `${activeTrip.cargo_weight} kg` : '-'}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4" />
+                  {activeTrip.route_name || 'Sin ruta'}
+                </div>
+              </div>
+
+              <Button
+                className="w-full bg-white text-blue-700 hover:bg-blue-50 rounded-lg btn-shine tap-scale font-semibold"
+                onClick={() => navigate('/driver/trip')}
+              >
+                Ver Detalles del Viaje
+                <ChevronRight className="w-4 h-4 ml-2" />
+              </Button>
+            </div>
           </CardContent>
         </Card>
       ) : (
-        <Card className="bg-slate-50 border-dashed">
+        <Card className="glass-light border-dashed border-slate-200 smooth-appear smooth-appear-1">
           <CardContent className="p-6 text-center">
-            <Truck className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <h3 className="font-bold text-slate-700 mb-1">Sin Viaje Activo</h3>
-            <p className="text-sm text-slate-500">
-              {scheduledTrips.length > 0 
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-3 icon-3d float-animation bg-slate-100">
+              <Truck className="w-8 h-8 text-slate-400" />
+            </div>
+            <h3 className="font-heading font-bold text-slate-700 uppercase tracking-tight">Sin Viaje Activo</h3>
+            <p className="text-sm text-slate-500 mt-1">
+              {scheduledTrips.length > 0
                 ? `Tienes ${scheduledTrips.length} viaje(s) programado(s)`
                 : 'No tienes viajes asignados'}
             </p>
@@ -137,22 +169,28 @@ const DriverHomePage = () => {
         </Card>
       )}
 
-      {/* Quick Actions */}
-      <div>
-        <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3">
+      {/* Quick Actions - large gradient grid 2x2 feel via 4 cols */}
+      <div className="smooth-appear smooth-appear-2">
+        <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">
           Acciones Rápidas
         </h2>
-        <div className="grid grid-cols-4 gap-3">
-          {quickActions.map((action) => (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {quickActions.map((action, idx) => (
             <button
               key={action.path}
               onClick={() => navigate(action.path)}
-              className="flex flex-col items-center p-3 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow"
+              className="group relative overflow-hidden flex flex-col items-start p-4 rounded-2xl text-white shadow-lg tap-scale card-3d touch-target text-left"
+              style={{ backgroundImage: action.gradient }}
             >
-              <div className={`w-12 h-12 ${action.color} rounded-full flex items-center justify-center mb-2`}>
+              <div
+                aria-hidden
+                className="absolute -top-8 -right-8 w-24 h-24 rounded-full bg-white/15 blur-2xl group-hover:scale-125 transition-transform duration-500"
+              />
+              <div className="relative w-11 h-11 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center mb-3 icon-3d">
                 <action.icon className="w-6 h-6 text-white" />
               </div>
-              <span className="text-xs font-medium text-slate-700">{action.label}</span>
+              <span className="relative text-sm font-bold tracking-tight">{action.label}</span>
+              <ChevronRight className="relative w-4 h-4 mt-1 opacity-70 group-hover:translate-x-1 transition-transform" />
             </button>
           ))}
         </div>
@@ -166,10 +204,16 @@ const DriverHomePage = () => {
           </h2>
           <div className="space-y-3">
             {scheduledTrips.map((trip) => (
-              <Card key={trip.id} className="bg-white" onClick={() => navigate('/driver/trip')}>
+              <Card key={trip.id} className="bg-white tap-scale hover:shadow-md transition-all cursor-pointer" onClick={() => navigate('/driver/trip')}>
                 <CardContent className="p-4 flex items-center gap-4">
-                  <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <Route className="w-6 h-6 text-orange-600" />
+                  <div
+                    className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 icon-3d"
+                    style={{
+                      backgroundImage: 'linear-gradient(135deg, color-mix(in srgb, var(--brand-color) 20%, #ffffff) 0%, color-mix(in srgb, var(--brand-color) 8%, #ffffff) 100%)',
+                      color: 'var(--brand-color)',
+                    }}
+                  >
+                    <Route className="w-6 h-6" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <h4 className="font-bold text-slate-800 truncate">
@@ -220,13 +264,23 @@ const DriverHomePage = () => {
       )}
 
       {/* Help Section */}
-      <Card className="bg-slate-900 text-white">
-        <CardContent className="p-4 flex items-center justify-between">
-          <div>
+      <Card
+        className="text-white border-0 overflow-hidden"
+        style={{
+          backgroundImage: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+        }}
+      >
+        <CardContent className="p-4 flex items-center justify-between relative">
+          <div
+            aria-hidden
+            className="absolute -bottom-10 -right-10 w-40 h-40 rounded-full blur-3xl opacity-25"
+            style={{ background: 'var(--brand-color)' }}
+          />
+          <div className="relative">
             <h3 className="font-bold">¿Necesitas ayuda?</h3>
             <p className="text-sm text-slate-400">Contacta a tu supervisor</p>
           </div>
-          <Button variant="outline" className="border-slate-600 text-white hover:bg-slate-800">
+          <Button variant="outline" className="relative border-slate-600 text-white hover:bg-slate-800 tap-scale btn-shine rounded-lg">
             Llamar
           </Button>
         </CardContent>

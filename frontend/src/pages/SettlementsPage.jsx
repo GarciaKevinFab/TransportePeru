@@ -278,7 +278,7 @@ const SettlementsPage = () => {
     .reduce((sum, t) => sum + (t.total_advance || 0), 0);
 
   return (
-    <div className="space-y-6" data-testid="settlements-page">
+    <div className="space-y-6 page-fade-in" data-testid="settlements-page">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -292,8 +292,8 @@ const SettlementsPage = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="bg-white border-l-4 border-l-yellow-500">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="bg-white border-l-4 border-l-yellow-500 card-enter card-stagger-1">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
@@ -304,7 +304,7 @@ const SettlementsPage = () => {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-blue-500">
+        <Card className="bg-white border-l-4 border-l-blue-500 card-enter card-stagger-2">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
@@ -317,7 +317,7 @@ const SettlementsPage = () => {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-green-500">
+        <Card className="bg-white border-l-4 border-l-green-500 card-enter card-stagger-3">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
@@ -330,7 +330,7 @@ const SettlementsPage = () => {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-orange-500">
+        <Card className="bg-white border-l-4 border-l-orange-500 card-enter card-stagger-4">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
@@ -344,7 +344,7 @@ const SettlementsPage = () => {
       </div>
 
       {/* Filters */}
-      <Card className="bg-white">
+      <Card className="bg-white section-enter">
         <CardContent className="py-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
@@ -357,7 +357,7 @@ const SettlementsPage = () => {
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px] rounded-sm">
+              <SelectTrigger className="w-full sm:w-[180px] rounded-sm">
                 <SelectValue placeholder="Estado" />
               </SelectTrigger>
               <SelectContent>
@@ -372,8 +372,8 @@ const SettlementsPage = () => {
       </Card>
 
       {/* Trips Table */}
-      <Card className="bg-white">
-        <CardContent className="p-0">
+      <Card className="bg-white section-enter section-stagger-1">
+        <CardContent className="p-0 overflow-x-auto">
           {loading ? (
             <div className="flex items-center justify-center h-64">
               <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
@@ -468,7 +468,7 @@ const SettlementsPage = () => {
 
       {/* Settlement Detail Dialog */}
       <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
-        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
               Liquidación de Viaje
@@ -477,7 +477,7 @@ const SettlementsPage = () => {
           {selectedTrip && (
             <div className="py-4">
               {/* Trip Info */}
-              <div className="grid grid-cols-3 gap-4 mb-4 p-4 bg-slate-50 rounded-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 p-4 bg-slate-50 rounded-sm">
                 <div>
                   <p className="text-xs uppercase text-slate-500 font-bold">Fecha</p>
                   <p className="font-medium">
@@ -534,7 +534,7 @@ const SettlementsPage = () => {
               )}
 
               {/* Summary Cards */}
-              <div className="grid grid-cols-3 gap-4 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                 <Card className="bg-green-50 border-green-200">
                   <CardContent className="py-3">
                     <div className="flex items-center gap-2">
@@ -702,7 +702,7 @@ const SettlementsPage = () => {
 
       {/* Add Expense Dialog */}
       <Dialog open={showExpenseDialog} onOpenChange={setShowExpenseDialog}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
               Registrar Gasto
@@ -733,7 +733,7 @@ const SettlementsPage = () => {
                 placeholder="Detalle del gasto..."
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">Monto (S/) *</Label>
                 <Input
@@ -754,7 +754,7 @@ const SettlementsPage = () => {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">RUC</Label>
                 <Input
@@ -792,7 +792,7 @@ const SettlementsPage = () => {
 
       {/* Add Advance Dialog */}
       <Dialog open={showAdvanceDialog} onOpenChange={setShowAdvanceDialog}>
-        <DialogContent className="sm:max-w-[400px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
               Registrar Anticipo
@@ -849,7 +849,7 @@ const SettlementsPage = () => {
       </Dialog>
       {/* Budget Dialog */}
       <Dialog open={showBudgetDialog} onOpenChange={setShowBudgetDialog}>
-        <DialogContent className="sm:max-w-[400px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
               Presupuesto de Viáticos

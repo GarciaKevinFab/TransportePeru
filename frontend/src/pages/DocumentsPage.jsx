@@ -171,7 +171,7 @@ const DocumentsPage = () => {
   const entities = entityType === 'vehicle' ? vehicles : drivers;
 
   return (
-    <div className="space-y-6" data-testid="documents-page">
+    <div className="space-y-6 page-fade-in" data-testid="documents-page">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -183,7 +183,7 @@ const DocumentsPage = () => {
           </p>
         </div>
         <Button
-          className="btn-action"
+          className="btn-action btn-press"
           onClick={() => {
             setFormData({ ...formData, entity_type: entityType });
             setShowCreateDialog(true);
@@ -292,8 +292,8 @@ const DocumentsPage = () => {
       </Tabs>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-white border-l-4 border-l-green-500">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="bg-white border-l-4 border-l-green-500 card-enter card-stagger-1">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
@@ -310,7 +310,7 @@ const DocumentsPage = () => {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-yellow-500">
+        <Card className="bg-white border-l-4 border-l-yellow-500 card-enter card-stagger-2">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
@@ -328,7 +328,7 @@ const DocumentsPage = () => {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-red-500">
+        <Card className="bg-white border-l-4 border-l-red-500 card-enter card-stagger-3">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
@@ -345,7 +345,7 @@ const DocumentsPage = () => {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-slate-500">
+        <Card className="bg-white border-l-4 border-l-slate-500 card-enter card-stagger-4">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
@@ -363,7 +363,7 @@ const DocumentsPage = () => {
 
       {/* Create Document Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
               Nuevo Documento
@@ -420,7 +420,7 @@ const DocumentsPage = () => {
                 className="rounded-sm"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">Fecha de Emisión</Label>
                 <Input

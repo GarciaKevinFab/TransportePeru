@@ -185,7 +185,7 @@ const EquipmentPage = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 page-fade-in">
       {/* Header */}
       <div>
         <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-slate-900">
@@ -197,8 +197,8 @@ const EquipmentPage = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="bg-white border-l-4 border-l-blue-500">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="bg-white border-l-4 border-l-blue-500 card-enter card-stagger-1">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
@@ -209,7 +209,7 @@ const EquipmentPage = () => {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-green-500">
+        <Card className="bg-white border-l-4 border-l-green-500 card-enter card-stagger-2">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
@@ -220,7 +220,7 @@ const EquipmentPage = () => {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-yellow-500">
+        <Card className="bg-white border-l-4 border-l-yellow-500 card-enter card-stagger-3">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
@@ -231,7 +231,7 @@ const EquipmentPage = () => {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-orange-500">
+        <Card className="bg-white border-l-4 border-l-orange-500 card-enter card-stagger-4">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
@@ -260,8 +260,8 @@ const EquipmentPage = () => {
       </Card>
 
       {/* Table */}
-      <Card className="bg-white">
-        <CardContent className="p-0">
+      <Card className="bg-white section-enter section-stagger-1">
+        <CardContent className="p-0 overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow className="table-dense">
@@ -320,7 +320,7 @@ const EquipmentPage = () => {
 
       {/* Edit Equipment Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
               Equipamiento EPP
@@ -329,7 +329,7 @@ const EquipmentPage = () => {
               Vehículo: {selectedVehicle?.plate} - {selectedVehicle?.brand} {selectedVehicle?.model}
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
+          <div className="py-4 overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow className="table-dense">
@@ -394,7 +394,7 @@ const EquipmentPage = () => {
 
       {/* Assign Driver Dialog */}
       <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
-        <DialogContent className="sm:max-w-[400px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
               Asignar Chofer

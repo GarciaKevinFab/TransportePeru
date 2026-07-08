@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
-
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+import { authApi, setAuthToken, clearAuthToken } from '../services/api';
+import { syncAllPending } from '../hooks/useOffline';
 
 const AuthContext = createContext(null);
 
@@ -18,12 +17,9 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Configure axios defaults
+  // Sync the persisted token onto the shared `api` instance on mount.
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    }
+    setAuthToken(localStorage.getItem('access_token'));
   }, []);
 
   // Check if user is logged in on mount
@@ -32,14 +28,14 @@ export const AuthProvider = ({ children }) => {
       const token = localStorage.getItem('access_token');
       if (token) {
         try {
-          axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-          const response = await axios.get(`${API_URL}/api/auth/me`);
+          setAuthToken(token);
+          const response = await authApi.getMe();
           setUser(response.data);
         } catch (err) {
           console.error('Auth check failed:', err);
           localStorage.removeItem('access_token');
           localStorage.removeItem('refresh_token');
-          delete axios.defaults.headers.common['Authorization'];
+          clearAuthToken();
         }
       }
       setLoading(false);
@@ -50,13 +46,13 @@ export const AuthProvider = ({ children }) => {
   const login = useCallback(async (credentials) => {
     try {
       setError(null);
-      const response = await axios.post(`${API_URL}/api/auth/login`, credentials);
+      const response = await authApi.login(credentials);
       const { access_token, refresh_token, user: userData } = response.data;
-      
+
       localStorage.setItem('access_token', access_token);
       localStorage.setItem('refresh_token', refresh_token);
-      axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
-      
+      setAuthToken(access_token);
+
       setUser(userData);
       return { success: true, user: userData };
     } catch (err) {
@@ -69,13 +65,13 @@ export const AuthProvider = ({ children }) => {
   const loginDriver = useCallback(async (dni, pin) => {
     try {
       setError(null);
-      const response = await axios.post(`${API_URL}/api/auth/login`, { dni, pin });
+      const response = await authApi.login({ dni, pin });
       const { access_token, refresh_token, user: userData } = response.data;
-      
+
       localStorage.setItem('access_token', access_token);
       localStorage.setItem('refresh_token', refresh_token);
-      axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
-      
+      setAuthToken(access_token);
+
       setUser(userData);
       return { success: true, user: userData };
     } catch (err) {
@@ -88,50 +84,25 @@ export const AuthProvider = ({ children }) => {
   const logout = useCallback(() => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
-    delete axios.defaults.headers.common['Authorization'];
+    clearAuthToken();
     setUser(null);
   }, []);
 
-  const refreshToken = useCallback(async () => {
-    const refresh = localStorage.getItem('refresh_token');
-    if (!refresh) return false;
-    
-    try {
-      const response = await axios.post(`${API_URL}/api/auth/refresh`, {
-        refresh_token: refresh
-      });
-      
-      const { access_token, refresh_token: newRefresh } = response.data;
-      localStorage.setItem('access_token', access_token);
-      localStorage.setItem('refresh_token', newRefresh);
-      axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
-      
-      return true;
-    } catch (err) {
-      logout();
-      return false;
-    }
-  }, [logout]);
-
-  // Axios interceptor for token refresh
+  // Auto-sync pending offline items on load and when coming back online
   useEffect(() => {
-    const interceptor = axios.interceptors.response.use(
-      (response) => response,
-      async (error) => {
-        const originalRequest = error.config;
-        if (error.response?.status === 401 && !originalRequest._retry) {
-          originalRequest._retry = true;
-          const success = await refreshToken();
-          if (success) {
-            return axios(originalRequest);
-          }
-        }
-        return Promise.reject(error);
-      }
-    );
+    if (navigator.onLine) {
+      syncAllPending().catch((e) => console.error('Initial sync error:', e));
+    }
+    const onOnline = () => {
+      syncAllPending().catch((e) => console.error('Online-event sync error:', e));
+    };
+    window.addEventListener('online', onOnline);
+    return () => window.removeEventListener('online', onOnline);
+  }, []);
 
-    return () => axios.interceptors.response.eject(interceptor);
-  }, [refreshToken]);
+  // Token refresh on 401 is handled centrally by the `api` instance interceptor
+  // in services/api.js (with an isRefreshing lock + queue). No axios-global
+  // interceptor here to avoid double-refresh / race conditions.
 
   const value = {
     user,
@@ -141,7 +112,8 @@ export const AuthProvider = ({ children }) => {
     loginDriver,
     logout,
     isAuthenticated: !!user,
-    isAdmin: user?.role === 'admin' || user?.role === 'owner',
+    isSuperAdmin: user?.role === 'superadmin',
+    isAdmin: user?.role === 'admin' || user?.role === 'owner' || user?.role === 'superadmin',
     isDriver: user?.role === 'chofer',
   };
 

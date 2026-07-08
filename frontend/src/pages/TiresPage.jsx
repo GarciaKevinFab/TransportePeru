@@ -39,6 +39,8 @@ import {
   RotateCcw,
   Gauge,
   History,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -57,9 +59,15 @@ const TiresPage = () => {
   
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showMountDialog, setShowMountDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const [selectedTire, setSelectedTire] = useState(null);
   const [saving, setSaving] = useState(false);
-  
+  const [editData, setEditData] = useState({
+    serial: '', brand: '', model: '', dimension: '',
+    purchase_cost: '', supplier: '', status: '', life_number: 1,
+    position_type: 'toda_posicion',
+  });
+
   const [formData, setFormData] = useState({
     serial: '',
     brand: '',
@@ -67,13 +75,22 @@ const TiresPage = () => {
     dimension: '',
     purchase_cost: '',
     supplier: '',
+    position_type: 'toda_posicion',
   });
   
   const [mountData, setMountData] = useState({
     vehicle_id: '',
     position_code: '',
     mount_odometer: '',
+    mount_date: new Date().toISOString().substring(0, 10),
   });
+
+  const positionTypes = [
+    { value: 'direccional', label: 'Direccional' },
+    { value: 'traccion', label: 'Tracción' },
+    { value: 'toda_posicion', label: 'Toda posición' },
+    { value: 'mixto', label: 'Mixto' },
+  ];
 
   const tireStatuses = [
     { value: 'nuevo', label: 'Nuevo', color: 'bg-green-100 text-green-700' },
@@ -132,6 +149,7 @@ const TiresPage = () => {
         dimension: '',
         purchase_cost: '',
         supplier: '',
+        position_type: 'toda_posicion',
       });
       fetchData();
     } catch (error) {
@@ -153,11 +171,19 @@ const TiresPage = () => {
         vehicle_id: mountData.vehicle_id,
         position_code: mountData.position_code,
         mount_odometer: parseInt(mountData.mount_odometer),
+        mount_date: mountData.mount_date
+          ? new Date(mountData.mount_date).toISOString()
+          : new Date().toISOString(),
       });
       toast.success('Llanta montada exitosamente');
       setShowMountDialog(false);
       setSelectedTire(null);
-      setMountData({ vehicle_id: '', position_code: '', mount_odometer: '' });
+      setMountData({
+        vehicle_id: '',
+        position_code: '',
+        mount_odometer: '',
+        mount_date: new Date().toISOString().substring(0, 10),
+      });
       fetchData();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Error al montar llanta');
@@ -167,7 +193,7 @@ const TiresPage = () => {
 
   const handleUnmountTire = async (tire) => {
     if (!confirm('¿Desmontar esta llanta del vehículo?')) return;
-    
+
     try {
       const vehicle = vehicles.find(v => v.id === tire.current_vehicle_id);
       await tiresApi.unmount(tire.id, {
@@ -178,6 +204,51 @@ const TiresPage = () => {
       fetchData();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Error al desmontar llanta');
+    }
+  };
+
+  const openEditDialog = (tire) => {
+    setSelectedTire(tire);
+    setEditData({
+      serial: tire.serial || '',
+      brand: tire.brand || '',
+      model: tire.model || '',
+      dimension: tire.dimension || '',
+      purchase_cost: tire.purchase_cost || '',
+      supplier: tire.supplier || '',
+      status: tire.status || '',
+      life_number: tire.life_number || 1,
+      position_type: tire.position_type || 'toda_posicion',
+    });
+    setShowEditDialog(true);
+  };
+
+  const handleUpdateTire = async () => {
+    if (!selectedTire) return;
+    setSaving(true);
+    try {
+      await tiresApi.update(selectedTire.id, {
+        ...editData,
+        purchase_cost: parseFloat(editData.purchase_cost) || 0,
+        life_number: parseInt(editData.life_number) || 1,
+      });
+      toast.success('Llanta actualizada');
+      setShowEditDialog(false);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Error al actualizar');
+    }
+    setSaving(false);
+  };
+
+  const handleDeleteTire = async (tire) => {
+    if (!confirm(`¿Eliminar la llanta ${tire.serial}? Esta acción no se puede deshacer.`)) return;
+    try {
+      await tiresApi.delete(tire.id);
+      toast.success('Llanta eliminada');
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Error al eliminar llanta');
     }
   };
 
@@ -196,7 +267,7 @@ const TiresPage = () => {
   ];
 
   return (
-    <div className="space-y-6" data-testid="tires-page">
+    <div className="space-y-6 page-fade-in" data-testid="tires-page">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -207,15 +278,33 @@ const TiresPage = () => {
             Inventario, montaje, inspecciones y reportes de llantas
           </p>
         </div>
-        <Button className="btn-action" onClick={() => setShowCreateDialog(true)} data-testid="new-tire-btn">
-          <Plus className="w-4 h-4 mr-2" />
-          Nueva Llanta
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => navigate('/tires/lifecycle')}
+            data-testid="tire-lifecycle-btn"
+          >
+            <History className="w-4 h-4 mr-2" />
+            Ciclo de vida
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => navigate('/tires/required-by-dimension')}
+            data-testid="tire-required-btn"
+          >
+            <Gauge className="w-4 h-4 mr-2" />
+            Llantas requeridas
+          </Button>
+          <Button className="btn-action btn-press" onClick={() => setShowCreateDialog(true)} data-testid="new-tire-btn">
+            <Plus className="w-4 h-4 mr-2" />
+            Nueva Llanta
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="bg-white border-l-4 border-l-blue-500">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="bg-white border-l-4 border-l-blue-500 card-enter card-stagger-1">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
@@ -226,7 +315,7 @@ const TiresPage = () => {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-slate-500">
+        <Card className="bg-white border-l-4 border-l-slate-500 card-enter card-stagger-2">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
@@ -237,7 +326,7 @@ const TiresPage = () => {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-red-500">
+        <Card className="bg-white border-l-4 border-l-red-500 card-enter card-stagger-3">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
@@ -248,7 +337,7 @@ const TiresPage = () => {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-yellow-500">
+        <Card className="bg-white border-l-4 border-l-yellow-500 card-enter card-stagger-4">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
@@ -302,8 +391,8 @@ const TiresPage = () => {
             </CardContent>
           </Card>
 
-          <Card className="bg-white">
-            <CardContent className="p-0">
+          <Card className="bg-white section-enter">
+            <CardContent className="p-0 overflow-x-auto">
               {loading ? (
                 <div className="flex items-center justify-center h-64">
                   <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
@@ -357,7 +446,7 @@ const TiresPage = () => {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
+                          <div className="flex justify-end gap-2 flex-wrap">
                             {tire.status === 'almacen' || tire.status === 'nuevo' ? (
                               <Button
                                 size="sm"
@@ -380,6 +469,25 @@ const TiresPage = () => {
                                 Desmontar
                               </Button>
                             ) : null}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openEditDialog(tire)}
+                              title="Editar"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            {!tire.current_vehicle_id && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDeleteTire(tire)}
+                                title="Eliminar"
+                                className="text-red-600 hover:bg-red-50"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -427,14 +535,14 @@ const TiresPage = () => {
 
       {/* Create Tire Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
               Nueva Llanta
             </DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">Serial *</Label>
                 <Input
@@ -455,7 +563,7 @@ const TiresPage = () => {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">Modelo</Label>
                 <Input
@@ -474,7 +582,7 @@ const TiresPage = () => {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="input-label">Costo (S/)</Label>
                 <Input
@@ -495,6 +603,22 @@ const TiresPage = () => {
                 />
               </div>
             </div>
+            <div className="space-y-2">
+              <Label className="input-label">Tipo de posición</Label>
+              <Select
+                value={formData.position_type}
+                onValueChange={(v) => setFormData({ ...formData, position_type: v })}
+              >
+                <SelectTrigger className="rounded-sm" data-testid="tire-position-type-select">
+                  <SelectValue placeholder="Seleccionar tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {positionTypes.map((pt) => (
+                    <SelectItem key={pt.value} value={pt.value}>{pt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreateDialog(false)}>Cancelar</Button>
@@ -511,9 +635,94 @@ const TiresPage = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Edit Tire Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="max-w-[95vw] sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
+              Editar Llanta {selectedTire?.serial}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="input-label">Serial *</Label>
+                <Input value={editData.serial} onChange={(e) => setEditData({ ...editData, serial: e.target.value })} className="rounded-sm" />
+              </div>
+              <div className="space-y-2">
+                <Label className="input-label">Marca *</Label>
+                <Input value={editData.brand} onChange={(e) => setEditData({ ...editData, brand: e.target.value })} className="rounded-sm" />
+              </div>
+              <div className="space-y-2">
+                <Label className="input-label">Modelo</Label>
+                <Input value={editData.model} onChange={(e) => setEditData({ ...editData, model: e.target.value })} className="rounded-sm" />
+              </div>
+              <div className="space-y-2">
+                <Label className="input-label">Dimensión *</Label>
+                <Input value={editData.dimension} onChange={(e) => setEditData({ ...editData, dimension: e.target.value })} className="rounded-sm" placeholder="295/80R22.5" />
+              </div>
+              <div className="space-y-2">
+                <Label className="input-label">Costo de Compra</Label>
+                <Input type="number" value={editData.purchase_cost} onChange={(e) => setEditData({ ...editData, purchase_cost: e.target.value })} className="rounded-sm" />
+              </div>
+              <div className="space-y-2">
+                <Label className="input-label">Proveedor</Label>
+                <Input value={editData.supplier} onChange={(e) => setEditData({ ...editData, supplier: e.target.value })} className="rounded-sm" />
+              </div>
+              <div className="space-y-2">
+                <Label className="input-label">Estado</Label>
+                <Select value={editData.status} onValueChange={(v) => setEditData({ ...editData, status: v })}>
+                  <SelectTrigger className="rounded-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="nuevo">Nuevo</SelectItem>
+                    <SelectItem value="almacen">En Almacén</SelectItem>
+                    <SelectItem value="en_uso">En Uso</SelectItem>
+                    <SelectItem value="reparacion">En Reparación</SelectItem>
+                    <SelectItem value="reencauche">Reencauche</SelectItem>
+                    <SelectItem value="descartada">Descartada</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="input-label">Vida (1=VN, 2=R1, ...)</Label>
+                <Input type="number" min="1" max="5" value={editData.life_number} onChange={(e) => setEditData({ ...editData, life_number: e.target.value })} className="rounded-sm" />
+              </div>
+              <div className="space-y-2">
+                <Label className="input-label">Tipo de posición</Label>
+                <Select value={editData.position_type} onValueChange={(v) => setEditData({ ...editData, position_type: v })}>
+                  <SelectTrigger className="rounded-sm"><SelectValue placeholder="Seleccionar tipo" /></SelectTrigger>
+                  <SelectContent>
+                    {positionTypes.map((pt) => (
+                      <SelectItem key={pt.value} value={pt.value}>{pt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            {selectedTire?.current_vehicle_id && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-sm text-sm text-blue-800">
+                <strong>Esta llanta está montada</strong> en {getVehiclePlate(selectedTire.current_vehicle_id)} posición {selectedTire.current_position}.
+                Para cambiar vehículo o posición, primero desmonte y vuelva a montar.
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditDialog(false)}>Cancelar</Button>
+            <Button
+              className="btn-action btn-press"
+              onClick={handleUpdateTire}
+              disabled={!editData.serial || !editData.brand || !editData.dimension || saving}
+            >
+              {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Guardar Cambios
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Mount Tire Dialog */}
       <Dialog open={showMountDialog} onOpenChange={setShowMountDialog}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
               Montar Llanta
@@ -564,6 +773,15 @@ const TiresPage = () => {
                   onChange={(e) => setMountData({ ...mountData, mount_odometer: e.target.value })}
                   className="rounded-sm"
                   placeholder="Kilometraje actual"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="input-label">Fecha de Montaje *</Label>
+                <Input
+                  type="date"
+                  value={mountData.mount_date}
+                  onChange={(e) => setMountData({ ...mountData, mount_date: e.target.value })}
+                  className="rounded-sm"
                 />
               </div>
             </div>
