@@ -221,28 +221,13 @@ const MainLayout = ({ children }) => {
       >
         {/* Logo */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800">
-          {sidebarOpen ? (
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-sm flex items-center justify-center overflow-hidden" style={{ backgroundColor: (companyBrand.logo_url && !logoError) ? 'transparent' : companyBrand.brand_color }}>
-                {companyBrand.logo_url && !logoError ? (
-                  <img src={companyBrand.logo_url} alt="Logo" className="w-full h-full object-contain" onError={() => setLogoError(true)} />
-                ) : (
-                  <Truck className="w-6 h-6 text-white" />
-                )}
-              </div>
-              <span className="font-heading font-bold text-lg tracking-tight uppercase truncate max-w-[140px]">
-                {companyBrand.name}
-              </span>
-            </div>
-          ) : (
-            <div className="w-10 h-10 rounded-sm flex items-center justify-center mx-auto overflow-hidden" style={{ backgroundColor: (companyBrand.logo_url && !logoError) ? 'transparent' : companyBrand.brand_color }}>
-              {companyBrand.logo_url && !logoError ? (
-                <img src={companyBrand.logo_url} alt="Logo" className="w-full h-full object-contain" onError={() => setLogoError(true)} />
-              ) : (
-                <Truck className="w-6 h-6 text-white" />
-              )}
-            </div>
-          )}
+          <div className={`w-10 h-10 rounded-sm flex items-center justify-center overflow-hidden ${sidebarOpen ? '' : 'mx-auto'}`} style={{ backgroundColor: (companyBrand.logo_url && !logoError) ? 'transparent' : companyBrand.brand_color }}>
+            {companyBrand.logo_url && !logoError ? (
+              <img src={companyBrand.logo_url} alt="Logo" className="w-full h-full object-contain" onError={() => setLogoError(true)} />
+            ) : (
+              <Truck className="w-6 h-6 text-white" />
+            )}
+          </div>
           <Button
             variant="ghost"
             size="icon"
@@ -377,6 +362,10 @@ const MainLayout = ({ children }) => {
                 {companyBrand.name}
               </span>
             </div>
+            {/* Configured company name in the desktop header/navbar */}
+            <span className="hidden md:inline font-heading font-bold text-lg tracking-tight uppercase text-slate-900">
+              {companyBrand.name}
+            </span>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
