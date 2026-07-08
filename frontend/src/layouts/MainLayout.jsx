@@ -221,13 +221,24 @@ const MainLayout = ({ children }) => {
       >
         {/* Logo */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800">
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden shadow-sm ${sidebarOpen ? '' : 'mx-auto'}`} style={{ backgroundColor: (companyBrand.logo_url && !logoError) ? 'transparent' : companyBrand.brand_color }}>
-            {companyBrand.logo_url && !logoError ? (
-              <img src={companyBrand.logo_url} alt="Logo" className="w-full h-full object-contain" onError={() => setLogoError(true)} />
+          {companyBrand.logo_url && !logoError ? (
+            sidebarOpen ? (
+              <img
+                src={companyBrand.logo_url}
+                alt="Logo"
+                className="h-10 w-auto max-w-[168px] object-contain object-left"
+                onError={() => setLogoError(true)}
+              />
             ) : (
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden mx-auto">
+                <img src={companyBrand.logo_url} alt="Logo" className="w-full h-full object-contain" onError={() => setLogoError(true)} />
+              </div>
+            )
+          ) : (
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm ${sidebarOpen ? '' : 'mx-auto'}`} style={{ backgroundColor: companyBrand.brand_color }}>
               <Truck className="w-6 h-6 text-white" />
-            )}
-          </div>
+            </div>
+          )}
           <Button
             variant="ghost"
             size="icon"
