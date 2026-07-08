@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import api from '../services/api';
 import {
   LayoutDashboard,
@@ -22,6 +23,10 @@ import {
   Receipt,
   Building2,
   Shield,
+  Wallet,
+  Link2,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import {
@@ -35,23 +40,51 @@ import { Badge } from '../components/ui/badge';
 import { ScrollArea } from '../components/ui/scroll-area';
 import NotificationsPopover from '../components/NotificationsPopover';
 
-const menuItems = [
-  { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', roles: ['superadmin', 'owner', 'admin', 'operaciones', 'flota', 'mantenimiento', 'almacen', 'contabilidad'] },
-  { path: '/companies', icon: Building2, label: 'Empresas', roles: ['superadmin', 'owner'] },
-  { path: '/vehicles', icon: Truck, label: 'Vehículos', roles: ['superadmin', 'owner', 'admin', 'operaciones', 'flota', 'mantenimiento'] },
-  { path: '/equipment', icon: Shield, label: 'Equipamiento', roles: ['superadmin', 'owner', 'admin', 'flota', 'almacen', 'operaciones'] },
-  { path: '/documents', icon: FileText, label: 'Documentos', roles: ['superadmin', 'owner', 'admin', 'flota'] },
-  { path: '/trips', icon: Route, label: 'Viajes', roles: ['superadmin', 'owner', 'admin', 'operaciones', 'contabilidad', 'chofer'] },
-  { path: '/settlements', icon: Receipt, label: 'Viáticos', roles: ['superadmin', 'owner', 'admin', 'contabilidad', 'operaciones'] },
-  { path: '/fuel', icon: Fuel, label: 'Combustible', roles: ['superadmin', 'owner', 'admin', 'operaciones', 'chofer'] },
-  { path: '/tires', icon: CircleDot, label: 'Llantas', roles: ['superadmin', 'owner', 'admin', 'flota', 'mantenimiento'] },
-  { path: '/maintenance', icon: Wrench, label: 'Mantenimiento', roles: ['superadmin', 'owner', 'admin', 'mantenimiento'] },
-  { path: '/inventory', icon: Package, label: 'Inventario', roles: ['superadmin', 'owner', 'admin', 'almacen'] },
-  { path: '/issues', icon: AlertTriangle, label: 'Incidentes', roles: ['superadmin', 'owner', 'admin', 'operaciones', 'chofer'] },
-  { path: '/billing', icon: FileText, label: 'Facturación', roles: ['superadmin', 'owner', 'admin', 'contabilidad'] },
-  { path: '/reports', icon: BarChart3, label: 'Reportes', roles: ['superadmin', 'owner', 'admin', 'contabilidad'] },
-  { path: '/users', icon: Users, label: 'Usuarios', roles: ['superadmin', 'owner', 'admin'] },
-  { path: '/settings', icon: Settings, label: 'Configuración', roles: ['superadmin', 'owner', 'admin'] },
+// Menú principal organizado por secciones lógicas.
+// Los roles por ítem se mantienen para respetar la visibilidad existente.
+const menuGroups = [
+  {
+    section: 'Operación',
+    items: [
+      { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', roles: ['superadmin', 'owner', 'admin', 'operaciones', 'flota', 'mantenimiento', 'almacen', 'contabilidad'] },
+      { path: '/trips', icon: Route, label: 'Viajes', roles: ['superadmin', 'owner', 'admin', 'operaciones', 'contabilidad', 'chofer'] },
+      { path: '/settlements', icon: Wallet, label: 'Viáticos', roles: ['superadmin', 'owner', 'admin', 'contabilidad', 'operaciones'] },
+      { path: '/fuel', icon: Fuel, label: 'Combustible', roles: ['superadmin', 'owner', 'admin', 'operaciones', 'chofer'] },
+    ],
+  },
+  {
+    section: 'Flota',
+    items: [
+      { path: '/vehicles', icon: Truck, label: 'Vehículos', roles: ['superadmin', 'owner', 'admin', 'operaciones', 'flota', 'mantenimiento'] },
+      { path: '/units', icon: Link2, label: 'Unidades', roles: ['superadmin', 'owner', 'admin', 'flota'] },
+      { path: '/tires', icon: CircleDot, label: 'Llantas', roles: ['superadmin', 'owner', 'admin', 'flota', 'mantenimiento'] },
+      { path: '/maintenance', icon: Wrench, label: 'Mantenimiento', roles: ['superadmin', 'owner', 'admin', 'mantenimiento'] },
+      { path: '/equipment', icon: Shield, label: 'Equipamiento', roles: ['superadmin', 'owner', 'admin', 'flota', 'almacen', 'operaciones'] },
+      { path: '/inventory', icon: Package, label: 'Inventario', roles: ['superadmin', 'owner', 'admin', 'almacen'] },
+    ],
+  },
+  {
+    section: 'Cumplimiento',
+    items: [
+      { path: '/documents', icon: FileText, label: 'Documentos', roles: ['superadmin', 'owner', 'admin', 'flota'] },
+      { path: '/issues', icon: AlertTriangle, label: 'Incidentes', roles: ['superadmin', 'owner', 'admin', 'operaciones', 'chofer'] },
+      { path: '/billing', icon: Receipt, label: 'Facturación', roles: ['superadmin', 'owner', 'admin', 'contabilidad'] },
+    ],
+  },
+  {
+    section: 'Análisis',
+    items: [
+      { path: '/reports', icon: BarChart3, label: 'Reportes', roles: ['superadmin', 'owner', 'admin', 'contabilidad'] },
+    ],
+  },
+  {
+    section: 'Administración',
+    items: [
+      { path: '/companies', icon: Building2, label: 'Empresas', roles: ['superadmin', 'owner'] },
+      { path: '/users', icon: Users, label: 'Usuarios', roles: ['superadmin', 'owner', 'admin'] },
+      { path: '/settings', icon: Settings, label: 'Configuración', roles: ['superadmin', 'owner', 'admin'] },
+    ],
+  },
 ];
 
 // Driver-specific menu items
@@ -65,6 +98,7 @@ const driverMenuItems = [
 
 const MainLayout = ({ children }) => {
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -100,10 +134,15 @@ const MainLayout = ({ children }) => {
   };
 
   const isDriver = user?.role === 'chofer';
-  const currentMenuItems = isDriver ? driverMenuItems : menuItems;
-  const filteredMenuItems = currentMenuItems.filter(
-    (item) => item.roles.includes(user?.role)
-  );
+
+  // Para el chofer se usa un menú plano; para el resto, menú agrupado por secciones.
+  const filteredDriverItems = driverMenuItems.filter((item) => item.roles.includes(user?.role));
+  const filteredGroups = menuGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => item.roles.includes(user?.role)),
+    }))
+    .filter((group) => group.items.length > 0);
 
   const NavItem = ({ item, onClick }) => (
     <NavLink
@@ -114,6 +153,7 @@ const MainLayout = ({ children }) => {
       }
       style={({ isActive }) => isActive ? { color: companyBrand.brand_color, borderLeftColor: companyBrand.brand_color } : {}}
       data-testid={`nav-${item.path.replace('/', '')}`}
+      title={item.label}
     >
       <item.icon className="w-5 h-5 sidebar-icon" />
       {(sidebarOpen || mobileSidebarOpen) && (
@@ -122,17 +162,53 @@ const MainLayout = ({ children }) => {
     </NavLink>
   );
 
+  // Renderiza la navegación: agrupada (con etiquetas de sección) o plana (chofer).
+  const SidebarNav = ({ expanded, onItemClick }) => {
+    if (isDriver) {
+      return (
+        <nav className="space-y-0.5">
+          {filteredDriverItems.map((item) => (
+            <NavItem key={item.path} item={item} onClick={onItemClick} />
+          ))}
+        </nav>
+      );
+    }
+    return (
+      <nav className="space-y-1">
+        {filteredGroups.map((group) => (
+          <div key={group.section} className="pt-2 first:pt-0">
+            {expanded ? (
+              <p className="sidebar-section-label px-5 pb-1 pt-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                {group.section}
+              </p>
+            ) : (
+              <div className="mx-3 my-2 border-t border-slate-700/60" aria-hidden="true" />
+            )}
+            <div className="space-y-0.5">
+              {group.items.map((item) => (
+                <NavItem key={item.path} item={item} onClick={onItemClick} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </nav>
+    );
+  };
+
   // Sidebar gradient background (subtle inner glow with brand color hint)
   const sidebarBg = {
     backgroundImage: `linear-gradient(180deg, #0b1220 0%, #0f172a 55%, color-mix(in srgb, ${companyBrand.brand_color} 12%, #0f172a) 100%)`,
   };
 
-  // Header bottom gradient
+  // Header bottom gradient (claro/oscuro según el tema activo)
+  const isDark = theme === 'dark';
   const headerStyle = {
-    background: 'linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.85) 100%)',
+    background: isDark
+      ? 'linear-gradient(180deg, rgba(15,23,42,0.94) 0%, rgba(15,23,42,0.88) 100%)'
+      : 'linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.85) 100%)',
     boxShadow:
       `0 1px 0 color-mix(in srgb, ${companyBrand.brand_color} 22%, transparent),` +
-      ` 0 1px 12px rgba(15, 23, 42, 0.04)`,
+      ` 0 1px 12px ${isDark ? 'rgba(0, 0, 0, 0.35)' : 'rgba(15, 23, 42, 0.04)'}`,
   };
 
   return (
@@ -181,11 +257,7 @@ const MainLayout = ({ children }) => {
 
         {/* Navigation */}
         <ScrollArea className="flex-1 py-3">
-          <nav className="space-y-0.5">
-            {filteredMenuItems.map((item) => (
-              <NavItem key={item.path} item={item} />
-            ))}
-          </nav>
+          <SidebarNav expanded={sidebarOpen} />
         </ScrollArea>
 
         {/* User Section */}
@@ -254,15 +326,7 @@ const MainLayout = ({ children }) => {
             </Button>
           </div>
           <ScrollArea className="flex-1 py-3">
-            <nav className="space-y-0.5">
-              {filteredMenuItems.map((item) => (
-                <NavItem
-                  key={item.path}
-                  item={item}
-                  onClick={() => setMobileSidebarOpen(false)}
-                />
-              ))}
-            </nav>
+            <SidebarNav expanded onItemClick={() => setMobileSidebarOpen(false)} />
           </ScrollArea>
           {/* Mobile sidebar user info */}
           <div className="p-3 border-t border-slate-800/80 bg-slate-900/60">
@@ -317,6 +381,19 @@ const MainLayout = ({ children }) => {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Theme toggle (claro/oscuro) */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleTheme}
+              data-testid="theme-toggle"
+              aria-label={isDark ? 'Activar modo claro' : 'Activar modo oscuro'}
+              title={isDark ? 'Modo claro' : 'Modo oscuro'}
+              className="rounded-full text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            >
+              {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </Button>
+
             {/* Notifications */}
             <div className="rounded-full transition-shadow">
               <NotificationsPopover />

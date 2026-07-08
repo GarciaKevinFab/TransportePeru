@@ -7205,6 +7205,46 @@ async def create_indexes():
     except Exception as e:
         logger.error(f"Error creando índices MongoDB: {e}")
 
+@app.on_event("startup")
+async def ensure_default_document_types():
+    """Asegura los tipos de documento estándar en empresas existentes (idempotente por nombre).
+    Repara instalaciones donde el seed no volvió a correr (p. ej. faltaban Tarjeta de
+    Circulación y Bonificación)."""
+    defaults = [
+        {"name": "SOAT", "applies_to": "vehiculo", "is_critical": True, "block_rule": "bloquea_inicio"},
+        {"name": "Revisión Técnica (CITV)", "applies_to": "vehiculo", "is_critical": True, "block_rule": "bloquea_inicio"},
+        {"name": "Tarjeta de Propiedad", "applies_to": "vehiculo", "is_critical": True, "block_rule": "bloquea_asignacion"},
+        {"name": "Tarjeta de Circulación", "applies_to": "vehiculo", "is_critical": False, "block_rule": "solo_alerta"},
+        {"name": "Bonificación", "applies_to": "vehiculo", "is_critical": False, "block_rule": "solo_alerta"},
+        {"name": "Póliza de Seguro", "applies_to": "vehiculo", "is_critical": False, "block_rule": "solo_alerta"},
+        {"name": "Licencia de Conducir", "applies_to": "chofer", "is_critical": True, "block_rule": "bloquea_asignacion"},
+        {"name": "DNI", "applies_to": "chofer", "is_critical": True, "block_rule": "bloquea_asignacion"},
+        {"name": "Certificado Médico", "applies_to": "chofer", "is_critical": False, "block_rule": "solo_alerta"},
+    ]
+    try:
+        companies = await db.companies.find({}, {"_id": 0, "id": 1}).to_list(length=None)
+        for comp in companies:
+            cid = comp.get("id")
+            if not cid:
+                continue
+            for dt in defaults:
+                exists = await db.document_types.find_one(
+                    {"company_id": cid, "name": dt["name"]}, {"_id": 1}
+                )
+                if exists:
+                    continue
+                doc_type = DocumentType(
+                    company_id=cid, name=dt["name"], applies_to=dt["applies_to"],
+                    is_critical=dt["is_critical"], block_rule=BlockRule(dt["block_rule"]),
+                )
+                d = doc_type.model_dump()
+                if isinstance(d.get("created_at"), datetime):
+                    d["created_at"] = d["created_at"].isoformat()
+                await db.document_types.insert_one(d)
+        logger.info("Tipos de documento por defecto verificados")
+    except Exception as e:
+        logger.error(f"Error asegurando tipos de documento: {e}")
+
 async def _scheduler_loop():
     """Barrido periódico (documentos + mantenimiento + llantas + viáticos) cada N horas."""
     try:
