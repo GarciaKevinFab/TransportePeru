@@ -83,23 +83,24 @@
             align-items: center;
             gap: 10px;
             padding: 6px 14px 6px 6px;
-            border-radius: 16px;
-            background: linear-gradient(135deg, rgba(15,23,42,0.92) 0%, rgba(30,41,59,0.88) 100%);
-            border: 1px solid rgba(255,255,255,0.10);
-            box-shadow:
-                0 10px 30px rgba(0,0,0,0.35),
-                0 2px 8px rgba(0,0,0,0.2),
-                inset 0 1px 0 rgba(255,255,255,0.08);
-            backdrop-filter: blur(20px) saturate(180%);
-            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border-radius: 14px;
+            background: rgba(255,255,255,0.85);
+            border: 1px solid rgba(2,6,23,0.08);
+            box-shadow: 0 4px 16px rgba(2,6,23,0.10), 0 1px 3px rgba(2,6,23,0.06);
+            backdrop-filter: blur(12px) saturate(160%);
+            -webkit-backdrop-filter: blur(12px) saturate(160%);
             text-decoration: none;
-            color: #fff;
+            color: #0f172a;
             font-family: 'Inter', system-ui, sans-serif;
-            transition: transform .35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow .3s ease;
-            transform-style: preserve-3d;
-            perspective: 800px;
+            transition: transform .25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow .25s ease;
             overflow: hidden;
-            animation: brand-float-in 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            animation: brand-float-in 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        html.dark #brand-badge {
+            background: rgba(15,23,42,0.85);
+            border-color: rgba(255,255,255,0.10);
+            color: #f1f5f9;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.2);
         }
         #brand-badge::before {
             content: '';
@@ -111,11 +112,11 @@
             pointer-events: none;
         }
         #brand-badge:hover {
-            transform: translateY(-4px) scale(1.03) rotateX(-2deg);
-            box-shadow:
-                0 20px 50px rgba(0,0,0,0.5),
-                0 4px 14px rgba(249,115,22,0.18),
-                inset 0 1px 0 rgba(255,255,255,0.14);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 28px rgba(2,6,23,0.14), 0 2px 8px rgba(249,115,22,0.12);
+        }
+        html.dark #brand-badge:hover {
+            box-shadow: 0 14px 34px rgba(0,0,0,0.5), 0 2px 10px rgba(249,115,22,0.18);
         }
         #brand-badge:hover::before {
             animation: brand-shine 1.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -138,7 +139,7 @@
             transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
         #brand-badge:hover #brand-badge-logo {
-            transform: rotateY(360deg) scale(1.05);
+            transform: scale(1.06);
         }
         #brand-badge-logo img {
             width: 30px; height: 30px;
@@ -149,23 +150,21 @@
         #brand-badge-title {
             font-size: 13px;
             font-weight: 700;
-            color: #ffffff;
+            color: #0f172a;
             letter-spacing: 0.2px;
             line-height: 1.1;
-            background: linear-gradient(180deg, #ffffff 0%, #cbd5e1 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
         }
+        html.dark #brand-badge-title { color: #f8fafc; }
         #brand-badge-sub {
             font-size: 10px;
             font-weight: 500;
-            color: rgba(255,255,255,0.55);
+            color: #64748b;
             letter-spacing: 0.4px;
             text-transform: uppercase;
             margin-top: 2px;
             line-height: 1;
         }
+        html.dark #brand-badge-sub { color: rgba(255,255,255,0.55); }
         #brand-badge-dot {
             width: 8px; height: 8px;
             border-radius: 50%;
