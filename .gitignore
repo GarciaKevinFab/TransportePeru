@@ -130,3 +130,8 @@ frontend/node_modules/.cache/default-development/14.pack
 *.env
 *.env.*
 frontend/node_modules/.cache/default-development/16.pack
+
+# Mantener los templates .env.example versionados (debe ir al final para
+# ganar sobre las reglas *.env.* duplicadas de arriba).
+!.env.example
+!**/.env.example

@@ -51,8 +51,8 @@ if not JWT_SECRET:
         raise RuntimeError("JWT_SECRET no configurado en producción")
     JWT_SECRET = "dev-only-insecure-secret"  # solo desarrollo
 JWT_ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-REFRESH_TOKEN_EXPIRE_DAYS = 7
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", "15"))
+REFRESH_TOKEN_EXPIRE_DAYS = int(os.environ.get("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
 
 # Upload directory
 UPLOAD_DIR = ROOT_DIR / "uploads"
@@ -6143,6 +6143,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Cabeceras de seguridad en todas las respuestas (defensa en profundidad).
+# El token sigue siendo bearer en localStorage (compatible con el deploy
+# cross-origin frontend/backend); estas cabeceras reducen la superficie XSS/clickjacking.
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers.setdefault("Cache-Control", "no-store")
+    return response
 
 # Logging
 logging.basicConfig(
