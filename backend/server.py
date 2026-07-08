@@ -2163,6 +2163,30 @@ async def get_couplings(
     couplings = await db.couplings.find(query, {"_id": 0}).sort("start_date", -1).to_list(100)
     return [serialize_doc(c) for c in couplings]
 
+@api_router.put("/couplings/{coupling_id}")
+async def update_coupling(coupling_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
+    """Actualiza un enganche. Se usa para DESACOPLAR (enviar end_date)."""
+    coupling = await db.couplings.find_one({"id": coupling_id, "company_id": current_user["company_id"]})
+    if not coupling:
+        raise HTTPException(status_code=404, detail="Enganche no encontrado")
+
+    update_data = {}
+    if "end_date" in request:
+        end_date = request["end_date"]
+        if isinstance(end_date, datetime):
+            end_date = end_date.isoformat()
+        update_data["end_date"] = end_date or datetime.now(timezone.utc).isoformat()
+    if "trip_id" in request:
+        update_data["trip_id"] = request["trip_id"]
+    if not update_data:
+        update_data["end_date"] = datetime.now(timezone.utc).isoformat()
+
+    await db.couplings.update_one(
+        {"id": coupling_id, "company_id": current_user["company_id"]},
+        {"$set": update_data},
+    )
+    return {"id": coupling_id, "message": "Enganche actualizado"}
+
 # ============== DOCUMENT TYPE ROUTES ==============
 @api_router.get("/document-types")
 async def get_document_types(
