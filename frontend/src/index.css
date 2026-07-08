@@ -64,7 +64,7 @@ code {
   [role="combobox"]:focus-visible {
     outline: none;
     box-shadow:
-      0 0 0 2px #ffffff,
+      0 0 0 2px var(--ring-offset-bg, #ffffff),
       0 0 0 4px color-mix(in srgb, var(--brand-color) 55%, transparent);
     border-color: var(--brand-color);
     transition: box-shadow 0.15s ease, border-color 0.15s ease;
@@ -107,13 +107,19 @@ code {
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
-    --radius: 0.25rem;
+    /* Radio base elevado: rounded-sm≈6px, md≈8px, lg≈10px.
+       Moderniza globalmente inputs/selects/botones que usan estas clases. */
+    --radius: 0.625rem;
     
     /* Status colors */
     --success: 142 76% 36%;
     --warning: 45 93% 47%;
     --error: 0 84% 60%;
     --info: 217 91% 60%;
+
+    /* Superficies de página (gris muy sutil) y offset del anillo de foco */
+    --page-bg: #f6f8fb;
+    --ring-offset-bg: #ffffff;
   }
 
   .dark {
@@ -141,6 +147,9 @@ code {
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
+
+    --page-bg: #0b1220;
+    --ring-offset-bg: #0f172a;
   }
 }
 
@@ -153,17 +162,21 @@ code {
   }
 }
 
-/* Table styles */
+/* Table styles — header sutil, filas limpias, hover de marca */
 .table-dense th {
-  @apply bg-slate-100 text-slate-600 uppercase text-xs font-bold tracking-wider border-b-2 border-slate-200 py-3 px-4;
+  @apply bg-slate-50 text-slate-500 uppercase text-[11px] font-bold tracking-wider border-b border-slate-200 py-3 px-4;
 }
 
 .table-dense td {
   @apply py-3 px-4 text-sm text-slate-700 border-b border-slate-100;
 }
 
-.table-dense tr:hover {
-  @apply bg-orange-50 transition-colors;
+.table-dense tbody tr {
+  transition: background-color 0.15s ease;
+}
+
+.table-dense tbody tr:hover {
+  background-color: color-mix(in srgb, var(--brand-color) 6%, transparent);
 }
 
 /* Status badges */
@@ -183,9 +196,22 @@ code {
   @apply bg-blue-100 text-blue-800 border-blue-200;
 }
 
-/* KPI Card styles */
+/* KPI Card styles — tarjeta con esquina redondeada, sombra suave y hover-lift */
 .kpi-card {
-  @apply bg-white border-l-4 border-l-orange-500 shadow-sm p-6 flex flex-col justify-between;
+  @apply bg-white border border-slate-200 p-6 flex flex-col justify-between;
+  border-left: 4px solid var(--brand-color);
+  border-radius: 0.875rem;
+  box-shadow:
+    0 1px 3px rgba(2, 6, 23, 0.06),
+    0 1px 2px rgba(2, 6, 23, 0.04);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 12px 28px -10px rgba(2, 6, 23, 0.14),
+    0 4px 10px -4px rgba(2, 6, 23, 0.06);
 }
 
 .kpi-value {
@@ -196,10 +222,55 @@ code {
   @apply text-xs font-bold uppercase text-slate-500 tracking-widest mt-2;
 }
 
+/* Icono tintado en círculo para KPIs / stat cards (por categoría de acento) */
+.stat-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 9999px;
+  background-color: color-mix(in srgb, var(--brand-color) 14%, transparent);
+  color: var(--brand-color);
+  flex-shrink: 0;
+}
+.stat-icon-brand   { background-color: color-mix(in srgb, var(--brand-color) 14%, transparent); color: var(--brand-color); }
+.stat-icon-blue    { background-color: rgba(59, 130, 246, 0.14);  color: #2563eb; }
+.stat-icon-green   { background-color: rgba(34, 197, 94, 0.14);   color: #16a34a; }
+.stat-icon-amber   { background-color: rgba(234, 179, 8, 0.16);   color: #b45309; }
+.stat-icon-red     { background-color: rgba(239, 68, 68, 0.14);   color: #dc2626; }
+.stat-icon-slate   { background-color: rgba(100, 116, 139, 0.14); color: #475569; }
+
 /* Button styles */
 .btn-primary {
-  @apply bg-slate-900 text-white hover:bg-slate-800 rounded-sm uppercase font-bold tracking-wide text-sm h-10 px-6 transition-all;
+  @apply bg-slate-900 text-white hover:bg-slate-800 rounded-lg uppercase font-bold tracking-wide text-sm h-10 px-6 transition-all;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* Botón de marca (usado por el variant default de shadcn Button) */
+.btn-brand {
+  background-color: var(--brand-color);
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--brand-color) 92%, #ffffff) 0%,
+    var(--brand-color) 58%,
+    color-mix(in srgb, var(--brand-color) 88%, #000000) 100%
+  );
+  color: #ffffff;
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--brand-color) 32%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  transition: filter 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+.btn-brand:hover {
+  filter: brightness(1.05);
+  box-shadow:
+    0 4px 12px -2px color-mix(in srgb, var(--brand-color) 32%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+.btn-brand:active {
+  filter: brightness(0.96);
+  transform: translateY(0.5px);
 }
 .btn-primary:hover {
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.06);
@@ -214,7 +285,7 @@ code {
     color-mix(in srgb, var(--brand-color) 88%, #000000) 100%
   );
   background-color: var(--brand-color);
-  @apply text-white rounded-sm uppercase font-bold tracking-wide text-sm h-10 px-6 transition-all;
+  @apply text-white rounded-lg uppercase font-bold tracking-wide text-sm h-10 px-6 transition-all;
   box-shadow:
     0 1px 2px color-mix(in srgb, var(--brand-color) 35%, transparent),
     0 4px 10px color-mix(in srgb, var(--brand-color) 18%, transparent),
@@ -345,6 +416,31 @@ code {
     0 1px 3px rgba(15, 23, 42, 0.06),
     0 1px 2px rgba(15, 23, 42, 0.04);
   transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+/* Superficie base de TODAS las tarjetas shadcn (componente ui/card.jsx).
+   Sombra suave de marca + hover-lift muy sutil, coherente con el look SaaS. */
+.card-surface {
+  box-shadow:
+    0 1px 3px rgba(2, 6, 23, 0.06),
+    0 1px 2px rgba(2, 6, 23, 0.04);
+  transition: box-shadow 0.22s ease, transform 0.22s ease, border-color 0.22s ease;
+}
+.card-surface:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 10px 25px -8px rgba(2, 6, 23, 0.12),
+    0 4px 10px -4px rgba(2, 6, 23, 0.06);
+}
+.dark .card-surface {
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.4),
+    0 1px 2px rgba(0, 0, 0, 0.3);
+}
+.dark .card-surface:hover {
+  box-shadow:
+    0 12px 28px -10px rgba(0, 0, 0, 0.6),
+    0 4px 10px -4px rgba(0, 0, 0, 0.4);
 }
 
 .shadow-card-hover:hover,
@@ -513,7 +609,7 @@ code {
 }
 
 /* KPI / métricas */
-.dark .kpi-card { background-color: #1e293b !important; }
+.dark .kpi-card { background-color: #1e293b !important; border-color: #334155 !important; }
 .dark .kpi-value { color: #f1f5f9 !important; }
 .dark .kpi-label { color: #94a3b8 !important; }
 

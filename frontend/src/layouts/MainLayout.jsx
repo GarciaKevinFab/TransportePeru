@@ -221,7 +221,7 @@ const MainLayout = ({ children }) => {
       >
         {/* Logo */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800">
-          <div className={`w-10 h-10 rounded-sm flex items-center justify-center overflow-hidden ${sidebarOpen ? '' : 'mx-auto'}`} style={{ backgroundColor: (companyBrand.logo_url && !logoError) ? 'transparent' : companyBrand.brand_color }}>
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden shadow-sm ${sidebarOpen ? '' : 'mx-auto'}`} style={{ backgroundColor: (companyBrand.logo_url && !logoError) ? 'transparent' : companyBrand.brand_color }}>
             {companyBrand.logo_url && !logoError ? (
               <img src={companyBrand.logo_url} alt="Logo" className="w-full h-full object-contain" onError={() => setLogoError(true)} />
             ) : (
@@ -351,7 +351,7 @@ const MainLayout = ({ children }) => {
             </Button>
             {/* Mobile logo in header */}
             <div className="flex md:hidden items-center gap-2">
-              <div className="w-8 h-8 rounded-sm flex items-center justify-center overflow-hidden" style={{ backgroundColor: (companyBrand.logo_url && !logoError) ? 'transparent' : companyBrand.brand_color }}>
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden shadow-sm" style={{ backgroundColor: (companyBrand.logo_url && !logoError) ? 'transparent' : companyBrand.brand_color }}>
                 {companyBrand.logo_url && !logoError ? (
                   <img src={companyBrand.logo_url} alt="Logo" className="w-full h-full object-contain" onError={() => setLogoError(true)} />
                 ) : (

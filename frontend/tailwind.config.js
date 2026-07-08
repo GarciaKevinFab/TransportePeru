@@ -15,6 +15,13 @@ module.exports = {
   		colors: {
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
+  			brand: {
+  				DEFAULT: 'var(--brand-color)',
+  				foreground: '#ffffff'
+  			},
+  			success: 'hsl(var(--success))',
+  			warning: 'hsl(var(--warning))',
+  			info: 'hsl(var(--info))',
   			card: {
   				DEFAULT: 'hsl(var(--card))',
   				foreground: 'hsl(var(--card-foreground))'
@@ -53,6 +60,11 @@ module.exports = {
   				'4': 'hsl(var(--chart-4))',
   				'5': 'hsl(var(--chart-5))'
   			}
+  		},
+  		boxShadow: {
+  			card: '0 1px 3px rgba(2, 6, 23, 0.06), 0 1px 2px rgba(2, 6, 23, 0.04)',
+  			'card-hover': '0 10px 25px -8px rgba(2, 6, 23, 0.12), 0 4px 10px -4px rgba(2, 6, 23, 0.06)',
+  			'brand-glow': '0 8px 20px -6px color-mix(in srgb, var(--brand-color) 45%, transparent)'
   		},
   		keyframes: {
   			'accordion-down': {
