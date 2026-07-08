@@ -7,6 +7,7 @@ import MobileLayout from './layouts/MobileLayout';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import VehiclesPage from './pages/VehiclesPage';
+import UnitsPage from './pages/UnitsPage';
 import TripsPage from './pages/TripsPage';
 import DocumentsPage from './pages/DocumentsPage';
 import UsersPage from './pages/UsersPage';
@@ -14,6 +15,7 @@ import TireSchemaPage from './pages/TireSchemaPage';
 import TiresPage from './pages/TiresPage';
 import FuelPage from './pages/FuelPage';
 import MaintenancePage from './pages/MaintenancePage';
+import MaintenancePlansPage from './pages/MaintenancePlansPage';
 import InventoryPage from './pages/InventoryPage';
 import IssuesPage from './pages/IssuesPage';
 import SettlementsPage from './pages/SettlementsPage';
@@ -24,6 +26,7 @@ import CompaniesPage from './pages/CompaniesPage';
 import EquipmentPage from './pages/EquipmentPage';
 import BillingPage from './pages/BillingPage';
 import OfflineIndicator from './components/OfflineIndicator';
+import { usePush } from './hooks/usePush';
 // Driver Mobile App Pages
 import DriverLoginPage from './pages/driver/DriverLoginPage';
 import DriverHomePage from './pages/driver/DriverHomePage';
@@ -81,6 +84,20 @@ const PublicRoute = ({ children }) => {
   return children;
 };
 
+// Registra el Web Push solo cuando hay un usuario autenticado.
+// Se separa en dos componentes para respetar las reglas de hooks
+// (usePush nunca se llama condicionalmente).
+const PushHook = () => {
+  usePush();
+  return null;
+};
+
+const PushRegistrar = () => {
+  const { isAuthenticated, loading } = useAuth();
+  if (loading || !isAuthenticated) return null;
+  return <PushHook />;
+};
+
 // Placeholder pages for routes not yet implemented
 const PlaceholderPage = ({ title }) => (
   <div className="flex flex-col items-center justify-center h-96 text-slate-400">
@@ -130,6 +147,15 @@ function AppRoutes() {
         }
       />
       
+      <Route
+        path="/units"
+        element={
+          <ProtectedRoute allowedRoles={['owner', 'admin', 'flota']}>
+            <UnitsPage />
+          </ProtectedRoute>
+        }
+      />
+
       <Route
         path="/vehicles/:vehicleId/tires"
         element={
@@ -234,6 +260,15 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={['owner', 'admin', 'mantenimiento']}>
             <MaintenancePage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/maintenance/plans"
+        element={
+          <ProtectedRoute allowedRoles={['owner', 'admin', 'flota', 'mantenimiento']}>
+            <MaintenancePlansPage />
           </ProtectedRoute>
         }
       />
@@ -392,6 +427,7 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <AppRoutes />
+        <PushRegistrar />
         <Toaster />
         <OfflineIndicator />
       </AuthProvider>

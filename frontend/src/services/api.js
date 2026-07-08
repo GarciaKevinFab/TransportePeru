@@ -146,6 +146,14 @@ export const vehiclesApi = {
   updateEquipment: (id, data) => api.put(`/vehicles/${id}/equipment`, data),
 };
 
+// Units API (tracto + carreta + chofer + EPP de unidad)
+export const unitsApi = {
+  getAll: (params) => api.get('/units', { params }),
+  create: (data) => api.post('/units', data),
+  update: (id, data) => api.put(`/units/${id}`, data),
+  delete: (id) => api.delete(`/units/${id}`),
+};
+
 // Couplings API
 export const couplingsApi = {
   getAll: (params) => api.get('/couplings', { params }),
@@ -199,6 +207,7 @@ export const tripsApi = {
   getExpenses: (tripId) => api.get(`/trips/${tripId}/expenses`),
   createExpense: (tripId, data) => api.post(`/trips/${tripId}/expenses`, data),
   setViaticoBudget: (tripId, data) => api.post(`/trips/${tripId}/viatico-budget`, data),
+  getViaticoStatus: (id) => api.get(`/trips/${id}/viatico-status`),
 };
 
 // Checklists API
@@ -248,6 +257,7 @@ export const tiresApi = {
   regroove: (id, data) => api.post(`/tires/${id}/regroove`, data),
   scrap: (id, data) => api.post(`/tires/${id}/scrap`, data),
   scrapPile: (params) => api.get('/tires/reports/scrap-pile', { params }),
+  getProjection: (id) => api.get(`/tires/${id}/projection`),
 };
 
 // Maintenance API
@@ -272,6 +282,7 @@ export const maintenanceApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
+  getStatus: (vehicleId) => api.get(`/vehicles/${vehicleId}/maintenance-status`),
 };
 
 // Settlement API
@@ -313,6 +324,20 @@ export const issuesApi = {
   getAll: (params) => api.get('/issues', { params }),
   create: (data) => api.post('/issues', data),
   update: (id, data) => api.put(`/issues/${id}`, data),
+};
+
+// Notifications API (Web Push)
+export const notificationsApi = {
+  getVapidKey: () => api.get('/notifications/vapid-public-key'),
+  subscribe: (sub) => api.post('/notifications/subscribe', sub),
+};
+
+// Reports API
+export const reportsApi = {
+  costPerKm: (params) => api.get('/reports/cost-per-km', { params }),
+  documentsExpiring: (params) => api.get('/reports/documents-expiring', { params }),
+  viaticos: (params) => api.get('/reports/viaticos', { params }),
+  tiresRequired: (params) => api.get('/tires/reports/required', { params }),
 };
 
 // Dashboard API

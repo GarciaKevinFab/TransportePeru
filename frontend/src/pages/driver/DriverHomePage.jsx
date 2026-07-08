@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { tripsApi, alertsApi } from '../../services/api';
+import { tripsApi, alertsApi, vehiclesApi, maintenanceApi } from '../../services/api';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
@@ -18,6 +18,9 @@ import {
   Loader2,
   CheckCircle,
   Play,
+  Wrench,
+  Gauge,
+  PlusCircle,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -30,19 +33,43 @@ const DriverHomePage = () => {
   const [activeTrip, setActiveTrip] = useState(null);
   const [scheduledTrips, setScheduledTrips] = useState([]);
   const [alerts, setAlerts] = useState([]);
+  const [myVehicle, setMyVehicle] = useState(null);
+  const [maintStatus, setMaintStatus] = useState(null);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [tripsRes, alertsRes] = await Promise.all([
+      const [tripsRes, alertsRes, vehiclesRes] = await Promise.all([
         tripsApi.getAll({ driver_id: user?.id }),
         alertsApi.getAll({ resolved: false }),
+        vehiclesApi.getAll().catch(() => ({ data: [] })),
       ]);
 
       const trips = tripsRes.data;
-      setActiveTrip(trips.find(t => t.status === 'en_curso'));
+      const currentTrip = trips.find(t => t.status === 'en_curso');
+      setActiveTrip(currentTrip);
       setScheduledTrips(trips.filter(t => t.status === 'programado').slice(0, 3));
       setAlerts(alertsRes.data.slice(0, 3));
+
+      // Unidad del chofer: preferir el tracto del viaje activo; si no, el vehículo asignado.
+      const vehicleList = vehiclesRes.data || [];
+      const tracto =
+        (currentTrip && vehicleList.find(v => v.id === currentTrip.tracto_id)) ||
+        vehicleList.find(v => v.assigned_driver_id === user?.id && v.vehicle_type === 'tracto') ||
+        vehicleList.find(v => v.assigned_driver_id === user?.id);
+      setMyVehicle(tracto || null);
+
+      // Estado de mantenimiento preventivo de la unidad (silencioso si no hay plan).
+      if (tracto) {
+        try {
+          const st = await maintenanceApi.getStatus(tracto.id);
+          setMaintStatus(st.data);
+        } catch (e) {
+          setMaintStatus(null);
+        }
+      } else {
+        setMaintStatus(null);
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
     }
@@ -195,6 +222,136 @@ const DriverHomePage = () => {
           ))}
         </div>
       </div>
+
+      {/* Mantenimiento de tu unidad */}
+      {myVehicle && (
+        <div className="smooth-appear smooth-appear-2">
+          <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">
+            Mantenimiento de tu Unidad
+          </h2>
+          {maintStatus && maintStatus.km_remaining != null ? (
+            <Card
+              className={`border ${
+                maintStatus.km_remaining <= 0
+                  ? 'bg-red-50 border-red-200'
+                  : maintStatus.due_soon
+                  ? 'bg-orange-50 border-orange-200'
+                  : 'bg-white border-slate-200'
+              }`}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                      maintStatus.km_remaining <= 0
+                        ? 'bg-red-100 text-red-600'
+                        : maintStatus.due_soon
+                        ? 'bg-orange-100 text-orange-600'
+                        : 'bg-slate-100 text-slate-600'
+                    }`}
+                  >
+                    <Gauge className="w-6 h-6" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    {maintStatus.km_remaining <= 0 ? (
+                      <p className="font-bold text-red-700">Servicio de mantenimiento vencido</p>
+                    ) : (
+                      <p
+                        className={`font-bold ${
+                          maintStatus.due_soon ? 'text-orange-700' : 'text-slate-800'
+                        }`}
+                      >
+                        Faltan {Number(maintStatus.km_remaining).toLocaleString('es-PE')} km para el mantenimiento
+                      </p>
+                    )}
+                    <p className="text-xs text-slate-500 truncate">
+                      {maintStatus.plan_name ? `Plan: ${maintStatus.plan_name}` : 'Plan preventivo'}
+                      {maintStatus.next_service_km != null &&
+                        ` · Próximo servicio a ${Number(maintStatus.next_service_km).toLocaleString('es-PE')} km`}
+                    </p>
+                  </div>
+                  {maintStatus.due_soon && (
+                    <Badge className="bg-orange-500 text-white flex-shrink-0">
+                      <AlertTriangle className="w-3 h-3 mr-1" />
+                      Pronto
+                    </Badge>
+                  )}
+                </div>
+                <Button
+                  variant="outline"
+                  className="w-full mt-3 rounded-lg tap-scale"
+                  onClick={() => navigate('/driver/issues')}
+                >
+                  <PlusCircle className="w-4 h-4 mr-2" />
+                  Agregar Observación
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="bg-white border-slate-200">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center flex-shrink-0">
+                  <Wrench className="w-6 h-6" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-slate-700">Sin plan de mantenimiento asignado</p>
+                  <p className="text-xs text-slate-500">Reporta cualquier novedad de tu unidad</p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-lg tap-scale flex-shrink-0"
+                  onClick={() => navigate('/driver/issues')}
+                >
+                  <PlusCircle className="w-4 h-4 mr-1" />
+                  Observación
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* Resumen de tu unidad */}
+      {(myVehicle || activeTrip) && (
+        <div className="smooth-appear smooth-appear-2">
+          <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">
+            Resumen de tu Unidad
+          </h2>
+          <div className="grid grid-cols-2 gap-3">
+            <Card className="bg-white border-slate-200">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 text-slate-500 mb-1">
+                  <Truck className="w-4 h-4" />
+                  <span className="text-[10px] uppercase font-bold tracking-widest">Tracto</span>
+                </div>
+                <p className="font-mono font-black text-lg text-slate-900">
+                  {myVehicle?.plate || activeTrip?.tracto_plate || '-'}
+                </p>
+                {myVehicle && (
+                  <p className="text-xs text-slate-500 truncate">
+                    {myVehicle.brand} {myVehicle.model}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+            <Card className="bg-white border-slate-200">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 text-slate-500 mb-1">
+                  <Package className="w-4 h-4" />
+                  <span className="text-[10px] uppercase font-bold tracking-widest">Carreta</span>
+                </div>
+                <p className="font-mono font-black text-lg text-slate-900">
+                  {activeTrip?.carreta_plate || '-'}
+                </p>
+                <p className="text-xs text-slate-500 truncate">
+                  {activeTrip?.carreta_plate ? 'En viaje activo' : 'Sin carreta acoplada'}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
 
       {/* Scheduled Trips */}
       {scheduledTrips.length > 0 && (

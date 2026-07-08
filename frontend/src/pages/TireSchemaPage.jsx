@@ -560,6 +560,7 @@ const TireSchemaPage = () => {
                   <TableHead>Fecha Montaje</TableHead>
                   <TableHead>Prof. (mm)</TableHead>
                   <TableHead>km Recorridos</TableHead>
+                  <TableHead>Km Restantes</TableHead>
                   <TableHead>Costo/km</TableHead>
                   <TableHead>Estado</TableHead>
                 </TableRow>
@@ -571,7 +572,12 @@ const TireSchemaPage = () => {
                   return (
                     <TableRow
                       key={tire.id}
-                      className="table-dense cursor-pointer hover:bg-slate-50"
+                      className={`table-dense cursor-pointer ${
+                        tire.needs_review
+                          ? 'bg-amber-50 hover:bg-amber-100'
+                          : 'hover:bg-slate-50'
+                      }`}
+                      data-testid={tire.needs_review ? 'tire-row-review' : undefined}
                       onClick={() => {
                         setSelectedTire(tire);
                         setShowTireDetailsDialog(true);
@@ -595,6 +601,17 @@ const TireSchemaPage = () => {
                         {md === null ? '—' : `${md.toFixed(1)}`}
                       </TableCell>
                       <TableCell className="font-mono">{fmtNum(tire.km_recorridos)}</TableCell>
+                      <TableCell className="font-mono">
+                        <div className="flex items-center gap-2">
+                          <span>{fmtNum(tire.km_remaining)}</span>
+                          {tire.needs_review && (
+                            <Badge className="bg-amber-100 text-amber-700 border-amber-200 gap-1 whitespace-nowrap">
+                              <AlertTriangle className="w-3 h-3" />
+                              Revisar
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="font-mono">{fmtMoney(tire.cost_per_km)}</TableCell>
                       <TableCell>
                         <Badge className={statusStyles[status]}>{statusLabels[status]}</Badge>

@@ -253,14 +253,24 @@ const MaintenancePlansPanel = ({ vehicles = [] }) => {
               <p className="text-sm text-slate-500">No hay vehículos disponibles</p>
             ) : (
               <div className="space-y-2">
-                {/* Group by type */}
-                {['tracto', 'carreta'].map(type => {
-                  const list = vehicles.filter(v => v.vehicle_type === type);
+                {/* Group by type — 'otros' captura cualquier vehículo sin tipo tracto/carreta */}
+                {[
+                  { key: 'tracto', label: 'Tractos' },
+                  { key: 'carreta', label: 'Carretas' },
+                  { key: 'otros', label: 'Otros' },
+                ].map(({ key, label }) => {
+                  const list = key === 'otros'
+                    ? vehicles.filter(v => v.vehicle_type !== 'tracto' && v.vehicle_type !== 'carreta')
+                    : vehicles.filter(v => v.vehicle_type === key);
                   if (list.length === 0) return null;
+                  const selectedInGroup = list.filter(v => assignVehicleIds.includes(v.id)).length;
                   return (
-                    <div key={type}>
-                      <div className="text-xs font-bold uppercase text-slate-500 mt-3 mb-1">
-                        {type === 'tracto' ? 'Tractos' : 'Carretas'}
+                    <div key={key}>
+                      <div className="flex items-center justify-between mt-3 mb-1">
+                        <div className="text-xs font-bold uppercase text-slate-500">{label}</div>
+                        {selectedInGroup > 0 && (
+                          <Badge variant="outline" className="text-[10px]">{selectedInGroup} seleccionado(s)</Badge>
+                        )}
                       </div>
                       {list.map(v => (
                         <label key={v.id} className="flex items-center gap-2 p-2 hover:bg-slate-50 rounded cursor-pointer">

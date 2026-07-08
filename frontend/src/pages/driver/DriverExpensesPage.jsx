@@ -34,11 +34,18 @@ import {
   ImageIcon,
   ArrowLeft,
   Check,
+  AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../../context/AuthContext';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+
+// Viáticos por viaje (regla de negocio): S/ 540 por viaje
+const VIATICO_POR_VIAJE = 540;
+const API_ORIGIN = process.env.REACT_APP_BACKEND_URL || '';
+// Resuelve URLs relativas de /uploads contra el backend; deja pasar base64 y absolutas
+const resolvePhoto = (u) => (u && typeof u === 'string' && u.startsWith('/uploads') ? `${API_ORIGIN}${u}` : u);
 
 const expenseCategories = [
   { value: 'alimentacion', label: 'Alimentación', icon: '🍽️' },
@@ -63,6 +70,9 @@ const DriverExpensesPage = () => {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [capturedPhoto, setCapturedPhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
+  const [scanning, setScanning] = useState(false);
+  const [viatico, setViatico] = useState(null);
+  const [photoViewer, setPhotoViewer] = useState({ open: false, url: '' });
 
   const [form, setForm] = useState({
     category: 'alimentacion',
@@ -89,6 +99,13 @@ const DriverExpensesPage = () => {
         // Fetch expenses for this trip
         const expRes = await api.get(`/trips/${active.id}/expenses`);
         setExpenses(expRes.data || []);
+        // Estado de viáticos (saldo vs 540/viaje)
+        try {
+          const vRes = await tripsApi.getViaticoStatus(active.id);
+          setViatico(vRes.data);
+        } catch (e) {
+          setViatico(null);
+        }
       }
     } catch (error) {
       console.error('Error fetching trips:', error);
@@ -111,9 +128,30 @@ const DriverExpensesPage = () => {
 
     // Show preview
     const reader = new FileReader();
-    reader.onload = (event) => {
-      setCapturedPhoto(event.target.result);
-      setPhotoPreview(event.target.result);
+    reader.onload = async (event) => {
+      const base64Data = event.target.result;
+      setCapturedPhoto(base64Data);
+      setPhotoPreview(base64Data);
+
+      // OCR opcional: autollenar el monto desde la foto (best-effort)
+      setScanning(true);
+      try {
+        const ocrRes = await api.post('/fuel/ocr', { image_base64: base64Data });
+        if (ocrRes.data?.success && ocrRes.data.extracted_data) {
+          const ex = ocrRes.data.extracted_data;
+          const monto = ex.total_amount ?? ex.amount;
+          setForm((prev) => ({
+            ...prev,
+            amount: prev.amount || (monto != null ? monto.toString() : prev.amount),
+            provider: prev.provider || ex.provider || prev.provider,
+            ruc: prev.ruc || ex.ruc || prev.ruc,
+          }));
+          if (monto != null) toast.success('Monto detectado del comprobante');
+        }
+      } catch (e) {
+        // OCR no disponible: continuar sin autollenado
+      }
+      setScanning(false);
     };
     reader.readAsDataURL(file);
   };
@@ -184,6 +222,12 @@ const DriverExpensesPage = () => {
     .reduce((sum, e) => sum + (e.amount || 0), 0);
   const todayRemaining = dailyBudget - todayExpenses;
 
+  // Estado de viáticos contra 540/viaje: usa el endpoint si respondió, si no cálculo local
+  const viaticoRemaining = viatico?.remaining ?? (totalBudget ? remaining : null);
+  const viaticoAlert = viatico?.alert ?? (viaticoRemaining != null && viaticoRemaining < VIATICO_POR_VIAJE);
+
+  const openReceipt = (url) => setPhotoViewer({ open: true, url: resolvePhoto(url) });
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -222,6 +266,31 @@ const DriverExpensesPage = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Alerta de saldo de viáticos (< 1 viaje) */}
+      {viaticoRemaining != null && (
+        <Card
+          data-testid="expenses-viatico-status"
+          className={viaticoAlert ? 'border-red-300 bg-red-50' : 'border-emerald-200 bg-emerald-50'}
+        >
+          <CardContent className="py-3 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Saldo de Viáticos</p>
+              <p className={`text-xl font-bold ${viaticoAlert ? 'text-red-600' : 'text-emerald-700'}`}>
+                S/ {viaticoRemaining.toFixed(2)}
+              </p>
+            </div>
+            {viaticoAlert && (
+              <div className="flex items-center gap-2 text-red-700">
+                <AlertTriangle className="w-5 h-5" />
+                <span className="text-sm font-semibold text-right">
+                  Saldo menor a 1 viaje (S/ {VIATICO_POR_VIAJE})
+                </span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Budget Summary */}
       {dailyBudget > 0 && (
@@ -309,13 +378,21 @@ const DriverExpensesPage = () => {
                         {format(new Date(expense.expense_date || expense.created_at), 'dd/MM HH:mm', { locale: es })}
                       </p>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right flex flex-col items-end">
                       <p className="font-bold text-red-600">-S/ {expense.amount.toFixed(2)}</p>
                       {expense.receipt_url && (
-                        <Badge variant="outline" className="text-[10px] mt-1">
-                          <ImageIcon className="w-3 h-3 mr-1" />
-                          Ticket
-                        </Badge>
+                        <button
+                          type="button"
+                          onClick={() => openReceipt(expense.receipt_url)}
+                          className="mt-1 border-2 border-slate-200 rounded p-0.5 hover:border-orange-400"
+                          title="Ver comprobante"
+                        >
+                          <img
+                            src={resolvePhoto(expense.receipt_url)}
+                            alt="Comprobante"
+                            className="w-10 h-10 object-cover rounded"
+                          />
+                        </button>
                       )}
                     </div>
                   </div>
@@ -417,6 +494,11 @@ const DriverExpensesPage = () => {
                   </Button>
                 </div>
               )}
+              {scanning && (
+                <p className="text-xs text-blue-700 flex items-center gap-1">
+                  <Loader2 className="w-3 h-3 animate-spin" /> Escaneando comprobante...
+                </p>
+              )}
             </div>
 
             {/* Category */}
@@ -516,6 +598,20 @@ const DriverExpensesPage = () => {
               Registrar Gasto
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Visor de comprobante */}
+      <Dialog open={photoViewer.open} onOpenChange={(open) => setPhotoViewer((p) => ({ ...p, open }))}>
+        <DialogContent className="max-w-[95vw] sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Comprobante</DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center justify-center bg-slate-100 rounded p-2">
+            {photoViewer.url && (
+              <img src={photoViewer.url} alt="Comprobante" className="max-h-[70vh] max-w-full object-contain" />
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { documentsApi, documentTypesApi, vehiclesApi, usersApi } from '../services/api';
+import React, { useState, useEffect, useRef } from 'react';
+import { documentsApi, documentTypesApi, vehiclesApi, usersApi, uploadApi } from '../services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -39,10 +39,22 @@ import {
   Clock,
   XCircle,
   Upload,
+  Download,
+  Ban,
+  Paperclip,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
+
+// Los archivos locales se sirven en `${BACKEND_URL}/uploads/...` (URL relativa);
+// los de S3 ya vienen como URL absoluta.
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
+const resolveFileUrl = (url) => {
+  if (!url) return '';
+  if (/^https?:\/\//i.test(url)) return url;
+  return `${BACKEND_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+};
 
 const DocumentsPage = () => {
   const [loading, setLoading] = useState(true);
@@ -51,11 +63,15 @@ const DocumentsPage = () => {
   const [entityType, setEntityType] = useState('vehicle');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [saving, setSaving] = useState(false);
-  
+
   // For creating documents
   const [vehicles, setVehicles] = useState([]);
   const [drivers, setDrivers] = useState([]);
-  
+
+  // File upload
+  const [selectedFile, setSelectedFile] = useState(null);
+  const fileInputRef = useRef(null);
+
   // Form state
   const [formData, setFormData] = useState({
     document_type_id: '',
@@ -65,6 +81,7 @@ const DocumentsPage = () => {
     issue_date: '',
     expiry_date: '',
     notes: '',
+    file_url: '',
   });
 
   const fetchData = async () => {
@@ -92,11 +109,31 @@ const DocumentsPage = () => {
     fetchData();
   }, [entityType]);
 
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    setSelectedFile(file || null);
+  };
+
   const handleCreateDocument = async () => {
     setSaving(true);
     try {
+      let fileUrl = formData.file_url || '';
+
+      // Subir el archivo adjunto (si lo hay) antes de crear el documento.
+      if (selectedFile) {
+        try {
+          const uploadRes = await uploadApi.upload(selectedFile, 'documents', formData.entity_id);
+          fileUrl = uploadRes.data?.url || '';
+        } catch (uploadErr) {
+          toast.error(uploadErr.response?.data?.detail || 'Error al subir el archivo');
+          setSaving(false);
+          return;
+        }
+      }
+
       await documentsApi.create({
         ...formData,
+        file_url: fileUrl || null,
         issue_date: formData.issue_date ? new Date(formData.issue_date).toISOString() : null,
         expiry_date: formData.expiry_date ? new Date(formData.expiry_date).toISOString() : null,
       });
@@ -119,10 +156,57 @@ const DocumentsPage = () => {
       issue_date: '',
       expiry_date: '',
       notes: '',
+      file_url: '',
     });
+    setSelectedFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const getStatusCell = (doc, docType) => {
+  // Regla: la Revisión Técnica solo aplica a vehículos que superan los 4 años.
+  const isRevisionTecnica = (docType) =>
+    (docType?.name || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .includes('revision tecnica');
+
+  const revisionTecnicaNoAplica = (docType, entity) => {
+    if (entityType !== 'vehicle' || !isRevisionTecnica(docType)) return false;
+    const year = entity?.year;
+    if (!year) return false;
+    const currentYear = new Date().getFullYear();
+    return currentYear - year <= 4;
+  };
+
+  const FileLink = ({ doc }) =>
+    doc?.file_url ? (
+      <a
+        href={resolveFileUrl(doc.file_url)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-slate-400 hover:text-orange-500"
+        title="Ver / descargar archivo"
+        onClick={(e) => e.stopPropagation()}
+        data-testid="doc-file-link"
+      >
+        <Download className="w-3 h-3" />
+      </a>
+    ) : null;
+
+  const getStatusCell = (doc, docType, entity) => {
+    // "No aplica" (Revisión Técnica en vehículos de 4 años o menos)
+    if (revisionTecnicaNoAplica(docType, entity)) {
+      return (
+        <div
+          className="doc-cell flex items-center justify-center gap-1 bg-slate-100 text-slate-400 border border-slate-200 rounded"
+          data-testid="doc-cell-no-aplica"
+        >
+          <Ban className="w-3 h-3" />
+          <span>No aplica</span>
+        </div>
+      );
+    }
+
     if (!doc) {
       return (
         <div className="doc-cell pendiente flex items-center justify-center gap-1">
@@ -278,7 +362,10 @@ const DocumentsPage = () => {
                         </TableCell>
                         {matrix.document_types.map((dt) => (
                           <TableCell key={dt.id} className="text-center p-2">
-                            {getStatusCell(row.documents[dt.id], dt)}
+                            <div className="flex items-center justify-center gap-1">
+                              {getStatusCell(row.documents[dt.id], dt, row.entity)}
+                              <FileLink doc={row.documents[dt.id]} />
+                            </div>
                           </TableCell>
                         ))}
                       </TableRow>
@@ -440,6 +527,46 @@ const DocumentsPage = () => {
                   data-testid="doc-expiry-input"
                 />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="input-label">Archivo Adjunto</Label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,application/pdf"
+                onChange={handleFileChange}
+                className="hidden"
+                data-testid="doc-file-input"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full justify-start border-dashed rounded-sm"
+                onClick={() => fileInputRef.current?.click()}
+                data-testid="doc-file-upload-btn"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                {selectedFile ? 'Cambiar archivo' : 'Subir archivo (PDF o imagen)'}
+              </Button>
+              {selectedFile && (
+                <div className="flex items-center justify-between gap-2 text-xs text-slate-600 bg-slate-50 rounded-sm px-2 py-1">
+                  <span className="flex items-center gap-1 truncate">
+                    <Paperclip className="w-3 h-3 shrink-0" />
+                    <span className="truncate">{selectedFile.name}</span>
+                  </span>
+                  <button
+                    type="button"
+                    className="text-slate-400 hover:text-red-500 shrink-0"
+                    onClick={() => {
+                      setSelectedFile(null);
+                      if (fileInputRef.current) fileInputRef.current.value = '';
+                    }}
+                    data-testid="doc-file-remove-btn"
+                  >
+                    <XCircle className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>

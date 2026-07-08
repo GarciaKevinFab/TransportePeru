@@ -54,6 +54,10 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useAuth } from '../context/AuthContext';
 
+const API_ORIGIN = process.env.REACT_APP_BACKEND_URL || '';
+// Resuelve URLs relativas de /uploads contra el backend; deja pasar base64 y absolutas
+const resolvePhoto = (u) => (u && typeof u === 'string' && u.startsWith('/uploads') ? `${API_ORIGIN}${u}` : u);
+
 const FuelPage = () => {
   const { user } = useAuth();
   const fileInputRef = useRef(null);
@@ -65,6 +69,7 @@ const FuelPage = () => {
   const [kpis, setKpis] = useState(null);
   const [vehicles, setVehicles] = useState([]);
   const [trips, setTrips] = useState([]);
+  const [allTrips, setAllTrips] = useState([]);
   const [drivers, setDrivers] = useState([]);
   const [photoPreview, setPhotoPreview] = useState({ open: false, url: '', title: '' });
   
@@ -120,7 +125,7 @@ const FuelPage = () => {
       const [vouchersRes, loadsRes, kpisRes, vehiclesRes, tripsRes, driversRes] = await Promise.all([
         fuelApi.getVouchers(),
         fuelApi.getLoads(),
-        fuelApi.getKpis(),
+        fuelApi.getKPIs(),
         vehiclesApi.getAll(),
         tripsApi.getAll(),
         usersApi.getAll({ role: 'chofer' }),
@@ -129,6 +134,7 @@ const FuelPage = () => {
       setLoads(loadsRes.data);
       setKpis(kpisRes.data);
       setVehicles(vehiclesRes.data);
+      setAllTrips(tripsRes.data);
       setTrips(tripsRes.data.filter(t => t.status === 'en_curso' || t.status === 'programado'));
       setDrivers(driversRes.data);
     } catch (error) {
@@ -473,7 +479,14 @@ const FuelPage = () => {
     const d = drivers.find(u => u.id === id);
     return d ? d.name : '-';
   };
-  const openPhoto = (url, title) => setPhotoPreview({ open: true, url, title });
+  const getTripLabel = (id) => {
+    if (!id) return null;
+    const t = allTrips.find(tr => tr.id === id);
+    if (!t) return null;
+    const cliente = t.client_name || 'Sin cliente';
+    return `${cliente} · ${format(new Date(t.scheduled_date), 'dd/MM/yy')}`;
+  };
+  const openPhoto = (url, title) => setPhotoPreview({ open: true, url: resolvePhoto(url), title });
 
   const totalLiters = loads.reduce((sum, l) => sum + (l.liters || 0), 0);
   const totalAmount = loads.reduce((sum, l) => sum + (l.total_amount || 0), 0);
@@ -659,14 +672,14 @@ const FuelPage = () => {
                           <div className="flex items-center gap-1">
                             {(voucher.voucher_photo_url || voucher.photo_url) ? (
                               <button onClick={() => openPhoto(voucher.voucher_photo_url || voucher.photo_url, `Vale ${voucher.voucher_number}`)} className="border-2 border-blue-300 rounded p-0.5 hover:border-blue-500" title="Foto del vale">
-                                <img src={voucher.voucher_photo_url || voucher.photo_url} alt="vale" className="w-8 h-8 object-cover rounded" />
+                                <img src={resolvePhoto(voucher.voucher_photo_url || voucher.photo_url)} alt="vale" className="w-8 h-8 object-cover rounded" />
                               </button>
                             ) : (
                               <div className="w-9 h-9 border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-slate-300 text-[10px]">V</div>
                             )}
                             {voucher.invoice_photo_url ? (
                               <button onClick={() => openPhoto(voucher.invoice_photo_url, `Factura ${voucher.invoice_number || ''}`)} className="border-2 border-orange-300 rounded p-0.5 hover:border-orange-500" title="Foto de factura">
-                                <img src={voucher.invoice_photo_url} alt="factura" className="w-8 h-8 object-cover rounded" />
+                                <img src={resolvePhoto(voucher.invoice_photo_url)} alt="factura" className="w-8 h-8 object-cover rounded" />
                               </button>
                             ) : (
                               <div className="w-9 h-9 border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-slate-300 text-[10px]">F</div>
@@ -723,6 +736,7 @@ const FuelPage = () => {
                       <TableHead>Fecha</TableHead>
                       <TableHead>Chofer</TableHead>
                       <TableHead>Vehículo</TableHead>
+                      <TableHead>Viaje</TableHead>
                       <TableHead>N° Vale</TableHead>
                       <TableHead>N° Factura</TableHead>
                       <TableHead>Litros</TableHead>
@@ -743,6 +757,13 @@ const FuelPage = () => {
                         </TableCell>
                         <TableCell className="text-sm font-medium">{getDriverName(load.driver_id)}</TableCell>
                         <TableCell className="font-mono">{getVehiclePlate(load.vehicle_id)}</TableCell>
+                        <TableCell className="text-xs">
+                          {getTripLabel(load.trip_id) ? (
+                            <span className="text-slate-700">{getTripLabel(load.trip_id)}</span>
+                          ) : (
+                            <span className="text-slate-300">-</span>
+                          )}
+                        </TableCell>
                         <TableCell className="font-mono text-xs">{load.voucher_number || '-'}</TableCell>
                         <TableCell className="font-mono text-xs">{load.invoice_number || '-'}</TableCell>
                         <TableCell className="font-bold">{load.liters?.toFixed(2)} L</TableCell>
@@ -752,14 +773,14 @@ const FuelPage = () => {
                           <div className="flex items-center justify-center gap-1">
                             {voucherPhoto ? (
                               <button onClick={() => openPhoto(voucherPhoto, `Vale ${load.voucher_number || ''}`)} className="border-2 border-blue-300 rounded p-0.5 hover:border-blue-500" title="Foto del vale">
-                                <img src={voucherPhoto} alt="vale" className="w-8 h-8 object-cover rounded" />
+                                <img src={resolvePhoto(voucherPhoto)} alt="vale" className="w-8 h-8 object-cover rounded" />
                               </button>
                             ) : (
                               <div className="w-9 h-9 border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-slate-300 text-[10px]">V</div>
                             )}
                             {invoicePhoto ? (
                               <button onClick={() => openPhoto(invoicePhoto, `Factura ${load.invoice_number || ''}`)} className="border-2 border-orange-300 rounded p-0.5 hover:border-orange-500" title="Foto de factura">
-                                <img src={invoicePhoto} alt="factura" className="w-8 h-8 object-cover rounded" />
+                                <img src={resolvePhoto(invoicePhoto)} alt="factura" className="w-8 h-8 object-cover rounded" />
                               </button>
                             ) : (
                               <div className="w-9 h-9 border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-slate-300 text-[10px]">F</div>
@@ -960,7 +981,7 @@ const FuelPage = () => {
               </div>
               {voucherForm.voucher_photo_url && (
                 <div className="mt-2 relative">
-                  <img src={voucherForm.voucher_photo_url} alt="Vale" className="w-full max-h-48 object-contain rounded-sm border" />
+                  <img src={resolvePhoto(voucherForm.voucher_photo_url)} alt="Vale" className="w-full max-h-48 object-contain rounded-sm border" />
                   <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full p-1">
                     <Check className="w-4 h-4" />
                   </div>
@@ -1004,7 +1025,7 @@ const FuelPage = () => {
               </div>
               {voucherForm.invoice_photo_url && (
                 <div className="mt-2 relative">
-                  <img src={voucherForm.invoice_photo_url} alt="Factura" className="w-full max-h-48 object-contain rounded-sm border" />
+                  <img src={resolvePhoto(voucherForm.invoice_photo_url)} alt="Factura" className="w-full max-h-48 object-contain rounded-sm border" />
                   <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full p-1">
                     <Check className="w-4 h-4" />
                   </div>
@@ -1165,7 +1186,7 @@ const FuelPage = () => {
               </div>
               {loadForm.voucher_photo_url && (
                 <div className="mt-2 relative">
-                  <img src={loadForm.voucher_photo_url} alt="Vale" className="w-full max-h-48 object-contain rounded-sm border" />
+                  <img src={resolvePhoto(loadForm.voucher_photo_url)} alt="Vale" className="w-full max-h-48 object-contain rounded-sm border" />
                   <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full p-1">
                     <Check className="w-4 h-4" />
                   </div>
@@ -1209,7 +1230,7 @@ const FuelPage = () => {
               </div>
               {loadForm.invoice_photo_url && (
                 <div className="mt-2 relative">
-                  <img src={loadForm.invoice_photo_url} alt="Factura" className="w-full max-h-48 object-contain rounded-sm border" />
+                  <img src={resolvePhoto(loadForm.invoice_photo_url)} alt="Factura" className="w-full max-h-48 object-contain rounded-sm border" />
                   <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full p-1">
                     <Check className="w-4 h-4" />
                   </div>

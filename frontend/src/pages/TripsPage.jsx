@@ -31,6 +31,7 @@ import {
 } from '../components/ui/dialog';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
+import { Checkbox } from '../components/ui/checkbox';
 import {
   Route,
   Plus,
@@ -77,7 +78,15 @@ const TripsPage = () => {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState(null);
   const [saving, setSaving] = useState(false);
-  
+
+  // Odometer dialog states
+  const [showStartDialog, setShowStartDialog] = useState(false);
+  const [showCompleteDialog, setShowCompleteDialog] = useState(false);
+  const [actionTrip, setActionTrip] = useState(null);
+  const [kmStart, setKmStart] = useState('');
+  const [kmEnd, setKmEnd] = useState('');
+  const [completeNotes, setCompleteNotes] = useState('');
+
   // Form state
   const [formData, setFormData] = useState({
     tracto_id: '',
@@ -89,6 +98,7 @@ const TripsPage = () => {
     cargo_weight: '',
     scheduled_date: '',
     notes: '',
+    is_round_trip: true,
   });
 
   const fetchData = async () => {
@@ -140,6 +150,7 @@ const TripsPage = () => {
         ...formData,
         cargo_weight: formData.cargo_weight ? parseFloat(formData.cargo_weight) : null,
         scheduled_date: new Date(formData.scheduled_date).toISOString(),
+        is_round_trip: formData.is_round_trip,
       });
       toast.success('Viaje creado exitosamente');
       setShowCreateDialog(false);
@@ -151,24 +162,66 @@ const TripsPage = () => {
     setSaving(false);
   };
 
-  const handleStartTrip = async (tripId) => {
+  const openStartDialog = (trip) => {
+    setActionTrip(trip);
+    // Precargar con el odómetro actual del tracto
+    const tracto = vehicles.find((v) => v.id === trip.tracto_id);
+    setKmStart(tracto?.odometer != null ? String(tracto.odometer) : '');
+    setShowStartDialog(true);
+  };
+
+  const handleStartTrip = async () => {
+    if (!actionTrip) return;
+    const km = parseInt(kmStart, 10);
+    if (isNaN(km) || km < 0) {
+      toast.error('Ingresa un kilometraje válido');
+      return;
+    }
+    setSaving(true);
     try {
-      await tripsApi.start(tripId, { km_start: 0 });
+      await tripsApi.start(actionTrip.id, { km_start: km });
       toast.success('Viaje iniciado');
+      setShowStartDialog(false);
+      setActionTrip(null);
+      setKmStart('');
       fetchData();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Error al iniciar viaje');
     }
+    setSaving(false);
   };
 
-  const handleCompleteTrip = async (tripId) => {
+  const openCompleteDialog = (trip) => {
+    setActionTrip(trip);
+    setKmEnd('');
+    setCompleteNotes(trip.notes || '');
+    setShowCompleteDialog(true);
+  };
+
+  const handleCompleteTrip = async () => {
+    if (!actionTrip) return;
+    const km = parseInt(kmEnd, 10);
+    if (isNaN(km) || km < 0) {
+      toast.error('Ingresa un kilometraje válido');
+      return;
+    }
+    if (actionTrip.km_start != null && km < actionTrip.km_start) {
+      toast.error(`El odómetro final debe ser mayor o igual a ${actionTrip.km_start} km`);
+      return;
+    }
+    setSaving(true);
     try {
-      await tripsApi.complete(tripId, { km_end: 0 });
+      await tripsApi.complete(actionTrip.id, { km_end: km, notes: completeNotes });
       toast.success('Viaje completado');
+      setShowCompleteDialog(false);
+      setActionTrip(null);
+      setKmEnd('');
+      setCompleteNotes('');
       fetchData();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Error al completar viaje');
     }
+    setSaving(false);
   };
 
   const resetForm = () => {
@@ -182,6 +235,7 @@ const TripsPage = () => {
       cargo_weight: '',
       scheduled_date: '',
       notes: '',
+      is_round_trip: true,
       status: 'programado',
     });
     setSelectedTrip(null);
@@ -199,6 +253,7 @@ const TripsPage = () => {
       cargo_weight: trip.cargo_weight?.toString() || '',
       scheduled_date: trip.scheduled_date ? trip.scheduled_date.substring(0, 16) : '',
       notes: trip.notes || '',
+      is_round_trip: trip.is_round_trip !== undefined ? trip.is_round_trip : true,
       status: trip.status || 'programado',
     });
     setShowEditDialog(true);
@@ -212,6 +267,7 @@ const TripsPage = () => {
         ...formData,
         cargo_weight: formData.cargo_weight ? parseFloat(formData.cargo_weight) : null,
         scheduled_date: formData.scheduled_date ? new Date(formData.scheduled_date).toISOString() : null,
+        is_round_trip: formData.is_round_trip,
       });
       toast.success('Viaje actualizado');
       setShowEditDialog(false);
@@ -395,13 +451,13 @@ const TripsPage = () => {
                             </DropdownMenuItem>
                           )}
                           {trip.status === 'programado' && (
-                            <DropdownMenuItem onClick={() => handleStartTrip(trip.id)}>
+                            <DropdownMenuItem onClick={() => openStartDialog(trip)}>
                               <Play className="w-4 h-4 mr-2" />
                               Iniciar Viaje
                             </DropdownMenuItem>
                           )}
                           {trip.status === 'en_curso' && (
-                            <DropdownMenuItem onClick={() => handleCompleteTrip(trip.id)}>
+                            <DropdownMenuItem onClick={() => openCompleteDialog(trip)}>
                               <CheckCircle className="w-4 h-4 mr-2" />
                               Completar Viaje
                             </DropdownMenuItem>
@@ -577,6 +633,18 @@ const TripsPage = () => {
                 rows={3}
               />
             </div>
+
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="create-round-trip"
+                checked={formData.is_round_trip}
+                onCheckedChange={(v) => setFormData({ ...formData, is_round_trip: !!v })}
+                data-testid="trip-round-trip-checkbox"
+              />
+              <Label htmlFor="create-round-trip" className="input-label cursor-pointer">
+                Ida y vuelta
+              </Label>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
@@ -734,6 +802,16 @@ const TripsPage = () => {
                 rows={3}
               />
             </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="edit-round-trip"
+                checked={formData.is_round_trip}
+                onCheckedChange={(v) => setFormData({ ...formData, is_round_trip: !!v })}
+              />
+              <Label htmlFor="edit-round-trip" className="input-label cursor-pointer">
+                Ida y vuelta
+              </Label>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { resetForm(); setShowEditDialog(false); }}>
@@ -746,6 +824,112 @@ const TripsPage = () => {
             >
               {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Actualizar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Start Trip Dialog (odometer) */}
+      <Dialog open={showStartDialog} onOpenChange={(open) => { if (!open) { setActionTrip(null); setKmStart(''); } setShowStartDialog(open); }}>
+        <DialogContent className="max-w-[95vw] sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
+              Iniciar Viaje
+            </DialogTitle>
+            <DialogDescription>
+              Registra el odómetro real del tracto al iniciar
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            {actionTrip && (
+              <div className="p-3 bg-orange-50 rounded-sm">
+                <p className="font-medium text-slate-800">{actionTrip.client_name || 'Sin cliente'}</p>
+                <p className="text-xs text-slate-500 font-mono">{getVehiclePlate(actionTrip.tracto_id)}</p>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label className="input-label">Odómetro inicial (km) *</Label>
+              <Input
+                type="number"
+                value={kmStart}
+                onChange={(e) => setKmStart(e.target.value)}
+                placeholder="Ej. 125000"
+                className="rounded-sm"
+                data-testid="trip-km-start-input"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowStartDialog(false)}>
+              Cancelar
+            </Button>
+            <Button
+              className="btn-action"
+              onClick={handleStartTrip}
+              disabled={saving || kmStart === ''}
+              data-testid="confirm-start-trip-btn"
+            >
+              {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Iniciar Viaje
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Complete Trip Dialog (odometer) */}
+      <Dialog open={showCompleteDialog} onOpenChange={(open) => { if (!open) { setActionTrip(null); setKmEnd(''); setCompleteNotes(''); } setShowCompleteDialog(open); }}>
+        <DialogContent className="max-w-[95vw] sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-xl font-bold uppercase tracking-wide">
+              Completar Viaje
+            </DialogTitle>
+            <DialogDescription>
+              Registra el odómetro real del tracto al finalizar
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            {actionTrip && (
+              <div className="p-3 bg-green-50 rounded-sm">
+                <p className="font-medium text-slate-800">{actionTrip.client_name || 'Sin cliente'}</p>
+                <p className="text-xs text-slate-500">
+                  Odómetro inicial: {actionTrip.km_start != null ? `${actionTrip.km_start} km` : '-'}
+                </p>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label className="input-label">Odómetro final (km) *</Label>
+              <Input
+                type="number"
+                value={kmEnd}
+                onChange={(e) => setKmEnd(e.target.value)}
+                placeholder="Ej. 125850"
+                className="rounded-sm"
+                data-testid="trip-km-end-input"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="input-label">Notas</Label>
+              <Textarea
+                value={completeNotes}
+                onChange={(e) => setCompleteNotes(e.target.value)}
+                placeholder="Observaciones del viaje"
+                className="rounded-sm"
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCompleteDialog(false)}>
+              Cancelar
+            </Button>
+            <Button
+              className="btn-action"
+              onClick={handleCompleteTrip}
+              disabled={saving || kmEnd === ''}
+              data-testid="confirm-complete-trip-btn"
+            >
+              {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Completar Viaje
             </Button>
           </DialogFooter>
         </DialogContent>

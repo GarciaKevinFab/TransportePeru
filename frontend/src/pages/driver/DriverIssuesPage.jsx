@@ -1,6 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import api from '../../services/api';
+import api, { tripsApi, issuesApi } from '../../services/api';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -25,15 +25,17 @@ import {
 import { toast } from 'sonner';
 import { useOffline } from '../../hooks/useOffline';
 
+// `value` identifica el botón en la UI; `type` es el valor del enum del backend
+// (incidente, multa, siniestro, llanta_critica, otro).
 const ISSUE_TYPES = [
-  { value: 'averia', label: 'Avería Mecánica', icon: '🔧' },
-  { value: 'accidente', label: 'Accidente', icon: '💥' },
-  { value: 'robo', label: 'Robo/Asalto', icon: '🚨' },
-  { value: 'neumatico', label: 'Problema de Neumático', icon: '🛞' },
-  { value: 'combustible', label: 'Sin Combustible', icon: '⛽' },
-  { value: 'documentos', label: 'Problema Documentos', icon: '📄' },
-  { value: 'carga', label: 'Problema con Carga', icon: '📦' },
-  { value: 'otro', label: 'Otro', icon: '❓' },
+  { value: 'averia', type: 'incidente', label: 'Avería Mecánica', icon: '🔧' },
+  { value: 'accidente', type: 'siniestro', label: 'Accidente', icon: '💥' },
+  { value: 'robo', type: 'siniestro', label: 'Robo/Asalto', icon: '🚨' },
+  { value: 'neumatico', type: 'llanta_critica', label: 'Problema de Neumático', icon: '🛞' },
+  { value: 'combustible', type: 'incidente', label: 'Sin Combustible', icon: '⛽' },
+  { value: 'documentos', type: 'incidente', label: 'Problema Documentos', icon: '📄' },
+  { value: 'carga', type: 'incidente', label: 'Problema con Carga', icon: '📦' },
+  { value: 'otro', type: 'otro', label: 'Otro', icon: '❓' },
 ];
 
 const DriverIssuesPage = () => {
@@ -47,11 +49,27 @@ const DriverIssuesPage = () => {
   const cameraInputRef = useRef(null);
   const fileInputRef = useRef(null);
 
+  // Viaje/unidad activa del chofer (para adjuntar vehicle_id y trip_id al reporte)
+  const [activeTrip, setActiveTrip] = useState(null);
+
   const [formData, setFormData] = useState({
     issue_type: '',
     description: '',
-    severity: 'medium',
+    severity: 'media',
   });
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const loadActiveTrip = async () => {
+      try {
+        const res = await tripsApi.getAll({ driver_id: user.id });
+        setActiveTrip(res.data.find((t) => t.status === 'en_curso') || null);
+      } catch (error) {
+        // Silencioso: el reporte de incidencia no depende de tener un viaje activo
+      }
+    };
+    loadActiveTrip();
+  }, [user?.id]);
 
   const handlePhotoCapture = (event) => {
     const file = event.target.files?.[0];
@@ -101,11 +119,30 @@ const DriverIssuesPage = () => {
 
     setSaving(true);
 
+    // Mapear el tipo de la UI al valor del enum del backend
+    const selectedType = ISSUE_TYPES.find((t) => t.value === formData.issue_type);
+    const backendIssueType = selectedType?.type || 'incidente';
+
+    // Datos de la unidad/viaje activo del chofer
+    const vehicleId = activeTrip?.tracto_id || null;
+    const tripId = activeTrip?.id || null;
+
+    const baseIssue = {
+      issue_type: backendIssueType,
+      severity: formData.severity,
+      description: formData.description,
+      vehicle_id: vehicleId,
+      driver_id: user?.id,
+      trip_id: tripId,
+      reporter_id: user?.id,
+      reporter_name: user?.name,
+    };
+
     const resetAll = () => {
       setFormData({
         issue_type: '',
         description: '',
-        severity: 'medium',
+        severity: 'media',
       });
       setCapturedPhotos([]);
       setLocation(null);
@@ -114,12 +151,10 @@ const DriverIssuesPage = () => {
     // Offline path: queue with base64 photos inline
     if (!navigator.onLine) {
       const payload = {
-        ...formData,
+        ...baseIssue,
         photos: [],
         photos_base64: capturedPhotos, // sync layer can re-upload these
         location,
-        reporter_id: user?.id,
-        reporter_name: user?.name,
       };
       const ok = await saveIssueOffline(payload);
       if (ok) {
@@ -144,12 +179,10 @@ const DriverIssuesPage = () => {
         photoUrls.push(uploadRes.data.url);
       }
 
-      await api.post('/issues', {
-        ...formData,
+      await issuesApi.create({
+        ...baseIssue,
         photos: photoUrls,
         location: location,
-        reporter_id: user?.id,
-        reporter_name: user?.name,
       });
 
       toast.success('Incidente reportado correctamente');
@@ -158,12 +191,10 @@ const DriverIssuesPage = () => {
       const isNetworkErr = !error.response;
       if (isNetworkErr) {
         const payload = {
-          ...formData,
+          ...baseIssue,
           photos: [],
           photos_base64: capturedPhotos,
           location,
-          reporter_id: user?.id,
-          reporter_name: user?.name,
         };
         const ok = await saveIssueOffline(payload);
         if (ok) {
@@ -243,9 +274,9 @@ const DriverIssuesPage = () => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="low">🟢 Baja - Puedo continuar</SelectItem>
-                <SelectItem value="medium">🟡 Media - Necesito asistencia</SelectItem>
-                <SelectItem value="high">🔴 Alta - Urgente</SelectItem>
+                <SelectItem value="baja">🟢 Baja - Puedo continuar</SelectItem>
+                <SelectItem value="media">🟡 Media - Necesito asistencia</SelectItem>
+                <SelectItem value="critica">🔴 Crítica - Urgente</SelectItem>
               </SelectContent>
             </Select>
           </div>

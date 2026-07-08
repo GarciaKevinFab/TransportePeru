@@ -1,6 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../services/api';
-import { vehiclesApi, usersApi } from '../services/api';
+import { vehiclesApi, usersApi, reportsApi } from '../services/api';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip as RechartsTooltip,
+  CartesianGrid,
+  ResponsiveContainer,
+} from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -35,6 +45,11 @@ import {
   Calendar,
   TrendingUp,
   DollarSign,
+  CircleDot,
+  Wallet,
+  Gauge,
+  ShieldAlert,
+  ExternalLink,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -56,6 +71,10 @@ const ReportsPage = () => {
   const [tripsReport, setTripsReport] = useState(null);
   const [fuelReport, setFuelReport] = useState(null);
   const [maintenanceReport, setMaintenanceReport] = useState(null);
+  const [tiresReport, setTiresReport] = useState(null);
+  const [viaticosReport, setViaticosReport] = useState(null);
+  const [costPerKmReport, setCostPerKmReport] = useState(null);
+  const [docsExpiringReport, setDocsExpiringReport] = useState(null);
 
   useEffect(() => {
     fetchBaseData();
@@ -122,6 +141,65 @@ const ReportsPage = () => {
     setLoading(false);
   };
 
+  const buildParams = () => {
+    const params = {};
+    if (startDate) params.start_date = startDate;
+    if (endDate) params.end_date = endDate;
+    return params;
+  };
+
+  const fetchTiresReport = async () => {
+    setLoading(true);
+    try {
+      const res = await reportsApi.tiresRequired();
+      setTiresReport(res.data || {});
+    } catch (error) {
+      toast.error('Error al cargar reporte de llantas');
+      setTiresReport({});
+    }
+    setLoading(false);
+  };
+
+  const fetchViaticosReport = async () => {
+    setLoading(true);
+    try {
+      const params = buildParams();
+      if (selectedDriver !== 'all') params.driver_id = selectedDriver;
+      const res = await reportsApi.viaticos(params);
+      setViaticosReport(res.data || {});
+    } catch (error) {
+      toast.error('Error al cargar reporte de viáticos');
+      setViaticosReport({});
+    }
+    setLoading(false);
+  };
+
+  const fetchCostPerKmReport = async () => {
+    setLoading(true);
+    try {
+      const params = buildParams();
+      if (selectedVehicle !== 'all') params.vehicle_id = selectedVehicle;
+      const res = await reportsApi.costPerKm(params);
+      setCostPerKmReport(res.data || {});
+    } catch (error) {
+      toast.error('Error al cargar reporte de costo/km');
+      setCostPerKmReport({});
+    }
+    setLoading(false);
+  };
+
+  const fetchDocsExpiringReport = async () => {
+    setLoading(true);
+    try {
+      const res = await reportsApi.documentsExpiring(buildParams());
+      setDocsExpiringReport(res.data || {});
+    } catch (error) {
+      toast.error('Error al cargar documentos por vencer');
+      setDocsExpiringReport({});
+    }
+    setLoading(false);
+  };
+
   const handleGenerateReport = () => {
     switch (activeTab) {
       case 'trips':
@@ -133,9 +211,46 @@ const ReportsPage = () => {
       case 'maintenance':
         fetchMaintenanceReport();
         break;
+      case 'tires':
+        fetchTiresReport();
+        break;
+      case 'viaticos':
+        fetchViaticosReport();
+        break;
+      case 'cost_per_km':
+        fetchCostPerKmReport();
+        break;
+      case 'docs_expiring':
+        fetchDocsExpiringReport();
+        break;
       default:
         break;
     }
+  };
+
+  // Exportación CSV en cliente (mismo patrón de descarga que el Excel del servidor).
+  const exportCsv = (filename, headers, rows) => {
+    if (!rows || rows.length === 0) {
+      toast.error('No hay datos para exportar');
+      return;
+    }
+    const escape = (val) => {
+      const s = val === null || val === undefined ? '' : String(val);
+      return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const csv = [
+      headers.join(';'),
+      ...rows.map((r) => r.map(escape).join(';')),
+    ].join('\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    toast.success('CSV descargado exitosamente');
   };
 
   const handleExportExcel = async () => {
@@ -214,6 +329,22 @@ const ReportsPage = () => {
             <Wrench className="w-4 h-4 mr-2" />
             Mantenimiento
           </TabsTrigger>
+          <TabsTrigger value="tires" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
+            <CircleDot className="w-4 h-4 mr-2" />
+            Llantas
+          </TabsTrigger>
+          <TabsTrigger value="viaticos" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
+            <Wallet className="w-4 h-4 mr-2" />
+            Viáticos
+          </TabsTrigger>
+          <TabsTrigger value="cost_per_km" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
+            <Gauge className="w-4 h-4 mr-2" />
+            Costo/km
+          </TabsTrigger>
+          <TabsTrigger value="docs_expiring" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
+            <ShieldAlert className="w-4 h-4 mr-2" />
+            Docs. por Vencer
+          </TabsTrigger>
         </TabsList>
 
         {/* Filters */}
@@ -238,7 +369,7 @@ const ReportsPage = () => {
                   className="rounded-sm"
                 />
               </div>
-              {activeTab === 'trips' && (
+              {(activeTab === 'trips' || activeTab === 'viaticos') && (
                 <div className="space-y-2">
                   <Label className="input-label">Chofer</Label>
                   <Select value={selectedDriver} onValueChange={setSelectedDriver}>
@@ -254,7 +385,7 @@ const ReportsPage = () => {
                   </Select>
                 </div>
               )}
-              {(activeTab === 'fuel' || activeTab === 'maintenance') && (
+              {(activeTab === 'fuel' || activeTab === 'maintenance' || activeTab === 'cost_per_km') && (
                 <div className="space-y-2">
                   <Label className="input-label">Vehículo</Label>
                   <Select value={selectedVehicle} onValueChange={setSelectedVehicle}>
@@ -531,6 +662,421 @@ const ReportsPage = () => {
               <CardContent className="py-16 text-center text-slate-400">
                 <Wrench className="w-12 h-12 mx-auto mb-4" />
                 <p>Seleccione los filtros y haga clic en "Generar" para ver el reporte</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* Tires Report */}
+        <TabsContent value="tires" className="mt-4">
+          {tiresReport ? (
+            <>
+              <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
+                <div className="grid grid-cols-2 gap-4 flex-1 min-w-[240px]">
+                  <Card className="bg-white border-l-4 border-l-red-500">
+                    <CardContent className="py-4">
+                      <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">A Reemplazar</p>
+                      <p className="font-heading text-3xl font-bold text-red-600 mt-1">{tiresReport.total_replace || 0}</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-white border-l-4 border-l-yellow-500">
+                    <CardContent className="py-4">
+                      <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">A Reencauchar</p>
+                      <p className="font-heading text-3xl font-bold text-yellow-600 mt-1">{tiresReport.total_retread || 0}</p>
+                    </CardContent>
+                  </Card>
+                </div>
+                <Link to="/tires/required-by-dimension">
+                  <Button variant="outline" data-testid="tires-by-dimension-link">
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Ver por dimensión
+                  </Button>
+                </Link>
+              </div>
+
+              {(() => {
+                const groups = [
+                  { key: 'replace_needed', label: 'A Reemplazar', color: 'text-red-600' },
+                  { key: 'retread_needed', label: 'A Reencauchar', color: 'text-yellow-600' },
+                ];
+                const hasData = groups.some(
+                  (g) => tiresReport[g.key] && Object.keys(tiresReport[g.key]).length > 0
+                );
+                if (!hasData) {
+                  return (
+                    <Card className="bg-white">
+                      <CardContent className="py-16 text-center text-slate-400">
+                        <CircleDot className="w-12 h-12 mx-auto mb-4" />
+                        <p>No hay llantas que requieran reemplazo o reencauche</p>
+                      </CardContent>
+                    </Card>
+                  );
+                }
+                return groups.map((g) => {
+                  const byDim = tiresReport[g.key] || {};
+                  const dims = Object.keys(byDim);
+                  if (dims.length === 0) return null;
+                  return (
+                    <Card key={g.key} className="bg-white section-enter mb-4">
+                      <CardHeader>
+                        <CardTitle className={`text-sm font-bold uppercase tracking-widest ${g.color}`}>
+                          {g.label}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-0 overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="table-dense">
+                              <TableHead>Dimensión</TableHead>
+                              <TableHead>Código / Serie</TableHead>
+                              <TableHead>Marca</TableHead>
+                              <TableHead>Prof. (mm)</TableHead>
+                              <TableHead>Vida</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {dims.map((dim) =>
+                              (byDim[dim] || []).map((t) => (
+                                <TableRow key={t.id} className="table-dense">
+                                  <TableCell className="font-mono">{dim}</TableCell>
+                                  <TableCell className="font-mono">{t.code || t.serial || t.id?.substring(0, 8)}</TableCell>
+                                  <TableCell>{t.brand || '-'}</TableCell>
+                                  <TableCell>{t.last_depth ?? '-'}</TableCell>
+                                  <TableCell>{t.life_number || 1}</TableCell>
+                                </TableRow>
+                              ))
+                            )}
+                          </TableBody>
+                        </Table>
+                      </CardContent>
+                    </Card>
+                  );
+                });
+              })()}
+            </>
+          ) : (
+            <Card className="bg-white">
+              <CardContent className="py-16 text-center text-slate-400">
+                <CircleDot className="w-12 h-12 mx-auto mb-4" />
+                <p>Haga clic en "Generar" para ver el reporte de llantas</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* Viáticos Report */}
+        <TabsContent value="viaticos" className="mt-4">
+          {viaticosReport ? (
+            (() => {
+              const rows = viaticosReport.rows || viaticosReport.drivers || viaticosReport.viaticos || [];
+              const totals = viaticosReport.totals || {
+                budget: rows.reduce((a, r) => a + (Number(r.budget) || 0), 0),
+                spent: rows.reduce((a, r) => a + (Number(r.spent) || 0), 0),
+                balance: rows.reduce((a, r) => a + (Number(r.balance) || 0), 0),
+              };
+              if (rows.length === 0) {
+                return (
+                  <Card className="bg-white">
+                    <CardContent className="py-16 text-center text-slate-400">
+                      <Wallet className="w-12 h-12 mx-auto mb-4" />
+                      <p>No hay datos de viáticos para el periodo seleccionado</p>
+                    </CardContent>
+                  </Card>
+                );
+              }
+              return (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                    <Card className="bg-white border-l-4 border-l-blue-500">
+                      <CardContent className="py-4">
+                        <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Presupuesto</p>
+                        <p className="font-heading text-xl font-bold text-blue-600 mt-1">S/ {(Number(totals.budget) || 0).toLocaleString()}</p>
+                      </CardContent>
+                    </Card>
+                    <Card className="bg-white border-l-4 border-l-orange-500">
+                      <CardContent className="py-4">
+                        <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Gastado</p>
+                        <p className="font-heading text-xl font-bold text-orange-600 mt-1">S/ {(Number(totals.spent) || 0).toLocaleString()}</p>
+                      </CardContent>
+                    </Card>
+                    <Card className="bg-white border-l-4 border-l-green-500">
+                      <CardContent className="py-4">
+                        <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Saldo</p>
+                        <p className={`font-heading text-xl font-bold mt-1 ${(Number(totals.balance) || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          S/ {(Number(totals.balance) || 0).toLocaleString()}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                  <Card className="bg-white section-enter">
+                    <CardHeader className="flex-row items-center justify-between">
+                      <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest">
+                        Consolidado por Chofer
+                      </CardTitle>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          exportCsv(
+                            'reporte_viaticos.csv',
+                            ['Chofer', 'Periodo', 'Presupuesto', 'Gastado', 'Saldo', 'Viajes'],
+                            rows.map((r) => [
+                              r.driver_name || getDriverName(r.driver_id),
+                              r.period || '',
+                              Number(r.budget) || 0,
+                              Number(r.spent) || 0,
+                              Number(r.balance) || 0,
+                              r.trips_count ?? '',
+                            ])
+                          )
+                        }
+                      >
+                        <FileSpreadsheet className="w-4 h-4 mr-2" />
+                        CSV
+                      </Button>
+                    </CardHeader>
+                    <CardContent className="p-0 overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="table-dense">
+                            <TableHead>Chofer</TableHead>
+                            <TableHead>Periodo</TableHead>
+                            <TableHead>Presupuesto</TableHead>
+                            <TableHead>Gastado</TableHead>
+                            <TableHead>Saldo</TableHead>
+                            <TableHead>Viajes</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {rows.map((r, i) => {
+                            const balance = Number(r.balance) || 0;
+                            return (
+                              <TableRow key={r.driver_id || i} className="table-dense">
+                                <TableCell>{r.driver_name || getDriverName(r.driver_id)}</TableCell>
+                                <TableCell>{r.period || '-'}</TableCell>
+                                <TableCell>S/ {(Number(r.budget) || 0).toFixed(2)}</TableCell>
+                                <TableCell className="text-orange-600">S/ {(Number(r.spent) || 0).toFixed(2)}</TableCell>
+                                <TableCell className={balance >= 0 ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}>
+                                  S/ {balance.toFixed(2)}
+                                </TableCell>
+                                <TableCell>{r.trips_count ?? '-'}</TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                </>
+              );
+            })()
+          ) : (
+            <Card className="bg-white">
+              <CardContent className="py-16 text-center text-slate-400">
+                <Wallet className="w-12 h-12 mx-auto mb-4" />
+                <p>Seleccione los filtros y haga clic en "Generar" para ver el reporte</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* Costo por Km Report */}
+        <TabsContent value="cost_per_km" className="mt-4">
+          {costPerKmReport ? (
+            (() => {
+              const rows = costPerKmReport.rows || costPerKmReport.vehicles || [];
+              if (rows.length === 0) {
+                return (
+                  <Card className="bg-white">
+                    <CardContent className="py-16 text-center text-slate-400">
+                      <Gauge className="w-12 h-12 mx-auto mb-4" />
+                      <p>No hay datos de costo por km para el periodo seleccionado</p>
+                    </CardContent>
+                  </Card>
+                );
+              }
+              const chartData = rows.map((r) => ({
+                plate: r.plate || getVehiclePlate(r.vehicle_id),
+                cpk: Number(r.cost_per_km) || 0,
+              }));
+              return (
+                <>
+                  <Card className="bg-white section-enter mb-4">
+                    <CardHeader>
+                      <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest">
+                        Costo por Km (S/ / km)
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div style={{ width: '100%', height: 280 }}>
+                        <ResponsiveContainer>
+                          <BarChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                            <XAxis dataKey="plate" tick={{ fontSize: 12 }} />
+                            <YAxis tick={{ fontSize: 12 }} />
+                            <RechartsTooltip formatter={(v) => `S/ ${Number(v).toFixed(2)}`} />
+                            <Bar dataKey="cpk" fill="#f97316" radius={[4, 4, 0, 0]} name="Costo/km" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-white section-enter">
+                    <CardHeader className="flex-row items-center justify-between">
+                      <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest">
+                        Detalle por Unidad
+                      </CardTitle>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          exportCsv(
+                            'reporte_costo_km.csv',
+                            ['Vehículo', 'Km', 'Combustible', 'Llantas', 'Mantenimiento', 'Costo Total', 'Costo/km'],
+                            rows.map((r) => [
+                              r.plate || getVehiclePlate(r.vehicle_id),
+                              Number(r.km) || 0,
+                              Number(r.fuel_cost) || 0,
+                              Number(r.tire_cost) || 0,
+                              Number(r.maintenance_cost) || 0,
+                              Number(r.total_cost) || 0,
+                              Number(r.cost_per_km) || 0,
+                            ])
+                          )
+                        }
+                      >
+                        <FileSpreadsheet className="w-4 h-4 mr-2" />
+                        CSV
+                      </Button>
+                    </CardHeader>
+                    <CardContent className="p-0 overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="table-dense">
+                            <TableHead>Vehículo</TableHead>
+                            <TableHead>Km</TableHead>
+                            <TableHead>Combustible</TableHead>
+                            <TableHead>Llantas</TableHead>
+                            <TableHead>Mantenimiento</TableHead>
+                            <TableHead>Costo Total</TableHead>
+                            <TableHead>Costo/km</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {rows.map((r, i) => (
+                            <TableRow key={r.vehicle_id || i} className="table-dense">
+                              <TableCell className="font-mono">{r.plate || getVehiclePlate(r.vehicle_id)}</TableCell>
+                              <TableCell>{(Number(r.km) || 0).toLocaleString()}</TableCell>
+                              <TableCell>S/ {(Number(r.fuel_cost) || 0).toFixed(2)}</TableCell>
+                              <TableCell>S/ {(Number(r.tire_cost) || 0).toFixed(2)}</TableCell>
+                              <TableCell>S/ {(Number(r.maintenance_cost) || 0).toFixed(2)}</TableCell>
+                              <TableCell className="font-bold">S/ {(Number(r.total_cost) || 0).toFixed(2)}</TableCell>
+                              <TableCell className="font-bold text-orange-600">S/ {(Number(r.cost_per_km) || 0).toFixed(2)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                </>
+              );
+            })()
+          ) : (
+            <Card className="bg-white">
+              <CardContent className="py-16 text-center text-slate-400">
+                <Gauge className="w-12 h-12 mx-auto mb-4" />
+                <p>Seleccione los filtros y haga clic en "Generar" para ver el reporte</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* Documentos por Vencer Report */}
+        <TabsContent value="docs_expiring" className="mt-4">
+          {docsExpiringReport ? (
+            (() => {
+              const rows = docsExpiringReport.documents || docsExpiringReport.rows || [];
+              if (rows.length === 0) {
+                return (
+                  <Card className="bg-white">
+                    <CardContent className="py-16 text-center text-slate-400">
+                      <ShieldAlert className="w-12 h-12 mx-auto mb-4" />
+                      <p>No hay documentos próximos a vencer</p>
+                    </CardContent>
+                  </Card>
+                );
+              }
+              const daysBadge = (days) => {
+                const d = Number(days);
+                if (Number.isNaN(d)) return <Badge variant="outline">-</Badge>;
+                if (d < 0) return <Badge variant="outline" className="bg-red-100 text-red-700">Vencido ({Math.abs(d)}d)</Badge>;
+                if (d <= 15) return <Badge variant="outline" className="bg-orange-100 text-orange-700">{d}d</Badge>;
+                return <Badge variant="outline" className="bg-yellow-100 text-yellow-700">{d}d</Badge>;
+              };
+              return (
+                <Card className="bg-white section-enter">
+                  <CardHeader className="flex-row items-center justify-between">
+                    <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest">
+                      Documentos Próximos a Vencer / Vencidos
+                    </CardTitle>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        exportCsv(
+                          'documentos_por_vencer.csv',
+                          ['Tipo', 'Entidad', 'Placa/Identificación', 'Número', 'Vencimiento', 'Días'],
+                          rows.map((r) => [
+                            r.document_type_name || r.document_type || '',
+                            r.entity_name || '',
+                            r.plate || r.entity_identifier || '',
+                            r.number || '',
+                            (r.expiry_date || '').substring(0, 10),
+                            r.days_until ?? r.days ?? '',
+                          ])
+                        )
+                      }
+                      data-testid="docs-expiring-export-btn"
+                    >
+                      <FileSpreadsheet className="w-4 h-4 mr-2" />
+                      CSV
+                    </Button>
+                  </CardHeader>
+                  <CardContent className="p-0 overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="table-dense">
+                          <TableHead>Tipo</TableHead>
+                          <TableHead>Entidad</TableHead>
+                          <TableHead>Placa / ID</TableHead>
+                          <TableHead>Número</TableHead>
+                          <TableHead>Vencimiento</TableHead>
+                          <TableHead>Días</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {rows.map((r, i) => (
+                          <TableRow key={r.id || i} className="table-dense">
+                            <TableCell>{r.document_type_name || r.document_type || '-'}</TableCell>
+                            <TableCell>{r.entity_name || '-'}</TableCell>
+                            <TableCell className="font-mono">{r.plate || r.entity_identifier || '-'}</TableCell>
+                            <TableCell>{r.number || '-'}</TableCell>
+                            <TableCell>{(r.expiry_date || '').substring(0, 10) || '-'}</TableCell>
+                            <TableCell>{daysBadge(r.days_until ?? r.days)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              );
+            })()
+          ) : (
+            <Card className="bg-white">
+              <CardContent className="py-16 text-center text-slate-400">
+                <ShieldAlert className="w-12 h-12 mx-auto mb-4" />
+                <p>Haga clic en "Generar" para ver los documentos por vencer</p>
               </CardContent>
             </Card>
           )}

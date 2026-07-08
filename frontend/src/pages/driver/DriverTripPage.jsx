@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { tripsApi } from '../../services/api';
-import api from '../../services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
@@ -14,6 +13,7 @@ import {
   DialogFooter,
 } from '../../components/ui/dialog';
 import { Textarea } from '../../components/ui/textarea';
+import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import {
   Truck,
@@ -47,6 +47,8 @@ const DriverTripPage = () => {
   const [selectedTrip, setSelectedTrip] = useState(null);
   const [saving, setSaving] = useState(false);
   const [notes, setNotes] = useState('');
+  const [kmStart, setKmStart] = useState('');
+  const [kmEnd, setKmEnd] = useState('');
 
   const fetchTrips = async () => {
     setLoading(true);
@@ -68,12 +70,18 @@ const DriverTripPage = () => {
 
   const handleStartTrip = async () => {
     if (!selectedTrip) return;
+    const km = parseInt(kmStart, 10);
+    if (isNaN(km) || km < 0) {
+      toast.error('Ingresa el kilometraje del odómetro');
+      return;
+    }
     setSaving(true);
     try {
-      await api.post(`/trips/${selectedTrip.id}/start`, {});
+      await tripsApi.start(selectedTrip.id, { km_start: km });
       toast.success('¡Viaje iniciado!');
       setShowStartDialog(false);
       setSelectedTrip(null);
+      setKmStart('');
       fetchTrips();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Error al iniciar viaje');
@@ -83,13 +91,23 @@ const DriverTripPage = () => {
 
   const handleCompleteTrip = async () => {
     if (!selectedTrip) return;
+    const km = parseInt(kmEnd, 10);
+    if (isNaN(km) || km < 0) {
+      toast.error('Ingresa el kilometraje del odómetro');
+      return;
+    }
+    if (selectedTrip.km_start != null && km < selectedTrip.km_start) {
+      toast.error(`El odómetro final debe ser mayor o igual a ${selectedTrip.km_start} km`);
+      return;
+    }
     setSaving(true);
     try {
-      await api.post(`/trips/${selectedTrip.id}/complete`, { notes });
+      await tripsApi.complete(selectedTrip.id, { km_end: km, notes });
       toast.success('¡Viaje completado!');
       setShowCompleteDialog(false);
       setSelectedTrip(null);
       setNotes('');
+      setKmEnd('');
       fetchTrips();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Error al completar viaje');
@@ -291,7 +309,7 @@ const DriverTripPage = () => {
       )}
 
       {/* Start Trip Dialog */}
-      <Dialog open={showStartDialog} onOpenChange={setShowStartDialog}>
+      <Dialog open={showStartDialog} onOpenChange={(open) => { if (!open) setKmStart(''); setShowStartDialog(open); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Iniciar Viaje</DialogTitle>
@@ -300,6 +318,17 @@ const DriverTripPage = () => {
             <div className="p-4 bg-orange-50 rounded-lg">
               <p className="font-bold text-slate-800">{selectedTrip?.client_name}</p>
               <p className="text-sm text-slate-600">{selectedTrip?.cargo_description}</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Odómetro inicial (km) *</Label>
+              <Input
+                type="number"
+                inputMode="numeric"
+                value={kmStart}
+                onChange={(e) => setKmStart(e.target.value)}
+                placeholder="Ej. 125000"
+                data-testid="driver-km-start-input"
+              />
             </div>
             <div className="flex items-center gap-2 text-sm text-slate-500">
               <AlertTriangle className="w-4 h-4 text-yellow-500" />
@@ -310,10 +339,10 @@ const DriverTripPage = () => {
             <Button variant="outline" onClick={() => setShowStartDialog(false)}>
               Cancelar
             </Button>
-            <Button 
+            <Button
               className="bg-orange-500 hover:bg-orange-600"
               onClick={handleStartTrip}
-              disabled={saving}
+              disabled={saving || kmStart === ''}
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Iniciar'}
             </Button>
@@ -322,7 +351,7 @@ const DriverTripPage = () => {
       </Dialog>
 
       {/* Complete Trip Dialog */}
-      <Dialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog}>
+      <Dialog open={showCompleteDialog} onOpenChange={(open) => { if (!open) { setKmEnd(''); setNotes(''); } setShowCompleteDialog(open); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Finalizar Viaje</DialogTitle>
@@ -331,6 +360,20 @@ const DriverTripPage = () => {
             <div className="p-4 bg-green-50 rounded-lg">
               <p className="font-bold text-slate-800">{selectedTrip?.client_name}</p>
               <p className="text-sm text-slate-600">{selectedTrip?.cargo_description}</p>
+              {selectedTrip?.km_start != null && (
+                <p className="text-xs text-slate-500 mt-1">Odómetro inicial: {selectedTrip.km_start} km</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label>Odómetro final (km) *</Label>
+              <Input
+                type="number"
+                inputMode="numeric"
+                value={kmEnd}
+                onChange={(e) => setKmEnd(e.target.value)}
+                placeholder="Ej. 125850"
+                data-testid="driver-km-end-input"
+              />
             </div>
             <div className="space-y-2">
               <Label>Notas de finalización</Label>
@@ -346,10 +389,10 @@ const DriverTripPage = () => {
             <Button variant="outline" onClick={() => setShowCompleteDialog(false)}>
               Cancelar
             </Button>
-            <Button 
+            <Button
               className="bg-green-500 hover:bg-green-600"
               onClick={handleCompleteTrip}
-              disabled={saving}
+              disabled={saving || kmEnd === ''}
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Finalizar'}
             </Button>

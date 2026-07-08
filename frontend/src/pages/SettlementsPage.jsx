@@ -45,10 +45,18 @@ import {
   ArrowDownCircle,
   Calculator,
   Clock,
+  Image as ImageIcon,
+  AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+
+// Viáticos por viaje (regla de negocio): S/ 540 por viaje
+const VIATICO_POR_VIAJE = 540;
+const API_ORIGIN = process.env.REACT_APP_BACKEND_URL || '';
+// Resuelve URLs relativas de /uploads contra el backend; deja pasar base64 y absolutas
+const resolvePhoto = (u) => (u && typeof u === 'string' && u.startsWith('/uploads') ? `${API_ORIGIN}${u}` : u);
 
 const SettlementsPage = () => {
   const [loading, setLoading] = useState(true);
@@ -65,6 +73,8 @@ const SettlementsPage = () => {
   const [selectedTrip, setSelectedTrip] = useState(null);
   const [tripExpenses, setTripExpenses] = useState([]);
   const [tripAdvances, setTripAdvances] = useState([]);
+  const [viaticoStatus, setViaticoStatus] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState({ open: false, url: '', title: '' });
   const [saving, setSaving] = useState(false);
   
   const [expenseForm, setExpenseForm] = useState({
@@ -143,9 +153,19 @@ const SettlementsPage = () => {
 
   const handleOpenDetail = async (trip) => {
     setSelectedTrip(trip);
+    setViaticoStatus(null);
     await fetchTripDetails(trip);
+    // Estado de viáticos del viaje (saldo vs 540/viaje)
+    try {
+      const vRes = await tripsApi.getViaticoStatus(trip.id);
+      setViaticoStatus(vRes.data);
+    } catch (e) {
+      setViaticoStatus(null);
+    }
     setShowDetailDialog(true);
   };
+
+  const openPhoto = (url, title) => setPhotoPreview({ open: true, url: resolvePhoto(url), title });
 
   const filteredTrips = trips.filter(trip => {
     const matchesSearch = trip.client_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -272,6 +292,12 @@ const SettlementsPage = () => {
   const totalAdvances = tripAdvances.reduce((sum, a) => sum + (a.amount || 0), 0);
   const totalExpenses = tripExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
   const balance = totalAdvances - totalExpenses;
+
+  // Estado de viáticos del viaje seleccionado (usa endpoint si respondió, si no cálculo local)
+  const viaticoBudget = viaticoStatus?.budget ?? viaticoStatus?.viatico_budget ?? selectedTrip?.viatico_budget ?? 0;
+  const viaticoSpent = viaticoStatus?.spent ?? viaticoStatus?.total_expenses ?? totalExpenses;
+  const viaticoRemaining = viaticoStatus?.remaining ?? (viaticoBudget - viaticoSpent);
+  const viaticoAlert = viaticoStatus?.alert ?? (viaticoBudget > 0 && viaticoRemaining < VIATICO_POR_VIAJE);
 
   const pendingTrips = trips.filter(t => t.settlement_status === 'pending' || !t.settlement_status).length;
   const totalPendingAdvances = trips.filter(t => t.settlement_status === 'pending' || !t.settlement_status)
@@ -505,20 +531,32 @@ const SettlementsPage = () => {
                       </Button>
                     )}
                   </div>
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     <div>
-                      <p className="text-xs text-indigo-600">Total Asignado</p>
-                      <p className="font-heading text-xl font-bold text-indigo-700">S/ {selectedTrip.viatico_budget?.toFixed(2)}</p>
+                      <p className="text-xs text-indigo-600">Presupuesto</p>
+                      <p className="font-heading text-xl font-bold text-indigo-700">S/ {viaticoBudget.toFixed(2)}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-indigo-600">Días</p>
-                      <p className="font-heading text-xl font-bold text-indigo-700">{selectedTrip.viatico_days}</p>
+                      <p className="text-xs text-indigo-600">Gastado</p>
+                      <p className="font-heading text-xl font-bold text-red-600">S/ {viaticoSpent.toFixed(2)}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-indigo-600">Por Día</p>
+                      <p className="text-xs text-indigo-600">Saldo</p>
+                      <p className={`font-heading text-xl font-bold ${viaticoAlert ? 'text-red-600' : 'text-emerald-700'}`}>
+                        S/ {viaticoRemaining.toFixed(2)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-indigo-600">Por Día ({selectedTrip.viatico_days}d)</p>
                       <p className="font-heading text-xl font-bold text-indigo-700">S/ {selectedTrip.viatico_daily?.toFixed(2)}</p>
                     </div>
                   </div>
+                  {viaticoAlert && (
+                    <div className="mt-3 flex items-center gap-2 rounded-sm bg-red-100 border border-red-300 px-3 py-2 text-red-700">
+                      <AlertTriangle className="w-4 h-4" />
+                      <span className="text-sm font-semibold">Saldo menor a 1 viaje (S/ {VIATICO_POR_VIAJE})</span>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="mb-4">
@@ -615,6 +653,7 @@ const SettlementsPage = () => {
                           <TableHead>Descripción</TableHead>
                           <TableHead>Proveedor</TableHead>
                           <TableHead>IGV</TableHead>
+                          <TableHead className="text-center">Comprobante</TableHead>
                           <TableHead className="text-right">Monto</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -634,6 +673,26 @@ const SettlementsPage = () => {
                                   <CheckCircle className="w-4 h-4 text-green-500" />
                                 ) : (
                                   <span className="text-slate-400">-</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {expense.receipt_url ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => openPhoto(expense.receipt_url, `${catInfo.label} — ${expense.provider || 'Comprobante'}`)}
+                                    className="inline-block border-2 border-slate-200 rounded p-0.5 hover:border-orange-400"
+                                    title="Ver comprobante"
+                                  >
+                                    <img
+                                      src={resolvePhoto(expense.receipt_url)}
+                                      alt="Comprobante"
+                                      className="w-9 h-9 object-cover rounded"
+                                    />
+                                  </button>
+                                ) : (
+                                  <div className="w-9 h-9 mx-auto border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-slate-300">
+                                    <ImageIcon className="w-4 h-4" />
+                                  </div>
                                 )}
                               </TableCell>
                               <TableCell className="text-right font-bold text-red-600">
@@ -898,6 +957,20 @@ const SettlementsPage = () => {
               Asignar Presupuesto
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Visor de comprobante */}
+      <Dialog open={photoPreview.open} onOpenChange={(open) => setPhotoPreview(p => ({ ...p, open }))}>
+        <DialogContent className="max-w-[95vw] sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{photoPreview.title || 'Comprobante'}</DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center justify-center bg-slate-100 rounded p-2">
+            {photoPreview.url && (
+              <img src={photoPreview.url} alt="comprobante" className="max-h-[70vh] max-w-full object-contain" />
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

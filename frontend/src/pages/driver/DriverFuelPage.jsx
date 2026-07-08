@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import api from '../../services/api';
+import api, { tripsApi } from '../../services/api';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -38,6 +38,12 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { useOffline } from '../../hooks/useOffline';
 
+// Viáticos por viaje (regla de negocio): S/ 540 por viaje
+const VIATICO_POR_VIAJE = 540;
+const API_ORIGIN = process.env.REACT_APP_BACKEND_URL || '';
+// Resuelve URLs relativas de /uploads contra el backend; deja pasar base64 y absolutas
+const resolvePhoto = (u) => (u && typeof u === 'string' && u.startsWith('/uploads') ? `${API_ORIGIN}${u}` : u);
+
 const DriverFuelPage = () => {
   const { user } = useAuth();
   const { saveFuelLoadOffline } = useOffline();
@@ -47,6 +53,9 @@ const DriverFuelPage = () => {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [saving, setSaving] = useState(false);
   const [extractingOCR, setExtractingOCR] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [activeTrip, setActiveTrip] = useState(null);
+  const [viatico, setViatico] = useState(null);
 
   const voucherCamRef = useRef(null);
   const voucherFileRef = useRef(null);
@@ -65,16 +74,37 @@ const DriverFuelPage = () => {
     invoice_photo_url: '',
   });
 
+  const fetchViatico = async (tripId) => {
+    try {
+      const res = await tripsApi.getViaticoStatus(tripId);
+      setViatico(res.data);
+    } catch (error) {
+      // Endpoint no disponible: se usa cálculo local con los datos del viaje
+      setViatico(null);
+    }
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [vehiclesRes, loadsRes] = await Promise.all([
+      const [vehiclesRes, loadsRes, tripsRes] = await Promise.all([
         api.get('/vehicles'),
         api.get('/fuel/loads'),
+        tripsApi.getAll(),
       ]);
       setVehicles(vehiclesRes.data.filter(v => v.vehicle_type === 'tracto'));
       // Filter loads for this driver
       setLoads(loadsRes.data.filter(l => l.driver_id === user?.id).slice(0, 10));
+      // Viaje activo del chofer (para ligar la carga y descontar viáticos)
+      const active = tripsRes.data.find(
+        (t) => t.driver_id === user?.id && (t.status === 'en_curso' || t.status === 'programado')
+      );
+      setActiveTrip(active || null);
+      if (active) {
+        fetchViatico(active.id);
+      } else {
+        setViatico(null);
+      }
     } catch (error) {
       toast.error('Error al cargar datos');
     }
@@ -93,10 +123,11 @@ const DriverFuelPage = () => {
       return;
     }
 
+    const field = slot === 'voucher' ? 'voucher_photo_url' : 'invoice_photo_url';
     const reader = new FileReader();
     reader.onload = async (e) => {
       const base64Data = e.target.result;
-      const field = slot === 'voucher' ? 'voucher_photo_url' : 'invoice_photo_url';
+      // Preview inmediato con el base64 mientras se sube al servidor
       setFormData(prev => ({ ...prev, [field]: base64Data }));
 
       // OCR only on invoice photo (factura tiene más datos)
@@ -123,6 +154,23 @@ const DriverFuelPage = () => {
         }
         setExtractingOCR(false);
       }
+
+      // Subir la foto y guardar la URL resultante (no el dataURL base64 en el documento)
+      setUploadingPhoto(true);
+      try {
+        const uploadRes = await api.post('/upload/base64', {
+          data: base64Data,
+          entity_type: 'fuel',
+          entity_id: activeTrip?.id || formData.vehicle_id || 'loads',
+        });
+        if (uploadRes.data?.url) {
+          setFormData(prev => ({ ...prev, [field]: uploadRes.data.url }));
+        }
+      } catch (err) {
+        // Sin conexión: se conserva el base64 como respaldo para la cola offline
+        console.log('Upload failed, keeping base64:', err);
+      }
+      setUploadingPhoto(false);
     };
     reader.readAsDataURL(file);
     event.target.value = '';
@@ -143,6 +191,8 @@ const DriverFuelPage = () => {
     const price = parseFloat(formData.price_per_liter);
     const payload = {
       vehicle_id: formData.vehicle_id,
+      // Liga la carga al viaje activo: sin trip_id el gasto no descuenta viáticos
+      trip_id: activeTrip?.id || null,
       voucher_number: formData.voucher_number || null,
       invoice_number: formData.invoice_number || null,
       liters,
@@ -218,6 +268,12 @@ const DriverFuelPage = () => {
   const totalLiters = loads.reduce((sum, l) => sum + (l.liters || 0), 0);
   const totalSpent = loads.reduce((sum, l) => sum + ((l.liters || 0) * (l.price_per_liter || 0)), 0);
 
+  // Estado de viáticos: usa el endpoint si respondió; si no, cálculo local con el viaje
+  const viaticoRemaining = viatico?.remaining ?? (
+    activeTrip ? ((activeTrip.viatico_budget || 0) - (activeTrip.total_expenses || 0)) : null
+  );
+  const viaticoAlert = viatico?.alert ?? (viaticoRemaining != null && viaticoRemaining < VIATICO_POR_VIAJE);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -238,6 +294,35 @@ const DriverFuelPage = () => {
           Cargar
         </Button>
       </div>
+
+      {/* Viáticos / Saldo del viaje activo */}
+      {activeTrip && viaticoRemaining != null && (
+        <Card
+          data-testid="fuel-viatico-status"
+          className={viaticoAlert ? 'border-red-300 bg-red-50' : 'border-emerald-200 bg-emerald-50'}
+        >
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-wider text-slate-500 font-bold">
+                  Saldo de Viáticos
+                </p>
+                <p className={`text-2xl font-bold ${viaticoAlert ? 'text-red-600' : 'text-emerald-700'}`}>
+                  S/ {viaticoRemaining.toFixed(2)}
+                </p>
+              </div>
+              <Badge className={viaticoAlert ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800'}>
+                {activeTrip.client_name || 'Viaje activo'}
+              </Badge>
+            </div>
+            {viaticoAlert && (
+              <p className="mt-2 text-sm font-semibold text-red-700">
+                ⚠️ Saldo menor a 1 viaje (S/ {VIATICO_POR_VIAJE})
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3">
@@ -321,17 +406,17 @@ const DriverFuelPage = () => {
               />
               {formData.voucher_photo_url ? (
                 <div className="relative">
-                  <img src={formData.voucher_photo_url} alt="Vale" className="w-full h-32 object-cover rounded-lg" />
+                  <img src={resolvePhoto(formData.voucher_photo_url)} alt="Vale" className="w-full h-32 object-cover rounded-lg" />
                   <button onClick={() => removePhoto('voucher')} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1">
                     <X className="w-3 h-3" />
                   </button>
                 </div>
               ) : (
                 <div className="flex gap-2">
-                  <Button type="button" variant="outline" className="flex-1 bg-white" onClick={() => voucherCamRef.current?.click()}>
-                    <Camera className="w-4 h-4 mr-2" />Tomar Foto
+                  <Button type="button" variant="outline" className="flex-1 bg-white" onClick={() => voucherCamRef.current?.click()} disabled={uploadingPhoto}>
+                    {uploadingPhoto ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Camera className="w-4 h-4 mr-2" />}Tomar Foto
                   </Button>
-                  <Button type="button" variant="outline" className="bg-white" onClick={() => voucherFileRef.current?.click()}>
+                  <Button type="button" variant="outline" className="bg-white" onClick={() => voucherFileRef.current?.click()} disabled={uploadingPhoto}>
                     <Image className="w-4 h-4" />
                   </Button>
                 </div>
@@ -351,18 +436,18 @@ const DriverFuelPage = () => {
               />
               {formData.invoice_photo_url ? (
                 <div className="relative">
-                  <img src={formData.invoice_photo_url} alt="Factura" className="w-full h-32 object-cover rounded-lg" />
+                  <img src={resolvePhoto(formData.invoice_photo_url)} alt="Factura" className="w-full h-32 object-cover rounded-lg" />
                   <button onClick={() => removePhoto('invoice')} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1">
                     <X className="w-3 h-3" />
                   </button>
                 </div>
               ) : (
                 <div className="flex gap-2">
-                  <Button type="button" variant="outline" className="flex-1 bg-white" onClick={() => invoiceCamRef.current?.click()} disabled={extractingOCR}>
-                    {extractingOCR ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Camera className="w-4 h-4 mr-2" />}
+                  <Button type="button" variant="outline" className="flex-1 bg-white" onClick={() => invoiceCamRef.current?.click()} disabled={extractingOCR || uploadingPhoto}>
+                    {(extractingOCR || uploadingPhoto) ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Camera className="w-4 h-4 mr-2" />}
                     Tomar Foto
                   </Button>
-                  <Button type="button" variant="outline" className="bg-white" onClick={() => invoiceFileRef.current?.click()} disabled={extractingOCR}>
+                  <Button type="button" variant="outline" className="bg-white" onClick={() => invoiceFileRef.current?.click()} disabled={extractingOCR || uploadingPhoto}>
                     <Image className="w-4 h-4" />
                   </Button>
                 </div>

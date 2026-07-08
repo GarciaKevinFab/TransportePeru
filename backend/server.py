@@ -16,6 +16,7 @@ from enum import Enum
 import shutil
 import re
 import secrets
+import asyncio
 
 # Rate limiting (slowapi). Add "slowapi" to backend/requirements.txt.
 try:
@@ -310,6 +311,7 @@ class OperationalBlock(BaseModel):
     reason: str
     block_type: str
     document_id: Optional[str] = None
+    document_type_id: Optional[str] = None
     is_active: bool = True
     resolved_at: Optional[datetime] = None
     resolved_by: Optional[str] = None
@@ -331,6 +333,7 @@ class Trip(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     company_id: str
+    trip_number: Optional[str] = None
     tracto_id: str
     carreta_id: Optional[str] = None
     driver_id: str
@@ -339,6 +342,7 @@ class Trip(BaseModel):
     cargo_description: Optional[str] = None
     cargo_weight: Optional[float] = None
     status: TripStatus = TripStatus.PROGRAMADO
+    is_round_trip: bool = True
     scheduled_date: datetime
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
@@ -830,6 +834,7 @@ class CreateTripRequest(BaseModel):
     cargo_description: Optional[str] = None
     cargo_weight: Optional[float] = None
     scheduled_date: datetime
+    is_round_trip: bool = True
     notes: Optional[str] = None
 
 class CreateDocumentRequest(BaseModel):
@@ -928,6 +933,38 @@ def serialize_doc(doc: dict) -> dict:
         if isinstance(value, datetime):
             result[key] = value.isoformat()
     return result
+
+def _normalize_text(s: Optional[str]) -> str:
+    """Lowercase + strip accents for tolerant name matching."""
+    if not s:
+        return ""
+    import unicodedata
+    s = unicodedata.normalize("NFKD", str(s))
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    return s.lower().strip()
+
+def _is_revision_tecnica(name: Optional[str]) -> bool:
+    """True if the document type name refers to Revisión Técnica (CITV)."""
+    n = _normalize_text(name)
+    if not n:
+        return False
+    return "citv" in n or ("revision" in n and "tecnica" in n)
+
+def _revision_tecnica_no_aplica(doc_type: dict, entity: dict, entity_type: str) -> bool:
+    """Regla: Revisión Técnica no aplica a vehículos con <= 4 años de antigüedad."""
+    if entity_type != "vehicle":
+        return False
+    if not _is_revision_tecnica((doc_type or {}).get("name")):
+        return False
+    year = (entity or {}).get("year")
+    try:
+        year = int(year) if year is not None else None
+    except (TypeError, ValueError):
+        year = None
+    if not year:
+        return False
+    current_year = datetime.now(timezone.utc).year
+    return (current_year - year) <= 4
 
 async def check_entity_blocks(company_id: str, entity_type: str, entity_id: str, block_type: str = None) -> List[dict]:
     """Check for active blocks on an entity"""
@@ -1029,12 +1066,478 @@ async def create_block_for_expired_doc(company_id: str, doc_type: dict, document
         entity_id=entity_id,
         reason=f"Documento vencido: {doc_type.get('name', 'Desconocido')}",
         block_type=doc_type.get("block_rule", "solo_alerta"),
-        document_id=document["id"]
+        document_id=document["id"],
+        document_type_id=doc_type.get("id")
     )
     doc = block.model_dump()
     doc["created_at"] = doc["created_at"].isoformat()
     await db.blocks.insert_one(doc)
     return block
+
+# ============== BUSINESS RULE HELPERS (viáticos / llantas / mantenimiento / push) ==============
+# Defaults configurables vía company.config
+DEFAULT_VIATICO_POR_VIAJE = 540
+DEFAULT_MAINT_ANTICIPATION_KM = 500
+DEFAULT_TIRE_REVIEW_KM = 5000
+DEFAULT_TIRE_CRITICAL_DEPTH = 3
+DEFAULT_TIRE_WARNING_DEPTH = 5
+
+
+async def _company_config(company_id: str) -> dict:
+    """Devuelve el dict de configuración de la empresa (o {})."""
+    company = await db.companies.find_one({"id": company_id}, {"_id": 0, "config": 1})
+    if not company:
+        return {}
+    return company.get("config", {}) or {}
+
+
+async def notify_users(company_id: str, title: str, message: str, notif_type: str = "info",
+                       target_role: str = None, user_id: str = None,
+                       entity_type: str = None, entity_id: str = None):
+    """Crea un registro de notificación y dispara push (si hay suscripciones). No propaga errores."""
+    try:
+        notification = {
+            "id": str(uuid.uuid4()),
+            "company_id": company_id,
+            "title": title,
+            "message": message,
+            "type": notif_type,
+            "target_role": target_role,
+            "user_id": user_id,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "is_read": False,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        await db.notifications.insert_one(notification)
+        try:
+            await send_push_notifications(company_id, title, message, target_role, user_id)
+        except Exception as e:
+            logging.error(f"notify_users push error: {e}")
+        return notification["id"]
+    except Exception as e:
+        logging.error(f"notify_users error: {e}")
+        return None
+
+
+async def create_alert_once(company_id: str, alert_type: str, entity_type: str, entity_id: str,
+                            message: str, severity: str = "warning"):
+    """Crea una Alert sólo si no existe una del mismo tipo sin resolver para la entidad. Devuelve el id o None."""
+    existing = await db.alerts.find_one({
+        "company_id": company_id,
+        "alert_type": alert_type,
+        "entity_id": entity_id,
+        "resolved": False,
+    })
+    if existing:
+        return None
+    alert = {
+        "id": str(uuid.uuid4()),
+        "company_id": company_id,
+        "alert_type": alert_type,
+        "entity_type": entity_type,
+        "entity_id": entity_id,
+        "message": message,
+        "severity": severity,
+        "is_read": False,
+        "resolved": False,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.alerts.insert_one(alert)
+    return alert["id"]
+
+
+async def _vehicle_km_per_day(company_id: str, vehicle_id: str):
+    """Estima km/día promedio a partir de viajes completados de la unidad. None si no es calculable."""
+    trips = await db.trips.find({
+        "company_id": company_id,
+        "tracto_id": vehicle_id,
+        "status": "completado",
+    }, {"_id": 0, "km_start": 1, "km_end": 1, "start_date": 1, "end_date": 1}).sort("end_date", -1).to_list(50)
+    total_km = 0.0
+    total_days = 0.0
+    for t in trips:
+        ks = t.get("km_start")
+        ke = t.get("km_end")
+        if ks is None or ke is None or ke <= ks:
+            continue
+        total_km += (ke - ks)
+        sd = t.get("start_date")
+        ed = t.get("end_date")
+        days = 1.0
+        try:
+            if sd and ed:
+                sd_dt = datetime.fromisoformat(str(sd).replace("Z", "+00:00")) if isinstance(sd, str) else sd
+                ed_dt = datetime.fromisoformat(str(ed).replace("Z", "+00:00")) if isinstance(ed, str) else ed
+                days = max((ed_dt - sd_dt).total_seconds() / 86400.0, 0.5)
+        except Exception:
+            days = 1.0
+        total_days += days
+    if total_days > 0 and total_km > 0:
+        return round(total_km / total_days, 2)
+    return None
+
+
+async def compute_tire_projection(company_id: str, tire: dict, vehicle: dict = None,
+                                  config: dict = None, km_recorridos: int = None,
+                                  latest_inspection: dict = None):
+    """Proyección de vida de llanta. Devuelve wear_rate_mm_per_km, km_remaining,
+    estimated_change_date, needs_review."""
+    if config is None:
+        config = await _company_config(company_id)
+    min_legal = config.get("tire_critical_depth", DEFAULT_TIRE_CRITICAL_DEPTH)
+    review_threshold = config.get("tire_review_km_threshold", DEFAULT_TIRE_REVIEW_KM)
+
+    initial_depth = tire.get("initial_depth")
+    last_depth = tire.get("last_depth")
+    if last_depth is None and latest_inspection and latest_inspection.get("depths"):
+        last_depth = min(latest_inspection["depths"])
+
+    # km recorridos: usa el override o lo calcula desde el montaje activo
+    km = km_recorridos
+    if km is None:
+        if vehicle is None and tire.get("current_vehicle_id"):
+            vehicle = await db.vehicles.find_one(
+                {"id": tire["current_vehicle_id"], "company_id": company_id}, {"_id": 0}
+            )
+        veh_odo = vehicle.get("odometer") if vehicle else None
+        mount = await db.tire_mounts.find_one(
+            {"tire_id": tire["id"], "unmount_date": None}, {"_id": 0}, sort=[("mount_date", -1)]
+        )
+        mount_odo = mount.get("mount_odometer") if mount else None
+        if veh_odo is not None and mount_odo is not None:
+            diff = veh_odo - mount_odo
+            km = diff if diff >= 0 else None
+
+    wear = None
+    if initial_depth is not None and last_depth is not None:
+        wear = initial_depth - last_depth
+
+    rate = None
+    if km and km > 0 and wear and wear > 0:
+        rate = wear / km
+
+    km_remaining = None
+    if rate and last_depth is not None:
+        km_remaining = (last_depth - min_legal) / rate
+        if km_remaining < 0:
+            km_remaining = 0
+        km_remaining = int(round(km_remaining))
+
+    needs_review = False
+    if last_depth is not None and last_depth <= min_legal:
+        needs_review = True
+    elif km_remaining is not None and km_remaining < review_threshold:
+        needs_review = True
+
+    estimated_change_date = None
+    if km_remaining is not None and vehicle:
+        kmpd = await _vehicle_km_per_day(company_id, vehicle["id"])
+        if kmpd and kmpd > 0:
+            try:
+                est = datetime.now(timezone.utc) + timedelta(days=km_remaining / kmpd)
+                estimated_change_date = est.isoformat()
+            except Exception:
+                estimated_change_date = None
+
+    return {
+        "wear_rate_mm_per_km": round(rate, 6) if rate else None,
+        "km_remaining": km_remaining,
+        "estimated_change_date": estimated_change_date,
+        "needs_review": needs_review,
+    }
+
+
+async def compute_maintenance_status(company_id: str, vehicle: dict) -> dict:
+    """Estado de mantenimiento: faltan X km para el próximo servicio."""
+    config = await _company_config(company_id)
+    anticipation = config.get("maintenance_anticipation_km", DEFAULT_MAINT_ANTICIPATION_KM)
+    current_odo = vehicle.get("odometer", 0) or 0
+    last_maint = vehicle.get("last_maintenance_km", 0) or 0
+
+    interval_km = None
+    plan_name = None
+
+    # 1) Plan matricial asignado a esta unidad (km guardados en miles: 30 = 30000)
+    matrix = await db.maintenance_matrix_plans.find_one(
+        {"company_id": company_id, "applies_to_vehicle_ids": vehicle["id"]}, {"_id": 0}
+    )
+    if matrix:
+        plan_name = matrix.get("name")
+        kms = []
+        for itv in matrix.get("intervals", []):
+            km = itv.get("km")
+            if km:
+                km = km * 1000 if km < 1000 else km
+                kms.append(km)
+        if kms:
+            interval_km = min(kms)
+
+    # 2) Fallback: MaintenancePlan por tipo de vehículo con interval_km
+    if interval_km is None:
+        vt = vehicle.get("vehicle_type")
+        plan = await db.maintenance_plans.find_one(
+            {"company_id": company_id, "vehicle_type": vt, "interval_km": {"$ne": None, "$gt": 0}},
+            {"_id": 0}, sort=[("interval_km", 1)]
+        )
+        if plan:
+            plan_name = plan.get("name")
+            interval_km = plan.get("interval_km")
+
+    next_service_km = None
+    km_remaining = None
+    due_soon = False
+    if interval_km:
+        next_service_km = last_maint + interval_km
+        km_remaining = next_service_km - current_odo
+        due_soon = km_remaining <= anticipation
+
+    return {
+        "current_odometer": current_odo,
+        "next_service_km": next_service_km,
+        "km_remaining": km_remaining,
+        "plan_name": plan_name,
+        "due_soon": due_soon,
+        "interval_km": interval_km,
+    }
+
+
+async def check_maintenance_due(company_id: str, vehicle: dict):
+    """Si el mantenimiento está próximo, crea alerta (dedup) y notifica al chofer asignado + admin."""
+    try:
+        status = await compute_maintenance_status(company_id, vehicle)
+        if status.get("km_remaining") is not None and status.get("due_soon"):
+            km_rem = status["km_remaining"]
+            plate = vehicle.get("plate", "")
+            msg = (f"Mantenimiento próximo para {plate}: faltan {km_rem} km"
+                   f"{' (' + status['plan_name'] + ')' if status.get('plan_name') else ''}")
+            created = await create_alert_once(
+                company_id, "maintenance_due", "vehicle", vehicle["id"], msg,
+                "critical" if km_rem <= 0 else "warning"
+            )
+            if created:
+                await notify_users(company_id, "Mantenimiento próximo", msg, "warning",
+                                   target_role="admin", entity_type="vehicle", entity_id=vehicle["id"])
+                driver_id = vehicle.get("assigned_driver_id")
+                if driver_id:
+                    await notify_users(company_id, "Mantenimiento próximo", msg, "warning",
+                                       user_id=driver_id, entity_type="vehicle", entity_id=vehicle["id"])
+    except Exception as e:
+        logging.error(f"check_maintenance_due error: {e}")
+
+
+async def check_tire_reviews(company_id: str, vehicle: dict):
+    """Revisa las llantas montadas y crea alerta tire_review_due cuando necesitan revisión."""
+    try:
+        config = await _company_config(company_id)
+        tires = await db.tires.find(
+            {"current_vehicle_id": vehicle["id"], "company_id": company_id}, {"_id": 0}
+        ).to_list(50)
+        for tire in tires:
+            proj = await compute_tire_projection(company_id, tire, vehicle, config)
+            if proj.get("needs_review"):
+                km_rem = proj.get("km_remaining")
+                msg = (f"Llanta {tire.get('serial', '')} requiere revisión"
+                       f"{f': ~{km_rem} km restantes' if km_rem is not None else ' (profundidad crítica)'}")
+                created = await create_alert_once(
+                    company_id, "tire_review_due", "tire", tire["id"], msg, "warning"
+                )
+                if created:
+                    await notify_users(company_id, "Revisión de llanta", msg, "warning",
+                                       target_role="admin", entity_type="tire", entity_id=tire["id"])
+                    driver_id = vehicle.get("assigned_driver_id")
+                    if driver_id:
+                        await notify_users(company_id, "Revisión de llanta", msg, "warning",
+                                           user_id=driver_id, entity_type="tire", entity_id=tire["id"])
+    except Exception as e:
+        logging.error(f"check_tire_reviews error: {e}")
+
+
+async def apply_odometer_update(company_id: str, vehicle_id: str, new_odometer, actor_user_id: str = None):
+    """Actualiza vehicle.odometer = max(actual, nuevo) y dispara checks de mantenimiento/llanta."""
+    vehicle = await db.vehicles.find_one({"id": vehicle_id, "company_id": company_id}, {"_id": 0})
+    if not vehicle:
+        return
+    current = vehicle.get("odometer", 0) or 0
+    try:
+        candidate = int(new_odometer) if new_odometer is not None else current
+    except (TypeError, ValueError):
+        candidate = current
+    final_odo = max(current, candidate)
+    if final_odo != current:
+        await db.vehicles.update_one(
+            {"id": vehicle_id, "company_id": company_id},
+            {"$set": {"odometer": final_odo, "updated_at": datetime.now(timezone.utc).isoformat()}}
+        )
+        vehicle["odometer"] = final_odo
+    # Disparar checks (no bloqueantes)
+    await check_maintenance_due(company_id, vehicle)
+    await check_tire_reviews(company_id, vehicle)
+
+
+async def check_viatico_alert(company_id: str, trip_id: str):
+    """Crea alerta viatico_low si (viatico_budget - total_expenses) < viatico_por_viaje."""
+    try:
+        trip = await db.trips.find_one({"id": trip_id, "company_id": company_id}, {"_id": 0})
+        if not trip:
+            return
+        config = await _company_config(company_id)
+        per_trip = config.get("viatico_por_viaje", DEFAULT_VIATICO_POR_VIAJE)
+        budget = trip.get("viatico_budget")
+        if budget is None:
+            budget = per_trip
+        spent = trip.get("total_expenses", 0) or 0
+        remaining = budget - spent
+        if remaining < per_trip:
+            msg = (f"Viáticos bajos en viaje {trip.get('trip_number', trip_id)}: "
+                   f"quedan S/ {round(remaining, 2)} (mínimo por viaje S/ {per_trip})")
+            created = await create_alert_once(
+                company_id, "viatico_low", "trip", trip_id, msg,
+                "critical" if remaining < 0 else "warning"
+            )
+            if created:
+                await notify_users(company_id, "Viáticos bajos", msg, "warning",
+                                   target_role="admin", entity_type="trip", entity_id=trip_id)
+                driver_id = trip.get("driver_id")
+                if driver_id:
+                    await notify_users(company_id, "Viáticos bajos", msg, "warning",
+                                       user_id=driver_id, entity_type="trip", entity_id=trip_id)
+    except Exception as e:
+        logging.error(f"check_viatico_alert error: {e}")
+
+
+async def _generate_document_alerts(company_id: str) -> int:
+    """Genera alertas (y notificaciones críticas) para documentos por vencer. Devuelve nº creadas."""
+    alerts_created = 0
+    now = datetime.now(timezone.utc)
+    alert_days = [60, 30, 15, 7, 3, 1, 0]
+    documents = await db.documents.find({
+        "company_id": company_id,
+        "expiry_date": {"$exists": True}
+    }, {"_id": 0}).to_list(1000)
+
+    # Documento más reciente por (entidad, tipo): sólo éste rige bloqueo/resolución
+    latest_by_type = {}
+    for d in documents:
+        if not d.get("expiry_date"):
+            continue
+        k = (d.get("entity_id"), d.get("document_type_id"))
+        cur = latest_by_type.get(k)
+        if cur is None or str(d.get("expiry_date", "")) > str(cur.get("expiry_date", "")):
+            latest_by_type[k] = d
+
+    for doc in documents:
+        if not doc.get("expiry_date"):
+            continue
+        expiry = doc["expiry_date"]
+        if isinstance(expiry, str):
+            expiry = datetime.fromisoformat(expiry.replace("Z", "+00:00"))
+        days_until = (expiry - now).days
+
+        doc_type = await db.document_types.find_one({"id": doc["document_type_id"], "company_id": company_id})
+        entity = await db.vehicles.find_one({"id": doc["entity_id"], "company_id": company_id}) or await db.users.find_one({"id": doc["entity_id"], "company_id": company_id})
+
+        # Regla Revisión Técnica: no aplica a unidades <= 4 años -> excluir de alertas y bloqueos
+        if _revision_tecnica_no_aplica(doc_type, entity, doc.get("entity_type")):
+            continue
+
+        # Bloqueo automático por vencimiento / resolución al renovar (sólo el doc más reciente del tipo)
+        is_latest = latest_by_type.get((doc.get("entity_id"), doc.get("document_type_id")), {}).get("id") == doc.get("id")
+        block_rule = (doc_type or {}).get("block_rule", "solo_alerta")
+        if is_latest and doc_type and block_rule != "solo_alerta":
+            block_dedup = {
+                "company_id": company_id,
+                "entity_type": doc.get("entity_type"),
+                "entity_id": doc.get("entity_id"),
+                "document_type_id": doc.get("document_type_id"),
+                "is_active": True,
+            }
+            if days_until <= 0:
+                existing_block = await db.blocks.find_one(block_dedup)
+                if not existing_block:
+                    await create_block_for_expired_doc(
+                        company_id, doc_type, doc, doc.get("entity_type"), doc.get("entity_id")
+                    )
+            else:
+                # Documento vigente nuevamente: cerrar bloqueos activos asociados
+                await db.blocks.update_many(
+                    block_dedup,
+                    {"$set": {"is_active": False, "resolved_at": now.isoformat(), "resolved_by": "system"}}
+                )
+
+        for alert_day in alert_days:
+            if days_until <= alert_day:
+                existing = await db.alerts.find_one({
+                    "entity_id": doc["id"],
+                    "alert_type": "document_expiry",
+                    "resolved": False,
+                    "company_id": company_id
+                })
+                if not existing:
+                    severity = "critical" if days_until <= 0 else "warning" if days_until <= 7 else "info"
+                    alert = {
+                        "id": str(uuid.uuid4()),
+                        "company_id": company_id,
+                        "alert_type": "document_expiry",
+                        "entity_type": doc["entity_type"],
+                        "entity_id": doc["id"],
+                        "message": f"{doc_type['name'] if doc_type else 'Documento'} de {(entity or {}).get('plate') or (entity or {}).get('name', 'N/A')} {'VENCIDO' if days_until <= 0 else f'vence en {days_until} días'}",
+                        "severity": severity,
+                        "is_read": False,
+                        "resolved": False,
+                        "created_at": now.isoformat()
+                    }
+                    await db.alerts.insert_one(alert)
+                    alerts_created += 1
+                    if severity == "critical":
+                        await db.notifications.insert_one({
+                            "id": str(uuid.uuid4()),
+                            "company_id": company_id,
+                            "title": "⚠️ Documento Vencido",
+                            "message": alert["message"],
+                            "type": "alert",
+                            "target_role": "admin",
+                            "entity_type": "alert",
+                            "entity_id": alert["id"],
+                            "is_read": False,
+                            "created_at": now.isoformat()
+                        })
+                break
+    return alerts_created
+
+
+async def run_maintenance_sweep():
+    """Barrido periódico por empresa: documentos + mantenimiento + llantas + viáticos."""
+    try:
+        companies = await db.companies.find({}, {"_id": 0, "id": 1}).to_list(1000)
+    except Exception as e:
+        logging.error(f"run_maintenance_sweep companies error: {e}")
+        return
+    for c in companies:
+        cid = c.get("id")
+        if not cid:
+            continue
+        try:
+            await _generate_document_alerts(cid)
+        except Exception as e:
+            logging.error(f"sweep documents error ({cid}): {e}")
+        try:
+            vehicles = await db.vehicles.find({"company_id": cid}, {"_id": 0}).to_list(1000)
+            for v in vehicles:
+                await check_maintenance_due(cid, v)
+                await check_tire_reviews(cid, v)
+        except Exception as e:
+            logging.error(f"sweep vehicles error ({cid}): {e}")
+        try:
+            trips = await db.trips.find(
+                {"company_id": cid, "status": {"$in": ["en_curso", "programado", "checklist_pendiente"]}},
+                {"_id": 0, "id": 1}
+            ).to_list(1000)
+            for t in trips:
+                await check_viatico_alert(cid, t["id"])
+        except Exception as e:
+            logging.error(f"sweep trips error ({cid}): {e}")
+
 
 # ============== AUTH ROUTES ==============
 @api_router.post("/auth/login", response_model=TokenResponse)
@@ -1816,11 +2319,20 @@ async def get_documents_matrix(
     for entity in entities:
         row = {
             "entity": serialize_doc(entity),
-            "documents": {}
+            "documents": {},
+            "no_aplica": {}
         }
         for doc_type in doc_types:
             key = f"{entity['id']}_{doc_type['id']}"
-            row["documents"][doc_type["id"]] = serialize_doc(doc_map.get(key))
+            na = _revision_tecnica_no_aplica(doc_type, entity, entity_type)
+            cell = serialize_doc(doc_map.get(key))
+            if na:
+                row["no_aplica"][doc_type["id"]] = True
+                if cell is None:
+                    cell = {"no_aplica": True}
+                else:
+                    cell["no_aplica"] = True
+            row["documents"][doc_type["id"]] = cell
         matrix.append(row)
     
     return {
@@ -1964,6 +2476,7 @@ async def create_trip(request: CreateTripRequest, current_user: dict = Depends(r
         cargo_description=request.cargo_description,
         cargo_weight=request.cargo_weight,
         scheduled_date=request.scheduled_date,
+        is_round_trip=request.is_round_trip,
         notes=request.notes,
         created_by=current_user["id"]
     )
@@ -1987,7 +2500,20 @@ async def create_trip(request: CreateTripRequest, current_user: dict = Depends(r
         coupling_doc = coupling.model_dump()
         coupling_doc["start_date"] = coupling_doc["start_date"].isoformat()
         await db.couplings.insert_one(coupling_doc)
-    
+
+    # Notificar (push + notification) al chofer asignado
+    if request.driver_id:
+        await notify_users(
+            current_user["company_id"],
+            "Nuevo viaje asignado",
+            f"Se te asignó el viaje {trip_number}"
+            + (f" - {request.client_name}" if request.client_name else ""),
+            "info",
+            user_id=request.driver_id,
+            entity_type="trip",
+            entity_id=trip.id,
+        )
+
     return {"id": trip.id, "message": "Viaje creado"}
 
 @api_router.put("/trips/{trip_id}")
@@ -2034,13 +2560,33 @@ async def start_trip(trip_id: str, request: dict = Body(...), current_user: dict
     validation = await validate_trip_can_start(current_user["company_id"], trip_id, trip)
     if not validation["valid"]:
         raise HTTPException(status_code=400, detail="; ".join(validation["errors"]))
-    
+
+    # Kilómetro de inicio REAL. Debe ser >= odómetro del tracto (o >= 0).
+    vehicle = await db.vehicles.find_one(
+        {"id": trip["tracto_id"], "company_id": current_user["company_id"]}, {"_id": 0}
+    )
+    veh_odo = (vehicle.get("odometer", 0) or 0) if vehicle else 0
+    km_start = request.get("km_start")
+    if km_start is None:
+        km_start = veh_odo
+    try:
+        km_start = int(km_start)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="km_start inválido")
+    if km_start < 0:
+        raise HTTPException(status_code=400, detail="El kilometraje inicial no puede ser negativo")
+    if veh_odo > 0 and km_start < veh_odo:
+        raise HTTPException(
+            status_code=400,
+            detail=f"El kilometraje inicial ({km_start}) no puede ser menor al odómetro del vehículo ({veh_odo})"
+        )
+
     await db.trips.update_one(
         {"id": trip_id},
         {"$set": {
             "status": TripStatus.EN_CURSO.value,
             "start_date": datetime.now(timezone.utc).isoformat(),
-            "km_start": request.get("km_start", 0)
+            "km_start": km_start
         }}
     )
     
@@ -2063,9 +2609,9 @@ async def start_trip(trip_id: str, request: dict = Body(...), current_user: dict
         "start_trip",
         "trip",
         trip_id,
-        {"km_start": request.get("km_start", 0)}
+        {"km_start": km_start}
     )
-    
+
     return {"message": "Viaje iniciado"}
 
 @api_router.post("/trips/{trip_id}/complete")
@@ -2073,16 +2619,28 @@ async def complete_trip(trip_id: str, request: dict = Body(...), current_user: d
     trip = await db.trips.find_one({"id": trip_id, "company_id": current_user["company_id"]})
     if not trip:
         raise HTTPException(status_code=404, detail="Viaje no encontrado")
-    
-    await db.trips.update_one(
-        {"id": trip_id},
-        {"$set": {
-            "status": TripStatus.COMPLETADO.value,
-            "end_date": datetime.now(timezone.utc).isoformat(),
-            "km_end": request.get("km_end", 0)
-        }}
-    )
-    
+
+    # Kilómetro final REAL. Validar km_end >= km_start.
+    km_start = trip.get("km_start") or 0
+    km_end = request.get("km_end")
+    trip_set = {
+        "status": TripStatus.COMPLETADO.value,
+        "end_date": datetime.now(timezone.utc).isoformat(),
+    }
+    if km_end is not None:
+        try:
+            km_end = int(km_end)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="km_end inválido")
+        if km_end < km_start:
+            raise HTTPException(
+                status_code=400,
+                detail=f"El kilometraje final ({km_end}) no puede ser menor al inicial ({km_start})"
+            )
+        trip_set["km_end"] = km_end
+
+    await db.trips.update_one({"id": trip_id}, {"$set": trip_set})
+
     # Update vehicle status
     await db.vehicles.update_one(
         {"id": trip["tracto_id"]},
@@ -2093,15 +2651,45 @@ async def complete_trip(trip_id: str, request: dict = Body(...), current_user: d
             {"id": trip["carreta_id"]},
             {"$set": {"status": VehicleStatus.DISPONIBLE.value}}
         )
-    
+
+    # CLAVE: actualizar odómetro del TRACTO y de la CARRETA acoplada con el km final.
+    # Alimenta llantas y mantenimiento + dispara checks (alertas/notificaciones).
+    if km_end is not None:
+        await apply_odometer_update(current_user["company_id"], trip["tracto_id"], km_end, current_user["id"])
+        if trip.get("carreta_id"):
+            await apply_odometer_update(current_user["company_id"], trip["carreta_id"], km_end, current_user["id"])
+
     # Close coupling
     if trip.get("carreta_id"):
         await db.couplings.update_one(
             {"trip_id": trip_id, "end_date": None},
             {"$set": {"end_date": datetime.now(timezone.utc).isoformat()}}
         )
-    
+
     return {"message": "Viaje completado"}
+
+@api_router.get("/trips/{trip_id}/viatico-status")
+async def get_trip_viatico_status(trip_id: str, current_user: dict = Depends(get_current_user)):
+    """Estado de viáticos del viaje: presupuesto, gastado, remanente y bandera de alerta."""
+    trip = await db.trips.find_one(
+        {"id": trip_id, "company_id": current_user["company_id"]}, {"_id": 0}
+    )
+    if not trip:
+        raise HTTPException(status_code=404, detail="Viaje no encontrado")
+    config = await _company_config(current_user["company_id"])
+    per_trip = config.get("viatico_por_viaje", DEFAULT_VIATICO_POR_VIAJE)
+    budget = trip.get("viatico_budget")
+    if budget is None:
+        budget = per_trip
+    spent = trip.get("total_expenses", 0) or 0
+    remaining = budget - spent
+    return {
+        "budget": budget,
+        "spent": spent,
+        "remaining": remaining,
+        "per_trip": per_trip,
+        "alert": remaining < per_trip,
+    }
 
 # ============== TRIP ADVANCE/EXPENSE ROUTES ==============
 @api_router.get("/trips/{trip_id}/advances")
@@ -2168,13 +2756,16 @@ async def create_trip_expense(trip_id: str, request: dict = Body(...), current_u
             doc[key] = value.isoformat()
     
     await db.trip_expenses.insert_one(doc)
-    
+
     # Update trip total
     await db.trips.update_one(
         {"id": trip_id},
         {"$inc": {"total_expenses": request["amount"]}}
     )
-    
+
+    # Alerta de viáticos bajos si corresponde
+    await check_viatico_alert(current_user["company_id"], trip_id)
+
     return {"id": expense.id, "message": "Gasto registrado"}
 
 # ============== CHECKLIST ROUTES ==============
@@ -2293,20 +2884,45 @@ async def create_fuel_load(request: dict = Body(...), current_user: dict = Depen
             doc[key] = value.isoformat()
     
     await db.fuel_loads.insert_one(doc)
-    
+
     # Mark voucher as used if provided
     if request.get("voucher_id"):
         await db.fuel_vouchers.update_one(
             {"id": request["voucher_id"]},
             {"$set": {"is_used": True}}
         )
-    
-    # Update vehicle odometer
-    await db.vehicles.update_one(
-        {"id": request["vehicle_id"]},
-        {"$set": {"odometer": request["odometer"]}}
+
+    # Si la carga está ligada a un viaje, el diésel DESCUENTA del saldo de viáticos:
+    # se registra como gasto categoría "combustible" y se incrementa total_expenses.
+    trip_id = request.get("trip_id")
+    if trip_id:
+        fuel_expense = TripExpense(
+            company_id=current_user["company_id"],
+            trip_id=trip_id,
+            category="combustible",
+            description=f"Combustible {load.liters} gl - {load.provider}",
+            amount=load.total_amount,
+            provider=load.provider,
+            ruc=request.get("ruc"),
+            receipt_url=request.get("receipt_url") or request.get("invoice_photo_url"),
+            created_by=current_user["id"]
+        )
+        exp_doc = fuel_expense.model_dump()
+        for key, value in exp_doc.items():
+            if isinstance(value, datetime):
+                exp_doc[key] = value.isoformat()
+        await db.trip_expenses.insert_one(exp_doc)
+        await db.trips.update_one(
+            {"id": trip_id, "company_id": current_user["company_id"]},
+            {"$inc": {"total_expenses": load.total_amount}}
+        )
+        await check_viatico_alert(current_user["company_id"], trip_id)
+
+    # Actualizar odómetro del vehículo (max) y disparar checks de mantenimiento/llanta
+    await apply_odometer_update(
+        current_user["company_id"], request["vehicle_id"], request["odometer"], current_user["id"]
     )
-    
+
     return {"id": load.id, "message": "Cargue registrado"}
 
 @api_router.put("/fuel/vouchers/{voucher_id}")
@@ -2587,6 +3203,7 @@ async def get_vehicle_tires(vehicle_id: str, current_user: dict = Depends(get_cu
         {"id": vehicle_id, "company_id": current_user["company_id"]}, {"_id": 0}
     )
     vehicle_odometer = vehicle.get("odometer") if vehicle else None
+    config = await _company_config(current_user["company_id"])
 
     # Get latest inspection for each tire + computed fields
     result = []
@@ -2636,6 +3253,16 @@ async def get_vehicle_tires(vehicle_id: str, current_user: dict = Depends(get_cu
                 cost_per_mm = round(costo / worn, 4)
         tire_data["cost_per_mm"] = cost_per_mm
 
+        # Proyección de vida: km_remaining / needs_review por llanta
+        projection = await compute_tire_projection(
+            current_user["company_id"], tire, vehicle, config,
+            km_recorridos=km, latest_inspection=inspection
+        )
+        tire_data["km_remaining"] = projection["km_remaining"]
+        tire_data["needs_review"] = projection["needs_review"]
+        tire_data["wear_rate_mm_per_km"] = projection["wear_rate_mm_per_km"]
+        tire_data["estimated_change_date"] = projection["estimated_change_date"]
+
         result.append(tire_data)
 
     return result
@@ -2661,15 +3288,23 @@ async def create_tire_inspection(request: CreateInspectionRequest, current_user:
     doc["inspection_date"] = doc["inspection_date"].isoformat()
     
     await db.tire_inspections.insert_one(doc)
-    
+
     # Check for alerts
     min_depth = min(request.depths) if request.depths else 0
     tire = await db.tires.find_one({"id": request.tire_id, "company_id": current_user["company_id"]})
-    
-    # Alert thresholds (mm)
-    critical_depth = 3  # Below this is critical
-    warning_depth = 5   # Below this is warning
-    
+
+    # Esta inspección es la más reciente -> actualizar last_depth de la llanta
+    if request.depths:
+        await db.tires.update_one(
+            {"id": request.tire_id, "company_id": current_user["company_id"]},
+            {"$set": {"last_depth": min_depth, "updated_at": datetime.now(timezone.utc).isoformat()}}
+        )
+
+    # Umbrales desde configuración de empresa (defaults 3/5)
+    config = await _company_config(current_user["company_id"])
+    critical_depth = config.get("tire_critical_depth", DEFAULT_TIRE_CRITICAL_DEPTH)
+    warning_depth = config.get("tire_warning_depth", DEFAULT_TIRE_WARNING_DEPTH)
+
     if min_depth < critical_depth:
         alert = Alert(
             company_id=current_user["company_id"],
@@ -2718,6 +3353,26 @@ async def get_tire_inspections(tire_id: str, current_user: dict = Depends(get_cu
     ).sort("inspection_date", -1).to_list(100)
     return [serialize_doc(i) for i in inspections]
 
+@api_router.get("/tires/{tire_id}/projection")
+async def get_tire_projection(tire_id: str, current_user: dict = Depends(get_current_user)):
+    """Proyección de vida de la llanta: tasa de desgaste, km restantes y fecha estimada de cambio."""
+    tire = await db.tires.find_one(
+        {"id": tire_id, "company_id": current_user["company_id"]}, {"_id": 0}
+    )
+    if not tire:
+        raise HTTPException(status_code=404, detail="Llanta no encontrada")
+    vehicle = None
+    if tire.get("current_vehicle_id"):
+        vehicle = await db.vehicles.find_one(
+            {"id": tire["current_vehicle_id"], "company_id": current_user["company_id"]}, {"_id": 0}
+        )
+    latest = await db.tire_inspections.find_one(
+        {"tire_id": tire_id}, {"_id": 0}, sort=[("inspection_date", -1)]
+    )
+    return await compute_tire_projection(
+        current_user["company_id"], tire, vehicle, latest_inspection=latest
+    )
+
 # ============== MAINTENANCE ROUTES ==============
 @api_router.get("/maintenance/plans")
 async def get_maintenance_plans(current_user: dict = Depends(get_current_user)):
@@ -2726,6 +3381,16 @@ async def get_maintenance_plans(current_user: dict = Depends(get_current_user)):
         {"_id": 0}
     ).to_list(100)
     return [serialize_doc(p) for p in plans]
+
+@api_router.get("/vehicles/{vehicle_id}/maintenance-status")
+async def get_vehicle_maintenance_status(vehicle_id: str, current_user: dict = Depends(get_current_user)):
+    """Faltan X km para el próximo servicio del vehículo (plan matricial o por tipo)."""
+    vehicle = await db.vehicles.find_one(
+        {"id": vehicle_id, "company_id": current_user["company_id"]}, {"_id": 0}
+    )
+    if not vehicle:
+        raise HTTPException(status_code=404, detail="Vehículo no encontrado")
+    return await compute_maintenance_status(current_user["company_id"], vehicle)
 
 @api_router.post("/maintenance/plans")
 async def create_maintenance_plan(request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "mantenimiento"))):
@@ -3037,13 +3702,26 @@ async def get_issues(
 
 @api_router.post("/issues")
 async def create_issue(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
+    # Chofer sólo puede registrar incidentes a su propio nombre
+    driver_id = request.get("driver_id")
+    if current_user["role"] == "chofer":
+        driver_id = current_user["id"]
+
+    # Número de incidente
+    count = await db.issues.count_documents({"company_id": current_user["company_id"]})
+    issue_number = f"INC-{count + 1:05d}"
+
     issue = Issue(
         company_id=current_user["company_id"],
+        issue_number=issue_number,
         trip_id=request.get("trip_id"),
         vehicle_id=request.get("vehicle_id"),
-        driver_id=request.get("driver_id"),
-        issue_type=request["issue_type"],
+        driver_id=driver_id,
+        checklist_id=request.get("checklist_id"),
+        tire_id=request.get("tire_id"),
+        issue_type=request.get("issue_type", "otro"),
         severity=request.get("severity", "media"),
+        title=request.get("title", ""),
         description=request["description"],
         location=request.get("location"),
         photos=request.get("photos", []),
@@ -3051,13 +3729,26 @@ async def create_issue(request: dict = Body(...), current_user: dict = Depends(g
         responsible=request.get("responsible"),
         created_by=current_user["id"]
     )
-    
+
     doc = issue.model_dump()
     for key, value in doc.items():
         if isinstance(value, datetime):
             doc[key] = value.isoformat()
-    
+
     await db.issues.insert_one(doc)
+
+    # Notificar al admin de incidentes críticos/altos
+    if issue.severity in ("critica", "alta"):
+        await notify_users(
+            current_user["company_id"],
+            "Incidente reportado",
+            f"[{issue.severity.upper()}] {issue.title or issue.issue_type}: {issue.description[:120]}",
+            "alert",
+            target_role="admin",
+            entity_type="issue",
+            entity_id=issue.id,
+        )
+
     return {"id": issue.id, "message": "Incidente registrado"}
 
 @api_router.put("/issues/{issue_id}")
@@ -4032,7 +4723,8 @@ async def get_vehicle_tire_diagnostics(
         {"current_vehicle_id": vehicle_id, "company_id": company_id}, {"_id": 0}
     ).to_list(50)
 
-    critical_depth = 3.0
+    config = await _company_config(company_id)
+    critical_depth = config.get("tire_critical_depth", DEFAULT_TIRE_CRITICAL_DEPTH)
     axle_groups: Dict[str, List[Dict[str, Any]]] = {}
     suggestions: List[Dict[str, Any]] = []
 
@@ -4751,6 +5443,11 @@ async def upload_base64(request: dict = Body(...), current_user: dict = Depends(
     return {"url": relative_url, "filename": filename, "storage": "local"}
 
 # ============== PUSH NOTIFICATIONS ==============
+@api_router.get("/notifications/vapid-public-key")
+async def get_vapid_public_key():
+    """Clave pública VAPID para suscribir Web Push en el navegador."""
+    return {"public_key": os.environ.get("VAPID_PUBLIC_KEY", "")}
+
 @api_router.post("/notifications/subscribe")
 async def subscribe_push(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """Subscribe to push notifications"""
@@ -4904,75 +5601,7 @@ async def send_push_notifications(company_id: str, title: str, message: str, tar
 async def generate_alerts(current_user: dict = Depends(require_roles("owner", "admin"))):
     """Generate alerts for expiring documents and other issues"""
     company_id = current_user["company_id"]
-    alerts_created = 0
-    
-    # Check expiring documents
-    now = datetime.now(timezone.utc)
-    alert_days = [60, 30, 15, 7, 3, 1, 0]
-    
-    documents = await db.documents.find({
-        "company_id": company_id,
-        "expiry_date": {"$exists": True}
-    }, {"_id": 0}).to_list(1000)
-    
-    for doc in documents:
-        if not doc.get("expiry_date"):
-            continue
-        
-        expiry = doc["expiry_date"]
-        if isinstance(expiry, str):
-            expiry = datetime.fromisoformat(expiry.replace("Z", "+00:00"))
-        
-        days_until = (expiry - now).days
-        
-        for alert_day in alert_days:
-            if days_until <= alert_day:
-                # Check if alert already exists
-                existing = await db.alerts.find_one({
-                    "entity_id": doc["id"],
-                    "alert_type": "document_expiry",
-                    "resolved": False,
-                    "company_id": company_id
-                })
-
-                if not existing:
-                    doc_type = await db.document_types.find_one({"id": doc["document_type_id"], "company_id": company_id})
-                    entity = await db.vehicles.find_one({"id": doc["entity_id"], "company_id": company_id}) or await db.users.find_one({"id": doc["entity_id"], "company_id": company_id})
-                    
-                    severity = "critical" if days_until <= 0 else "warning" if days_until <= 7 else "info"
-                    
-                    alert = {
-                        "id": str(uuid.uuid4()),
-                        "company_id": company_id,
-                        "alert_type": "document_expiry",
-                        "entity_type": doc["entity_type"],
-                        "entity_id": doc["id"],
-                        "message": f"{doc_type['name'] if doc_type else 'Documento'} de {entity.get('plate') or entity.get('name', 'N/A')} {'VENCIDO' if days_until <= 0 else f'vence en {days_until} días'}",
-                        "severity": severity,
-                        "is_read": False,
-                        "resolved": False,
-                        "created_at": now.isoformat()
-                    }
-                    
-                    await db.alerts.insert_one(alert)
-                    alerts_created += 1
-                    
-                    # Create notification for critical alerts
-                    if severity == "critical":
-                        await db.notifications.insert_one({
-                            "id": str(uuid.uuid4()),
-                            "company_id": company_id,
-                            "title": "⚠️ Documento Vencido",
-                            "message": alert["message"],
-                            "type": "alert",
-                            "target_role": "admin",
-                            "entity_type": "alert",
-                            "entity_id": alert["id"],
-                            "is_read": False,
-                            "created_at": now.isoformat()
-                        })
-                break
-    
+    alerts_created = await _generate_document_alerts(company_id)
     return {"message": f"{alerts_created} alertas generadas"}
 
 # ============== SYSTEM STATUS (public, no auth) ==============
@@ -5085,7 +5714,10 @@ async def seed_demo_data(_: bool = Depends(require_install_token)):
             "lockout_minutes": 15,
             "max_failed_attempts": 5,
             "tire_critical_depth": 3,
-            "tire_warning_depth": 5
+            "tire_warning_depth": 5,
+            "tire_review_km_threshold": 5000,
+            "viatico_por_viaje": 540,
+            "maintenance_anticipation_km": 500
         }
     )
     company_doc = company.model_dump()
@@ -5193,6 +5825,8 @@ async def seed_demo_data(_: bool = Depends(require_install_token)):
         {"name": "SOAT", "applies_to": "vehiculo", "is_critical": True, "block_rule": "bloquea_inicio"},
         {"name": "Revisión Técnica (CITV)", "applies_to": "vehiculo", "is_critical": True, "block_rule": "bloquea_inicio"},
         {"name": "Tarjeta de Propiedad", "applies_to": "vehiculo", "is_critical": True, "block_rule": "bloquea_asignacion"},
+        {"name": "Tarjeta de Circulación", "applies_to": "vehiculo", "is_critical": False, "block_rule": "solo_alerta"},
+        {"name": "Bonificación", "applies_to": "vehiculo", "is_critical": False, "block_rule": "solo_alerta"},
         {"name": "Póliza de Seguro", "applies_to": "vehiculo", "is_critical": False, "block_rule": "solo_alerta"},
         {"name": "Licencia de Conducir", "applies_to": "chofer", "is_critical": True, "block_rule": "bloquea_asignacion"},
         {"name": "DNI", "applies_to": "chofer", "is_critical": True, "block_rule": "bloquea_asignacion"},
@@ -5201,6 +5835,13 @@ async def seed_demo_data(_: bool = Depends(require_install_token)):
     
     doc_type_ids = {}
     for dt in doc_types:
+        # Idempotente: no duplicar tipos de documento por nombre
+        existing_dt = await db.document_types.find_one(
+            {"company_id": company.id, "name": dt["name"]}, {"_id": 0, "id": 1}
+        )
+        if existing_dt:
+            doc_type_ids[dt["name"]] = existing_dt["id"]
+            continue
         doc_type = DocumentType(
             company_id=company.id,
             name=dt["name"],
@@ -5584,7 +6225,38 @@ async def get_fuel_report(
         by_vehicle[vid]["liters"] += load.get("liters", 0)
         by_vehicle[vid]["amount"] += load.get("total_amount", 0)
         by_vehicle[vid]["loads"] += 1
-    
+
+    # Group by driver (resuelve chofer vía viaje asociado; fallback a created_by)
+    trip_ids = list({l.get("trip_id") for l in loads if l.get("trip_id")})
+    trips_map = {}
+    if trip_ids:
+        trips = await db.trips.find(
+            {"company_id": current_user["company_id"], "id": {"$in": trip_ids}},
+            {"_id": 0, "id": 1, "driver_id": 1}
+        ).to_list(1000)
+        trips_map = {t["id"]: t.get("driver_id") for t in trips}
+
+    by_driver = {}
+    driver_ids_seen = set()
+    for load in loads:
+        did = trips_map.get(load.get("trip_id")) or load.get("created_by") or "unknown"
+        driver_ids_seen.add(did)
+        if did not in by_driver:
+            by_driver[did] = {"driver_id": did, "driver_name": None, "liters": 0, "amount": 0, "loads": 0}
+        by_driver[did]["liters"] += load.get("liters", 0)
+        by_driver[did]["amount"] += load.get("total_amount", 0)
+        by_driver[did]["loads"] += 1
+
+    real_driver_ids = [d for d in driver_ids_seen if d and d != "unknown"]
+    if real_driver_ids:
+        drivers = await db.users.find(
+            {"company_id": current_user["company_id"], "id": {"$in": real_driver_ids}},
+            {"_id": 0, "id": 1, "name": 1}
+        ).to_list(1000)
+        name_map = {u["id"]: u.get("name") for u in drivers}
+        for did, agg in by_driver.items():
+            agg["driver_name"] = name_map.get(did, "N/A" if did == "unknown" else did)
+
     return {
         "loads": [serialize_doc(l) for l in loads],
         "totals": {
@@ -5593,7 +6265,8 @@ async def get_fuel_report(
             "total_loads": len(loads),
             "avg_price_per_liter": total_amount / total_liters if total_liters > 0 else 0
         },
-        "by_vehicle": by_vehicle
+        "by_vehicle": by_vehicle,
+        "by_driver": by_driver
     }
 
 @api_router.get("/reports/maintenance")
@@ -5784,9 +6457,6 @@ async def update_company_config(request: dict = Body(...), current_user: dict = 
     )
     
     return {"message": "Configuración actualizada"}
-
-# Include router
-app.include_router(api_router)
 
 # ============== GUÍAS DE TRANSPORTISTA Y FACTURAS (SUNAT) ==============
 class GuiaTransportistaStatus(str, Enum):
@@ -6097,6 +6767,364 @@ async def update_sunat_config(request: dict = Body(...), current_user: dict = De
 
     return {"message": "Configuración SUNAT actualizada"}
 
+# ============== REPORTES AVANZADOS (P3) ==============
+def _date_range_query(field: str, date_from: Optional[str], date_to: Optional[str]) -> dict:
+    """Construye un sub-query de rango de fechas (ISO strings) para `field`."""
+    cond = {}
+    if date_from:
+        cond["$gte"] = date_from
+    if date_to:
+        # inclusivo hasta el fin del día si sólo viene la fecha
+        cond["$lte"] = date_to if len(date_to) > 10 else date_to + "T23:59:59.999999"
+    return {field: cond} if cond else {}
+
+
+@api_router.get("/reports/cost-per-km")
+async def get_cost_per_km_report(
+    vehicle_id: Optional[str] = None,
+    from_: Optional[str] = Query(None, alias="from"),
+    to: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Costo por km por unidad: combustible + llantas + mantenimiento / km recorridos."""
+    company_id = current_user["company_id"]
+
+    veh_query = {"company_id": company_id}
+    if vehicle_id:
+        veh_query["id"] = vehicle_id
+    vehicles = await db.vehicles.find(veh_query, {"_id": 0}).to_list(1000)
+
+    rows = []
+    tot_fuel = tot_tires = tot_maint = tot_km = 0.0
+    for v in vehicles:
+        vid = v["id"]
+
+        # Combustible
+        fq = {"company_id": company_id, "vehicle_id": vid}
+        fq.update(_date_range_query("load_date", from_, to))
+        loads = await db.fuel_loads.find(fq, {"_id": 0}).to_list(2000)
+        fuel = sum(l.get("total_amount", 0) or 0 for l in loads)
+
+        # Llantas (montajes en el periodo -> costo de compra de la llanta)
+        mq = {"company_id": company_id, "vehicle_id": vid}
+        mq.update(_date_range_query("mount_date", from_, to))
+        mounts = await db.tire_mounts.find(mq, {"_id": 0}).to_list(2000)
+        tires = 0.0
+        for m in mounts:
+            tire = await db.tires.find_one({"id": m.get("tire_id"), "company_id": company_id}, {"_id": 0, "purchase_cost": 1})
+            if tire:
+                tires += tire.get("purchase_cost", 0) or 0
+
+        # Mantenimiento
+        wq = {"company_id": company_id, "vehicle_id": vid}
+        wq.update(_date_range_query("created_at", from_, to))
+        work_orders = await db.work_orders.find(wq, {"_id": 0}).to_list(2000)
+        maintenance = sum(wo.get("total_cost", 0) or 0 for wo in work_orders)
+
+        # Km recorridos (rango de odómetro observado en el periodo)
+        readings = [l.get("odometer") for l in loads if l.get("odometer")]
+        for wo in work_orders:
+            if wo.get("odometer_at_service"):
+                readings.append(wo["odometer_at_service"])
+        tq = {"company_id": company_id, "$or": [{"tracto_id": vid}, {"carreta_id": vid}]}
+        tq.update(_date_range_query("scheduled_date", from_, to))
+        trips = await db.trips.find(tq, {"_id": 0, "km_start": 1, "km_end": 1}).to_list(2000)
+        for t in trips:
+            if t.get("km_start"):
+                readings.append(t["km_start"])
+            if t.get("km_end"):
+                readings.append(t["km_end"])
+        readings = [r for r in readings if isinstance(r, (int, float))]
+        km = (max(readings) - min(readings)) if len(readings) >= 2 else 0
+        km = km if km > 0 else 0
+
+        total = fuel + tires + maintenance
+        rows.append({
+            "vehicle_id": vid,
+            "plate": v.get("plate"),
+            "fuel": round(fuel, 2),
+            "tires": round(tires, 2),
+            "maintenance": round(maintenance, 2),
+            "total": round(total, 2),
+            "km": km,
+            "cost_per_km": round(total / km, 4) if km > 0 else 0
+        })
+        tot_fuel += fuel
+        tot_tires += tires
+        tot_maint += maintenance
+        tot_km += km
+
+    grand_total = tot_fuel + tot_tires + tot_maint
+    return {
+        "rows": rows,
+        "totals": {
+            "fuel": round(tot_fuel, 2),
+            "tires": round(tot_tires, 2),
+            "maintenance": round(tot_maint, 2),
+            "total": round(grand_total, 2),
+            "km": tot_km,
+            "cost_per_km": round(grand_total / tot_km, 4) if tot_km > 0 else 0
+        }
+    }
+
+
+@api_router.get("/reports/documents-expiring")
+async def get_documents_expiring_report(
+    days: int = 90,
+    current_user: dict = Depends(get_current_user)
+):
+    """Documentos vencidos y por vencer, ordenados por days_remaining."""
+    company_id = current_user["company_id"]
+    now = datetime.now(timezone.utc)
+
+    documents = await db.documents.find(
+        {"company_id": company_id, "expiry_date": {"$exists": True, "$ne": None}},
+        {"_id": 0}
+    ).to_list(5000)
+
+    dt_ids = list({d.get("document_type_id") for d in documents if d.get("document_type_id")})
+    doc_types = {}
+    if dt_ids:
+        for dt in await db.document_types.find({"company_id": company_id, "id": {"$in": dt_ids}}, {"_id": 0}).to_list(1000):
+            doc_types[dt["id"]] = dt
+
+    rows = []
+    for d in documents:
+        expiry = d.get("expiry_date")
+        if not expiry:
+            continue
+        exp = expiry
+        if isinstance(exp, str):
+            try:
+                exp = datetime.fromisoformat(exp.replace("Z", "+00:00"))
+            except ValueError:
+                continue
+        days_remaining = (exp - now).days
+        dt = doc_types.get(d.get("document_type_id"), {})
+
+        # Entidad + regla Revisión Técnica (no aplica a unidades <= 4 años)
+        entity = None
+        etype = d.get("entity_type")
+        if etype == "vehicle":
+            entity = await db.vehicles.find_one({"id": d.get("entity_id"), "company_id": company_id}, {"_id": 0})
+        else:
+            entity = await db.users.find_one({"id": d.get("entity_id"), "company_id": company_id}, {"_id": 0})
+        if _revision_tecnica_no_aplica(dt, entity, etype):
+            continue
+
+        if days_remaining > days:
+            continue
+
+        entity_name = (entity or {}).get("plate") or (entity or {}).get("name") or "N/A"
+        status = "vencido" if days_remaining <= 0 else ("por_vencer" if days_remaining <= 30 else "vigente")
+        rows.append({
+            "entity_type": etype,
+            "entity_name": entity_name,
+            "document_type": dt.get("name", "Documento"),
+            "expiry_date": exp.isoformat() if isinstance(exp, datetime) else expiry,
+            "days_remaining": days_remaining,
+            "status": status
+        })
+
+    rows.sort(key=lambda r: r["days_remaining"])
+    return {"rows": rows}
+
+
+@api_router.get("/reports/viaticos")
+async def get_viaticos_report(
+    from_: Optional[str] = Query(None, alias="from"),
+    to: Optional[str] = None,
+    driver_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Consolidado de viáticos por chofer: presupuesto, gastado, saldo, viajes."""
+    company_id = current_user["company_id"]
+
+    tq = {"company_id": company_id}
+    if driver_id:
+        tq["driver_id"] = driver_id
+    tq.update(_date_range_query("scheduled_date", from_, to))
+    trips = await db.trips.find(tq, {"_id": 0}).to_list(5000)
+
+    by_driver = {}
+    for t in trips:
+        did = t.get("driver_id") or "unknown"
+        if did not in by_driver:
+            by_driver[did] = {"driver_id": did, "driver_name": None, "budget": 0.0, "spent": 0.0, "remaining": 0.0, "trips": 0}
+        by_driver[did]["budget"] += t.get("viatico_budget", 0) or 0
+        by_driver[did]["trips"] += 1
+        # Gasto real = suma de gastos del viaje
+        expenses = await db.trip_expenses.find({"company_id": company_id, "trip_id": t["id"]}, {"_id": 0, "amount": 1}).to_list(1000)
+        by_driver[did]["spent"] += sum(e.get("amount", 0) or 0 for e in expenses)
+
+    real_ids = [d for d in by_driver if d and d != "unknown"]
+    name_map = {}
+    if real_ids:
+        for u in await db.users.find({"company_id": company_id, "id": {"$in": real_ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(1000):
+            name_map[u["id"]] = u.get("name")
+
+    rows = []
+    tot_budget = tot_spent = 0.0
+    for did, agg in by_driver.items():
+        agg["driver_name"] = name_map.get(did, "N/A" if did == "unknown" else did)
+        agg["budget"] = round(agg["budget"], 2)
+        agg["spent"] = round(agg["spent"], 2)
+        agg["remaining"] = round(agg["budget"] - agg["spent"], 2)
+        tot_budget += agg["budget"]
+        tot_spent += agg["spent"]
+        rows.append(agg)
+
+    rows.sort(key=lambda r: r["spent"], reverse=True)
+    return {
+        "rows": rows,
+        "totals": {
+            "budget": round(tot_budget, 2),
+            "spent": round(tot_spent, 2),
+            "remaining": round(tot_budget - tot_spent, 2)
+        }
+    }
+
+
+# ============== UNIDADES (agrupación tracto + carreta + chofer + EPP) ==============
+class Unit(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    company_id: str
+    tracto_id: str
+    carreta_id: Optional[str] = None
+    driver_id: Optional[str] = None
+    status: str = "activa"
+    epp_items: List[Dict[str, Any]] = Field(default_factory=list)
+    active: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_by: Optional[str] = None
+
+
+async def _resolve_unit(company_id: str, unit: dict) -> dict:
+    """Enriquece una unidad con placas y nombre de chofer."""
+    out = serialize_doc(unit)
+    tracto = await db.vehicles.find_one({"id": unit.get("tracto_id"), "company_id": company_id}, {"_id": 0, "plate": 1})
+    out["tracto_plate"] = (tracto or {}).get("plate")
+    if unit.get("carreta_id"):
+        carreta = await db.vehicles.find_one({"id": unit.get("carreta_id"), "company_id": company_id}, {"_id": 0, "plate": 1})
+        out["carreta_plate"] = (carreta or {}).get("plate")
+    else:
+        out["carreta_plate"] = None
+    if unit.get("driver_id"):
+        driver = await db.users.find_one({"id": unit.get("driver_id"), "company_id": company_id}, {"_id": 0, "name": 1})
+        out["driver_name"] = (driver or {}).get("name")
+    else:
+        out["driver_name"] = None
+    return out
+
+
+@api_router.get("/units")
+async def get_units(
+    include_inactive: bool = False,
+    current_user: dict = Depends(get_current_user)
+):
+    """Lista de unidades con placas y chofer resueltos."""
+    query = {"company_id": current_user["company_id"]}
+    if not include_inactive:
+        query["active"] = True
+    units = await db.units.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    return [await _resolve_unit(current_user["company_id"], u) for u in units]
+
+
+@api_router.post("/units")
+async def create_unit(
+    request: dict = Body(...),
+    current_user: dict = Depends(require_roles("owner", "admin", "flota"))
+):
+    """Crea una unidad (capa aditiva sobre vehículos/chofer)."""
+    company_id = current_user["company_id"]
+    tracto_id = request.get("tracto_id")
+    if not tracto_id:
+        raise HTTPException(status_code=400, detail="tracto_id es obligatorio")
+
+    tracto = await db.vehicles.find_one({"id": tracto_id, "company_id": company_id}, {"_id": 0})
+    if not tracto:
+        raise HTTPException(status_code=404, detail="Tracto no encontrado")
+    if request.get("carreta_id"):
+        carreta = await db.vehicles.find_one({"id": request["carreta_id"], "company_id": company_id}, {"_id": 0, "id": 1})
+        if not carreta:
+            raise HTTPException(status_code=404, detail="Carreta no encontrada")
+
+    unit = Unit(
+        company_id=company_id,
+        tracto_id=tracto_id,
+        carreta_id=request.get("carreta_id"),
+        driver_id=request.get("driver_id"),
+        status=request.get("status", "activa"),
+        epp_items=request.get("epp_items", []) or [],
+        created_by=current_user["id"]
+    )
+    doc = unit.model_dump()
+    doc["created_at"] = doc["created_at"].isoformat()
+    doc["updated_at"] = doc["updated_at"].isoformat()
+    await db.units.insert_one(doc)
+
+    # Conveniencia: sincroniza el chofer asignado del tracto (no rompe el coupling existente)
+    if request.get("driver_id"):
+        await db.vehicles.update_one(
+            {"id": tracto_id, "company_id": company_id},
+            {"$set": {"assigned_driver_id": request["driver_id"], "updated_at": datetime.now(timezone.utc).isoformat()}}
+        )
+
+    return await _resolve_unit(company_id, doc)
+
+
+@api_router.put("/units/{unit_id}")
+async def update_unit(
+    unit_id: str,
+    request: dict = Body(...),
+    current_user: dict = Depends(require_roles("owner", "admin", "flota"))
+):
+    """Actualiza una unidad."""
+    company_id = current_user["company_id"]
+    existing = await db.units.find_one({"id": unit_id, "company_id": company_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Unidad no encontrada")
+
+    update_data = {}
+    for field in ["tracto_id", "carreta_id", "driver_id", "status", "epp_items", "active"]:
+        if field in request:
+            update_data[field] = request[field]
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+    await db.units.update_one({"id": unit_id, "company_id": company_id}, {"$set": update_data})
+
+    if request.get("driver_id"):
+        tracto_id = request.get("tracto_id", existing.get("tracto_id"))
+        await db.vehicles.update_one(
+            {"id": tracto_id, "company_id": company_id},
+            {"$set": {"assigned_driver_id": request["driver_id"], "updated_at": datetime.now(timezone.utc).isoformat()}}
+        )
+
+    updated = await db.units.find_one({"id": unit_id, "company_id": company_id}, {"_id": 0})
+    return await _resolve_unit(company_id, updated)
+
+
+@api_router.delete("/units/{unit_id}")
+async def delete_unit(
+    unit_id: str,
+    current_user: dict = Depends(require_roles("owner", "admin", "flota"))
+):
+    """Soft-delete de una unidad (active=False)."""
+    company_id = current_user["company_id"]
+    result = await db.units.update_one(
+        {"id": unit_id, "company_id": company_id},
+        {"$set": {"active": False, "status": "inactiva", "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Unidad no encontrada")
+    return {"message": "Unidad eliminada"}
+
+
+# Include router (DESPUÉS de definir TODAS las rutas @api_router, incluidas SUNAT)
+app.include_router(api_router)
+
 # Serve uploaded files
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -6176,6 +7204,35 @@ async def create_indexes():
         logger.info("Índices de MongoDB verificados/creados")
     except Exception as e:
         logger.error(f"Error creando índices MongoDB: {e}")
+
+async def _scheduler_loop():
+    """Barrido periódico (documentos + mantenimiento + llantas + viáticos) cada N horas."""
+    try:
+        interval_hours = int(os.environ.get("SCHEDULER_INTERVAL_HOURS", "6"))
+    except (TypeError, ValueError):
+        interval_hours = 6
+    interval = max(interval_hours, 1) * 3600
+    # Pequeño retraso inicial para no competir con el arranque
+    await asyncio.sleep(120)
+    while True:
+        try:
+            await run_maintenance_sweep()
+            logger.info("Barrido de alertas/mantenimiento ejecutado")
+        except Exception as e:
+            logger.error(f"Error en barrido programado: {e}")
+        await asyncio.sleep(interval)
+
+@app.on_event("startup")
+async def start_scheduler():
+    """Lanza el scheduler en background (deshabilitable con DISABLE_SCHEDULER=1)."""
+    if os.environ.get("DISABLE_SCHEDULER", "").lower() in ("1", "true", "yes"):
+        logger.info("Scheduler deshabilitado por DISABLE_SCHEDULER")
+        return
+    try:
+        asyncio.create_task(_scheduler_loop())
+        logger.info("Scheduler de mantenimiento/alertas iniciado")
+    except Exception as e:
+        logger.error(f"No se pudo iniciar el scheduler: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():

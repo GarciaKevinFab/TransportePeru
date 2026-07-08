@@ -46,6 +46,7 @@ import {
   X,
   FileSpreadsheet,
   ClipboardList,
+  Gauge,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -67,6 +68,10 @@ const MaintenancePage = () => {
   const [vehicles, setVehicles] = useState([]);
   const [statusFilter, setStatusFilter] = useState('all');
   const [activeTab, setActiveTab] = useState('orders');
+
+  // Estado de mantenimiento preventivo por vehículo (km restantes, plan, alerta)
+  const [maintStatuses, setMaintStatuses] = useState({});
+  const [maintLoading, setMaintLoading] = useState(false);
   
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -141,10 +146,29 @@ const MaintenancePage = () => {
       ]);
       setWorkOrders(ordersRes.data);
       setVehicles(vehiclesRes.data);
+      fetchMaintStatuses(vehiclesRes.data);
     } catch (error) {
       toast.error('Error al cargar datos');
     }
     setLoading(false);
+  };
+
+  // Carga el estado de mantenimiento de cada vehículo en paralelo.
+  // Los vehículos sin plan asignado devuelven error/404 y se ignoran silenciosamente.
+  const fetchMaintStatuses = async (vehicleList) => {
+    if (!vehicleList || vehicleList.length === 0) return;
+    setMaintLoading(true);
+    const results = await Promise.allSettled(
+      vehicleList.map((v) => maintenanceApi.getStatus(v.id))
+    );
+    const map = {};
+    results.forEach((res, idx) => {
+      if (res.status === 'fulfilled' && res.value?.data) {
+        map[vehicleList[idx].id] = res.value.data;
+      }
+    });
+    setMaintStatuses(map);
+    setMaintLoading(false);
   };
 
   useEffect(() => {
@@ -394,6 +418,88 @@ const MaintenancePage = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Estado de Mantenimiento Preventivo por Unidad */}
+      <Card className="bg-white section-enter" data-testid="maintenance-status-card">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 font-heading text-lg font-bold uppercase tracking-tight text-slate-900">
+            <Gauge className="w-5 h-5 text-slate-500" />
+            Estado de Mantenimiento por Unidad
+          </CardTitle>
+          <p className="text-xs text-slate-500">Kilómetros restantes para el próximo servicio preventivo</p>
+        </CardHeader>
+        <CardContent className="p-0 overflow-x-auto">
+          {maintLoading ? (
+            <div className="flex items-center justify-center h-32">
+              <Loader2 className="w-6 h-6 animate-spin text-orange-500" />
+            </div>
+          ) : Object.keys(maintStatuses).length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+              <Gauge className="w-10 h-10 mb-2" />
+              <p className="text-sm">Sin planes preventivos asignados a vehículos</p>
+              <p className="text-xs">Asigna un plan en la pestaña "Planes Preventivos"</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="table-dense">
+                  <TableHead>Vehículo</TableHead>
+                  <TableHead>Plan</TableHead>
+                  <TableHead className="text-right">Odómetro Actual</TableHead>
+                  <TableHead className="text-right">Próximo Servicio</TableHead>
+                  <TableHead className="text-right">Km Restantes</TableHead>
+                  <TableHead>Estado</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {vehicles
+                  .filter((v) => maintStatuses[v.id])
+                  .map((v) => {
+                    const st = maintStatuses[v.id];
+                    const kmRemaining = st.km_remaining;
+                    return (
+                      <TableRow key={v.id} className="table-dense">
+                        <TableCell className="font-mono font-bold">{v.plate}</TableCell>
+                        <TableCell className="text-slate-600">{st.plan_name || '-'}</TableCell>
+                        <TableCell className="text-right font-mono">
+                          {st.current_odometer != null ? `${Number(st.current_odometer).toLocaleString('es-PE')} km` : '-'}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {st.next_service_km != null ? `${Number(st.next_service_km).toLocaleString('es-PE')} km` : '-'}
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-bold">
+                          {kmRemaining != null ? (
+                            <span className={kmRemaining <= 0 ? 'text-red-600' : st.due_soon ? 'text-orange-600' : 'text-slate-900'}>
+                              {Number(kmRemaining).toLocaleString('es-PE')} km
+                            </span>
+                          ) : '-'}
+                        </TableCell>
+                        <TableCell>
+                          {kmRemaining != null && kmRemaining <= 0 ? (
+                            <Badge className="bg-red-100 text-red-800">
+                              <AlertTriangle className="w-3 h-3 mr-1" />
+                              Servicio vencido
+                            </Badge>
+                          ) : st.due_soon ? (
+                            <Badge className="bg-orange-100 text-orange-800">
+                              <AlertTriangle className="w-3 h-3 mr-1" />
+                              Faltan {Number(kmRemaining).toLocaleString('es-PE')} km
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-green-100 text-green-800">
+                              <CheckCircle className="w-3 h-3 mr-1" />
+                              Al día
+                            </Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Filters */}
       <Card className="bg-white section-enter">
