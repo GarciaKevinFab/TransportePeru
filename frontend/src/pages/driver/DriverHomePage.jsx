@@ -437,7 +437,7 @@ const DriverHomePage = () => {
             <h3 className="font-bold">¿Necesitas ayuda?</h3>
             <p className="text-sm text-slate-400">Contacta a tu supervisor</p>
           </div>
-          <Button variant="outline" className="relative border-slate-600 text-white hover:bg-slate-800 tap-scale btn-shine rounded-lg">
+          <Button variant="outline" className="relative bg-transparent border-white/25 text-white hover:bg-white/10 hover:text-white tap-scale btn-shine rounded-lg">
             Llamar
           </Button>
         </CardContent>

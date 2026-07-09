@@ -226,7 +226,7 @@ const MainLayout = ({ children }) => {
               <img
                 src={companyBrand.logo_url}
                 alt="Logo"
-                className="h-10 w-auto max-w-[168px] object-contain object-left"
+                className="h-14 w-auto max-w-[190px] object-contain object-left"
                 onError={() => setLogoError(true)}
               />
             ) : (

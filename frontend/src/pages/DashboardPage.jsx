@@ -310,7 +310,7 @@ const DashboardPage = () => {
                 </Button>
                 <Button
                   variant="outline"
-                  className="border-slate-600 text-white hover:bg-slate-800 btn-press touch-target transition-colors duration-200"
+                  className="bg-transparent border-white/25 text-white hover:bg-white/10 hover:text-white btn-press touch-target transition-colors duration-200"
                   onClick={() => navigate('/driver/fuel')}
                 >
                   <Fuel className="w-4 h-4 mr-2" />
@@ -318,7 +318,7 @@ const DashboardPage = () => {
                 </Button>
                 <Button
                   variant="outline"
-                  className="border-slate-600 text-white hover:bg-slate-800 btn-press touch-target transition-colors duration-200"
+                  className="bg-transparent border-white/25 text-white hover:bg-white/10 hover:text-white btn-press touch-target transition-colors duration-200"
                   onClick={() => navigate('/driver/issues')}
                 >
                   <AlertTriangle className="w-4 h-4 mr-2" />
@@ -774,7 +774,7 @@ const DashboardPage = () => {
               {(isAdmin || isFlota) && (
                 <Button
                   variant="outline"
-                  className="border-slate-600 text-white hover:bg-slate-800 btn-press touch-target transition-colors duration-200"
+                  className="bg-transparent border-white/25 text-white hover:bg-white/10 hover:text-white btn-press touch-target transition-colors duration-200"
                   onClick={() => navigate('/vehicles/new')}
                   data-testid="quick-new-vehicle-btn"
                 >
@@ -785,7 +785,7 @@ const DashboardPage = () => {
               {(isAdmin || isMantenimiento) && (
                 <Button
                   variant="outline"
-                  className="border-slate-600 text-white hover:bg-slate-800 btn-press touch-target transition-colors duration-200"
+                  className="bg-transparent border-white/25 text-white hover:bg-white/10 hover:text-white btn-press touch-target transition-colors duration-200"
                   onClick={() => navigate('/maintenance/new')}
                   data-testid="quick-new-ot-btn"
                 >
@@ -796,7 +796,7 @@ const DashboardPage = () => {
               {(isContabilidad) && (
                 <Button
                   variant="outline"
-                  className="border-slate-600 text-white hover:bg-slate-800 btn-press touch-target transition-colors duration-200"
+                  className="bg-transparent border-white/25 text-white hover:bg-white/10 hover:text-white btn-press touch-target transition-colors duration-200"
                   onClick={() => navigate('/settlements')}
                 >
                   <DollarSign className="w-4 h-4 mr-2" />
@@ -806,7 +806,7 @@ const DashboardPage = () => {
               {(isAlmacen) && (
                 <Button
                   variant="outline"
-                  className="border-slate-600 text-white hover:bg-slate-800 btn-press touch-target transition-colors duration-200"
+                  className="bg-transparent border-white/25 text-white hover:bg-white/10 hover:text-white btn-press touch-target transition-colors duration-200"
                   onClick={() => navigate('/inventory')}
                 >
                   <Package className="w-4 h-4 mr-2" />
