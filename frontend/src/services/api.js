@@ -312,6 +312,29 @@ export const reportsApi = {
   viaticos: (params) => api.get('/reports/viaticos', { params }),
 };
 
+// Detracciones API (SPOT - Sistema de Pago de Obligaciones Tributarias)
+export const detraccionesApi = {
+  getAll: (params) => api.get('/detracciones', { params }),
+  getById: (id) => api.get(`/detracciones/${id}`),
+  create: (data) => api.post('/detracciones', data),
+  update: (id, data) => api.put(`/detracciones/${id}`, data),
+  registerDeposit: (id, data) => api.post(`/detracciones/${id}/register-deposit`, data),
+  delete: (id) => api.delete(`/detracciones/${id}`),
+  fromFactura: (facturaId) => api.post(`/detracciones/from-factura/${facturaId}`),
+  getSummary: (params) => api.get('/detracciones/summary', { params }),
+};
+
+// Cashbox API (Caja: movimientos, kardex y reportes por rubro)
+export const cashboxApi = {
+  getMovements: (params) => api.get('/cashbox/movements', { params }),
+  createMovement: (data) => api.post('/cashbox/movements', data),
+  updateMovement: (id, data) => api.put(`/cashbox/movements/${id}`, data),
+  deleteMovement: (id) => api.delete(`/cashbox/movements/${id}`),
+  getBalance: (params) => api.get('/cashbox/balance', { params }),
+  getKardex: (params) => api.get('/cashbox/kardex', { params }),
+  getReportByCategory: (params) => api.get('/cashbox/report-by-category', { params }),
+};
+
 // Dashboard API
 export const dashboardApi = {
   getKPIs: () => api.get('/dashboard/kpis'),

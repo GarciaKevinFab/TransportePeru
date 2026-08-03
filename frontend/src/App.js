@@ -25,6 +25,8 @@ import SettingsPage from './pages/SettingsPage';
 import CompaniesPage from './pages/CompaniesPage';
 import EquipmentPage from './pages/EquipmentPage';
 import BillingPage from './pages/BillingPage';
+import DetraccionesPage from './pages/DetraccionesPage';
+import CashboxPage from './pages/CashboxPage';
 import OfflineIndicator from './components/OfflineIndicator';
 import { usePush } from './hooks/usePush';
 // Driver Mobile App Pages
@@ -290,6 +292,24 @@ function AppRoutes() {
         }
       />
       
+      <Route
+        path="/detracciones"
+        element={
+          <ProtectedRoute allowedRoles={['superadmin', 'owner', 'admin', 'contabilidad']}>
+            <DetraccionesPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/cashbox"
+        element={
+          <ProtectedRoute allowedRoles={['superadmin', 'owner', 'admin', 'contabilidad']}>
+            <CashboxPage />
+          </ProtectedRoute>
+        }
+      />
+
       <Route
         path="/trips/:tripId/checklist"
         element={

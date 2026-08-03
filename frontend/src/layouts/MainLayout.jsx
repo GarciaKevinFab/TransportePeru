@@ -24,6 +24,8 @@ import {
   Building2,
   Shield,
   Wallet,
+  Coins,
+  PiggyBank,
   Link2,
   Sun,
   Moon,
@@ -49,6 +51,7 @@ const menuGroups = [
       { path: '/trips', icon: Route, label: 'Viajes', roles: ['superadmin', 'owner', 'admin', 'operaciones', 'contabilidad', 'chofer'] },
       { path: '/settlements', icon: Wallet, label: 'Viáticos', roles: ['superadmin', 'owner', 'admin', 'contabilidad', 'operaciones'] },
       { path: '/fuel', icon: Fuel, label: 'Combustible', roles: ['superadmin', 'owner', 'admin', 'operaciones', 'chofer'] },
+      { path: '/cashbox', icon: PiggyBank, label: 'Caja', roles: ['superadmin', 'owner', 'admin', 'contabilidad'] },
     ],
   },
   {
@@ -68,6 +71,7 @@ const menuGroups = [
       { path: '/documents', icon: FileText, label: 'Documentos', roles: ['superadmin', 'owner', 'admin', 'flota'] },
       { path: '/issues', icon: AlertTriangle, label: 'Incidentes', roles: ['superadmin', 'owner', 'admin', 'operaciones', 'chofer'] },
       { path: '/billing', icon: Receipt, label: 'Facturación', roles: ['superadmin', 'owner', 'admin', 'contabilidad'] },
+      { path: '/detracciones', icon: Coins, label: 'Detracciones', roles: ['superadmin', 'owner', 'admin', 'contabilidad'] },
     ],
   },
   {
