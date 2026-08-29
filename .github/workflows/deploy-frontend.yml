@@ -1,11 +1,9 @@
 name: Deploy Frontend to cPanel
 
+# Ruta de despliegue en desuso (el frontend se despliega a Vercel manualmente).
+# Se deja disponible solo por disparo manual para no perder el workflow,
+# sin que falle automáticamente en cada push a main.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'frontend/**'
-      - '.github/workflows/deploy-frontend.yml'
   workflow_dispatch:
 
 jobs:
@@ -22,7 +20,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'yarn'
           cache-dependency-path: frontend/yarn.lock
 

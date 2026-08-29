@@ -1,11 +1,10 @@
 name: Deploy Backend to Windows Server
 
+# Ruta de despliegue en desuso (el backend corre en Docker en el VPS).
+# Requiere un self-hosted runner [self-hosted, Windows, X64] que ya no está
+# online, por eso quedaba colgado 24h y se cancelaba en cada push. Se deja
+# disponible solo por disparo manual para no perder el workflow.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'backend/**'
-      - '.github/workflows/deploy-backend.yml'
   workflow_dispatch:
 
 jobs:
