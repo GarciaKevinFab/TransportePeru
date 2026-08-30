@@ -3377,18 +3377,49 @@ async def create_checklist(request: dict = Body(...), current_user: dict = Depen
     
     return {"id": checklist.id, "message": "Checklist creado"}
 
+# ============== TABLAS EN POSTGRES: COMBUSTIBLE ==============
+# fuel_vouchers y fuel_loads cortaron con la migracion 011. Van juntas porque
+# una carga descuenta del vale que la autorizo.
+#
+# fuel_loads guarda la ubicacion en location_lat/location_lng, igual que los
+# checklists: se traduce con los mismos helpers (_fila_con_ubicacion y
+# _api_con_ubicacion).
+
+FUEL_VOUCHER_COLS = {
+    "id": "uuid", "company_id": "uuid", "vehicle_id": "uuid", "trip_id": "uuid",
+    "voucher_number": "text", "provider": "text",
+    "limit_amount": "float", "limit_liters": "float",
+    "valid_from": "ts", "valid_until": "ts", "is_used": "bool",
+    "approved_by": "uuid", "voucher_photo_url": "text",
+    "invoice_photo_url": "text", "invoice_number": "text",
+    "created_at": "ts",
+}
+
+FUEL_LOAD_COLS = {
+    "id": "uuid", "company_id": "uuid", "vehicle_id": "uuid",
+    "voucher_id": "uuid", "trip_id": "uuid",
+    "voucher_number": "text", "invoice_number": "text",
+    "liters": "float", "price_per_liter": "float", "total_amount": "float",
+    "odometer": "int", "provider": "text", "receipt_url": "text",
+    "voucher_photo_url": "text", "invoice_photo_url": "text",
+    "location_lat": "float", "location_lng": "float",
+    "load_date": "ts", "created_at": "ts", "created_by": "uuid",
+}
+
+
 # ============== FUEL ROUTES ==============
 @api_router.get("/fuel/vouchers")
 async def get_fuel_vouchers(
     vehicle_id: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
-    query = {"company_id": current_user["company_id"]}
-    if vehicle_id:
-        query["vehicle_id"] = vehicle_id
-    
-    vouchers = await db.fuel_vouchers.find(query, {"_id": 0}).to_list(500)
-    return [serialize_doc(v) for v in vouchers]
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(current_user["company_id"]))
+    f.si(vehicle_id, "vehicle_id = $?", db_pg.as_uuid(vehicle_id))
+    async with db_pg.tx(current_user) as conn:
+        return db_pg.rows_to_api(await conn.fetch(
+            "select * from fuel_vouchers where " + f.where
+            + " order by valid_from desc nulls last limit 500", *f.values
+        ))
 
 @api_router.post("/fuel/vouchers")
 async def create_fuel_voucher(request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "operaciones"))):
@@ -3406,12 +3437,11 @@ async def create_fuel_voucher(request: dict = Body(...), current_user: dict = De
         approved_by=current_user["id"]
     )
     
-    doc = voucher.model_dump()
-    for key, value in doc.items():
-        if isinstance(value, datetime):
-            doc[key] = value.isoformat()
-    
-    await db.fuel_vouchers.insert_one(doc)
+    sql, values = db_pg.build_insert(
+        "fuel_vouchers", FUEL_VOUCHER_COLS, _modelo_a_fila(voucher.model_dump())
+    )
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(sql, *values)
     return {"id": voucher.id, "message": "Vale creado"}
 
 @api_router.get("/fuel/loads")
@@ -3420,14 +3450,15 @@ async def get_fuel_loads(
     trip_id: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
-    query = {"company_id": current_user["company_id"]}
-    if vehicle_id:
-        query["vehicle_id"] = vehicle_id
-    if trip_id:
-        query["trip_id"] = trip_id
-    
-    loads = await db.fuel_loads.find(query, {"_id": 0}).sort("load_date", -1).to_list(1000)
-    return [serialize_doc(l) for l in loads]
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(current_user["company_id"]))
+    f.si(vehicle_id, "vehicle_id = $?", db_pg.as_uuid(vehicle_id))
+    f.si(trip_id, "trip_id = $?", db_pg.as_uuid(trip_id))
+    async with db_pg.tx(current_user) as conn:
+        filas = db_pg.rows_to_api(await conn.fetch(
+            "select * from fuel_loads where " + f.where
+            + " order by load_date desc nulls last limit 1000", *f.values
+        ))
+    return [_api_con_ubicacion(l) for l in filas]
 
 @api_router.post("/fuel/loads")
 async def create_fuel_load(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
@@ -3445,19 +3476,24 @@ async def create_fuel_load(request: dict = Body(...), current_user: dict = Depen
         created_by=current_user["id"]
     )
     
-    doc = load.model_dump()
-    for key, value in doc.items():
-        if isinstance(value, datetime):
-            doc[key] = value.isoformat()
-    
-    await db.fuel_loads.insert_one(doc)
+    # La carga y el vale que consume se escriben en la misma transaccion: un
+    # vale no puede quedar marcado como usado por una carga que no entro, ni
+    # al reves.
+    sql, values = db_pg.build_insert(
+        "fuel_loads", FUEL_LOAD_COLS,
+        _fila_con_ubicacion(_modelo_a_fila(load.model_dump())),
+    )
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(sql, *values)
 
-    # Mark voucher as used if provided
-    if request.get("voucher_id"):
-        await db.fuel_vouchers.update_one(
-            {"id": request["voucher_id"]},
-            {"$set": {"is_used": True}}
-        )
+        # Mark voucher as used if provided
+        if request.get("voucher_id"):
+            await conn.execute(
+                "update fuel_vouchers set is_used = true "
+                "where id = $1 and company_id = $2",
+                db_pg.as_uuid(request["voucher_id"]),
+                db_pg.as_uuid(current_user["company_id"]),
+            )
 
     # Si la carga está ligada a un viaje, el diésel DESCUENTA del saldo de viáticos:
     # se registra como gasto categoría "combustible" y se incrementa total_expenses.
@@ -3498,7 +3534,11 @@ async def create_fuel_load(request: dict = Body(...), current_user: dict = Depen
 @api_router.put("/fuel/vouchers/{voucher_id}")
 async def update_fuel_voucher(voucher_id: str, request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin"))):
     """Update a fuel voucher - Admin only"""
-    voucher = await db.fuel_vouchers.find_one({"id": voucher_id, "company_id": current_user["company_id"]})
+    async with db_pg.tx(current_user) as conn:
+        voucher = db_pg.to_api(await conn.fetchrow(
+            "select * from fuel_vouchers where id = $1 and company_id = $2",
+            db_pg.as_uuid(voucher_id), db_pg.as_uuid(current_user["company_id"]),
+        ))
     if not voucher:
         raise HTTPException(status_code=404, detail="Vale no encontrado")
     
@@ -3511,16 +3551,29 @@ async def update_fuel_voucher(voucher_id: str, request: dict = Body(...), curren
             else:
                 update_data[field] = request[field]
     
-    if update_data:
-        await db.fuel_vouchers.update_one({"id": voucher_id, "company_id": current_user["company_id"]}, {"$set": update_data})
-    
+    # "photo_url" esta en allowed_fields pero no es una columna (las que hay son
+    # voucher_photo_url e invoice_photo_url). FUEL_VOUCHER_COLS actua de lista
+    # blanca y lo descarta, igual que hacia falta en los cortes anteriores.
+    update_data["id"] = voucher_id
+    update_data["company_id"] = current_user["company_id"]
+    sql, values = db_pg.build_update(
+        "fuel_vouchers", FUEL_VOUCHER_COLS, update_data, ["id", "company_id"]
+    )
+    if sql:
+        async with db_pg.tx(current_user) as conn:
+            await conn.execute(sql, *values)
+
     return {"message": "Vale actualizado"}
 
 @api_router.delete("/fuel/vouchers/{voucher_id}")
 async def delete_fuel_voucher(voucher_id: str, current_user: dict = Depends(require_roles("owner", "admin"))):
     """Delete a fuel voucher - Admin only"""
-    result = await db.fuel_vouchers.delete_one({"id": voucher_id, "company_id": current_user["company_id"]})
-    if result.deleted_count == 0:
+    async with db_pg.tx(current_user) as conn:
+        borrado = await conn.fetchval(
+            "delete from fuel_vouchers where id = $1 and company_id = $2 returning id",
+            db_pg.as_uuid(voucher_id), db_pg.as_uuid(current_user["company_id"]),
+        )
+    if borrado is None:
         raise HTTPException(status_code=404, detail="Vale no encontrado")
     
     return {"message": "Vale eliminado"}
@@ -3528,7 +3581,11 @@ async def delete_fuel_voucher(voucher_id: str, current_user: dict = Depends(requ
 @api_router.put("/fuel/loads/{load_id}")
 async def update_fuel_load(load_id: str, request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin"))):
     """Update a fuel load - Admin only"""
-    load = await db.fuel_loads.find_one({"id": load_id, "company_id": current_user["company_id"]})
+    async with db_pg.tx(current_user) as conn:
+        load = db_pg.to_api(await conn.fetchrow(
+            "select * from fuel_loads where id = $1 and company_id = $2",
+            db_pg.as_uuid(load_id), db_pg.as_uuid(current_user["company_id"]),
+        ))
     if not load:
         raise HTTPException(status_code=404, detail="Carga no encontrada")
     
@@ -3544,16 +3601,26 @@ async def update_fuel_load(load_id: str, request: dict = Body(...), current_user
         price = update_data.get("price_per_liter", load.get("price_per_liter", 0))
         update_data["total_amount"] = liters * price
     
-    if update_data:
-        await db.fuel_loads.update_one({"id": load_id, "company_id": current_user["company_id"]}, {"$set": update_data})
-    
+    update_data["id"] = load_id
+    update_data["company_id"] = current_user["company_id"]
+    sql, values = db_pg.build_update(
+        "fuel_loads", FUEL_LOAD_COLS, update_data, ["id", "company_id"]
+    )
+    if sql:
+        async with db_pg.tx(current_user) as conn:
+            await conn.execute(sql, *values)
+
     return {"message": "Carga actualizada"}
 
 @api_router.delete("/fuel/loads/{load_id}")
 async def delete_fuel_load(load_id: str, current_user: dict = Depends(require_roles("owner", "admin"))):
     """Delete a fuel load - Admin only"""
-    result = await db.fuel_loads.delete_one({"id": load_id, "company_id": current_user["company_id"]})
-    if result.deleted_count == 0:
+    async with db_pg.tx(current_user) as conn:
+        borrada = await conn.fetchval(
+            "delete from fuel_loads where id = $1 and company_id = $2 returning id",
+            db_pg.as_uuid(load_id), db_pg.as_uuid(current_user["company_id"]),
+        )
+    if borrada is None:
         raise HTTPException(status_code=404, detail="Carga no encontrada")
     
     return {"message": "Carga eliminada"}
@@ -5758,8 +5825,16 @@ async def get_fuel_conciliation(
     if trip_id:
         query["trip_id"] = trip_id
     
-    vouchers = await db.fuel_vouchers.find(query, {"_id": 0}).to_list(500)
-    loads = await db.fuel_loads.find(query, {"_id": 0}).to_list(1000)
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(current_user["company_id"]))
+    f.si(vehicle_id, "vehicle_id = $?", db_pg.as_uuid(vehicle_id))
+    f.si(trip_id, "trip_id = $?", db_pg.as_uuid(trip_id))
+    async with db_pg.tx(current_user) as conn:
+        vouchers = db_pg.rows_to_api(await conn.fetch(
+            "select * from fuel_vouchers where " + f.where + " limit 500", *f.values
+        ))
+        loads = db_pg.rows_to_api(await conn.fetch(
+            "select * from fuel_loads where " + f.where + " limit 1000", *f.values
+        ))
     
     results = []
     for voucher in vouchers:
@@ -5797,12 +5872,14 @@ async def get_fuel_kpis(
     """Get fuel KPIs (km/gal, cost/km)"""
     company_id = current_user["company_id"]
     
-    query = {"company_id": company_id}
-    if vehicle_id:
-        query["vehicle_id"] = vehicle_id
-    
-    loads = await db.fuel_loads.find(query, {"_id": 0}).sort("load_date", -1).to_list(1000)
-    
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(company_id))
+    f.si(vehicle_id, "vehicle_id = $?", db_pg.as_uuid(vehicle_id))
+    async with db_pg.tx(current_user) as conn:
+        loads = db_pg.rows_to_api(await conn.fetch(
+            "select * from fuel_loads where " + f.where
+            + " order by load_date desc nulls last limit 1000", *f.values
+        ))
+
     if not loads:
         return {"message": "No hay datos de combustible"}
     
@@ -7055,15 +7132,15 @@ async def get_fuel_report(
     current_user: dict = Depends(get_current_user)
 ):
     """Get fuel consumption report"""
-    query = {"company_id": current_user["company_id"]}
-    if start_date:
-        query["load_date"] = {"$gte": start_date}
-    if end_date:
-        query.setdefault("load_date", {})["$lte"] = end_date
-    if vehicle_id:
-        query["vehicle_id"] = vehicle_id
-    
-    loads = await db.fuel_loads.find(query, {"_id": 0}).sort("load_date", -1).to_list(500)
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(current_user["company_id"]))
+    f.si(start_date, "load_date >= $?", db_pg.as_ts(start_date))
+    f.si(end_date, "load_date <= $?", db_pg.as_ts(end_date))
+    f.si(vehicle_id, "vehicle_id = $?", db_pg.as_uuid(vehicle_id))
+    async with db_pg.tx(current_user) as conn:
+        loads = db_pg.rows_to_api(await conn.fetch(
+            "select * from fuel_loads where " + f.where
+            + " order by load_date desc nulls last limit 500", *f.values
+        ))
     
     # Calculate totals and KPIs
     total_liters = sum(l.get("liters", 0) for l in loads)
@@ -7761,9 +7838,13 @@ async def get_cost_per_km_report(
         vid = v["id"]
 
         # Combustible
-        fq = {"company_id": company_id, "vehicle_id": vid}
-        fq.update(_date_range_query("load_date", from_, to))
-        loads = await db.fuel_loads.find(fq, {"_id": 0}).to_list(2000)
+        f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(company_id))
+        f.agregar("vehicle_id = $?", db_pg.as_uuid(vid))
+        _rango_fechas_pg(f, "load_date", from_, to)
+        async with db_pg.tx(current_user) as conn:
+            loads = db_pg.rows_to_api(await conn.fetch(
+                "select * from fuel_loads where " + f.where + " limit 2000", *f.values
+            ))
         fuel = sum(l.get("total_amount", 0) or 0 for l in loads)
 
         # Llantas (montajes en el periodo -> costo de compra de la llanta)

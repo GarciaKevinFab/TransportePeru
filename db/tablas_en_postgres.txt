@@ -65,3 +65,7 @@ blocks
 checklist_templates
 checklists
 checklist_runs
+
+# --- 011: Combustible (vales y cargas) ---
+fuel_vouchers
+fuel_loads

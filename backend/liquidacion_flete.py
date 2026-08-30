@@ -247,8 +247,13 @@ async def _recalc_linea_totales(conn, company_id: str, linea: dict) -> dict:
     )
 
     if linea.get("fuel_load_id"):
-        fuel_load = await srv.db.fuel_loads.find_one({"id": linea["fuel_load_id"]}, {"_id": 0})
-        total_combustible = srv._to_float(fuel_load.get("total_amount")) if fuel_load else 0
+        # Reusa la conexion que ya trae la funcion, y filtra por empresa: la
+        # consulta de Mongo buscaba solo por id, sin tenant.
+        total = await conn.fetchval(
+            "select total_amount from fuel_loads where id = $1 and company_id = $2",
+            db_pg.as_uuid(linea["fuel_load_id"]), db_pg.as_uuid(company_id),
+        )
+        total_combustible = srv._to_float(total) if total is not None else 0
     else:
         total_combustible = _calc_linea_total_combustible(linea.get("liters"), linea.get("price_per_liter"))
 
