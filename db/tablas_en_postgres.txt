@@ -41,3 +41,6 @@ suppliers
 inventory_items
 stock_moves
 purchase_orders
+
+# --- 006: Vehiculos ---
+vehicles

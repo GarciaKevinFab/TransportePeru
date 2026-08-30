@@ -149,6 +149,10 @@ create table vehicles (
   photo_url text,
   proveedor_id uuid, -- FK -> proveedores, agregada después de crear esa tabla (ver ALTER al final del bloque Liquidación)
   viatico_fijo double precision,
+  -- Los escribe complete_work_order al cerrar una OT y los lee
+  -- check_maintenance_due para saber cuando toca el proximo servicio
+  last_maintenance_km int,
+  last_maintenance_date timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   created_by uuid references users(id)

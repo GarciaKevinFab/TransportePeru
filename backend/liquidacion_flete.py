@@ -257,9 +257,12 @@ async def _recalc_linea_totales(conn, company_id: str, linea: dict) -> dict:
 
     viaticos = srv._to_float(linea.get("viaticos"))
     if not viaticos and linea.get("placa"):
-        vehicle = await srv.db.vehicles.find_one(
-            {"plate": linea["placa"], "company_id": company_id}, {"_id": 0, "viatico_fijo": 1}
-        )
+        # vehicles ya corto a Postgres (migracion 006).
+        async with db_pg.tx({"company_id": company_id}) as conn2:
+            vehicle = db_pg.to_api(await conn2.fetchrow(
+                "select viatico_fijo from vehicles where plate = $1 and company_id = $2",
+                linea["placa"], db_pg.as_uuid(company_id),
+            ))
         if vehicle and vehicle.get("viatico_fijo"):
             viaticos = srv._to_float(vehicle["viatico_fijo"])
 
