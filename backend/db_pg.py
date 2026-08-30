@@ -99,6 +99,29 @@ async def tx(current_user: dict, superadmin: bool = False):
             yield conn
 
 
+@asynccontextmanager
+async def tx_sin_empresa():
+    """Transaccion SIN contexto de empresa, para lo que ocurre antes de saber
+    de que empresa se trata.
+
+    El caso real es el webhook de WhatsApp: llega un mensaje de un numero
+    cualquiera y hay que registrarlo antes de resolver a que chofer -y por lo
+    tanto a que empresa- pertenece. No hay JWT ni current_user.
+
+    Esto NO es un agujero en RLS, es lo contrario: sin contexto,
+    app_current_company_id() devuelve NULL y la politica tenant_isolation no
+    deja ver ni escribir NINGUNA fila de las tablas con company_id. Solo
+    responden las tablas cuya politica es backend_full_access, que son
+    exactamente las que no tienen empresa (whatsapp_events,
+    whatsapp_unrecognized). Si alguien lo usa por error contra una tabla con
+    tenant no obtiene datos de mas: obtiene cero filas.
+    """
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            yield conn
+
+
 # ---------------------------------------------------------------------------
 # Conversión de tipos
 # ---------------------------------------------------------------------------
@@ -111,16 +134,21 @@ def to_api(record):
     """Un asyncpg.Record -> dict con la misma forma que devolvía Mongo."""
     if record is None:
         return None
+
+    def _valor(v):
+        if isinstance(v, _uuid.UUID):
+            return str(v)
+        if isinstance(v, (datetime, date)):
+            return v.isoformat()
+        # Las columnas array (uuid[]) llegan como lista: hay que convertir
+        # cada elemento, o el cliente recibiria objetos UUID sin serializar.
+        if isinstance(v, list):
+            return [_valor(x) for x in v]
+        return v
+
     out = {}
     for key, value in dict(record).items():
-        if isinstance(value, _uuid.UUID):
-            out[key] = str(value)
-        elif isinstance(value, datetime):
-            out[key] = value.isoformat()
-        elif isinstance(value, date):
-            out[key] = value.isoformat()
-        else:
-            out[key] = value
+        out[key] = _valor(value)
     return out
 
 
@@ -207,6 +235,9 @@ _COERCERS = {
     # la lista de Python viajan tal cual. Convertirlos a string aca los
     # codificaria dos veces.
     "json": lambda v: v,
+    # uuid[]: asyncpg no acepta una lista de str para una columna de uuids;
+    # hay que castear cada elemento.
+    "uuid[]": lambda v: [u for u in (as_uuid(x) for x in (v or [])) if u is not None],
 }
 
 

@@ -25,3 +25,9 @@ facturas
 guias_transportista
 detracciones
 cash_movements
+
+# --- 003: Bot de WhatsApp ---
+whatsapp_events
+whatsapp_unrecognized
+whatsapp_pending_selection
+whatsapp_documentos_pendientes
