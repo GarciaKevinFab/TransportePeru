@@ -3,6 +3,11 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+
+# Postgres: las tablas que ya cortaron. Mongo y Postgres conviven mientras
+# dura la migracion; ver db/tablas_en_postgres.txt para la lista al dia.
+import db_pg
+
 import os
 import logging
 from pathlib import Path
@@ -206,12 +211,12 @@ class User(BaseModel):
     license_number: Optional[str] = None
     license_expiry: Optional[datetime] = None
     phone: Optional[str] = None
+    whatsapp_number: Optional[str] = None  # E.164 normalizado (+51...), usado por el bot de WhatsApp
     # EPP (Equipo de Protección Personal) - solo para choferes
     # Estructura: {"casco": {"assigned": true, "date": "2024-01-15", "condition": "bueno", "size": "M"}, ...}
     epp: Dict[str, Any] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    whatsapp_number: Optional[str] = None  # E.164 normalizado (+51...), usado por el bot de WhatsApp
     created_by: Optional[str] = None
 
 class Vehicle(BaseModel):
@@ -234,14 +239,14 @@ class Vehicle(BaseModel):
     axle_config_history: Optional[List[Dict[str, Any]]] = None
     assigned_driver_id: Optional[str] = None
     photo_url: Optional[str] = None
+    proveedor_id: Optional[str] = None    # Proveedor/transportista dueño de esta unidad
+                                            # (ver liquidacion_flete.py) — None hasta que se asigne
+    viatico_fijo: Optional[float] = None   # Viático fijo por viaje para esta placa
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     created_by: Optional[str] = None
 
 class VehicleEquipment(BaseModel):
-    proveedor_id: Optional[str] = None    # Proveedor/transportista dueño de esta unidad
-                                            # (ver liquidacion_flete.py) — None hasta que se asigne
-    viatico_fijo: Optional[float] = None   # Viático fijo por viaje para esta placa
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     company_id: str
@@ -5434,7 +5439,7 @@ async def save_uploaded_content(
             return {"url": url, "filename": filename, "storage": "s3"}
         except ClientError as e:
             logging.error(f"S3 upload error: {e}")
-    
+
     # Fall back to local storage
     entity_dir = UPLOAD_DIR / entity_type / entity_id
     entity_dir.mkdir(parents=True, exist_ok=True)
@@ -5446,11 +5451,6 @@ async def save_uploaded_content(
     relative_url = f"/uploads/{entity_type}/{entity_id}/{filename}"
     return {"url": relative_url, "filename": filename, "storage": "local"}
 
-# ============== PUSH NOTIFICATIONS ==============
-@api_router.get("/notifications/vapid-public-key")
-async def get_vapid_public_key():
-    """Clave pública VAPID para suscribir Web Push en el navegador."""
-    return {"public_key": os.environ.get("VAPID_PUBLIC_KEY", "")}
 
 @api_router.post("/upload/base64")
 async def upload_base64(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
@@ -5474,12 +5474,17 @@ async def upload_base64(request: dict = Body(...), current_user: dict = Depends(
 
     return await save_uploaded_content(file_content, entity_type, entity_id, "image/jpeg", "jpg")
 
+# ============== PUSH NOTIFICATIONS ==============
+@api_router.get("/notifications/vapid-public-key")
+async def get_vapid_public_key():
+    """Clave pública VAPID para suscribir Web Push en el navegador."""
+    return {"public_key": os.environ.get("VAPID_PUBLIC_KEY", "")}
 
 @api_router.post("/notifications/subscribe")
 async def subscribe_push(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """Subscribe to push notifications"""
     subscription = request.get("subscription", {})
-
+    
     # Store subscription in user document
     await db.users.update_one(
         {"id": current_user["id"]},
@@ -5676,27 +5681,46 @@ async def bootstrap_superadmin(_: bool = Depends(require_install_token)):
             detail="Ya existe un superadmin. Use las credenciales de superadmin para acceder."
         )
 
-    # Create the system company for superadmin
-    system_company = Company(
-        name="Star Insights IT",
-        ruc="00000000000",
-        address="Sistema",
-        phone="",
-        email="admin@starinsights.pe",
-        config={}
-    )
-    company_doc = system_company.model_dump()
-    for key, value in company_doc.items():
-        if isinstance(value, datetime):
-            company_doc[key] = value.isoformat()
-    await db.companies.insert_one(company_doc)
+    # Empresa del sistema: se REUSA si ya existe.
+    #
+    # Antes se insertaba una nueva sin mirar, y la unica guarda del endpoint es
+    # que no exista el USUARIO superadmin. Si ese usuario se borraba o el
+    # bootstrap se corria de nuevo, quedaba una segunda 'Star Insights IT' con
+    # el mismo RUC placeholder — indistinguible de la primera en cualquier
+    # pantalla. Fue exactamente lo que paso en produccion.
+    #
+    # Se busca por RUC ademas de por nombre porque el nombre lo puede editar
+    # un admin desde la UI, y el RUC 00000000000 es el marcador real de que
+    # esta es la empresa interna y no la de un cliente.
+    SYSTEM_RUC = "00000000000"
+    existing_company = await db.companies.find_one({"ruc": SYSTEM_RUC}, {"_id": 0})
+    if existing_company:
+        system_company_id = existing_company["id"]
+        logger.info(
+            "bootstrap: reusando la empresa del sistema existente " + system_company_id
+        )
+    else:
+        system_company = Company(
+            name="Star Insights IT",
+            ruc=SYSTEM_RUC,
+            address="Sistema",
+            phone="",
+            email="admin@starinsights.pe",
+            config={},
+        )
+        company_doc = system_company.model_dump()
+        for key, value in company_doc.items():
+            if isinstance(value, datetime):
+                company_doc[key] = value.isoformat()
+        await db.companies.insert_one(company_doc)
+        system_company_id = system_company.id
 
     # Generar password aleatorio (se muestra UNA sola vez)
     generated_password = secrets.token_urlsafe(12)
 
     # Create superadmin user
     superadmin = User(
-        company_id=system_company.id,
+        company_id=system_company_id,
         email="superadmin@starinsights.pe",
         name="Super Administrador",
         role=UserRole.SUPERADMIN,
@@ -5716,7 +5740,7 @@ async def bootstrap_superadmin(_: bool = Depends(require_install_token)):
             "password": generated_password,
             "role": "superadmin"
         },
-        "company_id": system_company.id,
+        "company_id": system_company_id,
         "instructions": "Guarde esta contraseña ahora; no se volverá a mostrar. Deberá cambiarla en el primer inicio de sesión."
     }
 
@@ -6567,6 +6591,67 @@ class Factura(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     created_by: Optional[str] = None
 
+# ============== TABLAS EN POSTGRES: FACTURACION / SUNAT / CAJA ==============
+# Estas cuatro tablas ya cortaron (db/migrations/002_corte_facturacion.sql):
+# Postgres es su fuente de verdad y NO se escriben mas en Mongo. Lo que sigan
+# consultando de companies/trips/vehicles se lee de Mongo, que es correcto:
+# esas todavia no cortaron.
+#
+# El mapa {columna: tipo} es la lista blanca de columnas escribibles (nada que
+# venga del request puede sumar una) y le dice a db_pg como convertir cada
+# valor y cuando hace falta un cast SQL.
+
+GUIA_COLS = {
+    "id": "uuid", "company_id": "uuid", "trip_id": "uuid",
+    "serie": "text", "numero": "int", "fecha_emision": "text",
+    "remitente_ruc": "text", "remitente_razon_social": "text",
+    "destinatario_ruc": "text", "destinatario_razon_social": "text",
+    "transportista_ruc": "text", "transportista_razon_social": "text",
+    "punto_partida": "text", "punto_partida_ubigeo": "text",
+    "punto_llegada": "text", "punto_llegada_ubigeo": "text",
+    "vehiculo_placa": "text", "conductor_dni": "text",
+    "conductor_nombre": "text", "conductor_licencia": "text",
+    "descripcion_carga": "text", "peso_bruto": "float",
+    "unidad_peso": "text", "num_bultos": "int",
+    "sunat_response": "json", "sunat_ticket": "text", "sunat_cdr": "text",
+    "pdf_url": "text", "status": "enum:guia_transportista_status",
+    "created_at": "ts", "updated_at": "ts", "created_by": "uuid",
+}
+
+FACTURA_COLS = {
+    "id": "uuid", "company_id": "uuid", "trip_id": "uuid",
+    "serie": "text", "numero": "int", "fecha_emision": "text",
+    "cliente_ruc": "text", "cliente_razon_social": "text", "cliente_direccion": "text",
+    "items": "json", "subtotal": "float", "igv": "float", "total": "float",
+    "moneda": "text",
+    "sunat_response": "json", "sunat_ticket": "text", "sunat_cdr": "text",
+    "pdf_url": "text", "status": "enum:factura_status",
+    "created_at": "ts", "updated_at": "ts", "created_by": "uuid",
+}
+
+DETRACCION_COLS = {
+    "id": "uuid", "company_id": "uuid", "factura_id": "uuid", "trip_id": "uuid",
+    "client_ruc": "text", "client_name": "text",
+    "comprobante_serie": "text", "comprobante_numero": "text",
+    "fecha_emision": "text",
+    "base_amount": "float", "rate": "float", "amount": "float",
+    "codigo_bien_servicio": "text", "constancia_number": "text",
+    "deposit_date": "text", "status": "enum:detraccion_status", "notes": "text",
+    "anulada_at": "ts", "anulada_by": "uuid",
+    "created_at": "ts", "updated_at": "ts", "created_by": "uuid",
+}
+
+CASH_MOVEMENT_COLS = {
+    "id": "uuid", "company_id": "uuid", "movement_number": "text", "date": "text",
+    "type": "enum:cash_movement_type", "concept": "text", "category": "text",
+    "amount": "float", "payment_method": "enum:cash_payment_method",
+    "reference": "text", "trip_id": "uuid", "vehicle_id": "uuid",
+    "client_ruc": "text", "supplier": "text", "receipt_url": "text", "notes": "text",
+    "deleted": "bool", "deleted_at": "ts", "deleted_by": "uuid",
+    "created_at": "ts", "updated_at": "ts", "created_by": "uuid",
+}
+
+
 # --- Guía Endpoints ---
 @api_router.get("/guias")
 async def get_guias(
@@ -6574,109 +6659,112 @@ async def get_guias(
     status: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
-    query = {"company_id": current_user["company_id"]}
-    if trip_id:
-        query["trip_id"] = trip_id
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(current_user["company_id"]))
+    f.si(trip_id, "trip_id = $?", db_pg.as_uuid(trip_id))
     if status:
-        query["status"] = status
-    guias = await db.guias_transportista.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
-    return [serialize_doc(g) for g in guias]
+        # Un estado fuera del enum reventaria el cast en Postgres; con Mongo
+        # simplemente no casaba con nada. Se conserva esa forma: lista vacia.
+        if status not in [e.value for e in GuiaTransportistaStatus]:
+            return []
+        f.agregar("status = $?::guia_transportista_status", status)
+    async with db_pg.tx(current_user) as conn:
+        rows = await conn.fetch(
+            "select * from guias_transportista where " + f.where
+            + " order by created_at desc limit 500",
+            *f.values,
+        )
+    return db_pg.rows_to_api(rows)
 
 @api_router.get("/guias/{guia_id}")
 async def get_guia(guia_id: str, current_user: dict = Depends(get_current_user)):
-    guia = await db.guias_transportista.find_one(
-        {"id": guia_id, "company_id": current_user["company_id"]}, {"_id": 0}
-    )
-    if not guia:
+    async with db_pg.tx(current_user) as conn:
+        row = await conn.fetchrow(
+            "select * from guias_transportista where id = $1 and company_id = $2",
+            db_pg.as_uuid(guia_id), db_pg.as_uuid(current_user["company_id"]),
+        )
+    if not row:
         raise HTTPException(status_code=404, detail="Guía no encontrada")
-    return serialize_doc(guia)
+    return db_pg.to_api(row)
 
 @api_router.post("/guias")
 async def create_guia(request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "operaciones", "contabilidad"))):
 
-    # Auto-increment numero
-    last = await db.guias_transportista.find_one(
-        {"company_id": current_user["company_id"], "serie": request.get("serie", "T001")},
-        sort=[("numero", -1)]
-    )
-    next_num = (last.get("numero", 0) + 1) if last else 1
+    serie = request.get("serie", "T001")
+    async with db_pg.tx(current_user) as conn:
+        # Correlativo por (empresa, serie). Mantiene la misma carrera que tenia
+        # con Mongo: dos altas simultaneas de la misma serie pueden calcular el
+        # mismo numero. Se arregla con una secuencia cuando toque, no ahora.
+        ultimo = await conn.fetchval(
+            "select max(numero) from guias_transportista "
+            "where company_id = $1 and serie = $2",
+            db_pg.as_uuid(current_user["company_id"]), serie,
+        )
+        next_num = (ultimo or 0) + 1
 
-    guia = GuiaTransportista(
-        company_id=current_user["company_id"],
-        trip_id=request.get("trip_id"),
-        serie=request.get("serie", "T001"),
-        numero=next_num,
-        fecha_emision=request.get("fecha_emision", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
-        remitente_ruc=request.get("remitente_ruc"),
-        remitente_razon_social=request.get("remitente_razon_social"),
-        destinatario_ruc=request.get("destinatario_ruc"),
-        destinatario_razon_social=request.get("destinatario_razon_social"),
-        transportista_ruc=request.get("transportista_ruc"),
-        transportista_razon_social=request.get("transportista_razon_social"),
-        punto_partida=request.get("punto_partida"),
-        punto_partida_ubigeo=request.get("punto_partida_ubigeo"),
-        punto_llegada=request.get("punto_llegada"),
-        punto_llegada_ubigeo=request.get("punto_llegada_ubigeo"),
-        vehiculo_placa=request.get("vehiculo_placa"),
-        conductor_dni=request.get("conductor_dni"),
-        conductor_nombre=request.get("conductor_nombre"),
-        conductor_licencia=request.get("conductor_licencia"),
-        descripcion_carga=request.get("descripcion_carga"),
-        peso_bruto=request.get("peso_bruto"),
-        num_bultos=request.get("num_bultos"),
-        created_by=current_user["id"]
-    )
-
-    doc = guia.model_dump()
-    for key, value in doc.items():
-        if isinstance(value, datetime):
-            doc[key] = value.isoformat()
-    await db.guias_transportista.insert_one(doc)
+        guia = GuiaTransportista(
+            company_id=current_user["company_id"],
+            trip_id=request.get("trip_id"),
+            serie=serie,
+            numero=next_num,
+            fecha_emision=request.get("fecha_emision", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
+            remitente_ruc=request.get("remitente_ruc"),
+            remitente_razon_social=request.get("remitente_razon_social"),
+            destinatario_ruc=request.get("destinatario_ruc"),
+            destinatario_razon_social=request.get("destinatario_razon_social"),
+            transportista_ruc=request.get("transportista_ruc"),
+            transportista_razon_social=request.get("transportista_razon_social"),
+            punto_partida=request.get("punto_partida"),
+            punto_partida_ubigeo=request.get("punto_partida_ubigeo"),
+            punto_llegada=request.get("punto_llegada"),
+            punto_llegada_ubigeo=request.get("punto_llegada_ubigeo"),
+            vehiculo_placa=request.get("vehiculo_placa"),
+            conductor_dni=request.get("conductor_dni"),
+            conductor_nombre=request.get("conductor_nombre"),
+            conductor_licencia=request.get("conductor_licencia"),
+            descripcion_carga=request.get("descripcion_carga"),
+            peso_bruto=request.get("peso_bruto"),
+            num_bultos=request.get("num_bultos"),
+            created_by=current_user["id"]
+        )
+        sql, values = db_pg.build_insert(
+            "guias_transportista", GUIA_COLS, _finance_doc_to_row(guia.model_dump())
+        )
+        await conn.execute(sql, *values)
 
     return {"id": guia.id, "numero": f"{guia.serie}-{next_num:08d}", "message": "Guía creada"}
 
 @api_router.post("/guias/{guia_id}/emit")
 async def emit_guia_sunat(guia_id: str, current_user: dict = Depends(require_roles("owner", "admin", "contabilidad"))):
     """Emit guía to SUNAT - requires SUNAT API credentials in company config"""
+    async with db_pg.tx(current_user) as conn:
+        existe = await conn.fetchval(
+            "select 1 from guias_transportista where id = $1 and company_id = $2",
+            db_pg.as_uuid(guia_id), db_pg.as_uuid(current_user["company_id"]),
+        )
+        if not existe:
+            raise HTTPException(status_code=404, detail="Guía no encontrada")
 
-    guia = await db.guias_transportista.find_one(
-        {"id": guia_id, "company_id": current_user["company_id"]}, {"_id": 0}
-    )
-    if not guia:
-        raise HTTPException(status_code=404, detail="Guía no encontrada")
+        # companies sigue en Mongo: lectura cruzada, correcta mientras esa
+        # tabla no haya cortado.
+        company = await db.companies.find_one({"id": current_user["company_id"]})
+        sunat_config = company.get("sunat_config", {}) if company else {}
+        if not sunat_config.get("api_token"):
+            raise HTTPException(
+                status_code=400,
+                detail="Configuración SUNAT no encontrada. Configure su token API en Configuración > SUNAT"
+            )
 
-    # Get company SUNAT config
-    company = await db.companies.find_one({"id": current_user["company_id"]})
-    sunat_config = company.get("sunat_config", {}) if company else {}
-
-    if not sunat_config.get("api_token"):
-        raise HTTPException(
-            status_code=400,
-            detail="Configuración SUNAT no encontrada. Configure su token API en Configuración > SUNAT"
+        # TODO: Integrate with SUNAT API (Nubefact, PSE, or direct SUNAT)
+        await conn.execute(
+            "update guias_transportista set status = $1::guia_transportista_status, "
+            "sunat_response = $2, updated_at = now() where id = $3 and company_id = $4",
+            GuiaTransportistaStatus.EMITIDA.value,
+            {"message": "Pendiente integración SUNAT API"},
+            db_pg.as_uuid(guia_id),
+            db_pg.as_uuid(current_user["company_id"]),
         )
 
-    # TODO: Integrate with SUNAT API (Nubefact, PSE, or direct SUNAT)
-    # This is the placeholder for the actual SUNAT API call
-    # The structure supports: Nubefact, Efact, SUNAT directly
-    #
-    # Example with Nubefact:
-    # response = requests.post(
-    #     sunat_config["api_url"],
-    #     headers={"Authorization": f"Bearer {sunat_config['api_token']}"},
-    #     json=build_guia_payload(guia)
-    # )
-
-    await db.guias_transportista.update_one(
-        {"id": guia_id},
-        {"$set": {
-            "status": "emitida",
-            "sunat_response": {"message": "Pendiente integración SUNAT API"},
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        }}
-    )
-
     return {"message": "Guía marcada como emitida. Configure la API SUNAT para emisión electrónica."}
-
 # --- Factura Endpoints ---
 @api_router.get("/facturas")
 async def get_facturas(
@@ -6684,84 +6772,90 @@ async def get_facturas(
     status: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
-    query = {"company_id": current_user["company_id"]}
-    if trip_id:
-        query["trip_id"] = trip_id
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(current_user["company_id"]))
+    f.si(trip_id, "trip_id = $?", db_pg.as_uuid(trip_id))
     if status:
-        query["status"] = status
-    facturas = await db.facturas.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
-    return [serialize_doc(f) for f in facturas]
+        if status not in [e.value for e in FacturaStatus]:
+            return []
+        f.agregar("status = $?::factura_status", status)
+    async with db_pg.tx(current_user) as conn:
+        rows = await conn.fetch(
+            "select * from facturas where " + f.where
+            + " order by created_at desc limit 500",
+            *f.values,
+        )
+    return db_pg.rows_to_api(rows)
 
 @api_router.post("/facturas")
 async def create_factura(request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "contabilidad"))):
 
-    # Auto-increment numero
-    last = await db.facturas.find_one(
-        {"company_id": current_user["company_id"], "serie": request.get("serie", "F001")},
-        sort=[("numero", -1)]
-    )
-    next_num = (last.get("numero", 0) + 1) if last else 1
-
+    serie = request.get("serie", "F001")
     items = request.get("items", [])
     subtotal = sum(i.get("cantidad", 0) * i.get("precio_unitario", 0) for i in items)
     igv = round(subtotal * 0.18, 2)
     total = round(subtotal + igv, 2)
 
-    factura = Factura(
-        company_id=current_user["company_id"],
-        trip_id=request.get("trip_id"),
-        serie=request.get("serie", "F001"),
-        numero=next_num,
-        fecha_emision=request.get("fecha_emision", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
-        cliente_ruc=request.get("cliente_ruc"),
-        cliente_razon_social=request.get("cliente_razon_social"),
-        cliente_direccion=request.get("cliente_direccion"),
-        items=items,
-        subtotal=subtotal,
-        igv=igv,
-        total=total,
-        created_by=current_user["id"]
-    )
+    async with db_pg.tx(current_user) as conn:
+        # Correlativo por (empresa, serie), misma carrera que con Mongo.
+        ultimo = await conn.fetchval(
+            "select max(numero) from facturas where company_id = $1 and serie = $2",
+            db_pg.as_uuid(current_user["company_id"]), serie,
+        )
+        next_num = (ultimo or 0) + 1
 
-    doc = factura.model_dump()
-    for key, value in doc.items():
-        if isinstance(value, datetime):
-            doc[key] = value.isoformat()
-    await db.facturas.insert_one(doc)
+        factura = Factura(
+            company_id=current_user["company_id"],
+            trip_id=request.get("trip_id"),
+            serie=serie,
+            numero=next_num,
+            fecha_emision=request.get("fecha_emision", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
+            cliente_ruc=request.get("cliente_ruc"),
+            cliente_razon_social=request.get("cliente_razon_social"),
+            cliente_direccion=request.get("cliente_direccion"),
+            items=items,
+            subtotal=subtotal,
+            igv=igv,
+            total=total,
+            created_by=current_user["id"]
+        )
+        sql, values = db_pg.build_insert(
+            "facturas", FACTURA_COLS, _finance_doc_to_row(factura.model_dump())
+        )
+        await conn.execute(sql, *values)
 
     return {"id": factura.id, "numero": f"{factura.serie}-{next_num:08d}", "total": total, "message": "Factura creada"}
 
 @api_router.post("/facturas/{factura_id}/emit")
 async def emit_factura_sunat(factura_id: str, current_user: dict = Depends(require_roles("owner", "admin", "contabilidad"))):
     """Emit factura to SUNAT"""
+    async with db_pg.tx(current_user) as conn:
+        existe = await conn.fetchval(
+            "select 1 from facturas where id = $1 and company_id = $2",
+            db_pg.as_uuid(factura_id), db_pg.as_uuid(current_user["company_id"]),
+        )
+        if not existe:
+            raise HTTPException(status_code=404, detail="Factura no encontrada")
 
-    factura = await db.facturas.find_one(
-        {"id": factura_id, "company_id": current_user["company_id"]}, {"_id": 0}
-    )
-    if not factura:
-        raise HTTPException(status_code=404, detail="Factura no encontrada")
+        # companies sigue en Mongo: lectura cruzada.
+        company = await db.companies.find_one({"id": current_user["company_id"]})
+        sunat_config = company.get("sunat_config", {}) if company else {}
+        if not sunat_config.get("api_token"):
+            raise HTTPException(
+                status_code=400,
+                detail="Configuración SUNAT no encontrada. Configure su token API en Configuración > SUNAT"
+            )
 
-    company = await db.companies.find_one({"id": current_user["company_id"]})
-    sunat_config = company.get("sunat_config", {}) if company else {}
-
-    if not sunat_config.get("api_token"):
-        raise HTTPException(
-            status_code=400,
-            detail="Configuración SUNAT no encontrada. Configure su token API en Configuración > SUNAT"
+        # TODO: SUNAT API integration placeholder
+        await conn.execute(
+            "update facturas set status = $1::factura_status, "
+            "sunat_response = $2, updated_at = now() where id = $3 and company_id = $4",
+            FacturaStatus.EMITIDA.value,
+            {"message": "Pendiente integración SUNAT API"},
+            db_pg.as_uuid(factura_id),
+            db_pg.as_uuid(current_user["company_id"]),
         )
 
-    # TODO: SUNAT API integration placeholder
-    await db.facturas.update_one(
-        {"id": factura_id},
-        {"$set": {
-            "status": "emitida",
-            "sunat_response": {"message": "Pendiente integración SUNAT API"},
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        }}
-    )
-
     return {"message": "Factura marcada como emitida. Configure la API SUNAT para emisión electrónica."}
-
 # --- SUNAT Config ---
 @api_router.get("/config/sunat")
 async def get_sunat_config(current_user: dict = Depends(require_roles("owner", "admin"))):
@@ -7152,16 +7246,17 @@ async def delete_unit(
 # ============== DETRACCIONES (SPOT) Y CAJA ==============
 # Módulos financieros: detracción del IGV (SPOT) y caja chica / kardex.
 
-def _finance_doc_to_mongo(doc: dict) -> dict:
-    """Serializa un model_dump() para Mongo: datetime -> isoformat, Enum -> value."""
+def _finance_doc_to_row(doc: dict) -> dict:
+    """model_dump() -> dict listo para db_pg.build_insert.
+
+    Los datetime se dejan como datetime en vez de pasarlos a string:
+    Postgres los quiere como datetime, y convertirlos para que db_pg los
+    vuelva a parsear seria trabajo de ida y vuelta. Los Enum si se bajan a su
+    .value, que es lo que espera el cast a enum de Postgres.
+    """
     out = {}
     for key, value in doc.items():
-        if isinstance(value, datetime):
-            out[key] = value.isoformat()
-        elif isinstance(value, Enum):
-            out[key] = value.value
-        else:
-            out[key] = value
+        out[key] = value.value if isinstance(value, Enum) else value
     return out
 
 
@@ -7234,21 +7329,27 @@ async def get_detracciones(
     current_user: dict = Depends(get_current_user)
 ):
     """Lista de detracciones de la empresa (fecha de emisión desc)."""
-    query = {"company_id": current_user["company_id"]}
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(current_user["company_id"]))
     if status:
-        query["status"] = status
-    if client_ruc:
-        query["client_ruc"] = client_ruc
-    if factura_id:
-        query["factura_id"] = factura_id
-    if trip_id:
-        query["trip_id"] = trip_id
-    query.update(_date_range_query("fecha_emision", from_, to))
+        if status not in [e.value for e in DetraccionStatus]:
+            return []
+        f.agregar("status = $?::detraccion_status", status)
+    f.si(client_ruc, "client_ruc = $?", client_ruc)
+    f.si(factura_id, "factura_id = $?", db_pg.as_uuid(factura_id))
+    f.si(trip_id, "trip_id = $?", db_pg.as_uuid(trip_id))
+    # fecha_emision es texto YYYY-MM-DD, igual que en Mongo, asi que el rango
+    # se compara como cadena y da el mismo resultado. Ya no hace falta el
+    # T23:59:59 que _date_range_query le pegaba al limite superior.
+    f.si(from_, "fecha_emision >= $?", from_)
+    f.si(to, "fecha_emision <= $?", to)
 
-    detracciones = await db.detracciones.find(query, {"_id": 0}).sort(
-        [("fecha_emision", -1), ("created_at", -1)]
-    ).to_list(1000)
-    return [serialize_doc(d) for d in detracciones]
+    async with db_pg.tx(current_user) as conn:
+        rows = await conn.fetch(
+            "select * from detracciones where " + f.where
+            + " order by fecha_emision desc, created_at desc limit 1000",
+            *f.values,
+        )
+    return db_pg.rows_to_api(rows)
 
 
 @api_router.get("/detracciones/summary")
@@ -7258,15 +7359,23 @@ async def get_detracciones_summary(
     client_ruc: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
-    """Totales de detracciones del periodo: pendientes, depositadas, anuladas y total."""
-    query = {"company_id": current_user["company_id"]}
-    if client_ruc:
-        query["client_ruc"] = client_ruc
-    query.update(_date_range_query("fecha_emision", from_, to))
+    """Totales del periodo: pendientes, depositadas, anuladas y total.
 
-    detracciones = await db.detracciones.find(
-        query, {"_id": 0, "status": 1, "amount": 1, "base_amount": 1}
-    ).to_list(5000)
+    La suma la hace Postgres agrupando por estado, en vez de traer hasta 5000
+    filas al proceso para sumarlas en Python."""
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(current_user["company_id"]))
+    f.si(client_ruc, "client_ruc = $?", client_ruc)
+    f.si(from_, "fecha_emision >= $?", from_)
+    f.si(to, "fecha_emision <= $?", to)
+
+    async with db_pg.tx(current_user) as conn:
+        rows = await conn.fetch(
+            "select status::text as status, count(*) as n, "
+            "coalesce(sum(amount), 0) as monto, "
+            "coalesce(sum(base_amount), 0) as base "
+            "from detracciones where " + f.where + " group by status",
+            *f.values,
+        )
 
     buckets = {
         "pendientes": {"count": 0, "amount": 0.0},
@@ -7282,21 +7391,16 @@ async def get_detracciones_summary(
     total_count = 0
     total_amount = 0.0
     total_base = 0.0
-    for d in detracciones:
-        amount = _to_float(d.get("amount"))
-        base = _to_float(d.get("base_amount"))
-        key = key_by_status.get(d.get("status"))
+    for r in rows:
+        key = key_by_status.get(r["status"])
         if key:
-            buckets[key]["count"] += 1
-            buckets[key]["amount"] += amount
+            buckets[key]["count"] = r["n"]
+            buckets[key]["amount"] = round(_to_float(r["monto"]), 2)
         # El total del periodo no considera las anuladas
-        if d.get("status") != DetraccionStatus.ANULADA.value:
-            total_count += 1
-            total_amount += amount
-            total_base += base
-
-    for key in buckets:
-        buckets[key]["amount"] = round(buckets[key]["amount"], 2)
+        if r["status"] != DetraccionStatus.ANULADA.value:
+            total_count += r["n"]
+            total_amount += _to_float(r["monto"])
+            total_base += _to_float(r["base"])
 
     return {
         "from": from_,
@@ -7311,15 +7415,16 @@ async def get_detracciones_summary(
         },
     }
 
-
 @api_router.get("/detracciones/{detraccion_id}")
 async def get_detraccion(detraccion_id: str, current_user: dict = Depends(get_current_user)):
-    detraccion = await db.detracciones.find_one(
-        {"id": detraccion_id, "company_id": current_user["company_id"]}, {"_id": 0}
-    )
-    if not detraccion:
+    async with db_pg.tx(current_user) as conn:
+        row = await conn.fetchrow(
+            "select * from detracciones where id = $1 and company_id = $2",
+            db_pg.as_uuid(detraccion_id), db_pg.as_uuid(current_user["company_id"]),
+        )
+    if not row:
         raise HTTPException(status_code=404, detail="Detracción no encontrada")
-    return serialize_doc(detraccion)
+    return db_pg.to_api(row)
 
 
 @api_router.post("/detracciones")
@@ -7339,6 +7444,13 @@ async def create_detraccion(
     if rate <= 0 or rate > 100:
         raise HTTPException(status_code=400, detail="La tasa de detracción debe estar entre 0 y 100")
 
+    # Con Mongo un status invalido se guardaba tal cual; el enum de Postgres lo
+    # rechazaria con un 500. Se valida antes para responder 400, igual que ya
+    # hacia el PUT de este mismo recurso.
+    estado = request.get("status") or DetraccionStatus.PENDIENTE.value
+    if estado not in [e.value for e in DetraccionStatus]:
+        raise HTTPException(status_code=400, detail="Estado de detracción inválido")
+
     detraccion = Detraccion(
         company_id=company_id,
         factura_id=request.get("factura_id"),
@@ -7354,15 +7466,20 @@ async def create_detraccion(
         codigo_bien_servicio=request.get("codigo_bien_servicio") or defaults["codigo"],
         constancia_number=request.get("constancia_number"),
         deposit_date=request.get("deposit_date"),
-        status=request.get("status") or DetraccionStatus.PENDIENTE,
+        status=estado,
         notes=request.get("notes"),
         created_by=current_user["id"],
     )
 
-    doc = _finance_doc_to_mongo(detraccion.model_dump())
-    await db.detracciones.insert_one(doc)
-    return serialize_doc({k: v for k, v in doc.items()})
-
+    sql, values = db_pg.build_insert(
+        "detracciones", DETRACCION_COLS, _finance_doc_to_row(detraccion.model_dump())
+    )
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(sql, *values)
+        row = await conn.fetchrow(
+            "select * from detracciones where id = $1", db_pg.as_uuid(detraccion.id)
+        )
+    return db_pg.to_api(row)
 
 @api_router.put("/detracciones/{detraccion_id}")
 async def update_detraccion(
@@ -7372,47 +7489,55 @@ async def update_detraccion(
 ):
     """Actualiza una detracción y recalcula el importe si cambia la base o la tasa."""
     company_id = current_user["company_id"]
-    existing = await db.detracciones.find_one(
-        {"id": detraccion_id, "company_id": company_id}, {"_id": 0}
-    )
-    if not existing:
-        raise HTTPException(status_code=404, detail="Detracción no encontrada")
+    async with db_pg.tx(current_user) as conn:
+        row = await conn.fetchrow(
+            "select * from detracciones where id = $1 and company_id = $2",
+            db_pg.as_uuid(detraccion_id), db_pg.as_uuid(company_id),
+        )
+        if not row:
+            raise HTTPException(status_code=404, detail="Detracción no encontrada")
+        existing = db_pg.to_api(row)
 
-    update_data = {}
-    for field in ["factura_id", "trip_id", "client_ruc", "client_name", "comprobante_serie",
-                  "comprobante_numero", "fecha_emision", "codigo_bien_servicio",
-                  "constancia_number", "deposit_date", "notes"]:
-        if field in request:
-            update_data[field] = request[field]
+        update_data = {}
+        for field in ["factura_id", "trip_id", "client_ruc", "client_name", "comprobante_serie",
+                      "comprobante_numero", "fecha_emision", "codigo_bien_servicio",
+                      "constancia_number", "deposit_date", "notes"]:
+            if field in request:
+                update_data[field] = request[field]
 
-    if "status" in request and request["status"]:
-        if request["status"] not in [s.value for s in DetraccionStatus]:
-            raise HTTPException(status_code=400, detail="Estado de detracción inválido")
-        update_data["status"] = request["status"]
+        if "status" in request and request["status"]:
+            if request["status"] not in [e.value for e in DetraccionStatus]:
+                raise HTTPException(status_code=400, detail="Estado de detracción inválido")
+            update_data["status"] = request["status"]
 
-    base_amount = _to_float(request["base_amount"]) if "base_amount" in request else _to_float(existing.get("base_amount"))
-    rate = _to_float(request["rate"]) if "rate" in request else _to_float(existing.get("rate"), DEFAULT_DETRACCION_RATE)
+        base_amount = _to_float(request["base_amount"]) if "base_amount" in request else _to_float(existing.get("base_amount"))
+        rate = _to_float(request["rate"]) if "rate" in request else _to_float(existing.get("rate"), DEFAULT_DETRACCION_RATE)
 
-    if "base_amount" in request:
-        if base_amount <= 0:
-            raise HTTPException(status_code=400, detail="El importe base debe ser mayor a 0")
-        update_data["base_amount"] = round(base_amount, 2)
-    if "rate" in request:
-        if rate <= 0 or rate > 100:
-            raise HTTPException(status_code=400, detail="La tasa de detracción debe estar entre 0 y 100")
-        update_data["rate"] = rate
-    if "base_amount" in request or "rate" in request:
-        update_data["amount"] = _calc_detraccion_amount(base_amount, rate)
+        if "base_amount" in request:
+            if base_amount <= 0:
+                raise HTTPException(status_code=400, detail="El importe base debe ser mayor a 0")
+            update_data["base_amount"] = round(base_amount, 2)
+        if "rate" in request:
+            if rate <= 0 or rate > 100:
+                raise HTTPException(status_code=400, detail="La tasa de detracción debe estar entre 0 y 100")
+            update_data["rate"] = rate
+        if "base_amount" in request or "rate" in request:
+            update_data["amount"] = _calc_detraccion_amount(base_amount, rate)
 
-    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
-    await db.detracciones.update_one(
-        {"id": detraccion_id, "company_id": company_id}, {"$set": update_data}
-    )
+        update_data["updated_at"] = datetime.now(timezone.utc)
+        update_data["id"] = detraccion_id
+        update_data["company_id"] = company_id
+        sql, values = db_pg.build_update(
+            "detracciones", DETRACCION_COLS, update_data, ["id", "company_id"]
+        )
+        if sql:
+            await conn.execute(sql, *values)
 
-    updated = await db.detracciones.find_one(
-        {"id": detraccion_id, "company_id": company_id}, {"_id": 0}
-    )
-    return serialize_doc(updated)
+        actualizado = await conn.fetchrow(
+            "select * from detracciones where id = $1 and company_id = $2",
+            db_pg.as_uuid(detraccion_id), db_pg.as_uuid(company_id),
+        )
+    return db_pg.to_api(actualizado)
 
 
 @api_router.post("/detracciones/{detraccion_id}/register-deposit")
@@ -7423,35 +7548,41 @@ async def register_detraccion_deposit(
 ):
     """Registra la constancia de depósito y marca la detracción como depositada."""
     company_id = current_user["company_id"]
-    existing = await db.detracciones.find_one(
-        {"id": detraccion_id, "company_id": company_id}, {"_id": 0}
-    )
-    if not existing:
-        raise HTTPException(status_code=404, detail="Detracción no encontrada")
-    if existing.get("status") == DetraccionStatus.ANULADA.value:
-        raise HTTPException(status_code=400, detail="La detracción está anulada")
 
     constancia_number = (request.get("constancia_number") or "").strip()
     if not constancia_number:
         raise HTTPException(status_code=400, detail="El número de constancia es obligatorio")
 
-    update_data = {
-        "constancia_number": constancia_number,
-        "deposit_date": request.get("deposit_date") or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-        "status": DetraccionStatus.DEPOSITADA.value,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-    }
-    if request.get("notes"):
-        update_data["notes"] = request["notes"]
+    async with db_pg.tx(current_user) as conn:
+        estado_actual = await conn.fetchval(
+            "select status::text from detracciones where id = $1 and company_id = $2",
+            db_pg.as_uuid(detraccion_id), db_pg.as_uuid(company_id),
+        )
+        if estado_actual is None:
+            raise HTTPException(status_code=404, detail="Detracción no encontrada")
+        if estado_actual == DetraccionStatus.ANULADA.value:
+            raise HTTPException(status_code=400, detail="La detracción está anulada")
 
-    await db.detracciones.update_one(
-        {"id": detraccion_id, "company_id": company_id}, {"$set": update_data}
-    )
-    updated = await db.detracciones.find_one(
-        {"id": detraccion_id, "company_id": company_id}, {"_id": 0}
-    )
-    return {"message": "Depósito de detracción registrado", "detraccion": serialize_doc(updated)}
+        update_data = {
+            "constancia_number": constancia_number,
+            "deposit_date": request.get("deposit_date") or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            "status": DetraccionStatus.DEPOSITADA.value,
+            "updated_at": datetime.now(timezone.utc),
+            "id": detraccion_id,
+            "company_id": company_id,
+        }
+        if request.get("notes"):
+            update_data["notes"] = request["notes"]
 
+        sql, values = db_pg.build_update(
+            "detracciones", DETRACCION_COLS, update_data, ["id", "company_id"]
+        )
+        await conn.execute(sql, *values)
+        actualizado = await conn.fetchrow(
+            "select * from detracciones where id = $1 and company_id = $2",
+            db_pg.as_uuid(detraccion_id), db_pg.as_uuid(company_id),
+        )
+    return {"message": "Depósito de detracción registrado", "detraccion": db_pg.to_api(actualizado)}
 
 @api_router.delete("/detracciones/{detraccion_id}")
 async def delete_detraccion(
@@ -7460,16 +7591,21 @@ async def delete_detraccion(
 ):
     """Anula la detracción (soft-delete): se conserva la trazabilidad contable."""
     company_id = current_user["company_id"]
-    result = await db.detracciones.update_one(
-        {"id": detraccion_id, "company_id": company_id},
-        {"$set": {
-            "status": DetraccionStatus.ANULADA.value,
-            "anulada_at": datetime.now(timezone.utc).isoformat(),
-            "anulada_by": current_user["id"],
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        }}
-    )
-    if result.matched_count == 0:
+    ahora = datetime.now(timezone.utc)
+    async with db_pg.tx(current_user) as conn:
+        # UPDATE ... RETURNING: una sola ida a la base para anular y saber si
+        # la fila existia, en vez de un SELECT previo.
+        anulada = await conn.fetchval(
+            "update detracciones set status = $1::detraccion_status, "
+            "anulada_at = $2, anulada_by = $3, updated_at = $2 "
+            "where id = $4 and company_id = $5 returning id",
+            DetraccionStatus.ANULADA.value,
+            ahora,
+            db_pg.as_uuid(current_user["id"]),
+            db_pg.as_uuid(detraccion_id),
+            db_pg.as_uuid(company_id),
+        )
+    if not anulada:
         raise HTTPException(status_code=404, detail="Detracción no encontrada")
     return {"message": "Detracción anulada"}
 
@@ -7483,67 +7619,84 @@ async def create_detraccion_from_factura(
     """Genera la detracción a partir de una factura existente.
     No aplica si el total de la factura es menor al mínimo configurado."""
     company_id = current_user["company_id"]
-    factura = await db.facturas.find_one({"id": factura_id, "company_id": company_id}, {"_id": 0})
-    if not factura:
-        raise HTTPException(status_code=404, detail="Factura no encontrada")
-
-    existing = await db.detracciones.find_one(
-        {"company_id": company_id, "factura_id": factura_id, "status": {"$ne": DetraccionStatus.ANULADA.value}},
-        {"_id": 0}
-    )
-    if existing:
-        return {
-            "applies": True,
-            "created": False,
-            "message": "La factura ya tiene una detracción registrada",
-            "detraccion": serialize_doc(existing),
-        }
-
     defaults = await _detraccion_defaults(company_id)
-    base_amount = _to_float(factura.get("total"))
-    min_amount = defaults["min_amount"]
 
-    if base_amount <= 0:
-        raise HTTPException(status_code=400, detail="La factura no tiene importe total")
-    if base_amount < min_amount:
-        return {
-            "applies": False,
-            "created": False,
-            "base_amount": round(base_amount, 2),
-            "min_amount": min_amount,
-            "message": (f"No aplica detracción: el total de la factura (S/ {round(base_amount, 2)}) "
-                        f"es menor al mínimo de S/ {min_amount}"),
-        }
+    # Factura y detraccion cortaron juntas, asi que leer la factura, comprobar
+    # que no haya una detraccion previa y crear la nueva ocurre todo dentro de
+    # la misma transaccion: dos llamadas simultaneas ya no pueden generar dos
+    # detracciones para la misma factura.
+    async with db_pg.tx(current_user) as conn:
+        factura = await conn.fetchrow(
+            "select * from facturas where id = $1 and company_id = $2",
+            db_pg.as_uuid(factura_id), db_pg.as_uuid(company_id),
+        )
+        if not factura:
+            raise HTTPException(status_code=404, detail="Factura no encontrada")
+        factura = db_pg.to_api(factura)
 
-    rate = _to_float(request.get("rate"), defaults["rate"]) if request.get("rate") is not None else defaults["rate"]
+        existente = await conn.fetchrow(
+            "select * from detracciones where company_id = $1 and factura_id = $2 "
+            "and status <> $3::detraccion_status",
+            db_pg.as_uuid(company_id), db_pg.as_uuid(factura_id),
+            DetraccionStatus.ANULADA.value,
+        )
+        if existente:
+            return {
+                "applies": True,
+                "created": False,
+                "message": "La factura ya tiene una detracción registrada",
+                "detraccion": db_pg.to_api(existente),
+            }
 
-    numero = factura.get("numero")
-    detraccion = Detraccion(
-        company_id=company_id,
-        factura_id=factura_id,
-        trip_id=factura.get("trip_id"),
-        client_ruc=factura.get("cliente_ruc"),
-        client_name=factura.get("cliente_razon_social"),
-        comprobante_serie=factura.get("serie"),
-        comprobante_numero=f"{numero:08d}" if isinstance(numero, int) else (str(numero) if numero else None),
-        fecha_emision=factura.get("fecha_emision") or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-        base_amount=round(base_amount, 2),
-        rate=rate,
-        amount=_calc_detraccion_amount(base_amount, rate),
-        codigo_bien_servicio=request.get("codigo_bien_servicio") or defaults["codigo"],
-        notes=request.get("notes"),
-        created_by=current_user["id"],
-    )
+        base_amount = _to_float(factura.get("total"))
+        min_amount = defaults["min_amount"]
 
-    doc = _finance_doc_to_mongo(detraccion.model_dump())
-    await db.detracciones.insert_one(doc)
+        if base_amount <= 0:
+            raise HTTPException(status_code=400, detail="La factura no tiene importe total")
+        if base_amount < min_amount:
+            return {
+                "applies": False,
+                "created": False,
+                "base_amount": round(base_amount, 2),
+                "min_amount": min_amount,
+                "message": (f"No aplica detracción: el total de la factura (S/ {round(base_amount, 2)}) "
+                            f"es menor al mínimo de S/ {min_amount}"),
+            }
+
+        rate = _to_float(request.get("rate"), defaults["rate"]) if request.get("rate") is not None else defaults["rate"]
+
+        numero = factura.get("numero")
+        detraccion = Detraccion(
+            company_id=company_id,
+            factura_id=factura_id,
+            trip_id=factura.get("trip_id"),
+            client_ruc=factura.get("cliente_ruc"),
+            client_name=factura.get("cliente_razon_social"),
+            comprobante_serie=factura.get("serie"),
+            comprobante_numero=f"{numero:08d}" if isinstance(numero, int) else (str(numero) if numero else None),
+            fecha_emision=factura.get("fecha_emision") or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            base_amount=round(base_amount, 2),
+            rate=rate,
+            amount=_calc_detraccion_amount(base_amount, rate),
+            codigo_bien_servicio=request.get("codigo_bien_servicio") or defaults["codigo"],
+            notes=request.get("notes"),
+            created_by=current_user["id"],
+        )
+
+        sql, values = db_pg.build_insert(
+            "detracciones", DETRACCION_COLS, _finance_doc_to_row(detraccion.model_dump())
+        )
+        await conn.execute(sql, *values)
+        creada = await conn.fetchrow(
+            "select * from detracciones where id = $1", db_pg.as_uuid(detraccion.id)
+        )
+
     return {
         "applies": True,
         "created": True,
         "message": "Detracción generada desde la factura",
-        "detraccion": serialize_doc({k: v for k, v in doc.items()}),
+        "detraccion": db_pg.to_api(creada),
     }
-
 
 # --- Caja (ingresos / egresos, kardex, reportes por rubro) ---
 class CashMovementType(str, Enum):
@@ -7588,57 +7741,87 @@ class CashMovement(BaseModel):
     created_by: Optional[str] = None
 
 
-async def _next_movement_number(company_id: str) -> str:
-    """Correlativo por empresa (MOV-00001). Busca el último y suma 1, evitando colisiones."""
-    last = await db.cash_movements.find_one(
-        {"company_id": company_id, "movement_number": {"$exists": True, "$ne": None}},
-        {"_id": 0, "movement_number": 1},
-        sort=[("movement_number", -1)]
+async def _next_movement_number(conn, company_id: str) -> str:
+    """Correlativo por empresa (MOV-00001).
+
+    Cuenta tambien los movimientos eliminados: el correlativo es contable y no
+    se reutiliza, igual que antes."""
+    ultimo = await conn.fetchval(
+        "select movement_number from cash_movements "
+        "where company_id = $1 and movement_number is not null "
+        "order by movement_number desc limit 1",
+        db_pg.as_uuid(company_id),
     )
     next_num = 1
-    if last and last.get("movement_number"):
+    if ultimo:
         try:
-            next_num = int(str(last["movement_number"]).split("-")[-1]) + 1
+            next_num = int(str(ultimo).split("-")[-1]) + 1
         except (ValueError, IndexError):
-            next_num = await db.cash_movements.count_documents({"company_id": company_id}) + 1
+            total = await conn.fetchval(
+                "select count(*) from cash_movements where company_id = $1",
+                db_pg.as_uuid(company_id),
+            )
+            next_num = total + 1
 
-    # Verificación defensiva contra duplicados
+    # Verificacion defensiva contra duplicados (se conserva del codigo Mongo).
     for _ in range(50):
         candidate = f"MOV-{next_num:05d}"
-        clash = await db.cash_movements.find_one(
-            {"company_id": company_id, "movement_number": candidate}, {"_id": 0, "id": 1}
+        choque = await conn.fetchval(
+            "select 1 from cash_movements where company_id = $1 and movement_number = $2",
+            db_pg.as_uuid(company_id), candidate,
         )
-        if not clash:
+        if not choque:
             return candidate
         next_num += 1
     return f"MOV-{next_num:05d}"
 
 
-def _cashbox_base_query(company_id: str) -> dict:
-    """Query base de caja: excluye movimientos eliminados (soft-delete)."""
-    return {"company_id": company_id, "deleted": {"$ne": True}}
+def _cashbox_filtros(company_id: str, from_=None, to=None):
+    """Filtro base de caja: la empresa y los movimientos NO eliminados.
+
+    El soft-delete vive en la columna `deleted` (agregada en la migracion 002).
+    Cualquier consulta de caja que se olvide de excluirlos devuelve un saldo
+    equivocado, asi que el filtro se arma en un solo lugar.
+
+    `date` es una columna de texto YYYY-MM-DD, igual que en Mongo, asi que el
+    rango se compara como cadena y da el mismo resultado de siempre.
+    """
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(company_id))
+    f.crudo("not deleted")
+    f.si(from_, "date >= $?", from_)
+    f.si(to, "date <= $?", to)
+    return f
 
 
-async def _cashbox_saldo_inicial(company_id: str, date_from: Optional[str]) -> float:
-    """Saldo acumulado de todos los movimientos anteriores al inicio del rango."""
+async def _cashbox_saldo_inicial(conn, company_id: str, date_from: Optional[str]) -> float:
+    """Saldo acumulado de todos los movimientos anteriores al inicio del rango.
+
+    La suma la hace Postgres; antes se traian hasta 20000 filas al proceso
+    solo para sumarlas."""
     if not date_from:
         return 0.0
-    query = _cashbox_base_query(company_id)
-    query["date"] = {"$lt": date_from}
-    previous = await db.cash_movements.find(query, {"_id": 0, "type": 1, "amount": 1}).to_list(20000)
-    saldo = 0.0
-    for m in previous:
-        amount = _to_float(m.get("amount"))
-        saldo += amount if m.get("type") == CashMovementType.INGRESO.value else -amount
-    return round(saldo, 2)
+    f = _cashbox_filtros(company_id)
+    f.agregar("date < $?", date_from)
+    saldo = await conn.fetchval(
+        "select coalesce(sum(case when type = " + chr(39) + "ingreso" + chr(39) + " then amount else -amount end), 0) "
+        "from cash_movements where " + f.where,
+        *f.values,
+    )
+    return round(_to_float(saldo), 2)
 
 
 @api_router.get("/cashbox/categories")
 async def get_cashbox_categories(current_user: dict = Depends(get_current_user)):
     """Rubros sugeridos + los ya usados por la empresa."""
-    used = await db.cash_movements.distinct("category", _cashbox_base_query(current_user["company_id"]))
+    f = _cashbox_filtros(current_user["company_id"])
+    async with db_pg.tx(current_user) as conn:
+        rows = await conn.fetch(
+            "select distinct category from cash_movements where " + f.where,
+            *f.values,
+        )
     categories = list(CASHBOX_SUGGESTED_CATEGORIES)
-    for c in used:
+    for r in rows:
+        c = r["category"]
         if c and c not in categories:
             categories.append(c)
     return {"suggested": CASHBOX_SUGGESTED_CATEGORIES, "categories": categories}
@@ -7656,24 +7839,25 @@ async def get_cash_movements(
     current_user: dict = Depends(get_current_user)
 ):
     """Movimientos de caja (fecha desc)."""
-    query = _cashbox_base_query(current_user["company_id"])
-    if type:
-        query["type"] = type
-    if category:
-        query["category"] = category
-    if payment_method:
-        query["payment_method"] = payment_method
-    if trip_id:
-        query["trip_id"] = trip_id
-    if vehicle_id:
-        query["vehicle_id"] = vehicle_id
-    query.update(_date_range_query("date", from_, to))
+    if type and type not in [t.value for t in CashMovementType]:
+        return []
+    if payment_method and payment_method not in [p.value for p in CashPaymentMethod]:
+        return []
 
-    movements = await db.cash_movements.find(query, {"_id": 0}).sort(
-        [("date", -1), ("created_at", -1)]
-    ).to_list(2000)
-    return [serialize_doc(m) for m in movements]
+    f = _cashbox_filtros(current_user["company_id"], from_, to)
+    f.si(type, "type = $?::cash_movement_type", type)
+    f.si(category, "category = $?", category)
+    f.si(payment_method, "payment_method = $?::cash_payment_method", payment_method)
+    f.si(trip_id, "trip_id = $?", db_pg.as_uuid(trip_id))
+    f.si(vehicle_id, "vehicle_id = $?", db_pg.as_uuid(vehicle_id))
 
+    async with db_pg.tx(current_user) as conn:
+        rows = await conn.fetch(
+            "select * from cash_movements where " + f.where
+            + " order by date desc, created_at desc limit 2000",
+            *f.values,
+        )
+    return db_pg.rows_to_api(rows)
 
 @api_router.get("/cashbox/balance")
 async def get_cashbox_balance(
@@ -7683,27 +7867,27 @@ async def get_cashbox_balance(
 ):
     """Saldo de caja del periodo: ingresos, egresos, saldo inicial y saldo final."""
     company_id = current_user["company_id"]
-    query = _cashbox_base_query(company_id)
-    query.update(_date_range_query("date", from_, to))
+    f = _cashbox_filtros(company_id, from_, to)
 
-    movements = await db.cash_movements.find(query, {"_id": 0, "type": 1, "amount": 1}).to_list(20000)
-    total_ingresos = 0.0
-    total_egresos = 0.0
-    for m in movements:
-        amount = _to_float(m.get("amount"))
-        if m.get("type") == CashMovementType.INGRESO.value:
-            total_ingresos += amount
-        else:
-            total_egresos += amount
+    async with db_pg.tx(current_user) as conn:
+        r = await conn.fetchrow(
+            "select count(*) as n, "
+            "coalesce(sum(case when type = 'ingreso' then amount else 0 end), 0) as ingresos, "
+            "coalesce(sum(case when type <> 'ingreso' then amount else 0 end), 0) as egresos "
+            "from cash_movements where " + f.where,
+            *f.values,
+        )
+        saldo_inicial = await _cashbox_saldo_inicial(conn, company_id, from_)
 
+    total_ingresos = round(_to_float(r["ingresos"]), 2)
+    total_egresos = round(_to_float(r["egresos"]), 2)
     saldo = round(total_ingresos - total_egresos, 2)
-    saldo_inicial = await _cashbox_saldo_inicial(company_id, from_)
     return {
         "from": from_,
         "to": to,
-        "count": len(movements),
-        "total_ingresos": round(total_ingresos, 2),
-        "total_egresos": round(total_egresos, 2),
+        "count": r["n"],
+        "total_ingresos": total_ingresos,
+        "total_egresos": total_egresos,
         "saldo": saldo,
         "saldo_inicial": saldo_inicial,
         "saldo_final": round(saldo_inicial + saldo, 2),
@@ -7716,21 +7900,28 @@ async def get_cashbox_kardex(
     to: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
-    """Kardex clásico: movimientos en orden cronológico ascendente con saldo corriente."""
+    """Kardex clasico: movimientos en orden cronologico ascendente con saldo corriente.
+
+    El saldo corriente se sigue calculando en Python: es un acumulado fila a
+    fila que arranca del saldo inicial, y hacerlo aca deja el redondeo por
+    linea exactamente igual que antes."""
     company_id = current_user["company_id"]
-    query = _cashbox_base_query(company_id)
-    query.update(_date_range_query("date", from_, to))
+    f = _cashbox_filtros(company_id, from_, to)
 
-    movements = await db.cash_movements.find(query, {"_id": 0}).sort(
-        [("date", 1), ("created_at", 1)]
-    ).to_list(20000)
+    async with db_pg.tx(current_user) as conn:
+        movimientos = await conn.fetch(
+            "select * from cash_movements where " + f.where
+            + " order by date, created_at limit 20000",
+            *f.values,
+        )
+        saldo_inicial = await _cashbox_saldo_inicial(conn, company_id, from_)
 
-    saldo_inicial = await _cashbox_saldo_inicial(company_id, from_)
     saldo = saldo_inicial
     total_ingresos = 0.0
     total_egresos = 0.0
     rows = []
-    for m in movements:
+    for fila in movimientos:
+        m = db_pg.to_api(fila)
         amount = _to_float(m.get("amount"))
         is_ingreso = m.get("type") == CashMovementType.INGRESO.value
         ingreso = round(amount, 2) if is_ingreso else 0.0
@@ -7765,43 +7956,44 @@ async def get_cashbox_kardex(
         "saldo_final": saldo,
     }
 
-
 @api_router.get("/cashbox/report-by-category")
 async def get_cashbox_report_by_category(
     from_: Optional[str] = Query(None, alias="from"),
     to: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
-    """Reporte por rubro: ingresos, egresos y neto agrupados por category."""
-    company_id = current_user["company_id"]
-    query = _cashbox_base_query(company_id)
-    query.update(_date_range_query("date", from_, to))
+    """Reporte por rubro: ingresos, egresos y neto agrupados por category.
 
-    movements = await db.cash_movements.find(
-        query, {"_id": 0, "type": 1, "amount": 1, "category": 1}
-    ).to_list(20000)
+    El agrupado lo hace Postgres. Antes se traian hasta 20000 movimientos al
+    proceso para armar el mismo resumen en un diccionario."""
+    f = _cashbox_filtros(current_user["company_id"], from_, to)
 
-    by_category: Dict[str, Dict[str, Any]] = {}
-    tot_ingresos = 0.0
-    tot_egresos = 0.0
-    for m in movements:
-        cat = m.get("category") or "otros"
-        amount = _to_float(m.get("amount"))
-        agg = by_category.setdefault(cat, {"category": cat, "ingresos": 0.0, "egresos": 0.0, "neto": 0.0, "count": 0})
-        agg["count"] += 1
-        if m.get("type") == CashMovementType.INGRESO.value:
-            agg["ingresos"] += amount
-            tot_ingresos += amount
-        else:
-            agg["egresos"] += amount
-            tot_egresos += amount
+    async with db_pg.tx(current_user) as conn:
+        filas = await conn.fetch(
+            "select coalesce(category, 'otros') as category, count(*) as n, "
+            "coalesce(sum(case when type = 'ingreso' then amount else 0 end), 0) as ingresos, "
+            "coalesce(sum(case when type <> 'ingreso' then amount else 0 end), 0) as egresos "
+            "from cash_movements where " + f.where + " group by 1",
+            *f.values,
+        )
 
     rows = []
-    for agg in by_category.values():
-        agg["ingresos"] = round(agg["ingresos"], 2)
-        agg["egresos"] = round(agg["egresos"], 2)
-        agg["neto"] = round(agg["ingresos"] - agg["egresos"], 2)
-        rows.append(agg)
+    tot_ingresos = 0.0
+    tot_egresos = 0.0
+    total_count = 0
+    for r in filas:
+        ingresos = round(_to_float(r["ingresos"]), 2)
+        egresos = round(_to_float(r["egresos"]), 2)
+        tot_ingresos += ingresos
+        tot_egresos += egresos
+        total_count += r["n"]
+        rows.append({
+            "category": r["category"],
+            "ingresos": ingresos,
+            "egresos": egresos,
+            "neto": round(ingresos - egresos, 2),
+            "count": r["n"],
+        })
     rows.sort(key=lambda r: (r["egresos"] + r["ingresos"]), reverse=True)
 
     return {
@@ -7812,20 +8004,22 @@ async def get_cashbox_report_by_category(
             "ingresos": round(tot_ingresos, 2),
             "egresos": round(tot_egresos, 2),
             "neto": round(tot_ingresos - tot_egresos, 2),
-            "count": len(movements),
+            "count": total_count,
         },
     }
 
 
 @api_router.get("/cashbox/movements/{movement_id}")
 async def get_cash_movement(movement_id: str, current_user: dict = Depends(get_current_user)):
-    query = _cashbox_base_query(current_user["company_id"])
-    query["id"] = movement_id
-    movement = await db.cash_movements.find_one(query, {"_id": 0})
-    if not movement:
+    f = _cashbox_filtros(current_user["company_id"])
+    f.agregar("id = $?", db_pg.as_uuid(movement_id))
+    async with db_pg.tx(current_user) as conn:
+        row = await conn.fetchrow(
+            "select * from cash_movements where " + f.where, *f.values
+        )
+    if not row:
         raise HTTPException(status_code=404, detail="Movimiento de caja no encontrado")
-    return serialize_doc(movement)
-
+    return db_pg.to_api(row)
 
 @api_router.post("/cashbox/movements")
 async def create_cash_movement(
@@ -7851,29 +8045,35 @@ async def create_cash_movement(
     if not concept:
         raise HTTPException(status_code=400, detail="El concepto es obligatorio")
 
-    movement = CashMovement(
-        company_id=company_id,
-        movement_number=await _next_movement_number(company_id),
-        date=request.get("date") or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-        type=mov_type,
-        concept=concept,
-        category=(request.get("category") or "otros"),
-        amount=round(amount, 2),
-        payment_method=payment_method,
-        reference=request.get("reference"),
-        trip_id=request.get("trip_id"),
-        vehicle_id=request.get("vehicle_id"),
-        client_ruc=request.get("client_ruc"),
-        supplier=request.get("supplier"),
-        receipt_url=request.get("receipt_url"),
-        notes=request.get("notes"),
-        created_by=current_user["id"],
-    )
-
-    doc = _finance_doc_to_mongo(movement.model_dump())
-    await db.cash_movements.insert_one(doc)
-    return serialize_doc({k: v for k, v in doc.items()})
-
+    # El correlativo y el alta van en la MISMA transaccion: antes, entre
+    # calcular el numero y guardar el movimiento, otra alta podia colarse.
+    async with db_pg.tx(current_user) as conn:
+        movement = CashMovement(
+            company_id=company_id,
+            movement_number=await _next_movement_number(conn, company_id),
+            date=request.get("date") or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            type=mov_type,
+            concept=concept,
+            category=(request.get("category") or "otros"),
+            amount=round(amount, 2),
+            payment_method=payment_method,
+            reference=request.get("reference"),
+            trip_id=request.get("trip_id"),
+            vehicle_id=request.get("vehicle_id"),
+            client_ruc=request.get("client_ruc"),
+            supplier=request.get("supplier"),
+            receipt_url=request.get("receipt_url"),
+            notes=request.get("notes"),
+            created_by=current_user["id"],
+        )
+        sql, values = db_pg.build_insert(
+            "cash_movements", CASH_MOVEMENT_COLS, _finance_doc_to_row(movement.model_dump())
+        )
+        await conn.execute(sql, *values)
+        row = await conn.fetchrow(
+            "select * from cash_movements where id = $1", db_pg.as_uuid(movement.id)
+        )
+    return db_pg.to_api(row)
 
 @api_router.put("/cashbox/movements/{movement_id}")
 async def update_cash_movement(
@@ -7883,42 +8083,54 @@ async def update_cash_movement(
 ):
     """Actualiza un movimiento de caja (el correlativo no cambia)."""
     company_id = current_user["company_id"]
-    query = _cashbox_base_query(company_id)
-    query["id"] = movement_id
-    existing = await db.cash_movements.find_one(query, {"_id": 0})
-    if not existing:
-        raise HTTPException(status_code=404, detail="Movimiento de caja no encontrado")
+    async with db_pg.tx(current_user) as conn:
+        f = _cashbox_filtros(company_id)
+        f.agregar("id = $?", db_pg.as_uuid(movement_id))
+        existe = await conn.fetchval(
+            "select 1 from cash_movements where " + f.where, *f.values
+        )
+        if not existe:
+            raise HTTPException(status_code=404, detail="Movimiento de caja no encontrado")
 
-    update_data = {}
-    for field in ["date", "concept", "category", "reference", "trip_id", "vehicle_id",
-                  "client_ruc", "supplier", "receipt_url", "notes"]:
-        if field in request:
-            update_data[field] = request[field]
+        update_data = {}
+        for field in ["date", "concept", "category", "reference", "trip_id", "vehicle_id",
+                      "client_ruc", "supplier", "receipt_url", "notes"]:
+            if field in request:
+                update_data[field] = request[field]
 
-    if "amount" in request:
-        amount = _to_float(request.get("amount"))
-        if amount <= 0:
-            raise HTTPException(status_code=400, detail="El monto debe ser mayor a 0")
-        update_data["amount"] = round(amount, 2)
+        if "amount" in request:
+            amount = _to_float(request.get("amount"))
+            if amount <= 0:
+                raise HTTPException(status_code=400, detail="El monto debe ser mayor a 0")
+            update_data["amount"] = round(amount, 2)
 
-    if "type" in request and request["type"]:
-        if request["type"] not in [t.value for t in CashMovementType]:
-            raise HTTPException(status_code=400, detail="Tipo de movimiento inválido (ingreso|egreso)")
-        update_data["type"] = request["type"]
+        if "type" in request and request["type"]:
+            if request["type"] not in [t.value for t in CashMovementType]:
+                raise HTTPException(status_code=400, detail="Tipo de movimiento inválido (ingreso|egreso)")
+            update_data["type"] = request["type"]
 
-    if "payment_method" in request and request["payment_method"]:
-        if request["payment_method"] not in [p.value for p in CashPaymentMethod]:
-            raise HTTPException(status_code=400, detail="Método de pago inválido")
-        update_data["payment_method"] = request["payment_method"]
+        if "payment_method" in request and request["payment_method"]:
+            if request["payment_method"] not in [p.value for p in CashPaymentMethod]:
+                raise HTTPException(status_code=400, detail="Método de pago inválido")
+            update_data["payment_method"] = request["payment_method"]
 
-    if "concept" in request and not (request.get("concept") or "").strip():
-        raise HTTPException(status_code=400, detail="El concepto es obligatorio")
+        if "concept" in request and not (request.get("concept") or "").strip():
+            raise HTTPException(status_code=400, detail="El concepto es obligatorio")
 
-    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
-    await db.cash_movements.update_one({"id": movement_id, "company_id": company_id}, {"$set": update_data})
+        update_data["updated_at"] = datetime.now(timezone.utc)
+        update_data["id"] = movement_id
+        update_data["company_id"] = company_id
+        sql, values = db_pg.build_update(
+            "cash_movements", CASH_MOVEMENT_COLS, update_data, ["id", "company_id"]
+        )
+        if sql:
+            await conn.execute(sql, *values)
 
-    updated = await db.cash_movements.find_one({"id": movement_id, "company_id": company_id}, {"_id": 0})
-    return serialize_doc(updated)
+        actualizado = await conn.fetchrow(
+            "select * from cash_movements where id = $1 and company_id = $2",
+            db_pg.as_uuid(movement_id), db_pg.as_uuid(company_id),
+        )
+    return db_pg.to_api(actualizado)
 
 
 @api_router.delete("/cashbox/movements/{movement_id}")
@@ -7928,22 +8140,33 @@ async def delete_cash_movement(
 ):
     """Elimina un movimiento de caja (soft-delete: no altera los correlativos)."""
     company_id = current_user["company_id"]
-    result = await db.cash_movements.update_one(
-        {"id": movement_id, "company_id": company_id, "deleted": {"$ne": True}},
-        {"$set": {
-            "deleted": True,
-            "deleted_at": datetime.now(timezone.utc).isoformat(),
-            "deleted_by": current_user["id"],
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        }}
-    )
-    if result.matched_count == 0:
+    ahora = datetime.now(timezone.utc)
+    async with db_pg.tx(current_user) as conn:
+        # El "not deleted" del WHERE hace que borrar dos veces devuelva 404 la
+        # segunda vez, igual que el filtro deleted != true que usaba con Mongo.
+        borrado = await conn.fetchval(
+            "update cash_movements set deleted = true, deleted_at = $1, "
+            "deleted_by = $2, updated_at = $1 "
+            "where id = $3 and company_id = $4 and not deleted returning id",
+            ahora,
+            db_pg.as_uuid(current_user["id"]),
+            db_pg.as_uuid(movement_id),
+            db_pg.as_uuid(company_id),
+        )
+    if not borrado:
         raise HTTPException(status_code=404, detail="Movimiento de caja no encontrado")
     return {"message": "Movimiento de caja eliminado"}
 
-
 # Include router (DESPUÉS de definir TODAS las rutas @api_router, incluidas SUNAT)
 app.include_router(api_router)
+
+# Módulo Liquidación de Flete (proveedores, tipos de carga, liquidaciones y sus líneas)
+from liquidacion_flete import router as liquidacion_router
+app.include_router(liquidacion_router)
+
+# Bot de WhatsApp (webhook + bandeja de documentos pendientes)
+from whatsapp_bot import router as whatsapp_router
+app.include_router(whatsapp_router)
 
 # Serve uploaded files
 from fastapi.staticfiles import StaticFiles
@@ -8017,6 +8240,7 @@ async def create_indexes():
     try:
         await db.users.create_index([("company_id", 1), ("email", 1)], background=True)
         await db.users.create_index([("dni", 1)], background=True)
+        await db.users.create_index([("whatsapp_number", 1)], unique=True, sparse=True, background=True)
         await db.vehicles.create_index([("company_id", 1), ("plate", 1)], background=True)
         await db.trips.create_index([("company_id", 1), ("status", 1)], background=True)
         await db.tires.create_index([("company_id", 1), ("current_vehicle_id", 1)], background=True)
@@ -8097,12 +8321,3 @@ async def start_scheduler():
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
-# Módulo Liquidación de Flete (proveedores, tipos de carga, liquidaciones y sus líneas)
-from liquidacion_flete import router as liquidacion_router
-app.include_router(liquidacion_router)
-
-# Bot de WhatsApp (webhook + bandeja de documentos pendientes)
-from whatsapp_bot import router as whatsapp_router
-app.include_router(whatsapp_router)
-
-        await db.users.create_index([("whatsapp_number", 1)], unique=True, sparse=True, background=True)

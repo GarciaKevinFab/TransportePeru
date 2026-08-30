@@ -19,3 +19,9 @@ proveedores
 tipos_carga
 liquidaciones_flete
 liquidacion_lineas
+
+# --- 002: Facturacion / SUNAT / Caja ---
+facturas
+guias_transportista
+detracciones
+cash_movements

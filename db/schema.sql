@@ -748,6 +748,7 @@ create table facturas (
   pdf_url text,
   status factura_status not null default 'borrador',
   created_at timestamptz not null default now(),
+  updated_at timestamptz, -- lo escribe /facturas/{id}/emit
   created_by uuid references users(id)
 );
 
@@ -782,6 +783,7 @@ create table guias_transportista (
   pdf_url text,
   status guia_transportista_status not null default 'borrador',
   created_at timestamptz not null default now(),
+  updated_at timestamptz, -- lo escribe /guias/{id}/emit
   created_by uuid references users(id)
 );
 
@@ -803,7 +805,11 @@ create table detracciones (
   deposit_date text,
   status detraccion_status not null default 'pendiente',
   notes text,
+  -- DELETE /detracciones/{id} es soft-delete: anula y deja la trazabilidad
+  anulada_at timestamptz,
+  anulada_by uuid,
   created_at timestamptz not null default now(),
+  updated_at timestamptz,
   created_by uuid references users(id)
 );
 
@@ -827,7 +833,13 @@ create table cash_movements (
   supplier text,
   receipt_url text,
   notes text,
+  -- DELETE /cashbox/movements/{id} es soft-delete: el movimiento se marca y
+  -- toda consulta de caja filtra por `deleted` para no descuadrar el saldo
+  deleted boolean not null default false,
+  deleted_at timestamptz,
+  deleted_by uuid,
   created_at timestamptz not null default now(),
+  updated_at timestamptz,
   created_by uuid references users(id)
 );
 
