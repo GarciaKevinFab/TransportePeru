@@ -990,18 +990,49 @@ def _revision_tecnica_no_aplica(doc_type: dict, entity: dict, entity_type: str) 
     current_year = datetime.now(timezone.utc).year
     return (current_year - year) <= 4
 
+# ============== TABLAS EN POSTGRES: DOCUMENTOS Y BLOQUEOS ==============
+# document_types, documents y blocks cortaron con la migracion 009. Van juntas
+# porque documents apunta a document_types y blocks apunta a las dos.
+#
+# entity_id es polimorfico -segun entity_type apunta a vehicles o a users- y
+# por eso va sin FK, igual que estaba.
+
+DOCUMENT_TYPE_COLS = {
+    "id": "uuid", "company_id": "uuid", "name": "text", "applies_to": "text",
+    "is_critical": "bool", "requires_expiry": "bool",
+    "alert_days": "int[]", "block_rule": "enum:block_rule",
+    "created_at": "ts",
+}
+
+DOCUMENT_COLS = {
+    "id": "uuid", "company_id": "uuid", "document_type_id": "uuid",
+    "entity_type": "text", "entity_id": "uuid", "number": "text",
+    "issue_date": "ts", "expiry_date": "ts",
+    "status": "enum:document_status", "file_url": "text", "notes": "text",
+    "approved_by": "uuid", "approved_at": "ts",
+    "created_at": "ts", "updated_at": "ts", "created_by": "uuid",
+}
+
+BLOCK_COLS = {
+    "id": "uuid", "company_id": "uuid", "entity_type": "text",
+    "entity_id": "uuid", "reason": "text", "block_type": "text",
+    "document_id": "uuid", "document_type_id": "uuid",
+    "is_active": "bool", "resolved_at": "ts", "resolved_by": "uuid",
+    "created_at": "ts",
+}
+
+
 async def check_entity_blocks(company_id: str, entity_type: str, entity_id: str, block_type: str = None) -> List[dict]:
     """Check for active blocks on an entity"""
-    query = {
-        "company_id": company_id,
-        "entity_type": entity_type,
-        "entity_id": entity_id,
-        "is_active": True
-    }
-    if block_type:
-        query["block_type"] = block_type
-    blocks = await db.blocks.find(query, {"_id": 0}).to_list(100)
-    return blocks
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(company_id))
+    f.agregar("entity_type = $?", entity_type)
+    f.agregar("entity_id = $?", db_pg.as_uuid(entity_id))
+    f.crudo("is_active")
+    f.si(block_type, "block_type = $?", block_type)
+    async with db_pg.tx({"company_id": company_id}) as conn:
+        return db_pg.rows_to_api(await conn.fetch(
+            "select * from blocks where " + f.where + " limit 100", *f.values
+        ))
 
 async def validate_trip_can_be_assigned(company_id: str, tracto_id: str, carreta_id: str, driver_id: str) -> dict:
     """Validate that a trip can be assigned (no blocking conditions)"""
@@ -1093,9 +1124,11 @@ async def create_block_for_expired_doc(company_id: str, doc_type: dict, document
         document_id=document["id"],
         document_type_id=doc_type.get("id")
     )
-    doc = block.model_dump()
-    doc["created_at"] = doc["created_at"].isoformat()
-    await db.blocks.insert_one(doc)
+    sql, values = db_pg.build_insert(
+        "blocks", BLOCK_COLS, _modelo_a_fila(block.model_dump())
+    )
+    async with db_pg.tx({"company_id": company_id}) as conn:
+        await conn.execute(sql, *values)
     return block
 
 # ============== BUSINESS RULE HELPERS (viáticos / llantas / mantenimiento / push) ==============
@@ -1561,10 +1594,12 @@ async def _generate_document_alerts(company_id: str) -> int:
     alerts_created = 0
     now = datetime.now(timezone.utc)
     alert_days = [60, 30, 15, 7, 3, 1, 0]
-    documents = await db.documents.find({
-        "company_id": company_id,
-        "expiry_date": {"$exists": True}
-    }, {"_id": 0}).to_list(1000)
+    async with db_pg.tx({"company_id": company_id}) as conn:
+        documents = db_pg.rows_to_api(await conn.fetch(
+            "select * from documents where company_id = $1 "
+            "and expiry_date is not null limit 1000",
+            db_pg.as_uuid(company_id),
+        ))
 
     # Documento más reciente por (entidad, tipo): sólo éste rige bloqueo/resolución
     latest_by_type = {}
@@ -1584,7 +1619,11 @@ async def _generate_document_alerts(company_id: str) -> int:
             expiry = datetime.fromisoformat(expiry.replace("Z", "+00:00"))
         days_until = (expiry - now).days
 
-        doc_type = await db.document_types.find_one({"id": doc["document_type_id"], "company_id": company_id})
+        async with db_pg.tx({"company_id": company_id}) as conn:
+            doc_type = db_pg.to_api(await conn.fetchrow(
+                "select * from document_types where id = $1 and company_id = $2",
+                db_pg.as_uuid(doc["document_type_id"]), db_pg.as_uuid(company_id),
+            ))
         # vehicles sigue en Mongo; users ya corto a Postgres.
         entity = (
             await _vehiculo_pg(company_id, doc["entity_id"])
@@ -1599,24 +1638,32 @@ async def _generate_document_alerts(company_id: str) -> int:
         is_latest = latest_by_type.get((doc.get("entity_id"), doc.get("document_type_id")), {}).get("id") == doc.get("id")
         block_rule = (doc_type or {}).get("block_rule", "solo_alerta")
         if is_latest and doc_type and block_rule != "solo_alerta":
-            block_dedup = {
-                "company_id": company_id,
-                "entity_type": doc.get("entity_type"),
-                "entity_id": doc.get("entity_id"),
-                "document_type_id": doc.get("document_type_id"),
-                "is_active": True,
-            }
-            if days_until <= 0:
-                existing_block = await db.blocks.find_one(block_dedup)
-                if not existing_block:
-                    await create_block_for_expired_doc(
-                        company_id, doc_type, doc, doc.get("entity_type"), doc.get("entity_id")
+            async with db_pg.tx({"company_id": company_id}) as conn:
+                existing_block = await conn.fetchval(
+                    "select id from blocks where company_id = $1 and entity_type = $2 "
+                    "and entity_id = $3 and document_type_id = $4 and is_active",
+                    db_pg.as_uuid(company_id), doc.get("entity_type"),
+                    db_pg.as_uuid(doc.get("entity_id")),
+                    db_pg.as_uuid(doc.get("document_type_id")),
+                )
+                if days_until > 0:
+                    # Documento vigente nuevamente: cerrar bloqueos activos.
+                    # resolved_by queda NULL a proposito: la columna es uuid con
+                    # FK a users y el "system" que se escribia antes no es
+                    # ningun usuario. Un bloqueo con resolved_at puesto y
+                    # resolved_by nulo es, por definicion, uno que cerro el
+                    # barrido automatico.
+                    await conn.execute(
+                        "update blocks set is_active = false, resolved_at = $1, "
+                        "resolved_by = null where company_id = $2 and entity_type = $3 "
+                        "and entity_id = $4 and document_type_id = $5 and is_active",
+                        now, db_pg.as_uuid(company_id), doc.get("entity_type"),
+                        db_pg.as_uuid(doc.get("entity_id")),
+                        db_pg.as_uuid(doc.get("document_type_id")),
                     )
-            else:
-                # Documento vigente nuevamente: cerrar bloqueos activos asociados
-                await db.blocks.update_many(
-                    block_dedup,
-                    {"$set": {"is_active": False, "resolved_at": now.isoformat(), "resolved_by": "system"}}
+            if days_until <= 0 and not existing_block:
+                await create_block_for_expired_doc(
+                    company_id, doc_type, doc, doc.get("entity_type"), doc.get("entity_id")
                 )
 
         for alert_day in alert_days:
@@ -2533,12 +2580,13 @@ async def get_document_types(
     applies_to: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
-    query = {"company_id": current_user["company_id"]}
-    if applies_to:
-        query["applies_to"] = applies_to
-    
-    types = await db.document_types.find(query, {"_id": 0}).to_list(100)
-    return [serialize_doc(t) for t in types]
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(current_user["company_id"]))
+    f.si(applies_to, "applies_to = $?", applies_to)
+    async with db_pg.tx(current_user) as conn:
+        return db_pg.rows_to_api(await conn.fetch(
+            "select * from document_types where " + f.where
+            + " order by name limit 100", *f.values
+        ))
 
 @api_router.post("/document-types")
 async def create_document_type(request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin"))):
@@ -2552,10 +2600,11 @@ async def create_document_type(request: dict = Body(...), current_user: dict = D
         block_rule=request.get("block_rule", BlockRule.SOLO_ALERTA)
     )
     
-    doc = doc_type.model_dump()
-    doc["created_at"] = doc["created_at"].isoformat()
-    
-    await db.document_types.insert_one(doc)
+    sql, values = db_pg.build_insert(
+        "document_types", DOCUMENT_TYPE_COLS, _modelo_a_fila(doc_type.model_dump())
+    )
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(sql, *values)
     return {"id": doc_type.id, "message": "Tipo de documento creado"}
 
 # ============== DOCUMENT ROUTES ==============
@@ -2566,16 +2615,17 @@ async def get_documents(
     status: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
-    query = {"company_id": current_user["company_id"]}
-    if entity_type:
-        query["entity_type"] = entity_type
-    if entity_id:
-        query["entity_id"] = entity_id
-    if status:
-        query["status"] = status
-    
-    documents = await db.documents.find(query, {"_id": 0}).to_list(1000)
-    return [serialize_doc(d) for d in documents]
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(current_user["company_id"]))
+    f.si(entity_type, "entity_type = $?", entity_type)
+    f.si(entity_id, "entity_id = $?", db_pg.as_uuid(entity_id))
+    # status::text: el valor lo elige el cliente y uno que no exista en el enum
+    # devuelve lista vacia, como hacia Mongo, en vez de un 500 por el cast.
+    f.si(status, "status::text = $?", status)
+    async with db_pg.tx(current_user) as conn:
+        return db_pg.rows_to_api(await conn.fetch(
+            "select * from documents where " + f.where
+            + " order by expiry_date desc nulls last limit 1000", *f.values
+        ))
 
 @api_router.post("/documents")
 async def create_document(request: CreateDocumentRequest, current_user: dict = Depends(get_current_user)):
@@ -2601,41 +2651,47 @@ async def create_document(request: CreateDocumentRequest, current_user: dict = D
         else:
             document.status = DocumentStatus.VIGENTE
     
-    doc = document.model_dump()
-    for key, value in doc.items():
-        if isinstance(value, datetime):
-            doc[key] = value.isoformat()
-    
-    await db.documents.insert_one(doc)
+    sql, values = db_pg.build_insert(
+        "documents", DOCUMENT_COLS, _modelo_a_fila(document.model_dump())
+    )
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(sql, *values)
     return {"id": document.id, "message": "Documento creado"}
 
 @api_router.put("/documents/{document_id}")
 async def update_document(document_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     request.pop("id", None)
     request.pop("company_id", None)
-    request["updated_at"] = datetime.now(timezone.utc).isoformat()
-    
-    result = await db.documents.update_one(
-        {"id": document_id, "company_id": current_user["company_id"]},
-        {"$set": request}
+    datos = dict(request)
+    datos["updated_at"] = datetime.now(timezone.utc)
+    datos["id"] = document_id
+    datos["company_id"] = current_user["company_id"]
+
+    # DOCUMENT_COLS actua de lista blanca: lo que no sea una columna declarada
+    # se ignora, igual que en el resto de los cortes.
+    sql, values = db_pg.build_update(
+        "documents", DOCUMENT_COLS, datos, ["id", "company_id"]
     )
-    
-    if result.matched_count == 0:
+    async with db_pg.tx(current_user) as conn:
+        existia = await conn.fetchval(sql + " returning id", *values)
+    if existia is None:
         raise HTTPException(status_code=404, detail="Documento no encontrado")
-    
+
     return {"message": "Documento actualizado"}
 
 @api_router.post("/documents/{document_id}/approve")
 async def approve_document(document_id: str, current_user: dict = Depends(require_roles("owner", "admin", "flota"))):
-    await db.documents.update_one(
-        {"id": document_id, "company_id": current_user["company_id"]},
-        {"$set": {
-            "status": DocumentStatus.APROBADO.value,
-            "approved_by": current_user["id"],
-            "approved_at": datetime.now(timezone.utc).isoformat()
-        }}
-    )
-    
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(
+            "update documents set status = $1::document_status, approved_by = $2, "
+            "approved_at = now(), updated_at = now() "
+            "where id = $3 and company_id = $4",
+            DocumentStatus.APROBADO.value,
+            db_pg.as_uuid(current_user["id"]),
+            db_pg.as_uuid(document_id),
+            db_pg.as_uuid(current_user["company_id"]),
+        )
+
     return {"message": "Documento aprobado"}
 
 @api_router.get("/documents/matrix")
@@ -2649,10 +2705,12 @@ async def get_documents_matrix(
     applies_to = applies_to_map.get(entity_type, entity_type)
     
     # Get document types
-    doc_types = await db.document_types.find(
-        {"company_id": current_user["company_id"], "applies_to": applies_to},
-        {"_id": 0}
-    ).to_list(100)
+    async with db_pg.tx(current_user) as conn:
+        doc_types = db_pg.rows_to_api(await conn.fetch(
+            "select * from document_types where company_id = $1 and applies_to = $2 "
+            "order by name limit 100",
+            db_pg.as_uuid(current_user["company_id"]), applies_to,
+        ))
     
     # Get entities
     if entity_type == "vehicle":
@@ -2671,10 +2729,12 @@ async def get_documents_matrix(
         entities = [_sin_secretos(u) for u in db_pg.rows_to_api(filas)]
     
     # Get all documents
-    documents = await db.documents.find(
-        {"company_id": current_user["company_id"], "entity_type": entity_type},
-        {"_id": 0}
-    ).to_list(10000)
+    async with db_pg.tx(current_user) as conn:
+        documents = db_pg.rows_to_api(await conn.fetch(
+            "select * from documents where company_id = $1 and entity_type = $2 "
+            "limit 10000",
+            db_pg.as_uuid(current_user["company_id"]), entity_type,
+        ))
     
     # Build matrix
     doc_map = {}
@@ -2738,24 +2798,26 @@ async def get_blocks(
     is_active: Optional[bool] = True,
     current_user: dict = Depends(get_current_user)
 ):
-    query = {"company_id": current_user["company_id"]}
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(current_user["company_id"]))
     if is_active is not None:
-        query["is_active"] = is_active
-    
-    blocks = await db.blocks.find(query, {"_id": 0}).to_list(500)
-    return [serialize_doc(b) for b in blocks]
+        f.agregar("is_active = $?", bool(is_active))
+    async with db_pg.tx(current_user) as conn:
+        return db_pg.rows_to_api(await conn.fetch(
+            "select * from blocks where " + f.where
+            + " order by created_at desc nulls last limit 500", *f.values
+        ))
 
 @api_router.post("/blocks/{block_id}/resolve")
 async def resolve_block(block_id: str, request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "flota", "operaciones"))):
     
-    await db.blocks.update_one(
-        {"id": block_id, "company_id": current_user["company_id"]},
-        {"$set": {
-            "is_active": False,
-            "resolved_at": datetime.now(timezone.utc).isoformat(),
-            "resolved_by": current_user["id"]
-        }}
-    )
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(
+            "update blocks set is_active = false, resolved_at = now(), "
+            "resolved_by = $1 where id = $2 and company_id = $3",
+            db_pg.as_uuid(current_user["id"]),
+            db_pg.as_uuid(block_id),
+            db_pg.as_uuid(current_user["company_id"]),
+        )
     return {"message": "Bloqueo resuelto"}
 
 # ============== ROUTE ROUTES ==============
@@ -4055,9 +4117,11 @@ async def create_work_order(request: dict = Body(...), current_user: dict = Depe
             reason=f"OT Crítica: {request['description'][:50]}",
             block_type="bloquea_asignacion"
         )
-        block_doc = block.model_dump()
-        block_doc["created_at"] = block_doc["created_at"].isoformat()
-        await db.blocks.insert_one(block_doc)
+        sql, values = db_pg.build_insert(
+            "blocks", BLOCK_COLS, _modelo_a_fila(block.model_dump())
+        )
+        async with db_pg.tx(current_user) as conn:
+            await conn.execute(sql, *values)
         
         # Update vehicle status
         await _actualizar_vehiculo(
@@ -4082,14 +4146,15 @@ async def update_work_order(order_id: str, request: dict = Body(...), current_us
                 {"status": VehicleStatus.DISPONIBLE.value},
             )
             # Resolve any blocks
-            await db.blocks.update_many(
-                {"entity_id": order["vehicle_id"], "is_active": True, "company_id": current_user["company_id"]},
-                {"$set": {
-                    "is_active": False,
-                    "resolved_at": datetime.now(timezone.utc).isoformat(),
-                    "resolved_by": current_user["id"]
-                }}
-            )
+            async with db_pg.tx(current_user) as conn:
+                await conn.execute(
+                    "update blocks set is_active = false, resolved_at = now(), "
+                    "resolved_by = $1 where company_id = $2 and entity_id = $3 "
+                    "and is_active",
+                    db_pg.as_uuid(current_user["id"]),
+                    db_pg.as_uuid(current_user["company_id"]),
+                    db_pg.as_uuid(order["vehicle_id"]),
+                )
     
     result = await db.work_orders.update_one(
         {"id": order_id, "company_id": current_user["company_id"]},
@@ -5089,14 +5154,24 @@ async def complete_work_order(order_id: str, request: dict = Body(...), current_
     )
     
     # Resolve any blocks
-    await db.blocks.update_many(
-        {"work_order_id": order_id, "is_active": True},
-        {"$set": {
-            "is_active": False,
-            "resolved_at": datetime.now(timezone.utc).isoformat(),
-            "resolved_by": current_user["id"]
-        }}
-    )
+    #
+    # Esta consulta buscaba blocks por work_order_id, que NO es una columna de
+    # blocks (la tienen stock_moves y downtime_records, no esta). En Mongo eso
+    # no coincidia nunca: era un no-op silencioso y este cierre jamas resolvio
+    # un bloqueo. En SQL habria sido un error por columna inexistente.
+    #
+    # Se corrige a lo que evidentemente queria hacer, que ademas es lo que ya
+    # hace el otro camino de cierre en update_work_order: soltar los bloqueos
+    # del vehiculo de la orden. Se agrega tambien el filtro por empresa, que la
+    # consulta vieja no tenia.
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(
+            "update blocks set is_active = false, resolved_at = now(), "
+            "resolved_by = $1 where company_id = $2 and entity_id = $3 and is_active",
+            db_pg.as_uuid(current_user["id"]),
+            db_pg.as_uuid(current_user["company_id"]),
+            db_pg.as_uuid(order["vehicle_id"]),
+        )
     
     # Audit log
     await create_audit_log(
@@ -5755,15 +5830,20 @@ async def get_dashboard_kpis(current_user: dict = Depends(get_current_user)):
     critical_alerts = await db.alerts.count_documents({"company_id": company_id, "resolved": False, "severity": "critical"})
     
     # Count active blocks
-    active_blocks = await db.blocks.count_documents({"company_id": company_id, "is_active": True})
-    
-    # Count expiring documents (next 30 days)
-    thirty_days = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
-    expiring_docs = await db.documents.count_documents({
-        "company_id": company_id,
-        "expiry_date": {"$lte": thirty_days},
-        "status": {"$in": ["vigente", "por_vencer"]}
-    })
+    async with db_pg.tx(current_user) as conn:
+        active_blocks = await conn.fetchval(
+            "select count(*) from blocks where company_id = $1 and is_active",
+            db_pg.as_uuid(company_id),
+        )
+
+        # Count expiring documents (next 30 days)
+        expiring_docs = await conn.fetchval(
+            "select count(*) from documents where company_id = $1 "
+            "and expiry_date <= $2 "
+            "and status = any(array['vigente','por_vencer']::document_status[])",
+            db_pg.as_uuid(company_id),
+            datetime.now(timezone.utc) + timedelta(days=30),
+        )
     
     # Open work orders
     open_work_orders = await db.work_orders.count_documents({
@@ -6465,11 +6545,13 @@ async def seed_demo_data(_: bool = Depends(require_install_token)):
     doc_type_ids = {}
     for dt in doc_types:
         # Idempotente: no duplicar tipos de documento por nombre
-        existing_dt = await db.document_types.find_one(
-            {"company_id": company.id, "name": dt["name"]}, {"_id": 0, "id": 1}
-        )
+        async with db_pg.tx({"company_id": company.id}) as conn:
+            existing_dt = await conn.fetchval(
+                "select id from document_types where company_id = $1 and name = $2",
+                db_pg.as_uuid(company.id), dt["name"],
+            )
         if existing_dt:
-            doc_type_ids[dt["name"]] = existing_dt["id"]
+            doc_type_ids[dt["name"]] = str(existing_dt)
             continue
         doc_type = DocumentType(
             company_id=company.id,
@@ -6478,9 +6560,12 @@ async def seed_demo_data(_: bool = Depends(require_install_token)):
             is_critical=dt["is_critical"],
             block_rule=BlockRule(dt["block_rule"])
         )
-        doc_type_doc = doc_type.model_dump()
-        doc_type_doc["created_at"] = doc_type_doc["created_at"].isoformat()
-        await db.document_types.insert_one(doc_type_doc)
+        sql, values = db_pg.build_insert(
+            "document_types", DOCUMENT_TYPE_COLS,
+            _modelo_a_fila(doc_type.model_dump()),
+        )
+        async with db_pg.tx({"company_id": company.id}) as conn:
+            await conn.execute(sql, *values)
         doc_type_ids[dt["name"]] = doc_type.id
     
     # Create routes
@@ -6964,11 +7049,12 @@ async def get_maintenance_report(
 @api_router.get("/config/document-types")
 async def get_document_types_config(current_user: dict = Depends(get_current_user)):
     """Get document types configuration"""
-    doc_types = await db.document_types.find(
-        {"company_id": current_user["company_id"]},
-        {"_id": 0}
-    ).to_list(100)
-    return [serialize_doc(dt) for dt in doc_types]
+    async with db_pg.tx(current_user) as conn:
+        return db_pg.rows_to_api(await conn.fetch(
+            "select * from document_types where company_id = $1 "
+            "order by name limit 100",
+            db_pg.as_uuid(current_user["company_id"]),
+        ))
 
 @api_router.post("/config/document-types")
 async def create_document_type_config(request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin"))):
@@ -6984,10 +7070,12 @@ async def create_document_type_config(request: dict = Body(...), current_user: d
         block_rule=BlockRule(request.get("block_rule", "solo_alerta"))
     )
     
-    doc = doc_type.model_dump()
-    doc["created_at"] = doc["created_at"].isoformat()
-    await db.document_types.insert_one(doc)
-    
+    sql, values = db_pg.build_insert(
+        "document_types", DOCUMENT_TYPE_COLS, _modelo_a_fila(doc_type.model_dump())
+    )
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(sql, *values)
+
     return {"id": doc_type.id, "message": "Tipo de documento creado"}
 
 @api_router.put("/config/document-types/{doc_type_id}")
@@ -7006,11 +7094,15 @@ async def update_document_type_config(doc_type_id: str, request: dict = Body(...
     if "block_rule" in request:
         update_data["block_rule"] = request["block_rule"]
     
-    await db.document_types.update_one(
-        {"id": doc_type_id, "company_id": current_user["company_id"]},
-        {"$set": update_data}
+    update_data["id"] = doc_type_id
+    update_data["company_id"] = current_user["company_id"]
+    sql, values = db_pg.build_update(
+        "document_types", DOCUMENT_TYPE_COLS, update_data, ["id", "company_id"]
     )
-    
+    if sql:
+        async with db_pg.tx(current_user) as conn:
+            await conn.execute(sql, *values)
+
     return {"message": "Tipo de documento actualizado"}
 
 @api_router.delete("/config/document-types/{doc_type_id}")
@@ -7018,18 +7110,20 @@ async def delete_document_type_config(doc_type_id: str, current_user: dict = Dep
     """Delete document type"""
     
     # Check if any documents use this type
-    docs_count = await db.documents.count_documents({
-        "document_type_id": doc_type_id,
-        "company_id": current_user["company_id"]
-    })
-    
-    if docs_count > 0:
-        raise HTTPException(status_code=400, detail=f"No se puede eliminar: {docs_count} documentos usan este tipo")
-    
-    await db.document_types.delete_one({
-        "id": doc_type_id,
-        "company_id": current_user["company_id"]
-    })
+    async with db_pg.tx(current_user) as conn:
+        docs_count = await conn.fetchval(
+            "select count(*) from documents "
+            "where company_id = $1 and document_type_id = $2",
+            db_pg.as_uuid(current_user["company_id"]), db_pg.as_uuid(doc_type_id),
+        )
+
+        if docs_count > 0:
+            raise HTTPException(status_code=400, detail=f"No se puede eliminar: {docs_count} documentos usan este tipo")
+
+        await conn.execute(
+            "delete from document_types where id = $1 and company_id = $2",
+            db_pg.as_uuid(doc_type_id), db_pg.as_uuid(current_user["company_id"]),
+        )
     
     return {"message": "Tipo de documento eliminado"}
 
@@ -7619,15 +7713,24 @@ async def get_documents_expiring_report(
     company_id = current_user["company_id"]
     now = datetime.now(timezone.utc)
 
-    documents = await db.documents.find(
-        {"company_id": company_id, "expiry_date": {"$exists": True, "$ne": None}},
-        {"_id": 0}
-    ).to_list(5000)
+    async with db_pg.tx(current_user) as conn:
+        documents = db_pg.rows_to_api(await conn.fetch(
+            "select * from documents where company_id = $1 "
+            "and expiry_date is not null limit 5000",
+            db_pg.as_uuid(company_id),
+        ))
 
     dt_ids = list({d.get("document_type_id") for d in documents if d.get("document_type_id")})
     doc_types = {}
     if dt_ids:
-        for dt in await db.document_types.find({"company_id": company_id, "id": {"$in": dt_ids}}, {"_id": 0}).to_list(1000):
+        async with db_pg.tx(current_user) as conn:
+            filas = db_pg.rows_to_api(await conn.fetch(
+                "select * from document_types where company_id = $1 "
+                "and id = any($2::uuid[]) limit 1000",
+                db_pg.as_uuid(company_id),
+                [u for u in (db_pg.as_uuid(x) for x in dt_ids) if u],
+            ))
+        for dt in filas:
             doc_types[dt["id"]] = dt
 
     rows = []
@@ -8911,7 +9014,8 @@ async def create_indexes():
         # El indice de trips ya no se crea aca: la tabla corto a Postgres y sus
         # indices viven en db/schema.sql y en la migracion 007.
         await db.tires.create_index([("company_id", 1), ("current_vehicle_id", 1)], background=True)
-        await db.documents.create_index([("company_id", 1), ("entity_id", 1)], background=True)
+        # El indice de documents ya no se crea aca: la tabla corto a Postgres y
+        # sus indices viven en db/schema.sql y en la migracion 009.
         logger.info("Índices de MongoDB verificados/creados")
     except Exception as e:
         logger.error(f"Error creando índices MongoDB: {e}")
@@ -8940,19 +9044,24 @@ async def ensure_default_document_types():
             if not cid:
                 continue
             for dt in defaults:
-                exists = await db.document_types.find_one(
-                    {"company_id": cid, "name": dt["name"]}, {"_id": 1}
-                )
+                async with db_pg.tx({"company_id": cid}) as conn:
+                    exists = await conn.fetchval(
+                        "select id from document_types "
+                        "where company_id = $1 and name = $2",
+                        db_pg.as_uuid(cid), dt["name"],
+                    )
                 if exists:
                     continue
                 doc_type = DocumentType(
                     company_id=cid, name=dt["name"], applies_to=dt["applies_to"],
                     is_critical=dt["is_critical"], block_rule=BlockRule(dt["block_rule"]),
                 )
-                d = doc_type.model_dump()
-                if isinstance(d.get("created_at"), datetime):
-                    d["created_at"] = d["created_at"].isoformat()
-                await db.document_types.insert_one(d)
+                sql, values = db_pg.build_insert(
+                    "document_types", DOCUMENT_TYPE_COLS,
+                    _modelo_a_fila(doc_type.model_dump()),
+                )
+                async with db_pg.tx({"company_id": cid}) as conn:
+                    await conn.execute(sql, *values)
         logger.info("Tipos de documento por defecto verificados")
     except Exception as e:
         logger.error(f"Error asegurando tipos de documento: {e}")

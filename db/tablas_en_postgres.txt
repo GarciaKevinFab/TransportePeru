@@ -55,3 +55,8 @@ routes
 trip_advances
 trip_expenses
 settlements
+
+# --- 009: Documentos y bloqueos operativos ---
+document_types
+documents
+blocks

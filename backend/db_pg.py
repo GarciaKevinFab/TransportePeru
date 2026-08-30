@@ -275,6 +275,10 @@ _COERCERS = {
     # uuid[]: asyncpg no acepta una lista de str para una columna de uuids;
     # hay que castear cada elemento.
     "uuid[]": lambda v: [u for u in (as_uuid(x) for x in (v or [])) if u is not None],
+    # int[]: document_types.alert_days son los dias de aviso previo al
+    # vencimiento. Llegan del request como lista de JSON, donde un numero puede
+    # venir como texto ("30"), asi que cada elemento pasa por as_int.
+    "int[]": lambda v: [i for i in (as_int(x) for x in (v or [])) if i is not None],
 }
 
 
