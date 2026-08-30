@@ -67,7 +67,12 @@ create index if not exists couplings_trip_idx on couplings (trip_id);
 create index if not exists units_company_activas_idx on units (company_id) where active;
 
 -- ============================================================================
--- PENDIENTE - cuando crucen checklists y settlements:
--- alter table trips add constraint trips_checklist_id_fkey foreign key (checklist_id) references checklists(id);
--- alter table trips add constraint trips_settlement_id_fkey foreign key (settlement_id) references settlements(id);
+-- QUE PASO CON LAS DOS FKs QUE AQUI QUEDARON PENDIENTES
+--
+--   settlement_id  -> restaurada en la migracion 008, cuando settlements cruzo.
+--   checklist_id   -> NO se puede. Al cruzar checklists (migracion 010) se vio
+--                     que esa columna recibe ids de dos tablas distintas,
+--                     checklists y checklist_runs, asi que es polimorfica de
+--                     facto y una FK contra cualquiera rechazaria las filas de
+--                     la otra. La explicacion completa esta en la 010.
 -- ============================================================================

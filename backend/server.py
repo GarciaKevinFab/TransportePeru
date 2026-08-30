@@ -3265,17 +3265,88 @@ async def create_trip_expense(trip_id: str, request: dict = Body(...), current_u
     return {"id": expense.id, "message": "Gasto registrado"}
 
 # ============== CHECKLIST ROUTES ==============
+# ============== TABLAS EN POSTGRES: CHECKLIST PRE-VIAJE ==============
+# checklist_templates, checklists y checklist_runs cortaron con la migracion
+# 010.
+#
+# Hay DOS modelos para la misma cosa -Checklist y ChecklistRun, cada uno con
+# sus endpoints- y trips.checklist_id recibe ids de los dos. Por eso esa
+# columna se queda sin FK: es polimorfica de facto. La deuda es anterior a la
+# migracion; unificarlos toca el frontend y va aparte (ver la 010).
+
+
+def _fila_con_ubicacion(doc: dict) -> dict:
+    """El dict location {lat, lng} -> las columnas location_lat y location_lng.
+
+    Cuatro tablas guardan la ubicacion en dos columnas separadas (checklists,
+    checklist_runs, fuel_loads e issues), mientras que los modelos la llevan
+    como un unico dict, que es la forma que manda y espera el frontend.
+
+    Sin esta traduccion el dict no coincide con ninguna columna declarada y
+    build_insert lo descarta por su lista blanca: la ubicacion se perderia sin
+    ningun error, que es la peor forma de perder un dato.
+    """
+    fila = dict(doc)
+    ubicacion = fila.pop("location", None)
+    if isinstance(ubicacion, dict):
+        fila["location_lat"] = ubicacion.get("lat")
+        fila["location_lng"] = ubicacion.get("lng")
+    return fila
+
+
+def _api_con_ubicacion(fila: dict) -> dict:
+    """Lo inverso: las dos columnas vuelven a ser un dict location {lat, lng},
+    que es la forma que el frontend ya sabe leer."""
+    if not fila:
+        return fila
+    salida = dict(fila)
+    lat = salida.pop("location_lat", None)
+    lng = salida.pop("location_lng", None)
+    salida["location"] = (
+        {"lat": lat, "lng": lng} if lat is not None or lng is not None else None
+    )
+    return salida
+
+
+CHECKLIST_TEMPLATE_COLS = {
+    "id": "uuid", "company_id": "uuid", "name": "text",
+    "vehicle_type": "text", "items": "json", "is_active": "bool",
+    "created_at": "ts", "created_by": "uuid",
+}
+
+CHECKLIST_COLS = {
+    "id": "uuid", "company_id": "uuid", "trip_id": "uuid",
+    "vehicle_id": "uuid", "driver_id": "uuid",
+    "items": "json", "tire_checks": "json",
+    "result": "enum:checklist_result", "signature_url": "text",
+    "location_lat": "float", "location_lng": "float",
+    "completed_at": "ts", "created_at": "ts",
+}
+
+CHECKLIST_RUN_COLS = {
+    "id": "uuid", "company_id": "uuid", "template_id": "uuid",
+    "trip_id": "uuid", "tracto_id": "uuid", "carreta_id": "uuid",
+    "driver_id": "uuid", "responses": "json", "tire_checks": "json",
+    "result": "enum:checklist_result", "signature_url": "text",
+    "location_lat": "float", "location_lng": "float",
+    "started_at": "ts", "completed_at": "ts",
+    "photos": "text[]", "created_by": "uuid",
+}
+
+
 @api_router.get("/checklists")
 async def get_checklists(
     trip_id: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
-    query = {"company_id": current_user["company_id"]}
-    if trip_id:
-        query["trip_id"] = trip_id
-    
-    checklists = await db.checklists.find(query, {"_id": 0}).to_list(500)
-    return [serialize_doc(c) for c in checklists]
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(current_user["company_id"]))
+    f.si(trip_id, "trip_id = $?", db_pg.as_uuid(trip_id))
+    async with db_pg.tx(current_user) as conn:
+        filas = db_pg.rows_to_api(await conn.fetch(
+            "select * from checklists where " + f.where
+            + " order by created_at desc nulls last limit 500", *f.values
+        ))
+    return [_api_con_ubicacion(c) for c in filas]
 
 @api_router.post("/checklists")
 async def create_checklist(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
@@ -3290,12 +3361,12 @@ async def create_checklist(request: dict = Body(...), current_user: dict = Depen
         location=request.get("location")
     )
     
-    doc = checklist.model_dump()
-    for key, value in doc.items():
-        if isinstance(value, datetime):
-            doc[key] = value.isoformat()
-    
-    await db.checklists.insert_one(doc)
+    sql, values = db_pg.build_insert(
+        "checklists", CHECKLIST_COLS,
+        _fila_con_ubicacion(_modelo_a_fila(checklist.model_dump())),
+    )
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(sql, *values)
     
     # If result is OK, approve checklist on trip
     if request.get("result") == "ok":
@@ -4268,11 +4339,14 @@ async def get_checklist_templates(
     vehicle_type: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
-    query = {"company_id": current_user["company_id"], "is_active": True}
-    if vehicle_type:
-        query["vehicle_type"] = vehicle_type
-    templates = await db.checklist_templates.find(query, {"_id": 0}).to_list(100)
-    return [serialize_doc(t) for t in templates]
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(current_user["company_id"]))
+    f.crudo("is_active")
+    f.si(vehicle_type, "vehicle_type = $?", vehicle_type)
+    async with db_pg.tx(current_user) as conn:
+        return db_pg.rows_to_api(await conn.fetch(
+            "select * from checklist_templates where " + f.where
+            + " order by name limit 100", *f.values
+        ))
 
 @api_router.post("/checklist-templates")
 async def create_checklist_template(request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin"))):
@@ -4285,9 +4359,12 @@ async def create_checklist_template(request: dict = Body(...), current_user: dic
         created_by=current_user["id"]
     )
     
-    doc = template.model_dump()
-    doc["created_at"] = doc["created_at"].isoformat()
-    await db.checklist_templates.insert_one(doc)
+    sql, values = db_pg.build_insert(
+        "checklist_templates", CHECKLIST_TEMPLATE_COLS,
+        _modelo_a_fila(template.model_dump()),
+    )
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(sql, *values)
     return {"id": template.id, "message": "Plantilla creada"}
 
 @api_router.put("/checklist-templates/{template_id}")
@@ -4295,21 +4372,28 @@ async def update_checklist_template(template_id: str, request: dict = Body(...),
     
     request.pop("id", None)
     request.pop("company_id", None)
-    
-    await db.checklist_templates.update_one(
-        {"id": template_id, "company_id": current_user["company_id"]},
-        {"$set": request}
+
+    datos = dict(request)
+    datos["id"] = template_id
+    datos["company_id"] = current_user["company_id"]
+    sql, values = db_pg.build_update(
+        "checklist_templates", CHECKLIST_TEMPLATE_COLS, datos, ["id", "company_id"]
     )
+    if sql:
+        async with db_pg.tx(current_user) as conn:
+            await conn.execute(sql, *values)
     return {"message": "Plantilla actualizada"}
 
 # ============== CHECKLIST RUN ROUTES ==============
 @api_router.get("/checklists/trip/{trip_id}")
 async def get_checklist_by_trip(trip_id: str, current_user: dict = Depends(get_current_user)):
-    checklist = await db.checklist_runs.find_one(
-        {"trip_id": trip_id, "company_id": current_user["company_id"]},
-        {"_id": 0}
-    )
-    return serialize_doc(checklist) if checklist else None
+    async with db_pg.tx(current_user) as conn:
+        fila = db_pg.to_api(await conn.fetchrow(
+            "select * from checklist_runs where trip_id = $1 and company_id = $2 "
+            "order by started_at desc nulls last limit 1",
+            db_pg.as_uuid(trip_id), db_pg.as_uuid(current_user["company_id"]),
+        ))
+    return _api_con_ubicacion(fila) if fila else None
 
 @api_router.post("/checklists/start")
 async def start_checklist(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
@@ -4322,19 +4406,27 @@ async def start_checklist(request: dict = Body(...), current_user: dict = Depend
         raise HTTPException(status_code=404, detail="Viaje no encontrado")
     
     # Check if checklist already exists
-    existing = await db.checklist_runs.find_one({"trip_id": trip_id})
+    # Con el filtro por empresa, que la consulta de Mongo no tenia.
+    async with db_pg.tx(current_user) as conn:
+        existing = db_pg.to_api(await conn.fetchrow(
+            "select * from checklist_runs where trip_id = $1 and company_id = $2 "
+            "order by started_at desc nulls last limit 1",
+            db_pg.as_uuid(trip_id), db_pg.as_uuid(current_user["company_id"]),
+        ))
     if existing and existing.get("result") != "pending":
         raise HTTPException(status_code=400, detail="Ya existe un checklist completado para este viaje")
     
     # Get default template
     template_id = request.get("template_id")
     if not template_id:
-        template = await db.checklist_templates.find_one({
-            "company_id": current_user["company_id"],
-            "is_active": True
-        })
-        template_id = template["id"] if template else None
-    
+        async with db_pg.tx(current_user) as conn:
+            hallada = await conn.fetchval(
+                "select id from checklist_templates "
+                "where company_id = $1 and is_active limit 1",
+                db_pg.as_uuid(current_user["company_id"]),
+            )
+        template_id = str(hallada) if hallada else None
+
     if not template_id:
         raise HTTPException(status_code=400, detail="No hay plantilla de checklist disponible")
     
@@ -4349,10 +4441,13 @@ async def start_checklist(request: dict = Body(...), current_user: dict = Depend
         created_by=current_user["id"]
     )
     
-    doc = checklist.model_dump()
-    doc["started_at"] = doc["started_at"].isoformat()
-    await db.checklist_runs.insert_one(doc)
-    
+    sql, values = db_pg.build_insert(
+        "checklist_runs", CHECKLIST_RUN_COLS,
+        _fila_con_ubicacion(_modelo_a_fila(checklist.model_dump())),
+    )
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(sql, *values)
+
     # Update trip
     await _actualizar_viaje(
         current_user["company_id"], trip_id,
@@ -4364,10 +4459,11 @@ async def start_checklist(request: dict = Body(...), current_user: dict = Depend
 @api_router.post("/checklists/{checklist_id}/submit")
 async def submit_checklist(checklist_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """Submit a completed checklist"""
-    checklist = await db.checklist_runs.find_one({
-        "id": checklist_id,
-        "company_id": current_user["company_id"]
-    })
+    async with db_pg.tx(current_user) as conn:
+        checklist = db_pg.to_api(await conn.fetchrow(
+            "select * from checklist_runs where id = $1 and company_id = $2",
+            db_pg.as_uuid(checklist_id), db_pg.as_uuid(current_user["company_id"]),
+        ))
     if not checklist:
         raise HTTPException(status_code=404, detail="Checklist no encontrado")
     
@@ -4401,18 +4497,22 @@ async def submit_checklist(checklist_id: str, request: dict = Body(...), current
             observed_items.append(f"Llanta {tire.get('position', '')}")
     
     # Update checklist
-    await db.checklist_runs.update_one(
-        {"id": checklist_id},
-        {"$set": {
-            "responses": responses,
-            "tire_checks": tire_checks,
-            "signature_url": signature_url,
-            "photos": photos,
-            "location": location,
-            "result": result,
-            "completed_at": datetime.now(timezone.utc).isoformat()
-        }}
+    datos = _fila_con_ubicacion({
+        "responses": responses,
+        "tire_checks": tire_checks,
+        "signature_url": signature_url,
+        "photos": photos,
+        "location": location,
+        "result": result,
+        "completed_at": datetime.now(timezone.utc),
+        "id": checklist_id,
+        "company_id": current_user["company_id"],
+    })
+    sql, values = db_pg.build_update(
+        "checklist_runs", CHECKLIST_RUN_COLS, datos, ["id", "company_id"]
     )
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(sql, *values)
     
     # Update trip
     await _actualizar_viaje(current_user["company_id"], checklist["trip_id"], {
@@ -4470,7 +4570,13 @@ async def submit_trip_checklist(trip_id: str, request: dict = Body(...), current
         raise HTTPException(status_code=404, detail="Viaje no encontrado")
     
     # Check if checklist already exists and is completed
-    existing = await db.checklist_runs.find_one({"trip_id": trip_id})
+    # Con el filtro por empresa, que la consulta de Mongo no tenia.
+    async with db_pg.tx(current_user) as conn:
+        existing = db_pg.to_api(await conn.fetchrow(
+            "select * from checklist_runs where trip_id = $1 and company_id = $2 "
+            "order by started_at desc nulls last limit 1",
+            db_pg.as_uuid(trip_id), db_pg.as_uuid(current_user["company_id"]),
+        ))
     if existing and existing.get("result") not in [None, "pending"]:
         raise HTTPException(status_code=400, detail="Ya existe un checklist completado para este viaje")
     
@@ -4479,12 +4585,20 @@ async def submit_trip_checklist(trip_id: str, request: dict = Body(...), current
         checklist_id = existing["id"]
     else:
         # Get default template
-        template = await db.checklist_templates.find_one({
-            "company_id": current_user["company_id"],
-            "is_active": True
-        })
-        template_id = template["id"] if template else "default"
-        
+        async with db_pg.tx(current_user) as conn:
+            hallada = await conn.fetchval(
+                "select id from checklist_templates "
+                "where company_id = $1 and is_active limit 1",
+                db_pg.as_uuid(current_user["company_id"]),
+            )
+        if not hallada:
+            # template_id es NOT NULL con FK a checklist_templates: el "default"
+            # que se usaba antes no es un id real y aca reventaria el insert.
+            raise HTTPException(
+                status_code=400, detail="No hay plantilla de checklist disponible"
+            )
+        template_id = str(hallada)
+
         checklist = ChecklistRun(
             company_id=current_user["company_id"],
             template_id=template_id,
@@ -4496,9 +4610,12 @@ async def submit_trip_checklist(trip_id: str, request: dict = Body(...), current
             created_by=current_user["id"]
         )
         
-        doc = checklist.model_dump()
-        doc["started_at"] = doc["started_at"].isoformat()
-        await db.checklist_runs.insert_one(doc)
+        sql, values = db_pg.build_insert(
+            "checklist_runs", CHECKLIST_RUN_COLS,
+            _fila_con_ubicacion(_modelo_a_fila(checklist.model_dump())),
+        )
+        async with db_pg.tx(current_user) as conn:
+            await conn.execute(sql, *values)
         checklist_id = checklist.id
     
     # Process responses
@@ -4511,18 +4628,23 @@ async def submit_trip_checklist(trip_id: str, request: dict = Body(...), current
     observed_items = [r for r in responses if r.get("status") in ["observado", "critico"]]
     
     # Update checklist
-    await db.checklist_runs.update_one(
-        {"id": checklist_id},
-        {"$set": {
-            "responses": responses,
-            "tire_checks": tire_checks,
-            "signature_url": request.get("signature_url"),
-            "km_start": request.get("km_start"),
-            "notes": request.get("notes"),
-            "result": result,
-            "completed_at": datetime.now(timezone.utc).isoformat()
-        }}
+    # km_start y notes NO son columnas de checklist_runs y se quedan fuera:
+    # CHECKLIST_RUN_COLS actua de lista blanca. El km inicial no se pierde,
+    # porque el bloque de abajo lo guarda en el viaje, que es donde se usa.
+    datos = {
+        "responses": responses,
+        "tire_checks": tire_checks,
+        "signature_url": request.get("signature_url"),
+        "result": result,
+        "completed_at": datetime.now(timezone.utc),
+        "id": checklist_id,
+        "company_id": current_user["company_id"],
+    }
+    sql, values = db_pg.build_update(
+        "checklist_runs", CHECKLIST_RUN_COLS, datos, ["id", "company_id"]
     )
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(sql, *values)
     
     # Update trip
     await _actualizar_viaje(current_user["company_id"], trip_id, {
@@ -7130,11 +7252,12 @@ async def delete_document_type_config(doc_type_id: str, current_user: dict = Dep
 @api_router.get("/config/checklist-templates")
 async def get_checklist_templates_config(current_user: dict = Depends(get_current_user)):
     """Get checklist templates"""
-    templates = await db.checklist_templates.find(
-        {"company_id": current_user["company_id"]},
-        {"_id": 0}
-    ).to_list(100)
-    return [serialize_doc(t) for t in templates]
+    async with db_pg.tx(current_user) as conn:
+        return db_pg.rows_to_api(await conn.fetch(
+            "select * from checklist_templates where company_id = $1 "
+            "order by name limit 100",
+            db_pg.as_uuid(current_user["company_id"]),
+        ))
 
 @api_router.post("/config/checklist-templates")
 async def create_checklist_template_config(request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin"))):
@@ -7149,10 +7272,13 @@ async def create_checklist_template_config(request: dict = Body(...), current_us
         created_by=current_user["id"]
     )
     
-    doc = template.model_dump()
-    doc["created_at"] = doc["created_at"].isoformat()
-    await db.checklist_templates.insert_one(doc)
-    
+    sql, values = db_pg.build_insert(
+        "checklist_templates", CHECKLIST_TEMPLATE_COLS,
+        _modelo_a_fila(template.model_dump()),
+    )
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(sql, *values)
+
     return {"id": template.id, "message": "Plantilla creada"}
 
 @api_router.put("/config/checklist-templates/{template_id}")
@@ -7169,11 +7295,15 @@ async def update_checklist_template_config(template_id: str, request: dict = Bod
     if "is_active" in request:
         update_data["is_active"] = request["is_active"]
     
-    await db.checklist_templates.update_one(
-        {"id": template_id, "company_id": current_user["company_id"]},
-        {"$set": update_data}
+    update_data["id"] = template_id
+    update_data["company_id"] = current_user["company_id"]
+    sql, values = db_pg.build_update(
+        "checklist_templates", CHECKLIST_TEMPLATE_COLS, update_data, ["id", "company_id"]
     )
-    
+    if sql:
+        async with db_pg.tx(current_user) as conn:
+            await conn.execute(sql, *values)
+
     return {"message": "Plantilla actualizada"}
 
 @api_router.get("/config/company")

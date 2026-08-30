@@ -279,6 +279,10 @@ _COERCERS = {
     # vencimiento. Llegan del request como lista de JSON, donde un numero puede
     # venir como texto ("30"), asi que cada elemento pasa por as_int.
     "int[]": lambda v: [i for i in (as_int(x) for x in (v or [])) if i is not None],
+    # text[]: fotos de un checklist o de una incidencia, que viajan como lista
+    # de URLs. Se filtran los None para no meter nulos en un array declarado
+    # not null.
+    "text[]": lambda v: [str(x) for x in (v or []) if x is not None],
 }
 
 

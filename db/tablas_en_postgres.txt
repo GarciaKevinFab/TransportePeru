@@ -60,3 +60,8 @@ settlements
 document_types
 documents
 blocks
+
+# --- 010: Checklist pre-viaje ---
+checklist_templates
+checklists
+checklist_runs
