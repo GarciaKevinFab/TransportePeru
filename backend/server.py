@@ -1135,6 +1135,43 @@ async def _empresa_pg(company_id: str):
         ))
 
 
+async def _viaje_pg(company_id: str, trip_id):
+    """Fila de trips dentro de la empresa, o None."""
+    if not trip_id:
+        return None
+    async with db_pg.tx({"company_id": company_id}) as conn:
+        return db_pg.to_api(await conn.fetchrow(
+            "select * from trips where id = $1 and company_id = $2",
+            db_pg.as_uuid(trip_id), db_pg.as_uuid(company_id),
+        ))
+
+
+async def _contar_viajes(company_id: str, status=None) -> int:
+    """Cantidad de viajes de la empresa. `status` acepta uno o varios."""
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(company_id))
+    if isinstance(status, (list, tuple)):
+        f.agregar("status = any($?::trip_status[])", list(status))
+    elif status:
+        f.agregar("status = $?::trip_status", status)
+    async with db_pg.tx({"company_id": company_id}) as conn:
+        return await conn.fetchval(
+            "select count(*) from trips where " + f.where, *f.values
+        )
+
+
+async def _actualizar_viaje(company_id: str, trip_id, cambios: dict) -> bool:
+    """Aplica `cambios` a un viaje. False si no existe (para el 404)."""
+    datos = dict(cambios)
+    datos["updated_at"] = datetime.now(timezone.utc)
+    datos["id"] = trip_id
+    datos["company_id"] = company_id
+    sql, values = db_pg.build_update("trips", TRIP_COLS, datos, ["id", "company_id"])
+    if not sql:
+        return False
+    async with db_pg.tx({"company_id": company_id}) as conn:
+        return await conn.fetchval(sql + " returning id", *values) is not None
+
+
 async def _vehiculo_pg(company_id: str, vehicle_id):
     """Fila de vehicles dentro de la empresa, o None."""
     if not vehicle_id:
@@ -1261,11 +1298,14 @@ async def create_alert_once(company_id: str, alert_type: str, entity_type: str, 
 
 async def _vehicle_km_per_day(company_id: str, vehicle_id: str):
     """Estima km/día promedio a partir de viajes completados de la unidad. None si no es calculable."""
-    trips = await db.trips.find({
-        "company_id": company_id,
-        "tracto_id": vehicle_id,
-        "status": "completado",
-    }, {"_id": 0, "km_start": 1, "km_end": 1, "start_date": 1, "end_date": 1}).sort("end_date", -1).to_list(50)
+    async with db_pg.tx({"company_id": company_id}) as conn:
+        trips = db_pg.rows_to_api(await conn.fetch(
+            "select km_start, km_end, start_date, end_date from trips "
+            "where company_id = $1 and tracto_id = $2 "
+            "and status = 'completado'::trip_status "
+            "order by end_date desc nulls last limit 50",
+            db_pg.as_uuid(company_id), db_pg.as_uuid(vehicle_id),
+        ))
     total_km = 0.0
     total_days = 0.0
     for t in trips:
@@ -1485,7 +1525,7 @@ async def apply_odometer_update(company_id: str, vehicle_id: str, new_odometer, 
 async def check_viatico_alert(company_id: str, trip_id: str):
     """Crea alerta viatico_low si (viatico_budget - total_expenses) < viatico_por_viaje."""
     try:
-        trip = await db.trips.find_one({"id": trip_id, "company_id": company_id}, {"_id": 0})
+        trip = await _viaje_pg(company_id, trip_id)
         if not trip:
             return
         config = await _company_config(company_id)
@@ -1647,10 +1687,13 @@ async def run_maintenance_sweep():
         except Exception as e:
             logging.error(f"sweep vehicles error ({cid}): {e}")
         try:
-            trips = await db.trips.find(
-                {"company_id": cid, "status": {"$in": ["en_curso", "programado", "checklist_pendiente"]}},
-                {"_id": 0, "id": 1}
-            ).to_list(1000)
+            async with db_pg.tx({"company_id": cid}) as conn:
+                trips = db_pg.rows_to_api(await conn.fetch(
+                    "select id from trips where company_id = $1 "
+                    "and status = any($2::trip_status[]) limit 1000",
+                    db_pg.as_uuid(cid),
+                    ["en_curso", "programado", "checklist_pendiente"],
+                ))
             for t in trips:
                 await check_viatico_alert(cid, t["id"])
         except Exception as e:
@@ -2121,8 +2164,8 @@ async def get_company_stats(company_id: str, current_user: dict = Depends(get_cu
     stats = {
         "users": await _contar_usuarios(company_id),
         "vehicles": await _contar_vehiculos(company_id),
-        "trips": await db.trips.count_documents({"company_id": company_id}),
-        "active_trips": await db.trips.count_documents({"company_id": company_id, "status": "en_curso"}),
+        "trips": await _contar_viajes(company_id),
+        "active_trips": await _contar_viajes(company_id, "en_curso"),
         "work_orders": await db.work_orders.count_documents({"company_id": company_id}),
         "open_work_orders": await db.work_orders.count_documents({"company_id": company_id, "status": {"$ne": "completada"}}),
     }
@@ -2246,6 +2289,49 @@ async def delete_vehicle(vehicle_id: str, current_user: dict = Depends(require_r
     
     return {"message": "Vehículo eliminado"}
 
+# ============== TABLAS EN POSTGRES: VIAJES ==============
+# trips, couplings, units y routes ya cortaron (migracion 007). Ninguna FK
+# suya sale hacia Mongo: todas apuntan a companies, users, vehicles o entre
+# ellas mismas, y esas ya estaban en Postgres.
+#
+# checklist_id y settlement_id van sin FK a proposito: checklists y settlements
+# siguen en Mongo, asi que la fila destino no existe aca.
+
+TRIP_COLS = {
+    "id": "uuid", "company_id": "uuid", "trip_number": "text",
+    "tracto_id": "uuid", "carreta_id": "uuid", "driver_id": "uuid",
+    "route_id": "uuid", "client_name": "text", "cargo_description": "text",
+    "cargo_weight": "float", "status": "enum:trip_status",
+    "is_round_trip": "bool", "scheduled_date": "ts",
+    "start_date": "ts", "end_date": "ts", "km_start": "int", "km_end": "int",
+    "total_advance": "float", "total_expenses": "float",
+    "checklist_id": "uuid", "checklist_approved": "bool",
+    "checklist_result": "text", "settlement_id": "uuid",
+    "settlement_status": "text",
+    "viatico_budget": "float", "viatico_days": "int", "viatico_daily": "float",
+    "notes": "text", "created_at": "ts", "updated_at": "ts", "created_by": "uuid",
+}
+
+COUPLING_COLS = {
+    "id": "uuid", "company_id": "uuid", "tracto_id": "uuid",
+    "carreta_id": "uuid", "trip_id": "uuid",
+    "start_date": "ts", "end_date": "ts", "created_by": "uuid",
+}
+
+UNIT_COLS = {
+    "id": "uuid", "company_id": "uuid", "tracto_id": "uuid",
+    "carreta_id": "uuid", "driver_id": "uuid", "status": "text",
+    "epp_items": "json", "active": "bool",
+    "created_at": "ts", "updated_at": "ts", "created_by": "uuid",
+}
+
+ROUTE_COLS = {
+    "id": "uuid", "company_id": "uuid", "name": "text", "origin": "text",
+    "destination": "text", "distance_km": "float",
+    "estimated_hours": "float", "toll_cost": "float", "created_at": "ts",
+}
+
+
 # ============== TABLA EN POSTGRES: VEHICULOS ==============
 # vehicles ya corto (db/migrations/006_corte_vehicles.sql). Es la tabla mas
 # referenciada del modelo operativo, pero sus cuatro FKs apuntan a companies,
@@ -2361,17 +2447,13 @@ async def set_viatico_budget(trip_id: str, request: dict = Body(...), current_us
         days = 1
     daily = round(budget / days, 2)
 
-    result = await db.trips.update_one(
-        {"id": trip_id, "company_id": current_user["company_id"]},
-        {"$set": {
-            "viatico_budget": budget,
-            "viatico_days": days,
-            "viatico_daily": daily,
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        }}
+    # _actualizar_viaje pone updated_at y devuelve False si el viaje no existe,
+    # que es lo que antes decia matched_count == 0.
+    actualizado = await _actualizar_viaje(
+        current_user["company_id"], trip_id,
+        {"viatico_budget": budget, "viatico_days": days, "viatico_daily": daily},
     )
-
-    if result.matched_count == 0:
+    if not actualizado:
         raise HTTPException(status_code=404, detail="Viaje no encontrado")
 
     return {"message": "Presupuesto de viáticos asignado", "daily": daily}
@@ -2390,7 +2472,9 @@ async def create_coupling(request: dict = Body(...), current_user: dict = Depend
     doc = coupling.model_dump()
     doc["start_date"] = doc["start_date"].isoformat()
     
-    await db.couplings.insert_one(doc)
+    sql, values = db_pg.build_insert("couplings", COUPLING_COLS, doc)
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(sql, *values)
     return {"id": coupling.id, "message": "Enganche registrado"}
 
 @api_router.get("/couplings")
@@ -2398,17 +2482,26 @@ async def get_couplings(
     vehicle_id: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
-    query = {"company_id": current_user["company_id"]}
-    if vehicle_id:
-        query["$or"] = [{"tracto_id": vehicle_id}, {"carreta_id": vehicle_id}]
-    
-    couplings = await db.couplings.find(query, {"_id": 0}).sort("start_date", -1).to_list(100)
-    return [serialize_doc(c) for c in couplings]
+    # Filtros repite el mismo $n en las dos ramas del or: un solo parametro
+    # comparado contra las dos columnas, que es lo que hacia el $or de Mongo.
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(current_user["company_id"]))
+    f.si(vehicle_id, "(tracto_id = $? or carreta_id = $?)", db_pg.as_uuid(vehicle_id))
+    async with db_pg.tx(current_user) as conn:
+        couplings = db_pg.rows_to_api(await conn.fetch(
+            "select * from couplings where " + f.where
+            + " order by start_date desc nulls last limit 100",
+            *f.values,
+        ))
+    return couplings
 
 @api_router.put("/couplings/{coupling_id}")
 async def update_coupling(coupling_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """Actualiza un enganche. Se usa para DESACOPLAR (enviar end_date)."""
-    coupling = await db.couplings.find_one({"id": coupling_id, "company_id": current_user["company_id"]})
+    async with db_pg.tx(current_user) as conn:
+        coupling = db_pg.to_api(await conn.fetchrow(
+            "select * from couplings where id = $1 and company_id = $2",
+            db_pg.as_uuid(coupling_id), db_pg.as_uuid(current_user["company_id"]),
+        ))
     if not coupling:
         raise HTTPException(status_code=404, detail="Enganche no encontrado")
 
@@ -2423,10 +2516,12 @@ async def update_coupling(coupling_id: str, request: dict = Body(...), current_u
     if not update_data:
         update_data["end_date"] = datetime.now(timezone.utc).isoformat()
 
-    await db.couplings.update_one(
-        {"id": coupling_id, "company_id": current_user["company_id"]},
-        {"$set": update_data},
-    )
+    update_data["id"] = coupling_id
+    update_data["company_id"] = current_user["company_id"]
+    sql, values = db_pg.build_update("couplings", COUPLING_COLS, update_data, ["id", "company_id"])
+    async with db_pg.tx(current_user) as conn:
+        if sql:
+            await conn.execute(sql, *values)
     return {"id": coupling_id, "message": "Enganche actualizado"}
 
 # ============== DOCUMENT TYPE ROUTES ==============
@@ -2663,11 +2758,12 @@ async def resolve_block(block_id: str, request: dict = Body(...), current_user: 
 # ============== ROUTE ROUTES ==============
 @api_router.get("/routes")
 async def get_routes(current_user: dict = Depends(get_current_user)):
-    routes = await db.routes.find(
-        {"company_id": current_user["company_id"]},
-        {"_id": 0}
-    ).to_list(500)
-    return [serialize_doc(r) for r in routes]
+    async with db_pg.tx(current_user) as conn:
+        routes = db_pg.rows_to_api(await conn.fetch(
+            "select * from routes where company_id = $1 limit 500",
+            db_pg.as_uuid(current_user["company_id"]),
+        ))
+    return routes
 
 @api_router.post("/routes")
 async def create_route(request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "operaciones"))):
@@ -2685,7 +2781,9 @@ async def create_route(request: dict = Body(...), current_user: dict = Depends(r
     doc = route.model_dump()
     doc["created_at"] = doc["created_at"].isoformat()
     
-    await db.routes.insert_one(doc)
+    sql, values = db_pg.build_insert("routes", ROUTE_COLS, doc)
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(sql, *values)
     return {"id": route.id, "message": "Ruta creada"}
 
 # ============== TRIP ROUTES ==============
@@ -2695,25 +2793,28 @@ async def get_trips(
     driver_id: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
-    query = {"company_id": current_user["company_id"]}
-    if status:
-        query["status"] = status
-    if driver_id:
-        query["driver_id"] = driver_id
-    
-    # If driver, only show their trips
+    # El chofer ve solo los suyos: pisa el driver_id que haya pedido, igual que
+    # hacia el query de Mongo al reasignar la clave.
     if current_user["role"] == "chofer":
-        query["driver_id"] = current_user["id"]
-    
-    trips = await db.trips.find(query, {"_id": 0}).sort("scheduled_date", -1).to_list(1000)
-    return [serialize_doc(t) for t in trips]
+        driver_id = current_user["id"]
+
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(current_user["company_id"]))
+    # status::text y no un cast a trip_status: el valor lo elige el cliente, y
+    # uno que no exista en el enum haria fallar el cast con un 500. Comparando
+    # como texto un status desconocido devuelve lista vacia, igual que Mongo.
+    f.si(status, "status::text = $?", status)
+    f.si(driver_id, "driver_id = $?", db_pg.as_uuid(driver_id))
+    async with db_pg.tx(current_user) as conn:
+        trips = db_pg.rows_to_api(await conn.fetch(
+            "select * from trips where " + f.where
+            + " order by scheduled_date desc nulls last limit 1000",
+            *f.values,
+        ))
+    return trips
 
 @api_router.get("/trips/{trip_id}")
 async def get_trip(trip_id: str, current_user: dict = Depends(get_current_user)):
-    trip = await db.trips.find_one(
-        {"id": trip_id, "company_id": current_user["company_id"]},
-        {"_id": 0}
-    )
+    trip = await _viaje_pg(current_user["company_id"], trip_id)
     if not trip:
         raise HTTPException(status_code=404, detail="Viaje no encontrado")
     return serialize_doc(trip)
@@ -2732,7 +2833,7 @@ async def create_trip(request: CreateTripRequest, current_user: dict = Depends(r
         raise HTTPException(status_code=400, detail="; ".join(validation["errors"]))
     
     # Generate trip number
-    count = await db.trips.count_documents({"company_id": current_user["company_id"]})
+    count = await _contar_viajes(current_user["company_id"])
     trip_number = f"VJ-{count + 1:05d}"
     
     trip = Trip(
@@ -2751,12 +2852,9 @@ async def create_trip(request: CreateTripRequest, current_user: dict = Depends(r
         created_by=current_user["id"]
     )
     
-    doc = trip.model_dump()
-    for key, value in doc.items():
-        if isinstance(value, datetime):
-            doc[key] = value.isoformat()
-    
-    await db.trips.insert_one(doc)
+    sql, values = db_pg.build_insert("trips", TRIP_COLS, _modelo_a_fila(trip.model_dump()))
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(sql, *values)
     
     # Create coupling record if carreta assigned
     if request.carreta_id:
@@ -2769,7 +2867,9 @@ async def create_trip(request: CreateTripRequest, current_user: dict = Depends(r
         )
         coupling_doc = coupling.model_dump()
         coupling_doc["start_date"] = coupling_doc["start_date"].isoformat()
-        await db.couplings.insert_one(coupling_doc)
+        sql, values = db_pg.build_insert("couplings", COUPLING_COLS, coupling_doc)
+        async with db_pg.tx(current_user) as conn:
+            await conn.execute(sql, *values)
 
     # Notificar (push + notification) al chofer asignado
     if request.driver_id:
@@ -2792,10 +2892,7 @@ async def update_trip(trip_id: str, request: dict = Body(...), current_user: dic
     request.pop("company_id", None)
     request["updated_at"] = datetime.now(timezone.utc).isoformat()
     
-    result = await db.trips.update_one(
-        {"id": trip_id, "company_id": current_user["company_id"]},
-        {"$set": request}
-    )
+    existe_viaje = await _actualizar_viaje(current_user["company_id"], trip_id, request)
     
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Viaje no encontrado")
@@ -2806,20 +2903,24 @@ async def update_trip(trip_id: str, request: dict = Body(...), current_user: dic
 async def delete_trip(trip_id: str, current_user: dict = Depends(require_roles("owner", "admin"))):
     
     # Check if trip is in progress
-    trip = await db.trips.find_one({"id": trip_id, "company_id": current_user["company_id"]})
+    trip = await _viaje_pg(current_user["company_id"], trip_id)
     if not trip:
         raise HTTPException(status_code=404, detail="Viaje no encontrado")
     
     if trip.get("status") == "en_curso":
         raise HTTPException(status_code=400, detail="No se puede eliminar un viaje en curso")
     
-    await db.trips.delete_one({"id": trip_id, "company_id": current_user["company_id"]})
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(
+            "delete from trips where id = $1 and company_id = $2",
+            db_pg.as_uuid(trip_id), db_pg.as_uuid(current_user["company_id"]),
+        )
     
     return {"message": "Viaje eliminado"}
 
 @api_router.post("/trips/{trip_id}/start")
 async def start_trip(trip_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
-    trip = await db.trips.find_one({"id": trip_id, "company_id": current_user["company_id"]})
+    trip = await _viaje_pg(current_user["company_id"], trip_id)
     if not trip:
         raise HTTPException(status_code=404, detail="Viaje no encontrado")
     
@@ -2849,14 +2950,11 @@ async def start_trip(trip_id: str, request: dict = Body(...), current_user: dict
             detail=f"El kilometraje inicial ({km_start}) no puede ser menor al odómetro del vehículo ({veh_odo})"
         )
 
-    await db.trips.update_one(
-        {"id": trip_id},
-        {"$set": {
-            "status": TripStatus.EN_CURSO.value,
-            "start_date": datetime.now(timezone.utc).isoformat(),
-            "km_start": km_start
-        }}
-    )
+    await _actualizar_viaje(current_user["company_id"], trip_id, {
+        "status": TripStatus.EN_CURSO.value,
+        "start_date": datetime.now(timezone.utc),
+        "km_start": km_start,
+    })
     
     # Update vehicle status
     cid = current_user["company_id"]
@@ -2881,7 +2979,7 @@ async def start_trip(trip_id: str, request: dict = Body(...), current_user: dict
 
 @api_router.post("/trips/{trip_id}/complete")
 async def complete_trip(trip_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
-    trip = await db.trips.find_one({"id": trip_id, "company_id": current_user["company_id"]})
+    trip = await _viaje_pg(current_user["company_id"], trip_id)
     if not trip:
         raise HTTPException(status_code=404, detail="Viaje no encontrado")
 
@@ -2904,7 +3002,7 @@ async def complete_trip(trip_id: str, request: dict = Body(...), current_user: d
             )
         trip_set["km_end"] = km_end
 
-    await db.trips.update_one({"id": trip_id}, {"$set": trip_set})
+    await _actualizar_viaje(current_user["company_id"], trip_id, trip_set)
 
     # Update vehicle status
     cid = current_user["company_id"]
@@ -2923,19 +3021,20 @@ async def complete_trip(trip_id: str, request: dict = Body(...), current_user: d
 
     # Close coupling
     if trip.get("carreta_id"):
-        await db.couplings.update_one(
-            {"trip_id": trip_id, "end_date": None},
-            {"$set": {"end_date": datetime.now(timezone.utc).isoformat()}}
-        )
+        # Cierra el enganche abierto de este viaje (el que no tiene fin).
+        async with db_pg.tx(current_user) as conn:
+            await conn.execute(
+                "update couplings set end_date = now() "
+                "where trip_id = $1 and company_id = $2 and end_date is null",
+                db_pg.as_uuid(trip_id), db_pg.as_uuid(current_user["company_id"]),
+            )
 
     return {"message": "Viaje completado"}
 
 @api_router.get("/trips/{trip_id}/viatico-status")
 async def get_trip_viatico_status(trip_id: str, current_user: dict = Depends(get_current_user)):
     """Estado de viáticos del viaje: presupuesto, gastado, remanente y bandera de alerta."""
-    trip = await db.trips.find_one(
-        {"id": trip_id, "company_id": current_user["company_id"]}, {"_id": 0}
-    )
+    trip = await _viaje_pg(current_user["company_id"], trip_id)
     if not trip:
         raise HTTPException(status_code=404, detail="Viaje no encontrado")
     config = await _company_config(current_user["company_id"])
@@ -2982,10 +3081,15 @@ async def create_trip_advance(trip_id: str, request: dict = Body(...), current_u
     await db.trip_advances.insert_one(doc)
     
     # Update trip total
-    await db.trips.update_one(
-        {"id": trip_id},
-        {"$inc": {"total_advance": request["amount"]}}
-    )
+    # $inc de Mongo -> suma en la propia base: leerlo y reescribirlo desde
+    # Python abriria una carrera entre dos adelantos simultaneos.
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(
+            "update trips set total_advance = total_advance + $1, updated_at = now() "
+            "where id = $2 and company_id = $3",
+            _to_float(request["amount"]),
+            db_pg.as_uuid(trip_id), db_pg.as_uuid(current_user["company_id"]),
+        )
     
     return {"id": advance.id, "message": "Anticipo registrado"}
 
@@ -3020,10 +3124,13 @@ async def create_trip_expense(trip_id: str, request: dict = Body(...), current_u
     await db.trip_expenses.insert_one(doc)
 
     # Update trip total
-    await db.trips.update_one(
-        {"id": trip_id},
-        {"$inc": {"total_expenses": request["amount"]}}
-    )
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(
+            "update trips set total_expenses = total_expenses + $1, updated_at = now() "
+            "where id = $2 and company_id = $3",
+            _to_float(request["amount"]),
+            db_pg.as_uuid(trip_id), db_pg.as_uuid(current_user["company_id"]),
+        )
 
     # Alerta de viáticos bajos si corresponde
     await check_viatico_alert(current_user["company_id"], trip_id)
@@ -3065,9 +3172,9 @@ async def create_checklist(request: dict = Body(...), current_user: dict = Depen
     
     # If result is OK, approve checklist on trip
     if request.get("result") == "ok":
-        await db.trips.update_one(
-            {"id": request["trip_id"]},
-            {"$set": {"checklist_id": checklist.id, "checklist_approved": True}}
+        await _actualizar_viaje(
+            current_user["company_id"], request["trip_id"],
+            {"checklist_id": checklist.id, "checklist_approved": True},
         )
     
     return {"id": checklist.id, "message": "Checklist creado"}
@@ -3174,10 +3281,13 @@ async def create_fuel_load(request: dict = Body(...), current_user: dict = Depen
             if isinstance(value, datetime):
                 exp_doc[key] = value.isoformat()
         await db.trip_expenses.insert_one(exp_doc)
-        await db.trips.update_one(
-            {"id": trip_id, "company_id": current_user["company_id"]},
-            {"$inc": {"total_expenses": load.total_amount}}
-        )
+        async with db_pg.tx(current_user) as conn:
+            await conn.execute(
+                "update trips set total_expenses = total_expenses + $1, updated_at = now() "
+                "where id = $2 and company_id = $3",
+                _to_float(load.total_amount),
+                db_pg.as_uuid(trip_id), db_pg.as_uuid(current_user["company_id"]),
+            )
         await check_viatico_alert(current_user["company_id"], trip_id)
 
     # Actualizar odómetro del vehículo (max) y disparar checks de mantenimiento/llanta
@@ -4077,7 +4187,7 @@ async def start_checklist(request: dict = Body(...), current_user: dict = Depend
     trip_id = request["trip_id"]
     
     # Get trip
-    trip = await db.trips.find_one({"id": trip_id, "company_id": current_user["company_id"]})
+    trip = await _viaje_pg(current_user["company_id"], trip_id)
     if not trip:
         raise HTTPException(status_code=404, detail="Viaje no encontrado")
     
@@ -4114,9 +4224,9 @@ async def start_checklist(request: dict = Body(...), current_user: dict = Depend
     await db.checklist_runs.insert_one(doc)
     
     # Update trip
-    await db.trips.update_one(
-        {"id": trip_id},
-        {"$set": {"checklist_id": checklist.id, "status": "checklist_pendiente"}}
+    await _actualizar_viaje(
+        current_user["company_id"], trip_id,
+        {"checklist_id": checklist.id, "status": "checklist_pendiente"},
     )
     
     return {"id": checklist.id, "message": "Checklist iniciado"}
@@ -4175,13 +4285,10 @@ async def submit_checklist(checklist_id: str, request: dict = Body(...), current
     )
     
     # Update trip
-    await db.trips.update_one(
-        {"id": checklist["trip_id"]},
-        {"$set": {
-            "checklist_result": result,
-            "status": "programado" if result != "critico" else "checklist_pendiente"
-        }}
-    )
+    await _actualizar_viaje(current_user["company_id"], checklist["trip_id"], {
+        "checklist_result": result,
+        "status": "programado" if result != "critico" else "checklist_pendiente",
+    })
     
     # Create issue if critical
     if result == "critico":
@@ -4228,7 +4335,7 @@ async def submit_checklist(checklist_id: str, request: dict = Body(...), current
 async def submit_trip_checklist(trip_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """Submit a complete checklist for a trip (combines start and submit)"""
     # Get trip
-    trip = await db.trips.find_one({"id": trip_id, "company_id": current_user["company_id"]})
+    trip = await _viaje_pg(current_user["company_id"], trip_id)
     if not trip:
         raise HTTPException(status_code=404, detail="Viaje no encontrado")
     
@@ -4288,15 +4395,12 @@ async def submit_trip_checklist(trip_id: str, request: dict = Body(...), current
     )
     
     # Update trip
-    await db.trips.update_one(
-        {"id": trip_id},
-        {"$set": {
-            "checklist_id": checklist_id,
-            "checklist_result": result,
-            "km_start": request.get("km_start"),
-            "status": "programado" if result != "critico" else "checklist_pendiente"
-        }}
-    )
+    await _actualizar_viaje(current_user["company_id"], trip_id, {
+        "checklist_id": checklist_id,
+        "checklist_result": result,
+        "km_start": request.get("km_start"),
+        "status": "programado" if result != "critico" else "checklist_pendiente",
+    })
     
     # If critical, create an issue
     if result == "critico":
@@ -4347,7 +4451,7 @@ async def get_trip_settlement(trip_id: str, current_user: dict = Depends(get_cur
 @api_router.post("/trips/{trip_id}/settlement")
 async def create_or_update_settlement(trip_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """Create or update settlement for a trip"""
-    trip = await db.trips.find_one({"id": trip_id, "company_id": current_user["company_id"]})
+    trip = await _viaje_pg(current_user["company_id"], trip_id)
     if not trip:
         raise HTTPException(status_code=404, detail="Viaje no encontrado")
     
@@ -4400,9 +4504,9 @@ async def create_or_update_settlement(trip_id: str, request: dict = Body(...), c
                 doc[k] = v.isoformat()
         await db.settlements.insert_one(doc)
         
-        await db.trips.update_one(
-            {"id": trip_id},
-            {"$set": {"settlement_id": settlement.id, "settlement_status": "pendiente"}}
+        await _actualizar_viaje(
+            current_user["company_id"], trip_id,
+            {"settlement_id": settlement.id, "settlement_status": "pendiente"},
         )
         
         return {"id": settlement.id, "message": "Liquidación creada"}
@@ -4432,9 +4536,8 @@ async def close_settlement(settlement_id: str, request: dict = Body(...), curren
     )
     
     # Update trip
-    await db.trips.update_one(
-        {"id": settlement["trip_id"]},
-        {"$set": {"settlement_status": "cerrado"}}
+    await _actualizar_viaje(
+        current_user["company_id"], settlement["trip_id"], {"settlement_status": "cerrado"}
     )
     
     # Audit log
@@ -5554,9 +5657,9 @@ async def get_dashboard_kpis(current_user: dict = Depends(get_current_user)):
     in_maintenance = await _contar_vehiculos(company_id, "en_mantenimiento")
     
     # Count trips by status
-    total_trips = await db.trips.count_documents({"company_id": company_id})
-    active_trips = await db.trips.count_documents({"company_id": company_id, "status": "en_curso"})
-    completed_trips = await db.trips.count_documents({"company_id": company_id, "status": "completado"})
+    total_trips = await _contar_viajes(company_id)
+    active_trips = await _contar_viajes(company_id, "en_curso")
+    completed_trips = await _contar_viajes(company_id, "completado")
     
     # Count drivers
     total_drivers = await _contar_usuarios(company_id, "chofer")
@@ -5618,10 +5721,12 @@ async def get_recent_activity(current_user: dict = Depends(get_current_user)):
     company_id = current_user["company_id"]
     
     # Get recent trips
-    recent_trips = await db.trips.find(
-        {"company_id": company_id},
-        {"_id": 0}
-    ).sort("created_at", -1).limit(5).to_list(5)
+    async with db_pg.tx(current_user) as conn:
+        recent_trips = db_pg.rows_to_api(await conn.fetch(
+            "select * from trips where company_id = $1 "
+            "order by created_at desc nulls last limit 5",
+            db_pg.as_uuid(company_id),
+        ))
     
     # Get recent alerts
     recent_alerts = await db.alerts.find(
@@ -6310,9 +6415,11 @@ async def seed_demo_data(_: bool = Depends(require_install_token)):
             estimated_hours=r["estimated_hours"],
             toll_cost=r["toll_cost"]
         )
-        route_doc = route.model_dump()
-        route_doc["created_at"] = route_doc["created_at"].isoformat()
-        await db.routes.insert_one(route_doc)
+        sql, values = db_pg.build_insert(
+            "routes", ROUTE_COLS, _modelo_a_fila(route.model_dump())
+        )
+        async with db_pg.tx({"company_id": company.id}) as conn:
+            await conn.execute(sql, *values)
         route_ids.append(route.id)
     
     # Create some tires
@@ -6352,11 +6459,11 @@ async def seed_demo_data(_: bool = Depends(require_install_token)):
         status=TripStatus.PROGRAMADO,
         scheduled_date=datetime.now(timezone.utc) + timedelta(days=1)
     )
-    trip_doc = trip.model_dump()
-    for key, value in trip_doc.items():
-        if isinstance(value, datetime):
-            trip_doc[key] = value.isoformat()
-    await db.trips.insert_one(trip_doc)
+    sql, values = db_pg.build_insert(
+        "trips", TRIP_COLS, _modelo_a_fila(trip.model_dump())
+    )
+    async with db_pg.tx({"company_id": company.id}) as conn:
+        await conn.execute(sql, *values)
     
     return {
         "message": "Demo data created successfully",
@@ -6390,17 +6497,20 @@ async def get_trips_report(
     current_user: dict = Depends(get_current_user)
 ):
     """Get trips report data"""
-    query = {"company_id": current_user["company_id"]}
-    if start_date:
-        query["scheduled_date"] = {"$gte": start_date}
-    if end_date:
-        query.setdefault("scheduled_date", {})["$lte"] = end_date
-    if status:
-        query["status"] = status
-    if driver_id:
-        query["driver_id"] = driver_id
-    
-    trips = await db.trips.find(query, {"_id": 0}).sort("scheduled_date", -1).to_list(500)
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(current_user["company_id"]))
+    f.si(start_date, "scheduled_date >= $?", db_pg.as_ts(start_date))
+    f.si(end_date, "scheduled_date <= $?", db_pg.as_ts(end_date))
+    # status::text y no un cast a trip_status: el valor lo elige el cliente, y
+    # uno que no exista en el enum haria fallar el cast con un 500. Comparando
+    # como texto un status desconocido devuelve lista vacia, igual que Mongo.
+    f.si(status, "status::text = $?", status)
+    f.si(driver_id, "driver_id = $?", db_pg.as_uuid(driver_id))
+    async with db_pg.tx(current_user) as conn:
+        trips = db_pg.rows_to_api(await conn.fetch(
+            "select * from trips where " + f.where
+            + " order by scheduled_date desc nulls last limit 500",
+            *f.values,
+        ))
     
     # Enrich with driver and vehicle info
     for trip in trips:
@@ -6432,13 +6542,15 @@ async def export_trips_excel(
     current_user: dict = Depends(get_current_user)
 ):
     """Export trips report to Excel"""
-    query = {"company_id": current_user["company_id"]}
-    if start_date:
-        query["scheduled_date"] = {"$gte": start_date}
-    if end_date:
-        query.setdefault("scheduled_date", {})["$lte"] = end_date
-    
-    trips = await db.trips.find(query, {"_id": 0}).sort("scheduled_date", -1).to_list(500)
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(current_user["company_id"]))
+    f.si(start_date, "scheduled_date >= $?", db_pg.as_ts(start_date))
+    f.si(end_date, "scheduled_date <= $?", db_pg.as_ts(end_date))
+    async with db_pg.tx(current_user) as conn:
+        trips = db_pg.rows_to_api(await conn.fetch(
+            "select * from trips where " + f.where
+            + " order by scheduled_date desc nulls last limit 500",
+            *f.values,
+        ))
     
     # Create Excel workbook
     wb = openpyxl.Workbook()
@@ -6505,7 +6617,7 @@ async def export_trips_excel(
 @api_router.get("/reports/settlements/export/pdf/{trip_id}")
 async def export_settlement_pdf(trip_id: str, current_user: dict = Depends(get_current_user)):
     """Export settlement to PDF"""
-    trip = await db.trips.find_one({"id": trip_id, "company_id": current_user["company_id"]}, {"_id": 0})
+    trip = await _viaje_pg(current_user["company_id"], trip_id)
     if not trip:
         raise HTTPException(status_code=404, detail="Viaje no encontrado")
     
@@ -6668,10 +6780,13 @@ async def get_fuel_report(
     trip_ids = list({l.get("trip_id") for l in loads if l.get("trip_id")})
     trips_map = {}
     if trip_ids:
-        trips = await db.trips.find(
-            {"company_id": current_user["company_id"], "id": {"$in": trip_ids}},
-            {"_id": 0, "id": 1, "driver_id": 1}
-        ).to_list(1000)
+        async with db_pg.tx(current_user) as conn:
+            trips = db_pg.rows_to_api(await conn.fetch(
+                "select id, driver_id from trips "
+                "where company_id = $1 and id = any($2::uuid[]) limit 1000",
+                db_pg.as_uuid(current_user["company_id"]),
+                [u for u in (db_pg.as_uuid(t) for t in trip_ids) if u],
+            ))
         trips_map = {t["id"]: t.get("driver_id") for t in trips}
 
     by_driver = {}
@@ -7288,6 +7403,21 @@ def _date_range_query(field: str, date_from: Optional[str], date_to: Optional[st
     return {field: cond} if cond else {}
 
 
+def _rango_fechas_pg(f, columna, desde, hasta):
+    """Version SQL de _date_range_query: agrega el rango a un db_pg.Filtros.
+
+    Conserva la misma regla que la de Mongo: si `hasta` viene como fecha sola
+    (10 caracteres) el limite se estira al final de ese dia, para que el filtro
+    siga siendo inclusivo.
+    """
+    if desde:
+        f.agregar(columna + " >= $?", db_pg.as_ts(desde))
+    if hasta:
+        limite = hasta if len(hasta) > 10 else hasta + "T23:59:59.999999"
+        f.agregar(columna + " <= $?", db_pg.as_ts(limite))
+    return f
+
+
 @api_router.get("/reports/cost-per-km")
 async def get_cost_per_km_report(
     vehicle_id: Optional[str] = None,
@@ -7337,9 +7467,14 @@ async def get_cost_per_km_report(
         for wo in work_orders:
             if wo.get("odometer_at_service"):
                 readings.append(wo["odometer_at_service"])
-        tq = {"company_id": company_id, "$or": [{"tracto_id": vid}, {"carreta_id": vid}]}
-        tq.update(_date_range_query("scheduled_date", from_, to))
-        trips = await db.trips.find(tq, {"_id": 0, "km_start": 1, "km_end": 1}).to_list(2000)
+        f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(company_id))
+        f.agregar("(tracto_id = $? or carreta_id = $?)", db_pg.as_uuid(vid))
+        _rango_fechas_pg(f, "scheduled_date", from_, to)
+        async with db_pg.tx(current_user) as conn:
+            trips = db_pg.rows_to_api(await conn.fetch(
+                "select km_start, km_end from trips where " + f.where + " limit 2000",
+                *f.values,
+            ))
         for t in trips:
             if t.get("km_start"):
                 readings.append(t["km_start"])
@@ -7451,11 +7586,13 @@ async def get_viaticos_report(
     """Consolidado de viáticos por chofer: presupuesto, gastado, saldo, viajes."""
     company_id = current_user["company_id"]
 
-    tq = {"company_id": company_id}
-    if driver_id:
-        tq["driver_id"] = driver_id
-    tq.update(_date_range_query("scheduled_date", from_, to))
-    trips = await db.trips.find(tq, {"_id": 0}).to_list(5000)
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(company_id))
+    f.si(driver_id, "driver_id = $?", db_pg.as_uuid(driver_id))
+    _rango_fechas_pg(f, "scheduled_date", from_, to)
+    async with db_pg.tx(current_user) as conn:
+        trips = db_pg.rows_to_api(await conn.fetch(
+            "select * from trips where " + f.where + " limit 5000", *f.values,
+        ))
 
     by_driver = {}
     for t in trips:
@@ -7541,10 +7678,15 @@ async def get_units(
     current_user: dict = Depends(get_current_user)
 ):
     """Lista de unidades con placas y chofer resueltos."""
-    query = {"company_id": current_user["company_id"]}
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(current_user["company_id"]))
     if not include_inactive:
-        query["active"] = True
-    units = await db.units.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
+        f.crudo("active")
+    async with db_pg.tx(current_user) as conn:
+        units = db_pg.rows_to_api(await conn.fetch(
+            "select * from units where " + f.where
+            + " order by created_at desc nulls last limit 1000",
+            *f.values,
+        ))
     return [await _resolve_unit(current_user["company_id"], u) for u in units]
 
 
@@ -7579,7 +7721,9 @@ async def create_unit(
     doc = unit.model_dump()
     doc["created_at"] = doc["created_at"].isoformat()
     doc["updated_at"] = doc["updated_at"].isoformat()
-    await db.units.insert_one(doc)
+    sql, values = db_pg.build_insert("units", UNIT_COLS, doc)
+    async with db_pg.tx({"company_id": company_id}) as conn:
+        await conn.execute(sql, *values)
 
     # Conveniencia: sincroniza el chofer asignado del tracto (no rompe el coupling existente)
     if request.get("driver_id"):
@@ -7598,7 +7742,11 @@ async def update_unit(
 ):
     """Actualiza una unidad."""
     company_id = current_user["company_id"]
-    existing = await db.units.find_one({"id": unit_id, "company_id": company_id}, {"_id": 0})
+    async with db_pg.tx({"company_id": company_id}) as conn:
+        existing = db_pg.to_api(await conn.fetchrow(
+            "select * from units where id = $1 and company_id = $2",
+            db_pg.as_uuid(unit_id), db_pg.as_uuid(company_id),
+        ))
     if not existing:
         raise HTTPException(status_code=404, detail="Unidad no encontrada")
 
@@ -7608,7 +7756,12 @@ async def update_unit(
             update_data[field] = request[field]
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
 
-    await db.units.update_one({"id": unit_id, "company_id": company_id}, {"$set": update_data})
+    update_data["id"] = unit_id
+    update_data["company_id"] = company_id
+    sql, values = db_pg.build_update("units", UNIT_COLS, update_data, ["id", "company_id"])
+    async with db_pg.tx({"company_id": company_id}) as conn:
+        if sql:
+            await conn.execute(sql, *values)
 
     if request.get("driver_id"):
         tracto_id = request.get("tracto_id", existing.get("tracto_id"))
@@ -7616,7 +7769,11 @@ async def update_unit(
             company_id, tracto_id, {"assigned_driver_id": request["driver_id"]}
         )
 
-    updated = await db.units.find_one({"id": unit_id, "company_id": company_id}, {"_id": 0})
+    async with db_pg.tx({"company_id": company_id}) as conn:
+        updated = db_pg.to_api(await conn.fetchrow(
+            "select * from units where id = $1 and company_id = $2",
+            db_pg.as_uuid(unit_id), db_pg.as_uuid(company_id),
+        ))
     return await _resolve_unit(company_id, updated)
 
 
@@ -7627,11 +7784,18 @@ async def delete_unit(
 ):
     """Soft-delete de una unidad (active=False)."""
     company_id = current_user["company_id"]
-    result = await db.units.update_one(
-        {"id": unit_id, "company_id": company_id},
-        {"$set": {"active": False, "status": "inactiva", "updated_at": datetime.now(timezone.utc).isoformat()}}
-    )
-    if result.matched_count == 0:
+    datos = {
+        "active": False,
+        "status": "inactiva",
+        "updated_at": datetime.now(timezone.utc),
+        "id": unit_id,
+        "company_id": company_id,
+    }
+    sql, values = db_pg.build_update("units", UNIT_COLS, datos, ["id", "company_id"])
+    async with db_pg.tx({"company_id": company_id}) as conn:
+        # returning id ocupa el lugar de matched_count: None = no existia.
+        existia = await conn.fetchval(sql + " returning id", *values)
+    if existia is None:
         raise HTTPException(status_code=404, detail="Unidad no encontrada")
     return {"message": "Unidad eliminada"}
 
@@ -8636,7 +8800,8 @@ async def create_indexes():
         # en db/schema.sql, que es donde se versionan.
         # Los indices de vehicles viven ahora en db/schema.sql y en la
         # migracion 006, que es donde se versionan.
-        await db.trips.create_index([("company_id", 1), ("status", 1)], background=True)
+        # El indice de trips ya no se crea aca: la tabla corto a Postgres y sus
+        # indices viven en db/schema.sql y en la migracion 007.
         await db.tires.create_index([("company_id", 1), ("current_vehicle_id", 1)], background=True)
         await db.documents.create_index([("company_id", 1), ("entity_id", 1)], background=True)
         logger.info("Índices de MongoDB verificados/creados")

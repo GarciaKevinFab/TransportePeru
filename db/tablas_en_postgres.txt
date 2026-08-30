@@ -44,3 +44,9 @@ purchase_orders
 
 # --- 006: Vehiculos ---
 vehicles
+
+# --- 007: Viajes, enganches, unidades y rutas ---
+trips
+couplings
+units
+routes

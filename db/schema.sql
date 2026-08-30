@@ -56,7 +56,9 @@ create type user_role as enum ('superadmin', 'owner', 'admin', 'operaciones', 'f
 create type vehicle_type as enum ('tracto', 'carreta');
 create type vehicle_status as enum ('disponible', 'en_viaje', 'en_mantenimiento', 'fuera_servicio');
 create type document_status as enum ('vigente', 'por_vencer', 'vencido', 'pendiente', 'aprobado', 'observado', 'rechazado');
-create type trip_status as enum ('programado', 'en_curso', 'completado', 'cancelado');
+-- checklist_pendiente: lo pone start_checklist y lo deja submit_checklist
+-- cuando el checklist da critico. Sin el, ese UPDATE falla (ver migracion 007).
+create type trip_status as enum ('programado', 'en_curso', 'completado', 'cancelado', 'checklist_pendiente');
 create type tire_status as enum ('nuevo', 'en_uso', 'reencauche', 'baja', 'almacen');
 create type checklist_result as enum ('pending', 'ok', 'observado', 'critico');
 create type work_order_status as enum ('abierta', 'en_proceso', 'completada', 'cancelada');
@@ -398,6 +400,10 @@ create table trips (
   checklist_approved boolean not null default false,
   total_advance double precision not null default 0,
   total_expenses double precision not null default 0,
+  -- Los escribe el flujo de checklist y liquidacion. Sin FK: checklists y
+  -- settlements siguen en Mongo (ver migracion 007)
+  checklist_result text,
+  settlement_id uuid,
   settlement_status text not null default 'pending', -- inconsistente con SettlementStatus (usa "pending" en inglés) - limpiar en la migración
   viatico_budget double precision,
   viatico_days int,

@@ -108,10 +108,13 @@ async def resolve_driver(wa_id: str) -> Optional[dict]:
 async def find_active_trips_for_driver(company_id: str, driver_id: str) -> List[dict]:
     """Viajes en_curso del chofer, más reciente primero. No existe hoy en server.py
     (GET /trips está atado a JWT y no filtra por chofer sin JWT)."""
-    return await srv.db.trips.find(
-        {"company_id": company_id, "driver_id": driver_id, "status": "en_curso"},
-        {"_id": 0},
-    ).sort("start_date", -1).to_list(10)
+    async with db_pg.tx({"company_id": company_id}) as conn:
+        return db_pg.rows_to_api(await conn.fetch(
+            "select * from trips where company_id = $1 and driver_id = $2 "
+            "and status = 'en_curso'::trip_status "
+            "order by start_date desc nulls last limit 10",
+            db_pg.as_uuid(company_id), db_pg.as_uuid(driver_id),
+        ))
 
 
 async def download_whatsapp_media(media_id: str) -> Optional[Dict[str, Any]]:
