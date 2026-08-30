@@ -31,6 +31,7 @@ import os
 import uuid as _uuid
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timezone
+from enum import Enum
 
 import asyncpg
 
@@ -277,7 +278,24 @@ _COERCERS = {
 }
 
 
+def _sin_enum(value):
+    """Un miembro de Enum -> su .value; cualquier otra cosa se devuelve igual.
+
+    Los modelos declaran los enums como `class UserRole(str, Enum)`, y de ahi
+    sale una trampa: str(UserRole.ADMIN) devuelve "UserRole.ADMIN", no "admin",
+    porque el __str__ que gana es el de Enum y no el de str. Escrito asi en una
+    columna enum, Postgres rechaza la fila entera; en una columna text se
+    guardaria la cadena basura sin que nadie se entere.
+
+    Se normaliza aca, en la unica puerta por la que pasan todos los valores que
+    se escriben, en vez de confiar en que cada llamada se acuerde de bajar sus
+    enums antes (que es justo lo que se olvido en el seed).
+    """
+    return value.value if isinstance(value, Enum) else value
+
+
 def _coerce(kind, value):
+    value = _sin_enum(value)
     if kind.startswith("enum:"):
         return None if value is None else str(value)
     return _COERCERS[kind](value)

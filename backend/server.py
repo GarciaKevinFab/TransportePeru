@@ -2890,11 +2890,10 @@ async def create_trip(request: CreateTripRequest, current_user: dict = Depends(r
 async def update_trip(trip_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     request.pop("id", None)
     request.pop("company_id", None)
-    request["updated_at"] = datetime.now(timezone.utc).isoformat()
-    
-    existe_viaje = await _actualizar_viaje(current_user["company_id"], trip_id, request)
-    
-    if result.matched_count == 0:
+
+    # updated_at lo pone _actualizar_viaje; devuelve False si el viaje no
+    # existe, que es lo que antes decia matched_count == 0.
+    if not await _actualizar_viaje(current_user["company_id"], trip_id, request):
         raise HTTPException(status_code=404, detail="Viaje no encontrado")
     
     return {"message": "Viaje actualizado"}
