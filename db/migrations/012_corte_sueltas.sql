@@ -60,6 +60,24 @@ create index if not exists matrix_plan_vehicles_vehiculo_idx
 -- server.py la escribe y la reconstruye explicitamente, de modo que la API
 -- sigue recibiendo y devolviendo la lista de siempre.
 --
+-- NOTA - la tabla puente no se recarga desde Mongo
+--
+-- maintenance_matrix_plan_vehicles NO tiene coleccion equivalente en Mongo:
+-- alli esa relacion vive dentro del array applies_to_vehicle_ids del plan. Por
+-- eso NO se la puede pasar a cutover-modulo.sh en la lista de tablas: el
+-- script solo sabe recargar tablas que existen a los dos lados, y aborta con
+-- "tablas desconocidas".
+--
+-- Y como la puente apunta al plan, tampoco se puede vaciar
+-- maintenance_matrix_plans para recargarlo. El corte se hizo en dos tandas:
+--
+--   bash scripts/cutover-modulo.sh db/migrations/012_corte_sueltas.sql --        alerts,notifications,audit_logs,vehicle_equipment
+--
+-- y el plan aparte, comprobando antes a mano que ya coincidia (mismo id a los
+-- dos lados). Si algun dia hubiera planes con vehiculos asignados en Mongo,
+-- recargarlos exigiria ademas repoblar la puente leyendo el array, que es algo
+-- que migrate_to_postgres.py hoy no hace.
+--
 -- NOTA - alerts no tiene resolved_at
 --
 -- Al resolver las alertas de alineacion el codigo escribia resolved_at, que no
