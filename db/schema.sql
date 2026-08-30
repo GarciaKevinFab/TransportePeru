@@ -66,7 +66,9 @@ create type work_order_priority as enum ('baja', 'normal', 'alta', 'critica');
 create type issue_type as enum ('incidente', 'multa', 'siniestro', 'checklist_critico', 'llanta_critica', 'otro');
 create type issue_severity as enum ('baja', 'media', 'alta', 'critica');
 create type issue_status as enum ('abierto', 'en_proceso', 'cerrado'); -- antes: str libre en Issue.status
-create type expense_category as enum ('alimentacion', 'hospedaje', 'movilidad', 'peajes', 'parqueo', 'combustible', 'otros');
+-- balanza: el pesaje en balanza de la ruta. La app del chofer ya lo ofrece
+-- como categoria propia; sin el valor, ese gasto no se puede guardar (ver 008).
+create type expense_category as enum ('alimentacion', 'hospedaje', 'movilidad', 'peajes', 'parqueo', 'combustible', 'balanza', 'otros');
 create type settlement_status as enum ('pendiente', 'en_revision', 'aprobado', 'cerrado');
 create type stock_move_type as enum ('entrada', 'salida', 'ajuste', 'consumo_ot');
 create type block_rule as enum ('bloquea_asignacion', 'bloquea_inicio', 'solo_alerta');

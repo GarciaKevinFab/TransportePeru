@@ -50,3 +50,8 @@ trips
 couplings
 units
 routes
+
+# --- 008: Cierre del viaje (detalle y total en la misma transaccion) ---
+trip_advances
+trip_expenses
+settlements

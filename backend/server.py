@@ -183,6 +183,9 @@ class ExpenseCategory(str, Enum):
     PEAJES = "peajes"
     PARQUEO = "parqueo"
     COMBUSTIBLE = "combustible"
+    # La app del chofer ya ofrecia "Ticket Balanza" y este enum no lo tenia:
+    # las tres capas (aca, el enum de Postgres y el frontend) discrepaban.
+    BALANZA = "balanza"
     OTROS = "otros"
 
 class SettlementStatus(str, Enum):
@@ -3051,14 +3054,69 @@ async def get_trip_viatico_status(trip_id: str, current_user: dict = Depends(get
         "alert": remaining < per_trip,
     }
 
+# ============== TABLAS EN POSTGRES: CIERRE DEL VIAJE ==============
+# trip_advances, trip_expenses y settlements cortaron con la migracion 008.
+# Van juntas y con trips porque el detalle y el total del viaje tienen que
+# escribirse en la misma transaccion: mientras el detalle vivio en Mongo y el
+# total en Postgres, un fallo a mitad dejaba el viaje con un total que no
+# cuadraba con sus gastos.
+
+TRIP_ADVANCE_COLS = {
+    "id": "uuid", "company_id": "uuid", "trip_id": "uuid",
+    "amount": "float", "payment_method": "text",
+    "delivered_date": "ts", "delivered_by": "uuid",
+    "notes": "text", "created_at": "ts",
+}
+
+TRIP_EXPENSE_COLS = {
+    "id": "uuid", "company_id": "uuid", "trip_id": "uuid",
+    "category": "enum:expense_category", "description": "text",
+    "amount": "float", "provider": "text", "ruc": "text",
+    "has_igv": "bool", "receipt_url": "text",
+    "expense_date": "ts", "created_at": "ts", "created_by": "uuid",
+}
+
+SETTLEMENT_COLS = {
+    "id": "uuid", "company_id": "uuid", "trip_id": "uuid",
+    "total_advances": "float", "total_expenses": "float",
+    "deductions": "float", "deduction_notes": "text",
+    "balance": "float", "balance_type": "enum:balance_type",
+    "status": "enum:settlement_status",
+    "reviewed_by": "uuid", "reviewed_at": "ts",
+    "closed_by": "uuid", "closed_at": "ts",
+    "notes": "text", "created_at": "ts", "updated_at": "ts",
+}
+
+# Las categorias validas se derivan del enum y no se repiten a mano, para que
+# agregar una sola valga para el modelo y para esta validacion a la vez.
+_CATEGORIAS_GASTO = {c.value for c in ExpenseCategory}
+
+
+async def _sumar_del_viaje(conn, tabla, trip_id, company_id) -> float:
+    """Suma los importes de una tabla de detalle para un viaje.
+
+    Suma en la base en vez de traerse las filas y sumarlas en Python, que es lo
+    que hacia la version Mongo. El filtro por empresa va explicito: la consulta
+    vieja buscaba solo por trip_id, sin tenant.
+    """
+    total = await conn.fetchval(
+        "select coalesce(sum(amount), 0) from " + tabla
+        + " where trip_id = $1 and company_id = $2",
+        db_pg.as_uuid(trip_id), db_pg.as_uuid(company_id),
+    )
+    return float(total or 0)
+
+
 # ============== TRIP ADVANCE/EXPENSE ROUTES ==============
 @api_router.get("/trips/{trip_id}/advances")
 async def get_trip_advances(trip_id: str, current_user: dict = Depends(get_current_user)):
-    advances = await db.trip_advances.find(
-        {"trip_id": trip_id, "company_id": current_user["company_id"]},
-        {"_id": 0}
-    ).to_list(100)
-    return [serialize_doc(a) for a in advances]
+    async with db_pg.tx(current_user) as conn:
+        advances = db_pg.rows_to_api(await conn.fetch(
+            "select * from trip_advances where trip_id = $1 and company_id = $2 "
+            "order by delivered_date desc nulls last limit 100",
+            db_pg.as_uuid(trip_id), db_pg.as_uuid(current_user["company_id"]),
+        ))
+    return advances
 
 @api_router.post("/trips/{trip_id}/advances")
 async def create_trip_advance(trip_id: str, request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "contabilidad"))):
@@ -3072,17 +3130,18 @@ async def create_trip_advance(trip_id: str, request: dict = Body(...), current_u
         notes=request.get("notes")
     )
     
-    doc = advance.model_dump()
-    for key, value in doc.items():
-        if isinstance(value, datetime):
-            doc[key] = value.isoformat()
-    
-    await db.trip_advances.insert_one(doc)
-    
-    # Update trip total
-    # $inc de Mongo -> suma en la propia base: leerlo y reescribirlo desde
-    # Python abriria una carrera entre dos adelantos simultaneos.
+    # El anticipo y el total del viaje se escriben en la MISMA transaccion: o
+    # entran los dos o ninguno. Mientras el detalle vivio en Mongo y el total en
+    # Postgres esto no se podia garantizar, y un fallo a mitad dejaba el viaje
+    # con un total que no cuadraba con sus anticipos.
+    #
+    # La suma va en la propia base (total + $1) y no leyendo-y-reescribiendo
+    # desde Python, que abriria una carrera entre dos anticipos simultaneos.
+    sql, values = db_pg.build_insert(
+        "trip_advances", TRIP_ADVANCE_COLS, _modelo_a_fila(advance.model_dump())
+    )
     async with db_pg.tx(current_user) as conn:
+        await conn.execute(sql, *values)
         await conn.execute(
             "update trips set total_advance = total_advance + $1, updated_at = now() "
             "where id = $2 and company_id = $3",
@@ -3094,14 +3153,24 @@ async def create_trip_advance(trip_id: str, request: dict = Body(...), current_u
 
 @api_router.get("/trips/{trip_id}/expenses")
 async def get_trip_expenses(trip_id: str, current_user: dict = Depends(get_current_user)):
-    expenses = await db.trip_expenses.find(
-        {"trip_id": trip_id, "company_id": current_user["company_id"]},
-        {"_id": 0}
-    ).to_list(500)
-    return [serialize_doc(e) for e in expenses]
+    async with db_pg.tx(current_user) as conn:
+        expenses = db_pg.rows_to_api(await conn.fetch(
+            "select * from trip_expenses where trip_id = $1 and company_id = $2 "
+            "order by expense_date desc nulls last limit 500",
+            db_pg.as_uuid(trip_id), db_pg.as_uuid(current_user["company_id"]),
+        ))
+    return expenses
 
 @api_router.post("/trips/{trip_id}/expenses")
 async def create_trip_expense(trip_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
+    # category va a una columna enum: una que no exista hace fallar el insert
+    # con un 500 opaco. Se valida antes para responder 400 diciendo cual es.
+    if request.get("category") not in _CATEGORIAS_GASTO:
+        raise HTTPException(
+            status_code=400,
+            detail="Categoría de gasto inválida: %r. Válidas: %s"
+                   % (request.get("category"), ", ".join(sorted(_CATEGORIAS_GASTO))),
+        )
     expense = TripExpense(
         company_id=current_user["company_id"],
         trip_id=trip_id,
@@ -3115,15 +3184,12 @@ async def create_trip_expense(trip_id: str, request: dict = Body(...), current_u
         created_by=current_user["id"]
     )
     
-    doc = expense.model_dump()
-    for key, value in doc.items():
-        if isinstance(value, datetime):
-            doc[key] = value.isoformat()
-    
-    await db.trip_expenses.insert_one(doc)
-
-    # Update trip total
+    # Gasto y total del viaje, en la misma transaccion (ver create_trip_advance).
+    sql, values = db_pg.build_insert(
+        "trip_expenses", TRIP_EXPENSE_COLS, _modelo_a_fila(expense.model_dump())
+    )
     async with db_pg.tx(current_user) as conn:
+        await conn.execute(sql, *values)
         await conn.execute(
             "update trips set total_expenses = total_expenses + $1, updated_at = now() "
             "where id = $2 and company_id = $3",
@@ -3275,12 +3341,12 @@ async def create_fuel_load(request: dict = Body(...), current_user: dict = Depen
             receipt_url=request.get("receipt_url") or request.get("invoice_photo_url"),
             created_by=current_user["id"]
         )
-        exp_doc = fuel_expense.model_dump()
-        for key, value in exp_doc.items():
-            if isinstance(value, datetime):
-                exp_doc[key] = value.isoformat()
-        await db.trip_expenses.insert_one(exp_doc)
+        sql, values = db_pg.build_insert(
+            "trip_expenses", TRIP_EXPENSE_COLS,
+            _modelo_a_fila(fuel_expense.model_dump()),
+        )
         async with db_pg.tx(current_user) as conn:
+            await conn.execute(sql, *values)
             await conn.execute(
                 "update trips set total_expenses = total_expenses + $1, updated_at = now() "
                 "where id = $2 and company_id = $3",
@@ -4433,19 +4499,25 @@ async def get_settlements(
     status: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
-    query = {"company_id": current_user["company_id"]}
-    if status:
-        query["status"] = status
-    settlements = await db.settlements.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
-    return [serialize_doc(s) for s in settlements]
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(current_user["company_id"]))
+    # status::text y no un cast al enum: el valor lo elige el cliente, y uno que
+    # no exista devuelve lista vacia -como hacia Mongo- en vez de un 500.
+    f.si(status, "status::text = $?", status)
+    async with db_pg.tx(current_user) as conn:
+        settlements = db_pg.rows_to_api(await conn.fetch(
+            "select * from settlements where " + f.where
+            + " order by created_at desc nulls last limit 500",
+            *f.values,
+        ))
+    return settlements
 
 @api_router.get("/trips/{trip_id}/settlement")
 async def get_trip_settlement(trip_id: str, current_user: dict = Depends(get_current_user)):
-    settlement = await db.settlements.find_one(
-        {"trip_id": trip_id, "company_id": current_user["company_id"]},
-        {"_id": 0}
-    )
-    return serialize_doc(settlement) if settlement else None
+    async with db_pg.tx(current_user) as conn:
+        return db_pg.to_api(await conn.fetchrow(
+            "select * from settlements where trip_id = $1 and company_id = $2",
+            db_pg.as_uuid(trip_id), db_pg.as_uuid(current_user["company_id"]),
+        ))
 
 @api_router.post("/trips/{trip_id}/settlement")
 async def create_or_update_settlement(trip_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
@@ -4454,26 +4526,28 @@ async def create_or_update_settlement(trip_id: str, request: dict = Body(...), c
     if not trip:
         raise HTTPException(status_code=404, detail="Viaje no encontrado")
     
-    # Calculate totals
-    advances = await db.trip_advances.find({"trip_id": trip_id}, {"_id": 0}).to_list(100)
-    expenses = await db.trip_expenses.find({"trip_id": trip_id}, {"_id": 0}).to_list(500)
-    
-    total_advances = sum(a.get("amount", 0) for a in advances)
-    total_expenses = sum(e.get("amount", 0) for e in expenses)
-    deductions = request.get("deductions", 0)
-    
-    balance = total_advances - total_expenses - deductions
-    balance_type = "favor_empresa" if balance >= 0 else "favor_chofer"
-    
-    existing = await db.settlements.find_one({"trip_id": trip_id})
-    
-    if existing:
-        if existing.get("status") == "cerrado":
-            raise HTTPException(status_code=400, detail="Liquidación ya cerrada")
-        
-        await db.settlements.update_one(
-            {"id": existing["id"]},
-            {"$set": {
+    cid = current_user["company_id"]
+    deductions = _to_float(request.get("deductions", 0))
+
+    # Todo el calculo y las dos escrituras van en UNA transaccion: los totales
+    # que se guardan son los que habia al leerlos, y el settlement_id del viaje
+    # no puede quedar apuntando a una liquidacion que no llego a insertarse.
+    async with db_pg.tx(current_user) as conn:
+        total_advances = await _sumar_del_viaje(conn, "trip_advances", trip_id, cid)
+        total_expenses = await _sumar_del_viaje(conn, "trip_expenses", trip_id, cid)
+
+        balance = total_advances - total_expenses - deductions
+        balance_type = "favor_empresa" if balance >= 0 else "favor_chofer"
+
+        existing = db_pg.to_api(await conn.fetchrow(
+            "select * from settlements where trip_id = $1 and company_id = $2",
+            db_pg.as_uuid(trip_id), db_pg.as_uuid(cid),
+        ))
+
+        if existing:
+            if existing.get("status") == "cerrado":
+                raise HTTPException(status_code=400, detail="Liquidación ya cerrada")
+            datos = {
                 "total_advances": total_advances,
                 "total_expenses": total_expenses,
                 "deductions": deductions,
@@ -4481,13 +4555,18 @@ async def create_or_update_settlement(trip_id: str, request: dict = Body(...), c
                 "balance": abs(balance),
                 "balance_type": balance_type,
                 "notes": request.get("notes"),
-                "updated_at": datetime.now(timezone.utc).isoformat()
-            }}
-        )
-        return {"id": existing["id"], "message": "Liquidación actualizada"}
-    else:
+                "updated_at": datetime.now(timezone.utc),
+                "id": existing["id"],
+                "company_id": cid,
+            }
+            sql, values = db_pg.build_update(
+                "settlements", SETTLEMENT_COLS, datos, ["id", "company_id"]
+            )
+            await conn.execute(sql, *values)
+            return {"id": existing["id"], "message": "Liquidación actualizada"}
+
         settlement = TripSettlement(
-            company_id=current_user["company_id"],
+            company_id=cid,
             trip_id=trip_id,
             total_advances=total_advances,
             total_expenses=total_expenses,
@@ -4497,47 +4576,55 @@ async def create_or_update_settlement(trip_id: str, request: dict = Body(...), c
             balance_type=balance_type,
             notes=request.get("notes")
         )
-        doc = settlement.model_dump()
-        for k, v in doc.items():
-            if isinstance(v, datetime):
-                doc[k] = v.isoformat()
-        await db.settlements.insert_one(doc)
-        
-        await _actualizar_viaje(
-            current_user["company_id"], trip_id,
-            {"settlement_id": settlement.id, "settlement_status": "pendiente"},
+        sql, values = db_pg.build_insert(
+            "settlements", SETTLEMENT_COLS, _modelo_a_fila(settlement.model_dump())
         )
-        
+        await conn.execute(sql, *values)
+        await conn.execute(
+            "update trips set settlement_id = $1, settlement_status = 'pendiente', "
+            "updated_at = now() where id = $2 and company_id = $3",
+            db_pg.as_uuid(settlement.id),
+            db_pg.as_uuid(trip_id), db_pg.as_uuid(cid),
+        )
         return {"id": settlement.id, "message": "Liquidación creada"}
 
 @api_router.post("/settlements/{settlement_id}/close")
 async def close_settlement(settlement_id: str, request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "contabilidad"))):
     """Close a settlement"""
     
-    settlement = await db.settlements.find_one({
-        "id": settlement_id,
-        "company_id": current_user["company_id"]
-    })
-    if not settlement:
-        raise HTTPException(status_code=404, detail="Liquidación no encontrada")
-    
-    if settlement.get("status") == "cerrado":
-        raise HTTPException(status_code=400, detail="Liquidación ya cerrada")
-    
-    await db.settlements.update_one(
-        {"id": settlement_id},
-        {"$set": {
+    cid = current_user["company_id"]
+    # Leer, cerrar y marcar el viaje, todo en la misma transaccion. El for
+    # update sobre la liquidacion evita que dos cierres simultaneos pasen los
+    # dos por el chequeo de "ya cerrada".
+    async with db_pg.tx(current_user) as conn:
+        settlement = db_pg.to_api(await conn.fetchrow(
+            "select * from settlements where id = $1 and company_id = $2 for update",
+            db_pg.as_uuid(settlement_id), db_pg.as_uuid(cid),
+        ))
+        if not settlement:
+            raise HTTPException(status_code=404, detail="Liquidación no encontrada")
+
+        if settlement.get("status") == "cerrado":
+            raise HTTPException(status_code=400, detail="Liquidación ya cerrada")
+
+        datos = {
             "status": "cerrado",
             "closed_by": current_user["id"],
-            "closed_at": datetime.now(timezone.utc).isoformat(),
-            "notes": request.get("notes", settlement.get("notes"))
-        }}
-    )
-    
-    # Update trip
-    await _actualizar_viaje(
-        current_user["company_id"], settlement["trip_id"], {"settlement_status": "cerrado"}
-    )
+            "closed_at": datetime.now(timezone.utc),
+            "notes": request.get("notes", settlement.get("notes")),
+            "updated_at": datetime.now(timezone.utc),
+            "id": settlement_id,
+            "company_id": cid,
+        }
+        sql, values = db_pg.build_update(
+            "settlements", SETTLEMENT_COLS, datos, ["id", "company_id"]
+        )
+        await conn.execute(sql, *values)
+        await conn.execute(
+            "update trips set settlement_status = 'cerrado', updated_at = now() "
+            "where id = $1 and company_id = $2",
+            db_pg.as_uuid(settlement["trip_id"]), db_pg.as_uuid(cid),
+        )
     
     # Audit log
     await create_audit_log(
@@ -6622,8 +6709,18 @@ async def export_settlement_pdf(trip_id: str, current_user: dict = Depends(get_c
     
     driver = await _usuario_pg(current_user["company_id"], trip.get("driver_id"))
     tracto = await _vehiculo_pg(current_user["company_id"], trip.get("tracto_id"))
-    advances = await db.trip_advances.find({"trip_id": trip_id}, {"_id": 0}).to_list(100)
-    expenses = await db.trip_expenses.find({"trip_id": trip_id}, {"_id": 0}).to_list(100)
+    async with db_pg.tx(current_user) as conn:
+        # Con el filtro por empresa, que la consulta de Mongo no tenia.
+        advances = db_pg.rows_to_api(await conn.fetch(
+            "select * from trip_advances where trip_id = $1 and company_id = $2 "
+            "order by delivered_date desc nulls last limit 100",
+            db_pg.as_uuid(trip_id), db_pg.as_uuid(current_user["company_id"]),
+        ))
+        expenses = db_pg.rows_to_api(await conn.fetch(
+            "select * from trip_expenses where trip_id = $1 and company_id = $2 "
+            "order by expense_date desc nulls last limit 100",
+            db_pg.as_uuid(trip_id), db_pg.as_uuid(current_user["company_id"]),
+        ))
     
     # Create PDF
     output = BytesIO()
@@ -7593,6 +7690,20 @@ async def get_viaticos_report(
             "select * from trips where " + f.where + " limit 5000", *f.values,
         ))
 
+    # Gasto real por viaje, en UNA consulta agrupada. La version Mongo hacia una
+    # consulta por viaje dentro del bucle: con 5000 viajes eran 5000 viajes a la
+    # base para sumar unos pocos importes.
+    gasto_por_viaje = {}
+    ids_viajes = [u for u in (db_pg.as_uuid(t.get("id")) for t in trips) if u]
+    if ids_viajes:
+        async with db_pg.tx(current_user) as conn:
+            filas = await conn.fetch(
+                "select trip_id, coalesce(sum(amount), 0) as total from trip_expenses "
+                "where company_id = $1 and trip_id = any($2::uuid[]) group by trip_id",
+                db_pg.as_uuid(company_id), ids_viajes,
+            )
+        gasto_por_viaje = {str(f["trip_id"]): float(f["total"] or 0) for f in filas}
+
     by_driver = {}
     for t in trips:
         did = t.get("driver_id") or "unknown"
@@ -7600,9 +7711,7 @@ async def get_viaticos_report(
             by_driver[did] = {"driver_id": did, "driver_name": None, "budget": 0.0, "spent": 0.0, "remaining": 0.0, "trips": 0}
         by_driver[did]["budget"] += t.get("viatico_budget", 0) or 0
         by_driver[did]["trips"] += 1
-        # Gasto real = suma de gastos del viaje
-        expenses = await db.trip_expenses.find({"company_id": company_id, "trip_id": t["id"]}, {"_id": 0, "amount": 1}).to_list(1000)
-        by_driver[did]["spent"] += sum(e.get("amount", 0) or 0 for e in expenses)
+        by_driver[did]["spent"] += gasto_por_viaje.get(t.get("id"), 0.0)
 
     real_ids = [d for d in by_driver if d and d != "unknown"]
     name_map = {}
