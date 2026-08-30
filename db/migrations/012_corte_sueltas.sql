@@ -71,7 +71,7 @@ create index if not exists matrix_plan_vehicles_vehiculo_idx
 -- Y como la puente apunta al plan, tampoco se puede vaciar
 -- maintenance_matrix_plans para recargarlo. El corte se hizo en dos tandas:
 --
---   bash scripts/cutover-modulo.sh db/migrations/012_corte_sueltas.sql --        alerts,notifications,audit_logs,vehicle_equipment
+--   bash scripts/cutover-modulo.sh \n--        db/migrations/012_corte_sueltas.sql \n--        alerts,notifications,audit_logs,vehicle_equipment
 --
 -- y el plan aparte, comprobando antes a mano que ya coincidia (mismo id a los
 -- dos lados). Si algun dia hubiera planes con vehiculos asignados en Mongo,
