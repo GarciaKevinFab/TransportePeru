@@ -69,3 +69,11 @@ checklist_runs
 # --- 011: Combustible (vales y cargas) ---
 fuel_vouchers
 fuel_loads
+
+# --- 012: Sueltas (nada las referencia, no dependen entre si) ---
+alerts
+notifications
+audit_logs
+vehicle_equipment
+maintenance_matrix_plans
+maintenance_matrix_plan_vehicles

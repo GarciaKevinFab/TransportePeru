@@ -1109,9 +1109,11 @@ async def create_audit_log(company_id: str, user_id: str, user_name: str, action
         entity_id=entity_id,
         details=details or {}
     )
-    doc = log.model_dump()
-    doc["created_at"] = doc["created_at"].isoformat()
-    await db.audit_logs.insert_one(doc)
+    sql, values = db_pg.build_insert(
+        "audit_logs", AUDIT_LOG_COLS, _modelo_a_fila(log.model_dump())
+    )
+    async with db_pg.tx({"company_id": company_id}) as conn:
+        await conn.execute(sql, *values)
 
 async def create_block_for_expired_doc(company_id: str, doc_type: dict, document: dict, entity_type: str, entity_id: str):
     """Create operational block for expired document"""
@@ -1294,7 +1296,7 @@ async def notify_users(company_id: str, title: str, message: str, notif_type: st
             "is_read": False,
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
-        await db.notifications.insert_one(notification)
+        await _crear_notificacion(company_id, notification)
         try:
             await send_push_notifications(company_id, title, message, target_role, user_id)
         except Exception as e:
@@ -1305,31 +1307,130 @@ async def notify_users(company_id: str, title: str, message: str, notif_type: st
         return None
 
 
+# ============== TABLAS EN POSTGRES: ALERTAS, AVISOS Y BITACORA ==============
+# alerts, notifications, audit_logs, vehicle_equipment y los planes matriciales
+# cortaron con la migracion 012. No dependen unas de otras: van en un mismo
+# corte precisamente porque ninguna esta acoplada al resto.
+
+ALERT_COLS = {
+    "id": "uuid", "company_id": "uuid", "alert_type": "text",
+    "entity_type": "text", "entity_id": "uuid", "message": "text",
+    "severity": "text", "is_read": "bool", "resolved": "bool",
+    "created_at": "ts",
+}
+
+NOTIFICATION_COLS = {
+    "id": "uuid", "company_id": "uuid", "title": "text", "message": "text",
+    "type": "enum:notification_type", "target_role": "text", "user_id": "uuid",
+    "entity_type": "text", "entity_id": "uuid", "is_read": "bool",
+    "read_at": "ts", "created_by": "uuid", "created_at": "ts",
+}
+
+AUDIT_LOG_COLS = {
+    "id": "uuid", "company_id": "uuid", "user_id": "uuid", "user_name": "text",
+    "action": "text", "entity_type": "text", "entity_id": "uuid",
+    "details": "json", "ip_address": "text", "created_at": "ts",
+}
+
+VEHICLE_EQUIPMENT_COLS = {
+    "id": "uuid", "company_id": "uuid", "vehicle_id": "uuid",
+    "items": "json", "updated_at": "ts", "updated_by": "uuid",
+}
+
+MATRIX_PLAN_COLS = {
+    "id": "uuid", "company_id": "uuid", "name": "text",
+    "vehicle_model": "text", "intervals": "json", "sections": "json",
+    "notes": "text", "created_at": "ts", "updated_at": "ts",
+    "created_by": "uuid",
+}
+
+
+async def _insertar_alerta(company_id: str, alerta) -> str:
+    """Guarda una Alert ya construida. Devuelve su id.
+
+    Varios sitios creaban la alerta y repetian las tres lineas de insercion;
+    con una sola tabla destino no hay motivo para tenerlo escrito seis veces.
+    """
+    datos = alerta if isinstance(alerta, dict) else _modelo_a_fila(alerta.model_dump())
+    sql, values = db_pg.build_insert("alerts", ALERT_COLS, datos)
+    async with db_pg.tx({"company_id": company_id}) as conn:
+        await conn.execute(sql, *values)
+    return datos["id"]
+
+
+async def _crear_notificacion(company_id: str, notificacion: dict) -> str:
+    """Guarda una notificacion armada como dict (no hay modelo Notification)."""
+    sql, values = db_pg.build_insert(
+        "notifications", NOTIFICATION_COLS, notificacion
+    )
+    async with db_pg.tx({"company_id": company_id}) as conn:
+        await conn.execute(sql, *values)
+    return notificacion["id"]
+
+
+async def _guardar_vehiculos_del_plan(conn, plan_id, company_id, vehicle_ids):
+    """Reescribe la tabla puente de un plan matricial con la lista de vehiculos.
+
+    applies_to_vehicle_ids es una lista en el modelo, pero en Postgres esa
+    relacion vive normalizada en maintenance_matrix_plan_vehicles. Sin esto la
+    lista blanca de columnas la descartaria en silencio y el plan quedaria sin
+    sus vehiculos, sin ningun error.
+
+    Se borra y se reinserta en vez de calcular el diff: son unas pocas filas y
+    corre dentro de la misma transaccion que el plan.
+    """
+    pid = db_pg.as_uuid(plan_id)
+    await conn.execute("delete from maintenance_matrix_plan_vehicles where plan_id = $1", pid)
+    ids = [u for u in (db_pg.as_uuid(v) for v in (vehicle_ids or [])) if u]
+    if not ids:
+        return
+    # El vehiculo tiene que ser de la misma empresa que el plan: el select
+    # filtrado lo garantiza sin comprobarlo fila por fila.
+    await conn.execute(
+        "insert into maintenance_matrix_plan_vehicles (plan_id, vehicle_id) "
+        "select $1, v.id from vehicles v "
+        "where v.company_id = $2 and v.id = any($3::uuid[]) "
+        "on conflict do nothing",
+        pid, db_pg.as_uuid(company_id), ids,
+    )
+
+
+async def _plan_matriz_a_api(conn, plan: dict) -> dict:
+    """Devuelve el plan con applies_to_vehicle_ids reconstruido desde la tabla
+    puente, que es la forma que el frontend ya sabe leer."""
+    if not plan:
+        return plan
+    filas = await conn.fetch(
+        "select vehicle_id from maintenance_matrix_plan_vehicles where plan_id = $1",
+        db_pg.as_uuid(plan["id"]),
+    )
+    salida = dict(plan)
+    salida["applies_to_vehicle_ids"] = [str(f["vehicle_id"]) for f in filas]
+    return salida
+
+
 async def create_alert_once(company_id: str, alert_type: str, entity_type: str, entity_id: str,
                             message: str, severity: str = "warning"):
     """Crea una Alert sólo si no existe una del mismo tipo sin resolver para la entidad. Devuelve el id o None."""
-    existing = await db.alerts.find_one({
-        "company_id": company_id,
-        "alert_type": alert_type,
-        "entity_id": entity_id,
-        "resolved": False,
-    })
-    if existing:
-        return None
-    alert = {
-        "id": str(uuid.uuid4()),
-        "company_id": company_id,
-        "alert_type": alert_type,
-        "entity_type": entity_type,
-        "entity_id": entity_id,
-        "message": message,
-        "severity": severity,
-        "is_read": False,
-        "resolved": False,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
-    await db.alerts.insert_one(alert)
-    return alert["id"]
+    alerta = Alert(
+        company_id=company_id, alert_type=alert_type, entity_type=entity_type,
+        entity_id=entity_id, message=message, severity=severity,
+    )
+    sql, values = db_pg.build_insert(
+        "alerts", ALERT_COLS, _modelo_a_fila(alerta.model_dump())
+    )
+    # Comprobar y crear en la misma transaccion: si no, dos barridos a la vez
+    # pasarian los dos por el "no existe" y crearian la alerta por duplicado.
+    async with db_pg.tx({"company_id": company_id}) as conn:
+        existe = await conn.fetchval(
+            "select id from alerts where company_id = $1 and alert_type = $2 "
+            "and entity_id = $3 and not resolved",
+            db_pg.as_uuid(company_id), alert_type, db_pg.as_uuid(entity_id),
+        )
+        if existe:
+            return None
+        await conn.execute(sql, *values)
+    return alerta.id
 
 
 async def _vehicle_km_per_day(company_id: str, vehicle_id: str):
@@ -1445,9 +1546,15 @@ async def compute_maintenance_status(company_id: str, vehicle: dict) -> dict:
     plan_name = None
 
     # 1) Plan matricial asignado a esta unidad (km guardados en miles: 30 = 30000)
-    matrix = await db.maintenance_matrix_plans.find_one(
-        {"company_id": company_id, "applies_to_vehicle_ids": vehicle["id"]}, {"_id": 0}
-    )
+    # En Mongo esto buscaba el id dentro del array applies_to_vehicle_ids; aca
+    # esa relacion esta normalizada, asi que es un join contra la tabla puente.
+    async with db_pg.tx({"company_id": company_id}) as conn:
+        matrix = db_pg.to_api(await conn.fetchrow(
+            "select p.* from maintenance_matrix_plans p "
+            "join maintenance_matrix_plan_vehicles pv on pv.plan_id = p.id "
+            "where p.company_id = $1 and pv.vehicle_id = $2 limit 1",
+            db_pg.as_uuid(company_id), db_pg.as_uuid(vehicle["id"]),
+        ))
     if matrix:
         plan_name = matrix.get("name")
         kms = []
@@ -1668,12 +1775,13 @@ async def _generate_document_alerts(company_id: str) -> int:
 
         for alert_day in alert_days:
             if days_until <= alert_day:
-                existing = await db.alerts.find_one({
-                    "entity_id": doc["id"],
-                    "alert_type": "document_expiry",
-                    "resolved": False,
-                    "company_id": company_id
-                })
+                async with db_pg.tx({"company_id": company_id}) as conn:
+                    existing = await conn.fetchval(
+                        "select id from alerts where company_id = $1 "
+                        "and entity_id = $2 and alert_type = 'document_expiry' "
+                        "and not resolved",
+                        db_pg.as_uuid(company_id), db_pg.as_uuid(doc["id"]),
+                    )
                 if not existing:
                     severity = "critical" if days_until <= 0 else "warning" if days_until <= 7 else "info"
                     alert = {
@@ -1688,10 +1796,10 @@ async def _generate_document_alerts(company_id: str) -> int:
                         "resolved": False,
                         "created_at": now.isoformat()
                     }
-                    await db.alerts.insert_one(alert)
+                    await _insertar_alerta(company_id, alert)
                     alerts_created += 1
                     if severity == "critical":
-                        await db.notifications.insert_one({
+                        await _crear_notificacion(company_id, {
                             "id": str(uuid.uuid4()),
                             "company_id": company_id,
                             "title": "⚠️ Documento Vencido",
@@ -2438,10 +2546,11 @@ async def assign_driver_to_vehicle(vehicle_id: str, request: dict = Body(...), c
 # ============== VEHICLE EQUIPMENT (EPP) ==============
 @api_router.get("/vehicles/{vehicle_id}/equipment")
 async def get_vehicle_equipment(vehicle_id: str, current_user: dict = Depends(get_current_user)):
-    doc = await db.vehicle_equipment.find_one(
-        {"vehicle_id": vehicle_id, "company_id": current_user["company_id"]},
-        {"_id": 0}
-    )
+    async with db_pg.tx(current_user) as conn:
+        doc = db_pg.to_api(await conn.fetchrow(
+            "select * from vehicle_equipment where vehicle_id = $1 and company_id = $2",
+            db_pg.as_uuid(vehicle_id), db_pg.as_uuid(current_user["company_id"]),
+        ))
     if not doc:
         # Return default EPP items
         return {
@@ -2463,25 +2572,33 @@ async def get_vehicle_equipment(vehicle_id: str, current_user: dict = Depends(ge
 async def update_vehicle_equipment(vehicle_id: str, request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "flota", "almacen"))):
     items = request.get("items", [])
 
-    existing = await db.vehicle_equipment.find_one(
-        {"vehicle_id": vehicle_id, "company_id": current_user["company_id"]}
-    )
-
-    if existing:
-        await db.vehicle_equipment.update_one(
-            {"vehicle_id": vehicle_id, "company_id": current_user["company_id"]},
-            {"$set": {"items": items, "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": current_user["id"]}}
+    # Buscar y guardar en la misma transaccion: dos guardados simultaneos no
+    # pueden pasar los dos por el "no existe" y dejar dos filas de EPP para el
+    # mismo vehiculo.
+    async with db_pg.tx(current_user) as conn:
+        existing = await conn.fetchval(
+            "select id from vehicle_equipment "
+            "where vehicle_id = $1 and company_id = $2 for update",
+            db_pg.as_uuid(vehicle_id), db_pg.as_uuid(current_user["company_id"]),
         )
-    else:
-        equipment = VehicleEquipment(
-            company_id=current_user["company_id"],
-            vehicle_id=vehicle_id,
-            items=items,
-            updated_by=current_user["id"]
-        )
-        doc = equipment.model_dump()
-        doc["updated_at"] = doc["updated_at"].isoformat()
-        await db.vehicle_equipment.insert_one(doc)
+        if existing:
+            await conn.execute(
+                "update vehicle_equipment set items = $1, updated_at = now(), "
+                "updated_by = $2 where id = $3",
+                items, db_pg.as_uuid(current_user["id"]), existing,
+            )
+        else:
+            equipment = VehicleEquipment(
+                company_id=current_user["company_id"],
+                vehicle_id=vehicle_id,
+                items=items,
+                updated_by=current_user["id"]
+            )
+            sql, values = db_pg.build_insert(
+                "vehicle_equipment", VEHICLE_EQUIPMENT_COLS,
+                _modelo_a_fila(equipment.model_dump()),
+            )
+            await conn.execute(sql, *values)
 
     return {"message": "Equipamiento actualizado"}
 
@@ -2775,21 +2892,24 @@ async def get_alerts(
     severity: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
-    query = {"company_id": current_user["company_id"]}
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(current_user["company_id"]))
     if resolved is not None:
-        query["resolved"] = resolved
-    if severity:
-        query["severity"] = severity
-    
-    alerts = await db.alerts.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
-    return [serialize_doc(a) for a in alerts]
+        f.agregar("resolved = $?", bool(resolved))
+    f.si(severity, "severity = $?", severity)
+    async with db_pg.tx(current_user) as conn:
+        return db_pg.rows_to_api(await conn.fetch(
+            "select * from alerts where " + f.where
+            + " order by created_at desc nulls last limit 500", *f.values
+        ))
 
 @api_router.post("/alerts/{alert_id}/resolve")
 async def resolve_alert(alert_id: str, current_user: dict = Depends(get_current_user)):
-    await db.alerts.update_one(
-        {"id": alert_id, "company_id": current_user["company_id"]},
-        {"$set": {"resolved": True, "is_read": True}}
-    )
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(
+            "update alerts set resolved = true, is_read = true "
+            "where id = $1 and company_id = $2",
+            db_pg.as_uuid(alert_id), db_pg.as_uuid(current_user["company_id"]),
+        )
     return {"message": "Alerta resuelta"}
 
 # ============== OPERATIONAL BLOCKS ROUTES ==============
@@ -3949,9 +4069,7 @@ async def create_tire_inspection(request: CreateInspectionRequest, current_user:
             message=f"Llanta {tire.get('serial', '')} con profundidad crítica: {min_depth}mm",
             severity="critical"
         )
-        alert_doc = alert.model_dump()
-        alert_doc["created_at"] = alert_doc["created_at"].isoformat()
-        await db.alerts.insert_one(alert_doc)
+        await _insertar_alerta(current_user["company_id"], alert)
     elif min_depth < warning_depth:
         alert = Alert(
             company_id=current_user["company_id"],
@@ -3961,10 +4079,8 @@ async def create_tire_inspection(request: CreateInspectionRequest, current_user:
             message=f"Llanta {tire.get('serial', '')} con profundidad baja: {min_depth}mm",
             severity="warning"
         )
-        alert_doc = alert.model_dump()
-        alert_doc["created_at"] = alert_doc["created_at"].isoformat()
-        await db.alerts.insert_one(alert_doc)
-    
+        await _insertar_alerta(current_user["company_id"], alert)
+
     if request.irregular_wear:
         alert = Alert(
             company_id=current_user["company_id"],
@@ -3974,10 +4090,8 @@ async def create_tire_inspection(request: CreateInspectionRequest, current_user:
             message=f"Llanta {tire.get('serial', '')} con desgaste irregular. Se recomienda alineación.",
             severity="warning"
         )
-        alert_doc = alert.model_dump()
-        alert_doc["created_at"] = alert_doc["created_at"].isoformat()
-        await db.alerts.insert_one(alert_doc)
-    
+        await _insertar_alerta(current_user["company_id"], alert)
+
     return {"id": inspection.id, "message": "Inspección registrada"}
 
 @api_router.get("/tires/{tire_id}/inspections")
@@ -4046,21 +4160,24 @@ async def create_maintenance_plan(request: dict = Body(...), current_user: dict 
 # ============== MATRIX MAINTENANCE PLANS (E MAX 540 style) ==============
 @api_router.get("/maintenance/matrix-plans")
 async def list_matrix_plans(current_user: dict = Depends(get_current_user)):
-    plans = await db.maintenance_matrix_plans.find(
-        {"company_id": current_user["company_id"]},
-        {"_id": 0}
-    ).to_list(100)
-    return [serialize_doc(p) for p in plans]
+    async with db_pg.tx(current_user) as conn:
+        filas = db_pg.rows_to_api(await conn.fetch(
+            "select * from maintenance_matrix_plans where company_id = $1 "
+            "order by name limit 100",
+            db_pg.as_uuid(current_user["company_id"]),
+        ))
+        return [await _plan_matriz_a_api(conn, p) for p in filas]
 
 @api_router.get("/maintenance/matrix-plans/{plan_id}")
 async def get_matrix_plan(plan_id: str, current_user: dict = Depends(get_current_user)):
-    plan = await db.maintenance_matrix_plans.find_one(
-        {"id": plan_id, "company_id": current_user["company_id"]},
-        {"_id": 0}
-    )
-    if not plan:
-        raise HTTPException(status_code=404, detail="Plan no encontrado")
-    return serialize_doc(plan)
+    async with db_pg.tx(current_user) as conn:
+        plan = db_pg.to_api(await conn.fetchrow(
+            "select * from maintenance_matrix_plans where id = $1 and company_id = $2",
+            db_pg.as_uuid(plan_id), db_pg.as_uuid(current_user["company_id"]),
+        ))
+        if not plan:
+            raise HTTPException(status_code=404, detail="Plan no encontrado")
+        return await _plan_matriz_a_api(conn, plan)
 
 @api_router.post("/maintenance/matrix-plans")
 async def create_matrix_plan(request: dict = Body(...), current_user: dict = Depends(require_roles("superadmin", "owner", "admin", "mantenimiento"))):
@@ -4075,29 +4192,54 @@ async def create_matrix_plan(request: dict = Body(...), current_user: dict = Dep
         notes=request.get("notes"),
         created_by=current_user.get("user_id") or current_user.get("id"),
     )
-    doc = plan.model_dump()
-    for k, v in doc.items():
-        if isinstance(v, datetime):
-            doc[k] = v.isoformat()
-    await db.maintenance_matrix_plans.insert_one(doc)
+    sql, values = db_pg.build_insert(
+        "maintenance_matrix_plans", MATRIX_PLAN_COLS, _modelo_a_fila(plan.model_dump())
+    )
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(sql, *values)
+        await _guardar_vehiculos_del_plan(
+            conn, plan.id, current_user["company_id"], plan.applies_to_vehicle_ids
+        )
     return {"id": plan.id, "message": "Plan creado"}
 
 @api_router.put("/maintenance/matrix-plans/{plan_id}")
 async def update_matrix_plan(plan_id: str, request: dict = Body(...), current_user: dict = Depends(require_roles("superadmin", "owner", "admin", "mantenimiento"))):
 
-    plan = await db.maintenance_matrix_plans.find_one({"id": plan_id, "company_id": current_user["company_id"]})
-    if not plan:
-        raise HTTPException(status_code=404, detail="Plan no encontrado")
-
     allowed = ["name", "vehicle_model", "applies_to_vehicle_ids", "intervals", "sections", "notes"]
     update_data = {k: request[k] for k in allowed if k in request}
-    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
-    await db.maintenance_matrix_plans.update_one({"id": plan_id}, {"$set": update_data})
+    update_data["updated_at"] = datetime.now(timezone.utc)
+    update_data["id"] = plan_id
+    update_data["company_id"] = current_user["company_id"]
+
+    async with db_pg.tx(current_user) as conn:
+        existe = await conn.fetchval(
+            "select id from maintenance_matrix_plans where id = $1 and company_id = $2",
+            db_pg.as_uuid(plan_id), db_pg.as_uuid(current_user["company_id"]),
+        )
+        if not existe:
+            raise HTTPException(status_code=404, detail="Plan no encontrado")
+        # applies_to_vehicle_ids no es columna: lo descarta la lista blanca y se
+        # guarda aparte, en la tabla puente.
+        sql, values = db_pg.build_update(
+            "maintenance_matrix_plans", MATRIX_PLAN_COLS, update_data, ["id", "company_id"]
+        )
+        if sql:
+            await conn.execute(sql, *values)
+        if "applies_to_vehicle_ids" in request:
+            await _guardar_vehiculos_del_plan(
+                conn, plan_id, current_user["company_id"],
+                request["applies_to_vehicle_ids"],
+            )
     return {"message": "Plan actualizado"}
 
 @api_router.delete("/maintenance/matrix-plans/{plan_id}")
 async def delete_matrix_plan(plan_id: str, current_user: dict = Depends(require_roles("superadmin", "owner", "admin"))):
-    await db.maintenance_matrix_plans.delete_one({"id": plan_id, "company_id": current_user["company_id"]})
+    # La tabla puente cae sola: su FK al plan es on delete cascade.
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(
+            "delete from maintenance_matrix_plans where id = $1 and company_id = $2",
+            db_pg.as_uuid(plan_id), db_pg.as_uuid(current_user["company_id"]),
+        )
     return {"message": "Plan eliminado"}
 
 @api_router.post("/maintenance/matrix-plans/import-excel")
@@ -4190,11 +4332,14 @@ async def import_matrix_plan_excel(file: UploadFile = File(...), current_user: d
         sections=sections,
         created_by=current_user.get("user_id") or current_user.get("id"),
     )
-    doc = plan.model_dump()
-    for k, v in doc.items():
-        if isinstance(v, datetime):
-            doc[k] = v.isoformat()
-    await db.maintenance_matrix_plans.insert_one(doc)
+    sql, values = db_pg.build_insert(
+        "maintenance_matrix_plans", MATRIX_PLAN_COLS, _modelo_a_fila(plan.model_dump())
+    )
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(sql, *values)
+        await _guardar_vehiculos_del_plan(
+            conn, plan.id, current_user["company_id"], plan.applies_to_vehicle_ids
+        )
 
     return {
         "id": plan.id,
@@ -5015,10 +5160,8 @@ async def create_stock_move(request: dict = Body(...), current_user: dict = Depe
             message=f"Stock bajo: {item.get('name', '')} - {new_stock} {item.get('unit', 'unidades')}",
             severity="warning"
         )
-        alert_doc = alert.model_dump()
-        alert_doc["created_at"] = alert_doc["created_at"].isoformat()
-        await db.alerts.insert_one(alert_doc)
-    
+        await _insertar_alerta(current_user["company_id"], alert)
+
     return {"id": move.id, "new_stock": new_stock, "message": "Movimiento registrado"}
 
 @api_router.get("/inventory/kardex/{item_id}")
@@ -5433,15 +5576,16 @@ async def record_alignment(request: dict = Body(...), current_user: dict = Depen
     await db.alignment_records.insert_one(doc)
     
     # Resolve any alignment alerts
-    await db.alerts.update_many(
-        {
-            "company_id": current_user["company_id"],
-            "entity_id": request["vehicle_id"],
-            "alert_type": {"$in": ["tire_irregular_wear", "axle_misalignment"]},
-            "resolved": False
-        },
-        {"$set": {"resolved": True, "resolved_at": datetime.now(timezone.utc).isoformat()}}
-    )
+    # resolved_at no es una columna de alerts (si la tienen blocks): se omite.
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(
+            "update alerts set resolved = true where company_id = $1 "
+            "and entity_id = $2 "
+            "and alert_type = any(array['tire_irregular_wear','axle_misalignment']) "
+            "and not resolved",
+            db_pg.as_uuid(current_user["company_id"]),
+            db_pg.as_uuid(request["vehicle_id"]),
+        )
     
     return {"id": alignment.id, "message": "Alineación registrada"}
 
@@ -5808,8 +5952,18 @@ async def get_audit_logs(
     if action:
         query["action"] = action
     
-    logs = await db.audit_logs.find(query, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
-    return [serialize_doc(l) for l in logs]
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(current_user["company_id"]))
+    f.si(entity_type, "entity_type = $?", entity_type)
+    f.si(entity_id, "entity_id = $?", db_pg.as_uuid(entity_id))
+    f.si(action, "action = $?", action)
+    # El limite se interpola como entero, no como parametro: es un int de la
+    # firma del endpoint, nunca texto del cliente.
+    async with db_pg.tx(current_user) as conn:
+        return db_pg.rows_to_api(await conn.fetch(
+            "select * from audit_logs where " + f.where
+            + " order by created_at desc nulls last limit " + str(int(limit)),
+            *f.values
+        ))
 
 # ============== FUEL EXTENDED ROUTES ==============
 @api_router.get("/fuel/conciliation")
@@ -6025,8 +6179,16 @@ async def get_dashboard_kpis(current_user: dict = Depends(get_current_user)):
     total_drivers = await _contar_usuarios(company_id, "chofer")
     
     # Count active alerts
-    active_alerts = await db.alerts.count_documents({"company_id": company_id, "resolved": False})
-    critical_alerts = await db.alerts.count_documents({"company_id": company_id, "resolved": False, "severity": "critical"})
+    async with db_pg.tx(current_user) as conn:
+        active_alerts = await conn.fetchval(
+            "select count(*) from alerts where company_id = $1 and not resolved",
+            db_pg.as_uuid(company_id),
+        )
+        critical_alerts = await conn.fetchval(
+            "select count(*) from alerts where company_id = $1 and not resolved "
+            "and severity = 'critical'",
+            db_pg.as_uuid(company_id),
+        )
     
     # Count active blocks
     async with db_pg.tx(current_user) as conn:
@@ -6094,10 +6256,12 @@ async def get_recent_activity(current_user: dict = Depends(get_current_user)):
         ))
     
     # Get recent alerts
-    recent_alerts = await db.alerts.find(
-        {"company_id": company_id},
-        {"_id": 0}
-    ).sort("created_at", -1).limit(5).to_list(5)
+    async with db_pg.tx(current_user) as conn:
+        recent_alerts = db_pg.rows_to_api(await conn.fetch(
+            "select * from alerts where company_id = $1 "
+            "order by created_at desc nulls last limit 5",
+            db_pg.as_uuid(company_id),
+        ))
     
     # Get recent work orders
     recent_orders = await db.work_orders.find(
@@ -6329,21 +6493,24 @@ async def get_notifications(
     current_user: dict = Depends(get_current_user)
 ):
     """Get user notifications"""
-    query = {"company_id": current_user["company_id"]}
-    
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(current_user["company_id"]))
+
     # Role-based filtering
     if current_user["role"] == "chofer":
-        query["$or"] = [
-            {"user_id": current_user["id"]},
-            {"target_role": "chofer"},
-            {"target_role": "all"}
-        ]
-    
+        f.agregar(
+            "(user_id = $? or target_role = 'chofer' or target_role = 'all')",
+            db_pg.as_uuid(current_user["id"]),
+        )
+
     if unread_only:
-        query["is_read"] = False
-    
-    notifications = await db.notifications.find(query, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
-    return [serialize_doc(n) for n in notifications]
+        f.crudo("not is_read")
+
+    async with db_pg.tx(current_user) as conn:
+        return db_pg.rows_to_api(await conn.fetch(
+            "select * from notifications where " + f.where
+            + " order by created_at desc nulls last limit " + str(int(limit)),
+            *f.values
+        ))
 
 @api_router.post("/notifications")
 async def create_notification(request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin"))):
@@ -6364,8 +6531,8 @@ async def create_notification(request: dict = Body(...), current_user: dict = De
         "created_by": current_user["id"]
     }
     
-    await db.notifications.insert_one(notification)
-    
+    await _crear_notificacion(current_user["company_id"], notification)
+
     # Send push notification to subscribed users
     await send_push_notifications(
         current_user["company_id"],
@@ -6380,27 +6547,33 @@ async def create_notification(request: dict = Body(...), current_user: dict = De
 @api_router.put("/notifications/{notification_id}/read")
 async def mark_notification_read(notification_id: str, current_user: dict = Depends(get_current_user)):
     """Mark notification as read"""
-    await db.notifications.update_one(
-        {"id": notification_id},
-        {"$set": {"is_read": True, "read_at": datetime.now(timezone.utc).isoformat()}}
-    )
+    # Con el filtro por empresa, que la consulta de Mongo no tenia: sin el,
+    # cualquiera podia marcar como leida una notificacion de otro tenant.
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(
+            "update notifications set is_read = true, read_at = now() "
+            "where id = $1 and company_id = $2",
+            db_pg.as_uuid(notification_id),
+            db_pg.as_uuid(current_user["company_id"]),
+        )
     return {"message": "Notificación marcada como leída"}
 
 @api_router.put("/notifications/read-all")
 async def mark_all_notifications_read(current_user: dict = Depends(get_current_user)):
     """Mark all notifications as read"""
-    query = {"company_id": current_user["company_id"], "is_read": False}
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(current_user["company_id"]))
+    f.crudo("not is_read")
     if current_user["role"] == "chofer":
-        query["$or"] = [
-            {"user_id": current_user["id"]},
-            {"target_role": "chofer"},
-            {"target_role": "all"}
-        ]
-    
-    await db.notifications.update_many(
-        query,
-        {"$set": {"is_read": True, "read_at": datetime.now(timezone.utc).isoformat()}}
-    )
+        f.agregar(
+            "(user_id = $? or target_role = 'chofer' or target_role = 'all')",
+            db_pg.as_uuid(current_user["id"]),
+        )
+
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(
+            "update notifications set is_read = true, read_at = now() where "
+            + f.where, *f.values
+        )
     return {"message": "Todas las notificaciones marcadas como leídas"}
 
 async def send_push_notifications(company_id: str, title: str, message: str, target_role: str = None, user_id: str = None):
