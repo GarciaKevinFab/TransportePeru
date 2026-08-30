@@ -7312,41 +7312,51 @@ async def seed_demo_data(_: bool = Depends(require_install_token)):
     tire_positions_tracto = ["T-1L", "T-1R", "T-2L1", "T-2L2", "T-2R1", "T-2R2"]
     tire_positions_carreta = ["C-A-L", "C-A-R", "C-B-L", "C-B-R", "C-C-L", "C-C-R"]
     
-    for i, tracto_id in enumerate(tracto_ids):
-        for j, pos in enumerate(tire_positions_tracto):
-            tire = Tire(
-                company_id=company.id,
-                serial=f"TR{i+1}-{pos}-{j+1:03d}",
-                brand=tire_brands[j % len(tire_brands)],
-                model="XZA3",
-                dimension="295/80R22.5",
-                purchase_cost=450,
-                status=TireStatus.EN_USO,
-                current_vehicle_id=tracto_id,
-                current_position=pos
-            )
-            # La llanta nace montada, asi que tambien nace su registro de
-            # montaje. Sin el queda en_uso y ubicada pero sin historial: el
-            # esquema de la unidad no puede calcular km_recorridos ni
-            # cost_per_km, y un desmontaje posterior no encuentra que fila
-            # cerrar y se va sin dejar rastro. Es lo que le paso a la semilla
-            # anterior, cuyas diez llantas hubo que reconstruir a mano.
-            mount = TireMount(
-                company_id=company.id,
-                tire_id=tire.id,
-                vehicle_id=tracto_id,
-                position_code=pos,
-                mount_odometer=0,
-            )
-            sql_llanta, val_llanta = db_pg.build_insert(
-                "tires", TIRE_COLS, _modelo_a_fila(tire.model_dump())
-            )
-            sql_montaje, val_montaje = db_pg.build_insert(
-                "tire_mounts", TIRE_MOUNT_COLS, _modelo_a_fila(mount.model_dump())
-            )
-            async with db_pg.tx({"company_id": company.id}) as conn:
-                await conn.execute(sql_llanta, *val_llanta)
-                await conn.execute(sql_montaje, *val_montaje)
+    # Tractos y carretas se siembran por la MISMA tabla, a proposito. Antes
+    # habia un solo bucle, escrito a mano para los tractos, y
+    # tire_positions_carreta quedaba declarada y sin usar: las carretas se
+    # sembraban sin una sola llanta pese a llevar tire_config="6". Duplicar el
+    # cuerpo para arreglarlo habria sido repetir el error que lo causo.
+    for prefijo, ids_unidad, posiciones in (
+        ("TR", tracto_ids, tire_positions_tracto),
+        ("CR", carreta_ids, tire_positions_carreta),
+    ):
+        for i, vehicle_id in enumerate(ids_unidad):
+            for j, pos in enumerate(posiciones):
+                tire = Tire(
+                    company_id=company.id,
+                    serial=f"{prefijo}{i+1}-{pos}-{j+1:03d}",
+                    brand=tire_brands[j % len(tire_brands)],
+                    model="XZA3",
+                    dimension="295/80R22.5",
+                    purchase_cost=450,
+                    status=TireStatus.EN_USO,
+                    current_vehicle_id=vehicle_id,
+                    current_position=pos
+                )
+                # La llanta nace montada, asi que tambien nace su registro de
+                # montaje. Sin el queda en_uso y ubicada pero sin historial: el
+                # esquema de la unidad no puede calcular km_recorridos ni
+                # cost_per_km, y un desmontaje posterior no encuentra que fila
+                # cerrar y se va sin dejar rastro. Es lo que le paso a la
+                # semilla anterior, cuyas diez llantas hubo que reconstruir a
+                # mano.
+                mount = TireMount(
+                    company_id=company.id,
+                    tire_id=tire.id,
+                    vehicle_id=vehicle_id,
+                    position_code=pos,
+                    mount_odometer=0,
+                )
+                sql_llanta, val_llanta = db_pg.build_insert(
+                    "tires", TIRE_COLS, _modelo_a_fila(tire.model_dump())
+                )
+                sql_montaje, val_montaje = db_pg.build_insert(
+                    "tire_mounts", TIRE_MOUNT_COLS, _modelo_a_fila(mount.model_dump())
+                )
+                async with db_pg.tx({"company_id": company.id}) as conn:
+                    await conn.execute(sql_llanta, *val_llanta)
+                    await conn.execute(sql_montaje, *val_montaje)
     
     # Create a sample trip
     trip = Trip(
