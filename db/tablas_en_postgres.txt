@@ -35,3 +35,9 @@ whatsapp_documentos_pendientes
 # --- 004: raiz del modelo (todo lo demas apunta aca) ---
 companies
 users
+
+# --- 005: Inventario ---
+suppliers
+inventory_items
+stock_moves
+purchase_orders

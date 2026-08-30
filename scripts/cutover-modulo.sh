@@ -85,33 +85,33 @@ echo "    verificando que no quede ninguna FK cruzando la frontera Mongo/Postgre
 # mismo corte restaura) se reportaria como problema.
 FRONTERA=$(grep -v "^#" db/tablas_en_postgres.txt | grep -v "^$" | paste -sd, -)
 echo "    tablas en Postgres: $FRONTERA"
-CRUZADAS=$(psql_f -tA -v tablas="$FRONTERA" < db/verificar_frontera.sql)
-SALIENTES=$(echo "$CRUZADAS" | grep "^SALIENTE" || true)
-ENTRANTES=$(echo "$CRUZADAS" | grep "^entrante" || true)
-
-# Las SALIENTES son siempre un error: apuntan a filas que nacen en Mongo y no
-# existen en Postgres, o sea que el INSERT fallaria en produccion.
+# Dos chequeos distintos, con alcances distintos:
+#
+#   1. SALIENTES sobre TODA la frontera. Una FK que salga de cualquier tabla
+#      ya migrada hacia una que sigue en Mongo es siempre un error.
+SALIENTES=$(psql_f -tA -v tablas="$FRONTERA" < db/verificar_frontera.sql | grep "^SALIENTE" || true)
 if [ -n "$SALIENTES" ]; then
   echo "ERROR: estas FKs salen de una tabla ya migrada hacia una que sigue en Mongo."
   echo "       Hay que quitarlas en la migracion del corte:"
   echo "$SALIENTES"
   exit 1
 fi
+echo "    sin FKs salientes: la frontera esta limpia"
 
-# Las entrantes solo estorban si hay que vaciar la tabla apuntada.
-if [ -n "$ENTRANTES" ]; then
-  N=$(echo "$ENTRANTES" | wc -l)
-  if [ "${RECARGA:-si}" = "no" ]; then
-    echo "    $N FK(s) entrante(s): se conservan. Sin recarga no estorban, y"
-    echo "    quedan listas para cuando esas tablas crucen."
-  else
-    echo "ERROR: $N FK(s) entrante(s) impiden vaciar las tablas para recargarlas."
+#   2. Lo que impide VACIAR: solo las FKs que apuntan a las tablas de ESTE
+#      corte desde fuera de ellas. Las que apuntan a otras tablas ya migradas
+#      (companies y users reciben decenas) no tienen nada que ver con esta
+#      recarga. Por eso el segundo chequeo usa $TABLAS y no la frontera entera.
+if [ "${RECARGA:-si}" != "no" ]; then
+  BLOQUEAN=$(psql_f -tA -v tablas="$TABLAS" < db/verificar_frontera.sql | grep "^entrante" || true)
+  if [ -n "$BLOQUEAN" ]; then
+    echo "ERROR: estas FKs apuntan a las tablas del corte y no dejan vaciarlas."
     echo "       O se quitan en la migracion, o se corre con RECARGA=no:"
-    echo "$ENTRANTES"
+    echo "$BLOQUEAN"
     exit 1
   fi
+  echo "    nada bloquea la recarga"
 fi
-echo "    sin FKs salientes: la frontera esta limpia"
 
 # La recarga se omite con RECARGA=no. Hace falta cuando las tablas del corte
 # YA son referenciadas por FKs de tablas migradas antes: en ese caso no se las

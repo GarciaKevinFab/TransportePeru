@@ -4396,16 +4396,21 @@ async def get_inventory_items(
     low_stock: Optional[bool] = None,
     current_user: dict = Depends(get_current_user)
 ):
-    query = {"company_id": current_user["company_id"], "is_active": True}
-    if category:
-        query["category"] = category
-    
-    items = await db.inventory_items.find(query, {"_id": 0}).to_list(1000)
-    
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(current_user["company_id"]))
+    f.crudo("is_active")
+    f.si(category, "category = $?", category)
+    # El filtro de stock bajo lo resuelve la base. Antes se traian los 1000
+    # articulos al proceso para descartar casi todos en Python.
     if low_stock:
-        items = [i for i in items if i.get("current_stock", 0) <= i.get("min_stock", 0)]
-    
-    return [serialize_doc(i) for i in items]
+        f.crudo("current_stock <= min_stock")
+
+    async with db_pg.tx(current_user) as conn:
+        filas = await conn.fetch(
+            "select * from inventory_items where " + f.where
+            + " order by name limit 1000",
+            *f.values,
+        )
+    return db_pg.rows_to_api(filas)
 
 @api_router.post("/inventory/items")
 async def create_inventory_item(request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "almacen"))):
@@ -4423,11 +4428,11 @@ async def create_inventory_item(request: dict = Body(...), current_user: dict = 
         location=request.get("location")
     )
     
-    doc = item.model_dump()
-    for k, v in doc.items():
-        if isinstance(v, datetime):
-            doc[k] = v.isoformat()
-    await db.inventory_items.insert_one(doc)
+    sql, values = db_pg.build_insert(
+        "inventory_items", INVENTORY_ITEM_COLS, _modelo_a_fila(item.model_dump())
+    )
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(sql, *values)
     return {"id": item.id, "message": "Item creado"}
 
 @api_router.post("/inventory/moves")
@@ -4438,46 +4443,64 @@ async def create_stock_move(request: dict = Body(...), current_user: dict = Depe
     move_type = request["move_type"]
     quantity = request["quantity"]
     
-    # Get current item
-    item = await db.inventory_items.find_one({"id": item_id, "company_id": current_user["company_id"]})
-    if not item:
-        raise HTTPException(status_code=404, detail="Item no encontrado")
-    
-    current_stock = item.get("current_stock", 0)
-    
-    if move_type in ["salida", "consumo_ot"]:
-        if current_stock < quantity:
-            raise HTTPException(status_code=400, detail="Stock insuficiente")
-        new_stock = current_stock - quantity
-    elif move_type == "entrada":
-        new_stock = current_stock + quantity
-    else:  # ajuste
-        new_stock = quantity
-    
-    move = StockMove(
-        company_id=current_user["company_id"],
-        item_id=item_id,
-        move_type=move_type,
-        quantity=quantity,
-        unit_cost=request.get("unit_cost", item.get("unit_cost", 0)),
-        total_cost=quantity * request.get("unit_cost", item.get("unit_cost", 0)),
-        reference_type=request.get("reference_type"),
-        reference_id=request.get("reference_id"),
-        work_order_id=request.get("work_order_id"),
-        notes=request.get("notes"),
-        created_by=current_user["id"]
-    )
-    
-    doc = move.model_dump()
-    doc["move_date"] = doc["move_date"].isoformat()
-    await db.stock_moves.insert_one(doc)
-    
-    # Update item stock
-    await db.inventory_items.update_one(
-        {"id": item_id},
-        {"$set": {"current_stock": new_stock, "updated_at": datetime.now(timezone.utc).isoformat()}}
-    )
-    
+    if move_type not in [t.value for t in StockMoveType]:
+        raise HTTPException(status_code=400, detail="Tipo de movimiento invalido")
+
+    # Leer el stock, validarlo, registrar el movimiento y actualizar el saldo
+    # ocurren ahora en UNA transaccion, con FOR UPDATE sobre el articulo.
+    #
+    # Antes eran tres operaciones sueltas: dos salidas simultaneas del mismo
+    # articulo leian el mismo stock, las dos pasaban la validacion y el saldo
+    # terminaba en negativo. El bloqueo de fila hace que la segunda espere y
+    # lea el stock ya actualizado.
+    async with db_pg.tx(current_user) as conn:
+        item = db_pg.to_api(await conn.fetchrow(
+            "select * from inventory_items where id = $1 and company_id = $2 for update",
+            db_pg.as_uuid(item_id), db_pg.as_uuid(current_user["company_id"]),
+        ))
+        if not item:
+            raise HTTPException(status_code=404, detail="Item no encontrado")
+
+        current_stock = item.get("current_stock", 0)
+
+        if move_type in ["salida", "consumo_ot"]:
+            if current_stock < quantity:
+                raise HTTPException(status_code=400, detail="Stock insuficiente")
+            new_stock = current_stock - quantity
+        elif move_type == "entrada":
+            new_stock = current_stock + quantity
+        else:  # ajuste
+            new_stock = quantity
+
+        move = StockMove(
+            company_id=current_user["company_id"],
+            item_id=item_id,
+            move_type=move_type,
+            quantity=quantity,
+            unit_cost=request.get("unit_cost", item.get("unit_cost", 0)),
+            total_cost=quantity * request.get("unit_cost", item.get("unit_cost", 0)),
+            reference_type=request.get("reference_type"),
+            reference_id=request.get("reference_id"),
+            work_order_id=request.get("work_order_id"),
+            notes=request.get("notes"),
+            created_by=current_user["id"]
+        )
+        sql, values = db_pg.build_insert(
+            "stock_moves", STOCK_MOVE_COLS, _modelo_a_fila(move.model_dump())
+        )
+        await conn.execute(sql, *values)
+
+        await conn.execute(
+            "update inventory_items set current_stock = $1, updated_at = now() "
+            "where id = $2 and company_id = $3",
+            new_stock,
+            db_pg.as_uuid(item_id),
+            db_pg.as_uuid(current_user["company_id"]),
+        )
+
+    # La alerta queda FUERA de la transaccion y sigue en Mongo (alerts no ha
+    # cortado). Si fallara, el movimiento ya esta registrado, que es el mismo
+    # comportamiento de antes.
     # Check for low stock alert
     if new_stock <= item.get("min_stock", 0):
         alert = Alert(
@@ -4497,20 +4520,64 @@ async def create_stock_move(request: dict = Body(...), current_user: dict = Depe
 @api_router.get("/inventory/kardex/{item_id}")
 async def get_kardex(item_id: str, current_user: dict = Depends(get_current_user)):
     """Get stock movement history for an item"""
-    moves = await db.stock_moves.find(
-        {"item_id": item_id, "company_id": current_user["company_id"]},
-        {"_id": 0}
-    ).sort("move_date", -1).to_list(500)
-    return [serialize_doc(m) for m in moves]
+    async with db_pg.tx(current_user) as conn:
+        filas = await conn.fetch(
+            "select * from stock_moves where item_id = $1 and company_id = $2 "
+            "order by move_date desc limit 500",
+            db_pg.as_uuid(item_id), db_pg.as_uuid(current_user["company_id"]),
+        )
+    return db_pg.rows_to_api(filas)
+
+# ============== TABLAS EN POSTGRES: INVENTARIO ==============
+# Las cuatro tablas del modulo ya cortaron
+# (db/migrations/005_corte_inventario.sql). work_orders y alerts siguen en
+# Mongo: lo que se lea o escriba de ellas va por db, que es lo correcto
+# mientras no crucen.
+
+SUPPLIER_COLS = {
+    "id": "uuid", "company_id": "uuid", "name": "text", "ruc": "text",
+    "address": "text", "phone": "text", "email": "text",
+    "contact_person": "text", "category": "text", "is_active": "bool",
+    "created_at": "ts",
+}
+
+INVENTORY_ITEM_COLS = {
+    "id": "uuid", "company_id": "uuid", "code": "text", "name": "text",
+    "description": "text", "category": "text", "unit": "text",
+    "min_stock": "int", "max_stock": "int", "current_stock": "int",
+    "unit_cost": "float", "location": "text", "is_active": "bool",
+    "created_at": "ts", "updated_at": "ts",
+}
+
+STOCK_MOVE_COLS = {
+    "id": "uuid", "company_id": "uuid", "item_id": "uuid",
+    "move_type": "enum:stock_move_type", "quantity": "int",
+    "unit_cost": "float", "total_cost": "float",
+    "reference_type": "text", "reference_id": "uuid",
+    "work_order_id": "uuid", "notes": "text",
+    "move_date": "ts", "created_by": "uuid",
+}
+
+PURCHASE_ORDER_COLS = {
+    "id": "uuid", "company_id": "uuid", "order_number": "text",
+    "supplier_id": "uuid", "status": "text", "items": "json",
+    "subtotal": "float", "tax": "float", "total": "float", "notes": "text",
+    "approved_by": "uuid", "approved_at": "ts",
+    "received_by": "uuid", "received_at": "ts",
+    "created_at": "ts", "updated_at": "ts", "created_by": "uuid",
+}
+
 
 # ============== SUPPLIER ROUTES ==============
 @api_router.get("/suppliers")
 async def get_suppliers(current_user: dict = Depends(get_current_user)):
-    suppliers = await db.suppliers.find(
-        {"company_id": current_user["company_id"], "is_active": True},
-        {"_id": 0}
-    ).to_list(500)
-    return [serialize_doc(s) for s in suppliers]
+    async with db_pg.tx(current_user) as conn:
+        filas = await conn.fetch(
+            "select * from suppliers where company_id = $1 and is_active "
+            "order by name limit 500",
+            db_pg.as_uuid(current_user["company_id"]),
+        )
+    return db_pg.rows_to_api(filas)
 
 @api_router.post("/suppliers")
 async def create_supplier(request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "almacen"))):
@@ -4526,9 +4593,11 @@ async def create_supplier(request: dict = Body(...), current_user: dict = Depend
         category=request.get("category")
     )
     
-    doc = supplier.model_dump()
-    doc["created_at"] = doc["created_at"].isoformat()
-    await db.suppliers.insert_one(doc)
+    sql, values = db_pg.build_insert(
+        "suppliers", SUPPLIER_COLS, _modelo_a_fila(supplier.model_dump())
+    )
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(sql, *values)
     return {"id": supplier.id, "message": "Proveedor creado"}
 
 # ============== PURCHASE ORDER ROUTES ==============
@@ -4537,16 +4606,27 @@ async def get_purchase_orders(
     status: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
-    query = {"company_id": current_user["company_id"]}
-    if status:
-        query["status"] = status
-    orders = await db.purchase_orders.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
-    return [serialize_doc(o) for o in orders]
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(current_user["company_id"]))
+    f.si(status, "status = $?", status)
+    async with db_pg.tx(current_user) as conn:
+        filas = await conn.fetch(
+            "select * from purchase_orders where " + f.where
+            + " order by created_at desc limit 500",
+            *f.values,
+        )
+    return db_pg.rows_to_api(filas)
 
 @api_router.post("/purchase-orders")
 async def create_purchase_order(request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "almacen"))):
     
-    count = await db.purchase_orders.count_documents({"company_id": current_user["company_id"]})
+    async with db_pg.tx(current_user) as conn:
+        count = await conn.fetchval(
+            "select count(*) from purchase_orders where company_id = $1",
+            db_pg.as_uuid(current_user["company_id"]),
+        )
+    # Mismo correlativo y misma carrera que tenia con Mongo: dos altas
+    # simultaneas pueden calcular el mismo numero. No se cambia aca para no
+    # mezclar el cambio de base con un cambio de comportamiento.
     order_number = f"OC-{count + 1:05d}"
     
     items = request.get("items", [])
@@ -4566,61 +4646,72 @@ async def create_purchase_order(request: dict = Body(...), current_user: dict = 
         created_by=current_user["id"]
     )
     
-    doc = order.model_dump()
-    for k, v in doc.items():
-        if isinstance(v, datetime):
-            doc[k] = v.isoformat()
-    await db.purchase_orders.insert_one(doc)
+    sql, values = db_pg.build_insert(
+        "purchase_orders", PURCHASE_ORDER_COLS, _modelo_a_fila(order.model_dump())
+    )
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(sql, *values)
     return {"id": order.id, "order_number": order_number, "message": "Orden de compra creada"}
 
 @api_router.post("/purchase-orders/{order_id}/receive")
 async def receive_purchase_order(order_id: str, request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "almacen"))):
     """Receive a purchase order and update inventory"""
     
-    order = await db.purchase_orders.find_one({
-        "id": order_id,
-        "company_id": current_user["company_id"]
-    })
-    if not order:
-        raise HTTPException(status_code=404, detail="Orden no encontrada")
-    
-    if order.get("status") == "recibido":
-        raise HTTPException(status_code=400, detail="Orden ya recibida")
-    
-    # Create stock entries for each item
-    for item in order.get("items", []):
-        if item.get("item_id"):
-            move = StockMove(
-                company_id=current_user["company_id"],
-                item_id=item["item_id"],
-                move_type="entrada",
-                quantity=item.get("quantity", 0),
-                unit_cost=item.get("unit_price", 0),
-                total_cost=item.get("quantity", 0) * item.get("unit_price", 0),
-                reference_type="purchase_order",
-                reference_id=order_id,
-                notes=f"Recepción OC {order.get('order_number', '')}",
-                created_by=current_user["id"]
-            )
-            move_doc = move.model_dump()
-            move_doc["move_date"] = move_doc["move_date"].isoformat()
-            await db.stock_moves.insert_one(move_doc)
-            
-            # Update stock
-            await db.inventory_items.update_one(
-                {"id": item["item_id"]},
-                {"$inc": {"current_stock": item.get("quantity", 0)}}
-            )
-    
-    await db.purchase_orders.update_one(
-        {"id": order_id},
-        {"$set": {
-            "status": "recibido",
-            "received_by": current_user["id"],
-            "received_at": datetime.now(timezone.utc).isoformat()
-        }}
-    )
-    
+    # Toda la recepcion en UNA transaccion. Antes, si fallaba a mitad de los
+    # articulos, quedaban unos con stock sumado y otros no, y la orden seguia
+    # figurando como no recibida: al reintentar se sumaba dos veces.
+    async with db_pg.tx(current_user) as conn:
+        order = db_pg.to_api(await conn.fetchrow(
+            "select * from purchase_orders where id = $1 and company_id = $2 for update",
+            db_pg.as_uuid(order_id), db_pg.as_uuid(current_user["company_id"]),
+        ))
+        if not order:
+            raise HTTPException(status_code=404, detail="Orden no encontrada")
+
+        if order.get("status") == "recibido":
+            raise HTTPException(status_code=400, detail="Orden ya recibida")
+
+        # Create stock entries for each item
+        for item in order.get("items", []):
+            if item.get("item_id"):
+                move = StockMove(
+                    company_id=current_user["company_id"],
+                    item_id=item["item_id"],
+                    move_type="entrada",
+                    quantity=item.get("quantity", 0),
+                    unit_cost=item.get("unit_price", 0),
+                    total_cost=item.get("quantity", 0) * item.get("unit_price", 0),
+                    reference_type="purchase_order",
+                    reference_id=order_id,
+                    notes=f"Recepción OC {order.get('order_number', '')}",
+                    created_by=current_user["id"]
+                )
+                sql, values = db_pg.build_insert(
+                    "stock_moves", STOCK_MOVE_COLS, _modelo_a_fila(move.model_dump())
+                )
+                await conn.execute(sql, *values)
+
+                # El saldo se suma en la propia base: leerlo y reescribirlo
+                # desde Python volveria a abrir la carrera que evita el
+                # movimiento de stock normal.
+                await conn.execute(
+                    "update inventory_items set current_stock = current_stock + $1, "
+                    "updated_at = now() where id = $2 and company_id = $3",
+                    item.get("quantity", 0),
+                    db_pg.as_uuid(item["item_id"]),
+                    db_pg.as_uuid(current_user["company_id"]),
+                )
+
+        await conn.execute(
+            "update purchase_orders set status = $1, received_by = $2, "
+            "received_at = now(), updated_at = now() "
+            "where id = $3 and company_id = $4",
+            "recibido",
+            db_pg.as_uuid(current_user["id"]),
+            db_pg.as_uuid(order_id),
+            db_pg.as_uuid(current_user["company_id"]),
+        )
+
     return {"message": "Orden recibida e inventario actualizado"}
 
 # ============== EXTENDED WORK ORDER ROUTES ==============
@@ -4695,25 +4786,37 @@ async def complete_work_order(order_id: str, request: dict = Body(...), current_
     )
     
     # Consume parts from inventory
-    for item in request.get("consumed_items", []):
-        if item.get("item_id") and item.get("quantity"):
-            move = StockMove(
-                company_id=current_user["company_id"],
-                item_id=item["item_id"],
-                move_type="consumo_ot",
-                quantity=item["quantity"],
-                work_order_id=order_id,
-                notes=f"Consumo OT {order.get('order_number', '')}",
-                created_by=current_user["id"]
-            )
-            move_doc = move.model_dump()
-            move_doc["move_date"] = move_doc["move_date"].isoformat()
-            await db.stock_moves.insert_one(move_doc)
-            
-            await db.inventory_items.update_one(
-                {"id": item["item_id"]},
-                {"$inc": {"current_stock": -item["quantity"]}}
-            )
+    # Los consumos van en una sola transaccion. La orden de trabajo en si
+    # sigue en Mongo (work_orders no ha cortado), asi que ese par de escrituras
+    # no puede ser atomico entre las dos bases: lo era tampoco antes.
+    consumos = [
+        i for i in request.get("consumed_items", [])
+        if i.get("item_id") and i.get("quantity")
+    ]
+    if consumos:
+        async with db_pg.tx(current_user) as conn:
+            for item in consumos:
+                move = StockMove(
+                    company_id=current_user["company_id"],
+                    item_id=item["item_id"],
+                    move_type="consumo_ot",
+                    quantity=item["quantity"],
+                    work_order_id=order_id,
+                    notes=f"Consumo OT {order.get('order_number', '')}",
+                    created_by=current_user["id"]
+                )
+                sql, values = db_pg.build_insert(
+                    "stock_moves", STOCK_MOVE_COLS, _modelo_a_fila(move.model_dump())
+                )
+                await conn.execute(sql, *values)
+
+                await conn.execute(
+                    "update inventory_items set current_stock = current_stock - $1, "
+                    "updated_at = now() where id = $2 and company_id = $3",
+                    item["quantity"],
+                    db_pg.as_uuid(item["item_id"]),
+                    db_pg.as_uuid(current_user["company_id"]),
+                )
     
     # Close downtime
     await db.downtime_records.update_one(
