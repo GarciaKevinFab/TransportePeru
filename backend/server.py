@@ -7325,11 +7325,28 @@ async def seed_demo_data(_: bool = Depends(require_install_token)):
                 current_vehicle_id=tracto_id,
                 current_position=pos
             )
-            sql, values = db_pg.build_insert(
+            # La llanta nace montada, asi que tambien nace su registro de
+            # montaje. Sin el queda en_uso y ubicada pero sin historial: el
+            # esquema de la unidad no puede calcular km_recorridos ni
+            # cost_per_km, y un desmontaje posterior no encuentra que fila
+            # cerrar y se va sin dejar rastro. Es lo que le paso a la semilla
+            # anterior, cuyas diez llantas hubo que reconstruir a mano.
+            mount = TireMount(
+                company_id=company.id,
+                tire_id=tire.id,
+                vehicle_id=tracto_id,
+                position_code=pos,
+                mount_odometer=0,
+            )
+            sql_llanta, val_llanta = db_pg.build_insert(
                 "tires", TIRE_COLS, _modelo_a_fila(tire.model_dump())
             )
+            sql_montaje, val_montaje = db_pg.build_insert(
+                "tire_mounts", TIRE_MOUNT_COLS, _modelo_a_fila(mount.model_dump())
+            )
             async with db_pg.tx({"company_id": company.id}) as conn:
-                await conn.execute(sql, *values)
+                await conn.execute(sql_llanta, *val_llanta)
+                await conn.execute(sql_montaje, *val_montaje)
     
     # Create a sample trip
     trip = Trip(
