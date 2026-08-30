@@ -53,7 +53,7 @@ scp_put "$ROOT_DIR/backend/requirements.txt"       "$REMOTE_DIR/backend/requirem
 
 # Las variables viajan como prefijo del comando remoto: el heredoc ocupa el
 # stdin de ssh, asi que no hay otro canal por donde pasarlas.
-ssh_run "MIGRACION='$MIGRACION' TABLAS='$TABLAS' bash -s" <<'ENDSSH'
+ssh_run "MIGRACION='$MIGRACION' TABLAS='$TABLAS' RECARGA='${RECARGA:-si}' bash -s" <<'ENDSSH'
 set -euo pipefail
 cd /opt/transporteperu
 set -a; . ./.env; set +a
@@ -86,16 +86,50 @@ echo "    verificando que no quede ninguna FK cruzando la frontera Mongo/Postgre
 FRONTERA=$(grep -v "^#" db/tablas_en_postgres.txt | grep -v "^$" | paste -sd, -)
 echo "    tablas en Postgres: $FRONTERA"
 CRUZADAS=$(psql_f -tA -v tablas="$FRONTERA" < db/verificar_frontera.sql)
-if [ -n "$CRUZADAS" ]; then
-  echo "ERROR: estas FKs cruzan la frontera. Agregalas a la migracion del corte:"
-  echo "$CRUZADAS"
+SALIENTES=$(echo "$CRUZADAS" | grep "^SALIENTE" || true)
+ENTRANTES=$(echo "$CRUZADAS" | grep "^entrante" || true)
+
+# Las SALIENTES son siempre un error: apuntan a filas que nacen en Mongo y no
+# existen en Postgres, o sea que el INSERT fallaria en produccion.
+if [ -n "$SALIENTES" ]; then
+  echo "ERROR: estas FKs salen de una tabla ya migrada hacia una que sigue en Mongo."
+  echo "       Hay que quitarlas en la migracion del corte:"
+  echo "$SALIENTES"
   exit 1
 fi
-echo "    ok, ninguna"
 
-echo "==> 3/5 Recargando $TABLAS desde Mongo (foto exacta previa al corte)"
-RUNNER="docker run --rm --network transporteperu_default -v /opt/transporteperu/scripts:/w -w /w -e SOURCE_MONGO_URL=mongodb://transporteperu-mongo:27017 -e SOURCE_DB_NAME=transporteperu -e TARGET_DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@transporteperu-postgres:5432/transporteperu python:3.11-slim"
-$RUNNER sh -c "pip install --quiet --disable-pip-version-check asyncpg motor && python migrate_to_postgres.py --tables $TABLAS --truncate"
+# Las entrantes solo estorban si hay que vaciar la tabla apuntada.
+if [ -n "$ENTRANTES" ]; then
+  N=$(echo "$ENTRANTES" | wc -l)
+  if [ "${RECARGA:-si}" = "no" ]; then
+    echo "    $N FK(s) entrante(s): se conservan. Sin recarga no estorban, y"
+    echo "    quedan listas para cuando esas tablas crucen."
+  else
+    echo "ERROR: $N FK(s) entrante(s) impiden vaciar las tablas para recargarlas."
+    echo "       O se quitan en la migracion, o se corre con RECARGA=no:"
+    echo "$ENTRANTES"
+    exit 1
+  fi
+fi
+echo "    sin FKs salientes: la frontera esta limpia"
+
+# La recarga se omite con RECARGA=no. Hace falta cuando las tablas del corte
+# YA son referenciadas por FKs de tablas migradas antes: en ese caso no se las
+# puede vaciar sin arrastrar a sus hijas, y no hace falta, porque hasta el
+# momento del corte Mongo y Postgres venian sincronizados por la migracion.
+# Antes de usarlo hay que comprobar a mano que el contenido coincida.
+if [ "${RECARGA:-si}" = "no" ]; then
+  echo "==> 3/5 Recarga OMITIDA (RECARGA=no)"
+  echo "    Las tablas de este corte ya son referenciadas por FKs restauradas,"
+  echo "    asi que no se pueden vaciar. Se asume que ya estaban sincronizadas."
+  for T in $(echo "$TABLAS" | tr "," " "); do
+    echo "    $T: $(psql_q -tAc "select count(*) from \"$T\"") filas en Postgres"
+  done
+else
+  echo "==> 3/5 Recargando $TABLAS desde Mongo (foto exacta previa al corte)"
+  RUNNER="docker run --rm --network transporteperu_default -v /opt/transporteperu/scripts:/w -w /w -e SOURCE_MONGO_URL=mongodb://transporteperu-mongo:27017 -e SOURCE_DB_NAME=transporteperu -e TARGET_DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@transporteperu-postgres:5432/transporteperu python:3.11-slim"
+  $RUNNER sh -c "pip install --quiet --disable-pip-version-check asyncpg motor && python migrate_to_postgres.py --tables $TABLAS --truncate"
+fi
 
 echo "==> 4/5 DATABASE_URL en backend/.env.production"
 if grep -q '^DATABASE_URL=' backend/.env.production; then

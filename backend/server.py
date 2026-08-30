@@ -49,6 +49,29 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
+# ============== TABLAS EN POSTGRES: EMPRESAS Y USUARIOS ==============
+# companies y users ya cortaron (db/migrations/004_corte_companies_users.sql).
+# Son la raiz del modelo: todo lo demas apunta a ellas.
+
+COMPANY_COLS = {
+    "id": "uuid", "name": "text", "ruc": "text", "address": "text",
+    "phone": "text", "email": "text", "logo_url": "text", "brand_color": "text",
+    "config": "json", "sunat_config": "json",
+    "created_at": "ts", "updated_at": "ts",
+}
+
+USER_COLS = {
+    "id": "uuid", "company_id": "uuid", "email": "text", "dni": "text",
+    "name": "text", "role": "enum:user_role",
+    "password_hash": "text", "pin_hash": "text", "is_active": "bool",
+    "failed_attempts": "int", "locked_until": "ts",
+    "force_password_change": "bool",
+    "license_number": "text", "license_expiry": "ts",
+    "phone": "text", "whatsapp_number": "text",
+    "epp": "json", "push_subscription": "json",
+    "created_at": "ts", "updated_at": "ts", "created_by": "uuid",
+}
+
 # JWT Settings
 JWT_SECRET = os.environ.get("JWT_SECRET")
 if not JWT_SECRET:
@@ -897,9 +920,18 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     if payload.get("type") != "access":
         raise HTTPException(status_code=401, detail="Token inválido")
     
-    user = await db.users.find_one({"id": payload["user_id"]}, {"_id": 0})
-    if not user:
+    # tx_global y no tx(): resolver la identidad es justamente lo que pasa antes
+    # de saber la empresa. Ademas, el company_id del token NO sirve para filtrar:
+    # un superadmin que uso /companies/{id}/switch lleva en el token la empresa a
+    # la que entro, no la suya, y filtrar por ese valor no encontraria su usuario.
+    # Se devuelve la fila tal cual, igual que hacia la version con Mongo.
+    async with db_pg.tx_global("autenticacion: resolver la identidad antes de conocer la empresa") as conn:
+        fila = await conn.fetchrow(
+            "select * from users where id = $1", db_pg.as_uuid(payload["user_id"])
+        )
+    if not fila:
         raise HTTPException(status_code=401, detail="Usuario no encontrado")
+    user = db_pg.to_api(fila)
     if not user.get("is_active"):
         raise HTTPException(status_code=401, detail="Usuario desactivado")
     return user
@@ -1006,7 +1038,7 @@ async def validate_trip_can_start(company_id: str, trip_id: str, trip: dict) -> 
     errors = []
     
     # Check if checklist is required and approved
-    company = await db.companies.find_one({"id": company_id}, {"_id": 0})
+    company = await _empresa_pg(company_id)
     config = company.get("config", {}) if company else {}
     
     if config.get("require_checklist_for_start", True):
@@ -1076,9 +1108,57 @@ DEFAULT_DETRACCION_MIN_AMOUNT = 400
 DEFAULT_DETRACCION_CODIGO = "027"  # servicio de transporte de carga
 
 
+def _sin_secretos(user: dict) -> dict:
+    """Quita los hashes de credenciales antes de devolver un usuario por la API.
+
+    Con Mongo esto se hacia con una proyeccion ({password_hash: 0}) en cada
+    consulta. En SQL seria enumerar las 20 columnas restantes en cada select y
+    olvidarse de una al agregar la proxima, asi que se filtra a la salida y en
+    un solo lugar.
+    """
+    if not user:
+        return user
+    return {k: v for k, v in user.items() if k not in ("password_hash", "pin_hash")}
+
+
+async def _empresa_pg(company_id: str):
+    """Fila de companies de la empresa dada, o None.
+
+    Con RLS activo, el contexto de la transaccion ya limita a esa empresa; el
+    where por id esta igual para que la consulta se lea sola.
+    """
+    if not company_id:
+        return None
+    async with db_pg.tx({"company_id": company_id}) as conn:
+        return db_pg.to_api(await conn.fetchrow(
+            "select * from companies where id = $1", db_pg.as_uuid(company_id)
+        ))
+
+
+async def _contar_usuarios(company_id: str, role: str = None) -> int:
+    """Cantidad de usuarios de la empresa, opcionalmente filtrando por rol."""
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(company_id))
+    f.si(role, "role = $?::user_role", role)
+    async with db_pg.tx({"company_id": company_id}) as conn:
+        return await conn.fetchval(
+            "select count(*) from users where " + f.where, *f.values
+        )
+
+
+async def _usuario_pg(company_id: str, user_id):
+    """Fila de users dentro de la empresa, o None si no existe o es de otra."""
+    if not user_id:
+        return None
+    async with db_pg.tx({"company_id": company_id}) as conn:
+        return db_pg.to_api(await conn.fetchrow(
+            "select * from users where id = $1 and company_id = $2",
+            db_pg.as_uuid(user_id), db_pg.as_uuid(company_id),
+        ))
+
+
 async def _company_config(company_id: str) -> dict:
     """Devuelve el dict de configuración de la empresa (o {})."""
-    company = await db.companies.find_one({"id": company_id}, {"_id": 0, "config": 1})
+    company = await _empresa_pg(company_id)
     if not company:
         return {}
     return company.get("config", {}) or {}
@@ -1428,7 +1508,11 @@ async def _generate_document_alerts(company_id: str) -> int:
         days_until = (expiry - now).days
 
         doc_type = await db.document_types.find_one({"id": doc["document_type_id"], "company_id": company_id})
-        entity = await db.vehicles.find_one({"id": doc["entity_id"], "company_id": company_id}) or await db.users.find_one({"id": doc["entity_id"], "company_id": company_id})
+        # vehicles sigue en Mongo; users ya corto a Postgres.
+        entity = (
+            await db.vehicles.find_one({"id": doc["entity_id"], "company_id": company_id})
+            or await _usuario_pg(company_id, doc["entity_id"])
+        )
 
         # Regla Revisión Técnica: no aplica a unidades <= 4 años -> excluir de alertas y bloqueos
         if _revision_tecnica_no_aplica(doc_type, entity, doc.get("entity_type")):
@@ -1502,7 +1586,10 @@ async def _generate_document_alerts(company_id: str) -> int:
 async def run_maintenance_sweep():
     """Barrido periódico por empresa: documentos + mantenimiento + llantas + viáticos."""
     try:
-        companies = await db.companies.find({}, {"_id": 0, "id": 1}).to_list(1000)
+        async with db_pg.tx_global("tarea de fondo: recorre todas las empresas") as conn:
+            companies = db_pg.rows_to_api(
+                await conn.fetch("select id from companies limit 1000")
+            )
     except Exception as e:
         logging.error(f"run_maintenance_sweep companies error: {e}")
         return
@@ -1540,7 +1627,12 @@ async def login(request: Request, login_data: LoginRequest):
 
     # Admin login (email + password)
     if login_data.email and login_data.password:
-        user = await db.users.find_one({"email": login_data.email}, {"_id": 0})
+        # El email identifica a un usuario en todo el sistema, no dentro de una
+        # empresa: en el login todavia no hay empresa que conocer.
+        async with db_pg.tx_global("autenticacion: resolver la identidad antes de conocer la empresa") as conn:
+            user = db_pg.to_api(await conn.fetchrow(
+                "select * from users where email = $1", login_data.email
+            ))
         if not user:
             raise HTTPException(status_code=401, detail="Credenciales inválidas")
         if not user.get("password_hash"):
@@ -1550,7 +1642,10 @@ async def login(request: Request, login_data: LoginRequest):
 
     # Driver login (DNI + PIN)
     elif login_data.dni and login_data.pin:
-        user = await db.users.find_one({"dni": login_data.dni}, {"_id": 0})
+        async with db_pg.tx_global("autenticacion: resolver la identidad antes de conocer la empresa") as conn:
+            user = db_pg.to_api(await conn.fetchrow(
+                "select * from users where dni = $1", login_data.dni
+            ))
         if not user:
             raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
@@ -1567,20 +1662,25 @@ async def login(request: Request, login_data: LoginRequest):
 
         if not verify_password(login_data.pin, user["pin_hash"]):
             # Increment failed attempts
-            failed_attempts = user.get("failed_attempts", 0) + 1
-            update_data = {"failed_attempts": failed_attempts}
-            
-            if failed_attempts >= 5:
-                update_data["locked_until"] = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
-            
-            await db.users.update_one({"id": user["id"]}, {"$set": update_data})
+            failed_attempts = (user.get("failed_attempts") or 0) + 1
+            bloqueo = (
+                datetime.now(timezone.utc) + timedelta(minutes=15)
+                if failed_attempts >= 5 else None
+            )
+            async with db_pg.tx_global("autenticacion: el intento fallido se registra antes de conocer la empresa") as conn:
+                await conn.execute(
+                    "update users set failed_attempts = $1, "
+                    "locked_until = coalesce($2, locked_until) where id = $3",
+                    failed_attempts, bloqueo, db_pg.as_uuid(user["id"]),
+                )
             raise HTTPException(status_code=401, detail="Credenciales inválidas")
-        
+
         # Reset failed attempts on successful login
-        await db.users.update_one(
-            {"id": user["id"]}, 
-            {"$set": {"failed_attempts": 0, "locked_until": None}}
-        )
+        async with db_pg.tx_global("autenticacion: el intento fallido se registra antes de conocer la empresa") as conn:
+            await conn.execute(
+                "update users set failed_attempts = 0, locked_until = null where id = $1",
+                db_pg.as_uuid(user["id"]),
+            )
     else:
         raise HTTPException(status_code=400, detail="Se requiere email/password o DNI/PIN")
     
@@ -1620,7 +1720,11 @@ async def refresh_token(request: RefreshRequest):
     if payload.get("type") != "refresh":
         raise HTTPException(status_code=401, detail="Token inválido")
     
-    user = await db.users.find_one({"id": payload["user_id"]}, {"_id": 0})
+    async with db_pg.tx_global("autenticacion: resolver la identidad antes de conocer la empresa") as conn:
+        fila = await conn.fetchrow(
+            "select * from users where id = $1", db_pg.as_uuid(payload["user_id"])
+        )
+    user = db_pg.to_api(fila)
     if not user or not user.get("is_active"):
         raise HTTPException(status_code=401, detail="Usuario no válido")
     
@@ -1659,17 +1763,16 @@ async def get_me(current_user: dict = Depends(get_current_user)):
 async def get_companies(current_user: dict = Depends(require_roles("superadmin", "owner", "admin"))):
     # Superadmin sees ALL companies
     if current_user["role"] == "superadmin":
-        companies = await db.companies.find({}, {"_id": 0}).to_list(100)
-        return [serialize_doc(c) for c in companies]
+        async with db_pg.tx_global("superadmin: listar todas las empresas") as conn:
+            filas = await conn.fetch("select * from companies order by name limit 100")
+        return db_pg.rows_to_api(filas)
     # Others see only their own company
-    companies = await db.companies.find(
-        {"id": current_user["company_id"]}, {"_id": 0}
-    ).to_list(100)
-    return [serialize_doc(c) for c in companies]
+    company = await _empresa_pg(current_user["company_id"])
+    return [company] if company else []
 
 @api_router.get("/company")
 async def get_current_company(current_user: dict = Depends(get_current_user)):
-    company = await db.companies.find_one({"id": current_user["company_id"]}, {"_id": 0})
+    company = await _empresa_pg(current_user["company_id"])
     return serialize_doc(company)
 
 @api_router.post("/companies/{company_id}/switch")
@@ -1678,7 +1781,12 @@ async def switch_company(company_id: str, current_user: dict = Depends(get_curre
     if current_user["role"] != "superadmin":
         raise HTTPException(status_code=403, detail="Solo superadmin puede cambiar de empresa")
 
-    company = await db.companies.find_one({"id": company_id}, {"_id": 0})
+    # La empresa destino es, por definicion, distinta de la actual: hay que
+    # mirarla desde fuera del aislamiento.
+    async with db_pg.tx_global("superadmin: cambiar de contexto de empresa") as conn:
+        company = db_pg.to_api(await conn.fetchrow(
+            "select * from companies where id = $1", db_pg.as_uuid(company_id)
+        ))
     if not company:
         raise HTTPException(status_code=404, detail="Empresa no encontrada")
 
@@ -1704,36 +1812,29 @@ async def get_users(
     role: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
-    query = {"company_id": current_user["company_id"]}
-    if role:
-        query["role"] = role
-    
-    users = await db.users.find(query, {"_id": 0, "password_hash": 0, "pin_hash": 0}).to_list(1000)
-    return [serialize_doc(u) for u in users]
+    if role and role not in [r.value for r in UserRole]:
+        return []
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(current_user["company_id"]))
+    f.si(role, "role = $?::user_role", role)
+    async with db_pg.tx(current_user) as conn:
+        filas = await conn.fetch(
+            "select * from users where " + f.where + " order by name limit 1000",
+            *f.values,
+        )
+    # Los hashes no salen nunca de la base hacia la API.
+    return [_sin_secretos(u) for u in db_pg.rows_to_api(filas)]
 
 @api_router.get("/users/{user_id}")
 async def get_user(user_id: str, current_user: dict = Depends(get_current_user)):
-    user = await db.users.find_one(
-        {"id": user_id, "company_id": current_user["company_id"]},
-        {"_id": 0, "password_hash": 0, "pin_hash": 0}
-    )
+    user = await _usuario_pg(current_user["company_id"], user_id)
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    return serialize_doc(user)
+    return _sin_secretos(user)
 
 @api_router.post("/users")
 async def create_user(request: CreateUserRequest, current_user: dict = Depends(require_roles("owner", "admin"))):
     
     # Check if email/dni already exists within same company
-    if request.email:
-        existing = await db.users.find_one({"email": request.email, "company_id": current_user["company_id"]})
-        if existing:
-            raise HTTPException(status_code=400, detail="Email ya registrado en esta empresa")
-    if request.dni:
-        existing = await db.users.find_one({"dni": request.dni, "company_id": current_user["company_id"]})
-        if existing:
-            raise HTTPException(status_code=400, detail="DNI ya registrado en esta empresa")
-    
     user = User(
         company_id=current_user["company_id"],
         email=request.email,
@@ -1751,12 +1852,25 @@ async def create_user(request: CreateUserRequest, current_user: dict = Depends(r
     if request.pin:
         user.pin_hash = hash_password(request.pin)
     
-    doc = user.model_dump()
-    for key, value in doc.items():
-        if isinstance(value, datetime):
-            doc[key] = value.isoformat()
-    
-    await db.users.insert_one(doc)
+    # Comprobar duplicados y dar de alta en la MISMA transaccion: separados,
+    # dos altas simultaneas con el mismo email pasaban las dos comprobaciones.
+    cid = current_user["company_id"]
+    async with db_pg.tx(current_user) as conn:
+        if request.email:
+            if await conn.fetchval(
+                "select 1 from users where email = $1 and company_id = $2",
+                request.email, db_pg.as_uuid(cid),
+            ):
+                raise HTTPException(status_code=400, detail="Email ya registrado en esta empresa")
+        if request.dni:
+            if await conn.fetchval(
+                "select 1 from users where dni = $1 and company_id = $2",
+                request.dni, db_pg.as_uuid(cid),
+            ):
+                raise HTTPException(status_code=400, detail="DNI ya registrado en esta empresa")
+
+        sql, values = db_pg.build_insert("users", USER_COLS, _modelo_a_fila(user.model_dump()))
+        await conn.execute(sql, *values)
     return {"id": user.id, "message": "Usuario creado exitosamente"}
 
 @api_router.put("/users/{user_id}")
@@ -1770,16 +1884,22 @@ async def update_user(user_id: str, request: dict = Body(...), current_user: dic
     request.pop("id", None)
     request.pop("company_id", None)
     
-    request["updated_at"] = datetime.now(timezone.utc).isoformat()
-    
-    result = await db.users.update_one(
-        {"id": user_id, "company_id": current_user["company_id"]},
-        {"$set": request}
-    )
-    
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    
+    request["updated_at"] = datetime.now(timezone.utc)
+    request["id"] = user_id
+    request["company_id"] = current_user["company_id"]
+
+    async with db_pg.tx(current_user) as conn:
+        if not await conn.fetchval(
+            "select 1 from users where id = $1 and company_id = $2",
+            db_pg.as_uuid(user_id), db_pg.as_uuid(current_user["company_id"]),
+        ):
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        # USER_COLS hace de lista blanca: lo que venga en el body y no sea una
+        # columna declarada se ignora, igual que antes lo ignoraba el modelo.
+        sql, values = db_pg.build_update("users", USER_COLS, request, ["id", "company_id"])
+        if sql:
+            await conn.execute(sql, *values)
+
     return {"message": "Usuario actualizado"}
 
 @api_router.post("/users/{user_id}/reset-pin")
@@ -1789,15 +1909,15 @@ async def reset_user_pin(user_id: str, request: dict = Body(...), current_user: 
     if not new_pin or len(new_pin) != 6 or not new_pin.isdigit():
         raise HTTPException(status_code=400, detail="PIN debe ser de 6 dígitos")
     
-    await db.users.update_one(
-        {"id": user_id, "company_id": current_user["company_id"]},
-        {"$set": {
-            "pin_hash": hash_password(new_pin),
-            "force_password_change": True,
-            "failed_attempts": 0,
-            "locked_until": None
-        }}
-    )
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(
+            "update users set pin_hash = $1, force_password_change = true, "
+            "failed_attempts = 0, locked_until = null, updated_at = now() "
+            "where id = $2 and company_id = $3",
+            hash_password(new_pin),
+            db_pg.as_uuid(user_id),
+            db_pg.as_uuid(current_user["company_id"]),
+        )
     
     return {"message": "PIN reseteado. El usuario deberá cambiarlo en su próximo inicio de sesión."}
 
@@ -1805,7 +1925,7 @@ async def reset_user_pin(user_id: str, request: dict = Body(...), current_user: 
 async def delete_user(user_id: str, current_user: dict = Depends(require_roles("owner", "admin"))):
     
     # Cannot delete owner users or self
-    target_user = await db.users.find_one({"id": user_id, "company_id": current_user["company_id"]})
+    target_user = await _usuario_pg(current_user["company_id"], user_id)
     if not target_user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
@@ -1815,8 +1935,12 @@ async def delete_user(user_id: str, current_user: dict = Depends(require_roles("
     if user_id == current_user["id"]:
         raise HTTPException(status_code=400, detail="No puede eliminarse a sí mismo")
     
-    await db.users.delete_one({"id": user_id, "company_id": current_user["company_id"]})
-    
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(
+            "delete from users where id = $1 and company_id = $2",
+            db_pg.as_uuid(user_id), db_pg.as_uuid(current_user["company_id"]),
+        )
+
     return {"message": "Usuario eliminado"}
 
 # ============== MULTI-TENANT / COMPANY ROUTES ==============
@@ -1826,7 +1950,7 @@ async def get_company(company_id: str, current_user: dict = Depends(get_current_
     if current_user["role"] != "owner" and current_user["company_id"] != company_id:
         raise HTTPException(status_code=403, detail="No autorizado")
     
-    company = await db.companies.find_one({"id": company_id}, {"_id": 0})
+    company = await _empresa_pg(company_id)
     if not company:
         raise HTTPException(status_code=404, detail="Empresa no encontrada")
     return serialize_doc(company)
@@ -1848,23 +1972,29 @@ async def create_company(request: dict = Body(...), current_user: dict = Depends
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
     
-    await db.companies.insert_one(company)
-    
-    # Create default admin user for the company
-    if request.get("admin_email") and request.get("admin_password"):
-        admin_user = {
-            "id": str(uuid.uuid4()),
-            "company_id": company_id,
-            "email": request["admin_email"],
-            "name": request.get("admin_name", "Administrador"),
-            "role": "admin",
-            "password_hash": hash_password(request["admin_password"]),
-            "is_active": True,
-            "failed_attempts": 0,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        }
-        await db.users.insert_one(admin_user)
-    
+    # El contexto se fija en la empresa que se esta creando: la politica RLS
+    # exige id = empresa_actual para insertar en companies, asi que esto entra
+    # sin necesidad de saltarse el aislamiento.
+    async with db_pg.tx({"company_id": company_id}) as conn:
+        sql, values = db_pg.build_insert("companies", COMPANY_COLS, company)
+        await conn.execute(sql, *values)
+
+        # Create default admin user for the company
+        if request.get("admin_email") and request.get("admin_password"):
+            admin_user = {
+                "id": str(uuid.uuid4()),
+                "company_id": company_id,
+                "email": request["admin_email"],
+                "name": request.get("admin_name", "Administrador"),
+                "role": "admin",
+                "password_hash": hash_password(request["admin_password"]),
+                "is_active": True,
+                "failed_attempts": 0,
+                "created_at": datetime.now(timezone.utc),
+            }
+            sql, values = db_pg.build_insert("users", USER_COLS, admin_user)
+            await conn.execute(sql, *values)
+
     return {"id": company_id, "message": "Empresa creada exitosamente"}
 
 @api_router.put("/companies/{company_id}")
@@ -1878,26 +2008,69 @@ async def update_company(company_id: str, request: dict = Body(...), current_use
         raise HTTPException(status_code=403, detail="No autorizado")
     
     request.pop("id", None)
-    request["updated_at"] = datetime.now(timezone.utc).isoformat()
-    
-    result = await db.companies.update_one({"id": company_id}, {"$set": request})
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Empresa no encontrada")
-    
+    request["updated_at"] = datetime.now(timezone.utc)
+    request["id"] = company_id
+
+    # El contexto va a la empresa EDITADA, no a la del usuario: un superadmin
+    # puede editar cualquiera, y asi la politica RLS lo permite sin apagar el
+    # aislamiento para el resto de la peticion.
+    async with db_pg.tx({"company_id": company_id}) as conn:
+        if not await conn.fetchval(
+            "select 1 from companies where id = $1", db_pg.as_uuid(company_id)
+        ):
+            raise HTTPException(status_code=404, detail="Empresa no encontrada")
+        sql, values = db_pg.build_update("companies", COMPANY_COLS, request, ["id"])
+        if sql:
+            await conn.execute(sql, *values)
+
     return {"message": "Empresa actualizada"}
 
 @api_router.delete("/companies/{company_id}")
 async def delete_company(company_id: str, current_user: dict = Depends(require_roles("superadmin", "owner"))):
     """Delete company and all its data (superadmin/owner only)"""
     
-    # Delete all company data
-    collections = ["users", "vehicles", "trips", "documents", "work_orders", "issues", 
-                   "fuel_vouchers", "fuel_loads", "tires", "inventory_items", "alerts"]
-    
-    for collection in collections:
+    # En Postgres hay que quitar TODA fila que apunte a la empresa antes que la
+    # empresa misma: el corte 004 devolvio las FKs y ahora la base las exige.
+    #
+    # El orden correcto depende de esas FKs. En vez de mantener a mano una lista
+    # ordenada que se desincroniza en cuanto alguien agrega una tabla, se
+    # intentan todas y se reintentan las que fallan por clave foranea: en cada
+    # vuelta caen las hojas y en la siguiente sus padres. Si una vuelta entera
+    # no logra avanzar, hay un ciclo y se corta en vez de dejar la empresa a
+    # medio eliminar.
+    async with db_pg.tx({"company_id": company_id}) as conn:
+        pendientes = [r["t"] for r in await conn.fetch(
+            "select table_name as t from information_schema.columns "
+            "where table_schema = 'public' and column_name = 'company_id'"
+        )]
+        while pendientes:
+            quedan = []
+            for tabla in pendientes:
+                try:
+                    async with conn.transaction():  # savepoint: el fallo no aborta todo
+                        await conn.execute(
+                            'delete from "' + tabla + '" where company_id = $1',
+                            db_pg.as_uuid(company_id),
+                        )
+                except db_pg.ForeignKeyViolationError:
+                    quedan.append(tabla)
+            if len(quedan) == len(pendientes):
+                raise HTTPException(
+                    status_code=500,
+                    detail="No se pudo eliminar la empresa: dependencias sin resolver en "
+                           + ", ".join(quedan),
+                )
+            pendientes = quedan
+
+        await conn.execute(
+            "delete from companies where id = $1", db_pg.as_uuid(company_id)
+        )
+
+    # Lo que todavia vive en Mongo. users ya no esta en esta lista: corto a
+    # Postgres y lo elimina el bucle de arriba.
+    for collection in ["vehicles", "trips", "documents", "work_orders", "issues",
+                       "fuel_vouchers", "fuel_loads", "tires", "inventory_items", "alerts"]:
         await db[collection].delete_many({"company_id": company_id})
-    
-    await db.companies.delete_one({"id": company_id})
     
     return {"message": "Empresa y todos sus datos eliminados"}
 
@@ -1908,7 +2081,7 @@ async def get_company_stats(company_id: str, current_user: dict = Depends(get_cu
         raise HTTPException(status_code=403, detail="No autorizado")
     
     stats = {
-        "users": await db.users.count_documents({"company_id": company_id}),
+        "users": await _contar_usuarios(company_id),
         "vehicles": await db.vehicles.count_documents({"company_id": company_id}),
         "trips": await db.trips.count_documents({"company_id": company_id}),
         "active_trips": await db.trips.count_documents({"company_id": company_id, "status": "en_curso"}),
@@ -2030,7 +2203,9 @@ async def assign_driver_to_vehicle(vehicle_id: str, request: dict = Body(...), c
 
     # If assigning (not unassigning), validate driver exists
     if driver_id:
-        driver = await db.users.find_one({"id": driver_id, "company_id": current_user["company_id"], "role": "chofer"})
+        driver = await _usuario_pg(current_user["company_id"], driver_id)
+        if driver and driver.get("role") != "chofer":
+            driver = None
         if not driver:
             raise HTTPException(status_code=404, detail="Chofer no encontrado")
 
@@ -2314,10 +2489,13 @@ async def get_documents_matrix(
             {"_id": 0}
         ).to_list(1000)
     else:
-        entities = await db.users.find(
-            {"company_id": current_user["company_id"], "role": "chofer"},
-            {"_id": 0, "password_hash": 0, "pin_hash": 0}
-        ).to_list(1000)
+        async with db_pg.tx(current_user) as conn:
+            filas = await conn.fetch(
+                "select * from users where company_id = $1 "
+                "and role = 'chofer'::user_role limit 1000",
+                db_pg.as_uuid(current_user["company_id"]),
+            )
+        entities = [_sin_secretos(u) for u in db_pg.rows_to_api(filas)]
     
     # Get all documents
     documents = await db.documents.find(
@@ -4654,7 +4832,7 @@ async def get_tires_required_report(current_user: dict = Depends(get_current_use
     company_id = current_user["company_id"]
     
     # Get company config for thresholds
-    company = await db.companies.find_one({"id": company_id})
+    company = await _empresa_pg(company_id)
     config = company.get("config", {}) if company else {}
     critical_depth = config.get("tire_critical_depth", 3)
     warning_depth = config.get("tire_warning_depth", 5)
@@ -5215,7 +5393,7 @@ async def get_dashboard_kpis(current_user: dict = Depends(get_current_user)):
     completed_trips = await db.trips.count_documents({"company_id": company_id, "status": "completado"})
     
     # Count drivers
-    total_drivers = await db.users.count_documents({"company_id": company_id, "role": "chofer"})
+    total_drivers = await _contar_usuarios(company_id, "chofer")
     
     # Count active alerts
     active_alerts = await db.alerts.count_documents({"company_id": company_id, "resolved": False})
@@ -5486,20 +5664,25 @@ async def subscribe_push(request: dict = Body(...), current_user: dict = Depends
     subscription = request.get("subscription", {})
     
     # Store subscription in user document
-    await db.users.update_one(
-        {"id": current_user["id"]},
-        {"$set": {"push_subscription": subscription}}
-    )
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(
+            "update users set push_subscription = $1 where id = $2 and company_id = $3",
+            subscription,
+            db_pg.as_uuid(current_user["id"]),
+            db_pg.as_uuid(current_user["company_id"]),
+        )
     
     return {"message": "Subscripción registrada"}
 
 @api_router.delete("/notifications/unsubscribe")
 async def unsubscribe_push(current_user: dict = Depends(get_current_user)):
     """Unsubscribe from push notifications"""
-    await db.users.update_one(
-        {"id": current_user["id"]},
-        {"$unset": {"push_subscription": ""}}
-    )
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(
+            "update users set push_subscription = null where id = $1 and company_id = $2",
+            db_pg.as_uuid(current_user["id"]),
+            db_pg.as_uuid(current_user["company_id"]),
+        )
     
     return {"message": "Subscripción eliminada"}
 
@@ -5602,7 +5785,14 @@ async def send_push_notifications(company_id: str, title: str, message: str, tar
         elif target_role and target_role != "all":
             query["role"] = target_role
         
-        users = await db.users.find(query, {"_id": 0, "push_subscription": 1}).to_list(1000)
+        # El filtro por suscripcion no nula lo hace ahora la base, apoyado en
+        # el indice parcial users_company_push_idx.
+        async with db_pg.tx({"company_id": company_id}) as conn:
+            users = db_pg.rows_to_api(await conn.fetch(
+                "select push_subscription from users "
+                "where company_id = $1 and push_subscription is not null limit 1000",
+                db_pg.as_uuid(company_id),
+            ))
         
         payload = {
             "title": title,
@@ -5640,8 +5830,11 @@ async def generate_alerts(current_user: dict = Depends(require_roles("owner", "a
 @api_router.get("/system/status")
 async def system_status():
     """Check if the system has been initialized (owner exists)"""
-    owner_exists = await db.users.find_one({"role": "owner"}) is not None
-    company_count = await db.companies.count_documents({})
+    async with db_pg.tx_global("autenticacion: comprobaciones previas al login") as conn:
+        owner_exists = await conn.fetchval(
+            "select 1 from users where role = 'owner'::user_role limit 1"
+        ) is not None
+        company_count = await conn.fetchval("select count(*) from companies")
     return {
         "initialized": owner_exists,
         "companies": company_count
@@ -5658,7 +5851,10 @@ async def require_install_token(x_install_token: Optional[str] = Header(None)):
         if not x_install_token or not secrets.compare_digest(str(x_install_token), configured):
             raise HTTPException(status_code=403, detail="Token de instalación inválido")
     else:
-        existing = await db.users.find_one({"role": "superadmin"})
+        async with db_pg.tx_global("autenticacion: comprobaciones previas al login") as conn:
+            existing = await conn.fetchval(
+                "select 1 from users where role = 'superadmin'::user_role limit 1"
+            )
         if existing:
             raise HTTPException(
                 status_code=403,
@@ -5674,7 +5870,10 @@ async def bootstrap_superadmin(_: bool = Depends(require_install_token)):
     Only works when NO superadmin user exists in the system.
     This is the entry point for multi-tenancy management.
     """
-    existing = await db.users.find_one({"role": "superadmin"})
+    async with db_pg.tx_global("autenticacion: comprobaciones previas al login") as conn:
+        existing = await conn.fetchval(
+            "select 1 from users where role = 'superadmin'::user_role limit 1"
+        )
     if existing:
         raise HTTPException(
             status_code=400,
@@ -5693,7 +5892,10 @@ async def bootstrap_superadmin(_: bool = Depends(require_install_token)):
     # un admin desde la UI, y el RUC 00000000000 es el marcador real de que
     # esta es la empresa interna y no la de un cliente.
     SYSTEM_RUC = "00000000000"
-    existing_company = await db.companies.find_one({"ruc": SYSTEM_RUC}, {"_id": 0})
+    async with db_pg.tx_global("autenticacion: comprobaciones previas al login") as conn:
+        existing_company = db_pg.to_api(await conn.fetchrow(
+            "select * from companies where ruc = $1", SYSTEM_RUC
+        ))
     if existing_company:
         system_company_id = existing_company["id"]
         logger.info(
@@ -5712,7 +5914,9 @@ async def bootstrap_superadmin(_: bool = Depends(require_install_token)):
         for key, value in company_doc.items():
             if isinstance(value, datetime):
                 company_doc[key] = value.isoformat()
-        await db.companies.insert_one(company_doc)
+        async with db_pg.tx({"company_id": system_company.id}) as conn:
+            sql, values = db_pg.build_insert("companies", COMPANY_COLS, company_doc)
+            await conn.execute(sql, *values)
         system_company_id = system_company.id
 
     # Generar password aleatorio (se muestra UNA sola vez)
@@ -5731,7 +5935,9 @@ async def bootstrap_superadmin(_: bool = Depends(require_install_token)):
     for key, value in sa_doc.items():
         if isinstance(value, datetime):
             sa_doc[key] = value.isoformat()
-    await db.users.insert_one(sa_doc)
+    async with db_pg.tx({"company_id": system_company_id}) as conn:
+        sql, values = db_pg.build_insert("users", USER_COLS, sa_doc)
+        await conn.execute(sql, *values)
 
     return {
         "message": "SuperAdmin creado exitosamente",
@@ -5749,7 +5955,10 @@ async def bootstrap_superadmin(_: bool = Depends(require_install_token)):
 async def seed_demo_data(_: bool = Depends(require_install_token)):
     """Create demo data for testing"""
     # Check if company already exists
-    existing = await db.companies.find_one({"ruc": "20123456789"})
+    async with db_pg.tx_global("seed: buscar la empresa de demo en todo el sistema") as conn:
+        existing = db_pg.to_api(await conn.fetchrow(
+            "select * from companies where ruc = $1", "20123456789"
+        ))
     if existing:
         # No devolver credenciales si ya existía
         return {"message": "Demo data already exists", "company_id": existing["id"]}
@@ -5775,7 +5984,11 @@ async def seed_demo_data(_: bool = Depends(require_install_token)):
     for key, value in company_doc.items():
         if isinstance(value, datetime):
             company_doc[key] = value.isoformat()
-    await db.companies.insert_one(company_doc)
+    # El contexto se fija en la empresa que se crea: la politica RLS permite
+    # insertar en companies cuando id coincide con la empresa actual.
+    async with db_pg.tx({"company_id": company.id}) as conn:
+        sql, values = db_pg.build_insert("companies", COMPANY_COLS, company_doc)
+        await conn.execute(sql, *values)
     
     # Create admin user con password aleatorio (se muestra UNA sola vez)
     admin_password = secrets.token_urlsafe(12)
@@ -5791,7 +6004,9 @@ async def seed_demo_data(_: bool = Depends(require_install_token)):
     for key, value in admin_doc.items():
         if isinstance(value, datetime):
             admin_doc[key] = value.isoformat()
-    await db.users.insert_one(admin_doc)
+    async with db_pg.tx({"company_id": company.id}) as conn:
+        sql, values = db_pg.build_insert("users", USER_COLS, admin_doc)
+        await conn.execute(sql, *values)
     
     # Create drivers
     drivers = [
@@ -5816,7 +6031,9 @@ async def seed_demo_data(_: bool = Depends(require_install_token)):
         for key, value in driver_doc.items():
             if isinstance(value, datetime):
                 driver_doc[key] = value.isoformat()
-        await db.users.insert_one(driver_doc)
+        async with db_pg.tx({"company_id": company.id}) as conn:
+            sql, values = db_pg.build_insert("users", USER_COLS, driver_doc)
+            await conn.execute(sql, *values)
         driver_ids.append(driver.id)
     
     # Create vehicles - Tractos
@@ -6017,7 +6234,7 @@ async def get_trips_report(
     
     # Enrich with driver and vehicle info
     for trip in trips:
-        driver = await db.users.find_one({"id": trip.get("driver_id")}, {"_id": 0, "name": 1})
+        driver = await _usuario_pg(current_user["company_id"], trip.get("driver_id"))
         tracto = await db.vehicles.find_one({"id": trip.get("tracto_id")}, {"_id": 0, "plate": 1})
         trip["driver_name"] = driver.get("name") if driver else "-"
         trip["tracto_plate"] = tracto.get("plate") if tracto else "-"
@@ -6078,7 +6295,7 @@ async def export_trips_excel(
     
     # Data
     for row, trip in enumerate(trips, 2):
-        driver = await db.users.find_one({"id": trip.get("driver_id")}, {"_id": 0, "name": 1})
+        driver = await _usuario_pg(current_user["company_id"], trip.get("driver_id"))
         tracto = await db.vehicles.find_one({"id": trip.get("tracto_id")}, {"_id": 0, "plate": 1})
         carreta = await db.vehicles.find_one({"id": trip.get("carreta_id")}, {"_id": 0, "plate": 1}) if trip.get("carreta_id") else None
         
@@ -6122,7 +6339,7 @@ async def export_settlement_pdf(trip_id: str, current_user: dict = Depends(get_c
     if not trip:
         raise HTTPException(status_code=404, detail="Viaje no encontrado")
     
-    driver = await db.users.find_one({"id": trip.get("driver_id"), "company_id": current_user["company_id"]}, {"_id": 0})
+    driver = await _usuario_pg(current_user["company_id"], trip.get("driver_id"))
     tracto = await db.vehicles.find_one({"id": trip.get("tracto_id"), "company_id": current_user["company_id"]}, {"_id": 0})
     advances = await db.trip_advances.find({"trip_id": trip_id}, {"_id": 0}).to_list(100)
     expenses = await db.trip_expenses.find({"trip_id": trip_id}, {"_id": 0}).to_list(100)
@@ -6300,10 +6517,12 @@ async def get_fuel_report(
 
     real_driver_ids = [d for d in driver_ids_seen if d and d != "unknown"]
     if real_driver_ids:
-        drivers = await db.users.find(
-            {"company_id": current_user["company_id"], "id": {"$in": real_driver_ids}},
-            {"_id": 0, "id": 1, "name": 1}
-        ).to_list(1000)
+        async with db_pg.tx(current_user) as conn:
+            drivers = db_pg.rows_to_api(await conn.fetch(
+                "select id, name from users where company_id = $1 and id = any($2::uuid[])",
+                db_pg.as_uuid(current_user["company_id"]),
+                [db_pg.as_uuid(x) for x in real_driver_ids],
+            ))
         name_map = {u["id"]: u.get("name") for u in drivers}
         for did, agg in by_driver.items():
             agg["driver_name"] = name_map.get(did, "N/A" if did == "unknown" else did)
@@ -6485,10 +6704,7 @@ async def update_checklist_template_config(template_id: str, request: dict = Bod
 @api_router.get("/config/company")
 async def get_company_config(current_user: dict = Depends(get_current_user)):
     """Get company configuration"""
-    company = await db.companies.find_one(
-        {"id": current_user["company_id"]},
-        {"_id": 0}
-    )
+    company = await _empresa_pg(current_user["company_id"])
     return serialize_doc(company)
 
 @api_router.put("/config/company")
@@ -6502,10 +6718,11 @@ async def update_company_config(request: dict = Body(...), current_user: dict = 
     
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     
-    await db.companies.update_one(
-        {"id": current_user["company_id"]},
-        {"$set": update_data}
-    )
+    update_data["id"] = current_user["company_id"]
+    sql, values = db_pg.build_update("companies", COMPANY_COLS, update_data, ["id"])
+    async with db_pg.tx(current_user) as conn:
+        if sql:
+            await conn.execute(sql, *values)
     
     return {"message": "Configuración actualizada"}
 
@@ -6727,7 +6944,7 @@ async def create_guia(request: dict = Body(...), current_user: dict = Depends(re
             created_by=current_user["id"]
         )
         sql, values = db_pg.build_insert(
-            "guias_transportista", GUIA_COLS, _finance_doc_to_row(guia.model_dump())
+            "guias_transportista", GUIA_COLS, _modelo_a_fila(guia.model_dump())
         )
         await conn.execute(sql, *values)
 
@@ -6746,7 +6963,7 @@ async def emit_guia_sunat(guia_id: str, current_user: dict = Depends(require_rol
 
         # companies sigue en Mongo: lectura cruzada, correcta mientras esa
         # tabla no haya cortado.
-        company = await db.companies.find_one({"id": current_user["company_id"]})
+        company = await _empresa_pg(current_user["company_id"])
         sunat_config = company.get("sunat_config", {}) if company else {}
         if not sunat_config.get("api_token"):
             raise HTTPException(
@@ -6819,7 +7036,7 @@ async def create_factura(request: dict = Body(...), current_user: dict = Depends
             created_by=current_user["id"]
         )
         sql, values = db_pg.build_insert(
-            "facturas", FACTURA_COLS, _finance_doc_to_row(factura.model_dump())
+            "facturas", FACTURA_COLS, _modelo_a_fila(factura.model_dump())
         )
         await conn.execute(sql, *values)
 
@@ -6837,7 +7054,7 @@ async def emit_factura_sunat(factura_id: str, current_user: dict = Depends(requi
             raise HTTPException(status_code=404, detail="Factura no encontrada")
 
         # companies sigue en Mongo: lectura cruzada.
-        company = await db.companies.find_one({"id": current_user["company_id"]})
+        company = await _empresa_pg(current_user["company_id"])
         sunat_config = company.get("sunat_config", {}) if company else {}
         if not sunat_config.get("api_token"):
             raise HTTPException(
@@ -6859,7 +7076,7 @@ async def emit_factura_sunat(factura_id: str, current_user: dict = Depends(requi
 # --- SUNAT Config ---
 @api_router.get("/config/sunat")
 async def get_sunat_config(current_user: dict = Depends(require_roles("owner", "admin"))):
-    company = await db.companies.find_one({"id": current_user["company_id"]})
+    company = await _empresa_pg(current_user["company_id"])
     config = company.get("sunat_config", {}) if company else {}
     # Mask token
     if config.get("api_token"):
@@ -6881,10 +7098,11 @@ async def update_sunat_config(request: dict = Body(...), current_user: dict = De
         "updated_at": datetime.now(timezone.utc).isoformat()
     }
 
-    await db.companies.update_one(
-        {"id": current_user["company_id"]},
-        {"$set": {"sunat_config": sunat_config}}
-    )
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(
+            "update companies set sunat_config = $1, updated_at = now() where id = $2",
+            sunat_config, db_pg.as_uuid(current_user["company_id"]),
+        )
 
     return {"message": "Configuración SUNAT actualizada"}
 
@@ -7029,7 +7247,7 @@ async def get_documents_expiring_report(
         if etype == "vehicle":
             entity = await db.vehicles.find_one({"id": d.get("entity_id"), "company_id": company_id}, {"_id": 0})
         else:
-            entity = await db.users.find_one({"id": d.get("entity_id"), "company_id": company_id}, {"_id": 0})
+            entity = await _usuario_pg(company_id, d.get("entity_id"))
         if _revision_tecnica_no_aplica(dt, entity, etype):
             continue
 
@@ -7081,7 +7299,12 @@ async def get_viaticos_report(
     real_ids = [d for d in by_driver if d and d != "unknown"]
     name_map = {}
     if real_ids:
-        for u in await db.users.find({"company_id": company_id, "id": {"$in": real_ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(1000):
+        async with db_pg.tx({"company_id": company_id}) as conn:
+            filas = db_pg.rows_to_api(await conn.fetch(
+                "select id, name from users where company_id = $1 and id = any($2::uuid[])",
+                db_pg.as_uuid(company_id), [db_pg.as_uuid(x) for x in real_ids],
+            ))
+        for u in filas:
             name_map[u["id"]] = u.get("name")
 
     rows = []
@@ -7133,7 +7356,7 @@ async def _resolve_unit(company_id: str, unit: dict) -> dict:
     else:
         out["carreta_plate"] = None
     if unit.get("driver_id"):
-        driver = await db.users.find_one({"id": unit.get("driver_id"), "company_id": company_id}, {"_id": 0, "name": 1})
+        driver = await _usuario_pg(company_id, unit.get("driver_id"))
         out["driver_name"] = (driver or {}).get("name")
     else:
         out["driver_name"] = None
@@ -7246,7 +7469,7 @@ async def delete_unit(
 # ============== DETRACCIONES (SPOT) Y CAJA ==============
 # Módulos financieros: detracción del IGV (SPOT) y caja chica / kardex.
 
-def _finance_doc_to_row(doc: dict) -> dict:
+def _modelo_a_fila(doc: dict) -> dict:
     """model_dump() -> dict listo para db_pg.build_insert.
 
     Los datetime se dejan como datetime en vez de pasarlos a string:
@@ -7472,7 +7695,7 @@ async def create_detraccion(
     )
 
     sql, values = db_pg.build_insert(
-        "detracciones", DETRACCION_COLS, _finance_doc_to_row(detraccion.model_dump())
+        "detracciones", DETRACCION_COLS, _modelo_a_fila(detraccion.model_dump())
     )
     async with db_pg.tx(current_user) as conn:
         await conn.execute(sql, *values)
@@ -7684,7 +7907,7 @@ async def create_detraccion_from_factura(
         )
 
         sql, values = db_pg.build_insert(
-            "detracciones", DETRACCION_COLS, _finance_doc_to_row(detraccion.model_dump())
+            "detracciones", DETRACCION_COLS, _modelo_a_fila(detraccion.model_dump())
         )
         await conn.execute(sql, *values)
         creada = await conn.fetchrow(
@@ -8067,7 +8290,7 @@ async def create_cash_movement(
             created_by=current_user["id"],
         )
         sql, values = db_pg.build_insert(
-            "cash_movements", CASH_MOVEMENT_COLS, _finance_doc_to_row(movement.model_dump())
+            "cash_movements", CASH_MOVEMENT_COLS, _modelo_a_fila(movement.model_dump())
         )
         await conn.execute(sql, *values)
         row = await conn.fetchrow(
@@ -8238,9 +8461,9 @@ logger = logging.getLogger(__name__)
 async def create_indexes():
     """Crea índices idempotentes en background para consultas multi-tenant frecuentes."""
     try:
-        await db.users.create_index([("company_id", 1), ("email", 1)], background=True)
-        await db.users.create_index([("dni", 1)], background=True)
-        await db.users.create_index([("whatsapp_number", 1)], unique=True, sparse=True, background=True)
+        # Los indices de users ya no se crean aca: la tabla corto a Postgres y
+        # sus indices (incluido el unico parcial sobre whatsapp_number) viven
+        # en db/schema.sql, que es donde se versionan.
         await db.vehicles.create_index([("company_id", 1), ("plate", 1)], background=True)
         await db.trips.create_index([("company_id", 1), ("status", 1)], background=True)
         await db.tires.create_index([("company_id", 1), ("current_vehicle_id", 1)], background=True)
@@ -8266,7 +8489,8 @@ async def ensure_default_document_types():
         {"name": "Certificado Médico", "applies_to": "chofer", "is_critical": False, "block_rule": "solo_alerta"},
     ]
     try:
-        companies = await db.companies.find({}, {"_id": 0, "id": 1}).to_list(length=None)
+        async with db_pg.tx_global("arranque: sembrar tipos de documento en cada empresa") as conn:
+            companies = db_pg.rows_to_api(await conn.fetch("select id from companies"))
         for comp in companies:
             cid = comp.get("id")
             if not cid:

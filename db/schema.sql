@@ -91,6 +91,7 @@ create table companies (
   logo_url text,
   brand_color text not null default '#f97316',
   config jsonb not null default '{}'::jsonb, -- freeform (detraccion_rate, tire_critical_depth, etc.)
+  sunat_config jsonb not null default '{}'::jsonb, -- token y URL de la API de facturacion electronica
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -112,7 +113,8 @@ create table users (
   license_expiry timestamptz,
   phone text,
   whatsapp_number text, -- E.164, único global (el bot de WhatsApp resuelve por este campo sin JWT)
-  epp jsonb not null default '{}'::jsonb, -- {"casco": {"assigned":true,"date":"...","condition":"bueno","size":"M"}, ...}
+  epp jsonb not null default '{}'::jsonb,
+  push_subscription jsonb, -- suscripcion Web Push del navegador de este usuario -- {"casco": {"assigned":true,"date":"...","condition":"bueno","size":"M"}, ...}
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   created_by uuid references users(id)

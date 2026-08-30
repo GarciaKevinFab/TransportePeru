@@ -34,6 +34,10 @@ from datetime import date, datetime, timezone
 
 import asyncpg
 
+# Se reexporta para que quien use esta capa no tenga que importar asyncpg
+# solo para atrapar una violacion de clave foranea.
+ForeignKeyViolationError = asyncpg.ForeignKeyViolationError
+
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
 _pool = None
@@ -119,6 +123,38 @@ async def tx_sin_empresa():
     pool = await get_pool()
     async with pool.acquire() as conn:
         async with conn.transaction():
+            yield conn
+
+
+@asynccontextmanager
+async def tx_global(motivo: str):
+    """Transaccion que ve TODAS las empresas. Pide un motivo a proposito.
+
+    Hay tres situaciones donde filtrar por empresa es imposible o incorrecto:
+
+      1. Autenticacion. Para resolver quien es el usuario hay que leer su fila
+         ANTES de saber a que empresa pertenece. Y no alcanza con usar el
+         company_id del JWT: un superadmin puede cambiar de contexto con
+         /companies/{id}/switch, asi que su token lleva la empresa a la que
+         entro y no la suya; filtrar por ese valor no encontraria su usuario
+         y lo dejaria afuera del sistema.
+      2. Operaciones de superadmin que cruzan empresas por diseno (listar
+         todas, crear una nueva, cambiar de contexto).
+      3. Tareas de arranque y de fondo, que recorren todas las empresas y no
+         tienen usuario ni request.
+
+    El parametro `motivo` no se usa para nada tecnico: obliga a que cada
+    llamada deje escrito por que necesita saltarse el aislamiento, y hace que
+    un uso indebido salte a la vista al leer el codigo.
+
+    Para todo lo demas va tx(), que si filtra por empresa.
+    """
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            await conn.execute(
+                "select set_config('app.is_superadmin', 'true', true)"
+            )
             yield conn
 
 

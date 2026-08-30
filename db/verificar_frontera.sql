@@ -4,21 +4,30 @@
 -- Se corre con la lista de tablas que estan cortando:
 --   psql -tA -v tablas="proveedores,tipos_carga" -f db/verificar_frontera.sql
 --
--- Devuelve UNA FILA POR PROBLEMA (cero filas = todo bien). Busca en los dos
--- sentidos, porque cada direccion rompe algo distinto:
+-- Devuelve una fila por FK que cruza, marcada con su direccion, porque cada
+-- una tiene consecuencias muy distintas:
 --
---   saliente  (tabla que corta  ->  tabla que sigue en Mongo)
---             imposible de cumplir: la fila destino nace en Mongo y no existe
---             en Postgres, asi que el INSERT falla en produccion.
+--   SALIENTE  (tabla que corta  ->  tabla que sigue en Mongo)
+--             SIEMPRE hay que quitarla. Es imposible de cumplir: la fila
+--             destino nace en Mongo y no existe en Postgres, asi que el
+--             INSERT falla en produccion.
 --
 --   entrante  (tabla que sigue en Mongo  ->  tabla que corta)
---             ademas de imposible, impide vaciar la tabla apuntada durante la
---             recarga, y el error que devuelve Postgres ahi no explica nada
---             del corte.
+--             normalmente se puede DEJAR. Nadie escribe la copia congelada
+--             que quedo en Postgres de la tabla de origen, asi que la FK no
+--             puede fallar; y cuando esa tabla cruce, ya estara puesta.
+--             El unico problema es que impide VACIAR la tabla apuntada, o
+--             sea que solo estorba si el corte necesita recargar datos.
 --
--- Lo que aparezca aca va a la migracion del corte, para quitarlo.
+-- Regla: toda SALIENTE va a la migracion del corte para quitarla. Las
+-- entrantes solo si el corte va a recargar (ver RECARGA en cutover-modulo.sh).
 -- ============================================================================
-select conrelid::regclass::text || '.' || conname
+select case
+         when conrelid::regclass::text = any(string_to_array(:'tablas', ','))
+         then 'SALIENTE'
+         else 'entrante'
+       end
+       || '  ' || conrelid::regclass::text || '.' || conname
        || '  ->  ' || confrelid::regclass::text as fk_que_cruza
 from pg_constraint
 where contype = 'f'
