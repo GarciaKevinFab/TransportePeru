@@ -187,14 +187,14 @@ const LoginPage = () => {
                 <TabsList className="grid w-full grid-cols-2 mb-6 bg-slate-100 rounded-lg p-1 h-11">
                   <TabsTrigger
                     value="admin"
-                    className="rounded-md data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm font-semibold text-sm transition-all"
+                    className="rounded-md data-[state=inactive]:text-slate-600 dark:data-[state=inactive]:text-slate-300 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm font-semibold text-sm transition-all"
                   >
                     <User className="w-4 h-4 mr-2" />
                     Admin
                   </TabsTrigger>
                   <TabsTrigger
                     value="driver"
-                    className="rounded-md data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm font-semibold text-sm transition-all"
+                    className="rounded-md data-[state=inactive]:text-slate-600 dark:data-[state=inactive]:text-slate-300 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm font-semibold text-sm transition-all"
                   >
                     <Truck className="w-4 h-4 mr-2" />
                     Chofer

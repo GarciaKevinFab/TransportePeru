@@ -624,9 +624,27 @@ code {
 /* Etiquetas de inputs */
 .dark .input-label { color: #94a3b8 !important; }
 
-/* Tarjetas glass */
-.dark .glass-card {
+/* Tarjetas glass
+ *
+ * Las tres tienen que ensombrecerse juntas. glass-card ya lo hacia, pero
+ * glass-strong (la tarjeta del login) y glass-light (la home del chofer) se
+ * quedaban en blanco translucido tambien en modo oscuro, y ahi el texto SI
+ * cambia: las reglas .dark .text-slate-* de mas arriba lo aclaran. El
+ * resultado era texto claro sobre una tarjeta clara.
+ *
+ * Medido en el login antes de esto: blanco al 55% sobre el fondo oscuro
+ * compone un gris medio rgb(147,151,159), y encima quedaban las etiquetas a
+ * 1.98:1 y los placeholders a 2.81:1, cuando WCAG AA pide 4.5. Es la primera
+ * pantalla que ve cualquiera, y en el movil del chofer se notaba mas.
+ */
+.dark .glass-card,
+.dark .glass-strong {
   background-color: rgba(30, 41, 59, 0.72) !important;
+  border-color: rgba(148, 163, 184, 0.12) !important;
+}
+
+.dark .glass-light {
+  background-color: rgba(30, 41, 59, 0.6) !important;
   border-color: rgba(148, 163, 184, 0.12) !important;
 }
 
