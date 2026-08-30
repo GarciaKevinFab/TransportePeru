@@ -15,10 +15,28 @@ jobs:
         python-version: ["3.11"]
 
     services:
+      # Las dos bases conviven a proposito: la migracion a Postgres va por
+      # cortes, y hasta que termine cada tabla tiene UNA fuente de verdad, unas
+      # en Postgres y otras todavia en Mongo (ver db/tablas_en_postgres.txt).
       mongodb:
         image: mongo:6
         ports:
           - 27017:27017
+
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: ci-postgres-pass
+          POSTGRES_DB: transporteperu_test
+        ports:
+          - 5432:5432
+        # Sin healthcheck el job sigue apenas arranca el contenedor y el primer
+        # psql se encuentra la base a medio inicializar.
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
 
     env:
       # --- Server runtime config (read by backend/server.py) ---
@@ -26,6 +44,16 @@ jobs:
       DB_NAME: transporteperu_test
       JWT_SECRET: ci-test-secret
       CORS_ORIGINS: "*"
+      # --- Postgres ---
+      # El backend se conecta con app_backend, NUNCA con postgres: ese rol no
+      # puede evadir RLS, asi que una consulta a la que se le olvide el filtro
+      # por empresa devuelve cero filas en vez de datos de otro tenant.
+      DATABASE_URL: postgresql://app_backend:ci-app-backend-pass@localhost:5432/transporteperu_test
+      # Solo para montar el esquema y para el fixup post-seed, que corren fuera
+      # de cualquier request y no tienen empresa con la que filtrar.
+      POSTGRES_ADMIN_URL: postgresql://postgres:ci-postgres-pass@localhost:5432/transporteperu_test
+      PGPASSWORD: ci-postgres-pass
+      APP_BACKEND_PASSWORD: ci-app-backend-pass
       # INSTALL_TOKEN protege /api/bootstrap y /api/seed (require_install_token).
       # El seed se llama abajo con el header X-Install-Token = este valor.
       INSTALL_TOKEN: ci-install-token
@@ -46,6 +74,51 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r backend/requirements.txt
+
+      - name: Montar el esquema de Postgres
+        # Reproduce lo que scripts/deploy-postgres.sh hace en el VPS, en el
+        # mismo orden: esquema, indices, RLS y despues las migraciones de cada
+        # corte. Las migraciones NO son opcionales aunque schema.sql ya este al
+        # dia: lo que hacen es SOLTAR las FKs que cruzan la frontera entre las
+        # tablas ya migradas y las que siguen en Mongo. Sin ellas, insertar una
+        # factura cuyo trip_id vive en Mongo falla por clave foranea.
+        #
+        # Se aplican con `psql -f`, o sea en autocommit y no dentro de una
+        # transaccion: la 007 trae un `alter type ... add value`, que Postgres
+        # no deja usar en la misma transaccion en que se agrega.
+        run: |
+          set -euo pipefail
+          PSQL="psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d transporteperu_test"
+          $PSQL -q -f db/schema.sql
+          echo "schema.sql aplicado"
+          $PSQL -q -f db/indexes.sql
+          echo "indexes.sql aplicado"
+          $PSQL -q -v app_backend_password="$APP_BACKEND_PASSWORD" -f db/rls.sql
+          echo "rls.sql aplicado"
+          for M in db/migrations/*.sql; do
+            $PSQL -q -f "$M"
+            echo "$M aplicado"
+          done
+          echo ""
+          $PSQL -tAc "select 'tablas: ' || count(*) from information_schema.tables where table_schema='public'"
+          $PSQL -tAc "select 'con RLS forzado: ' || count(*) from pg_class where relrowsecurity and relforcerowsecurity"
+          $PSQL -tAc "select 'politicas: ' || count(*) from pg_policies where schemaname='public'"
+
+      - name: Comprobar que el backend puede conectarse como app_backend
+        # Falla aca, con un mensaje claro, en vez de mas adelante como un 500
+        # opaco del seed: si el rol no existe o RLS no lo deja entrar, todo lo
+        # que sigue seria ruido.
+        run: |
+          python - <<'PY'
+          import asyncio, os, asyncpg
+          async def main():
+              c = await asyncpg.connect(os.environ["DATABASE_URL"])
+              print("conectado como:", await c.fetchval("select current_user"))
+              print("puede evadir RLS:", await c.fetchval(
+                  "select rolbypassrls from pg_roles where rolname = current_user"))
+              await c.close()
+          asyncio.run(main())
+          PY
 
       - name: Disable login rate limiting for deterministic tests
         # server.py aplica @limiter.limit("10/minute") al login (slowapi).
@@ -92,7 +165,11 @@ jobs:
         # El seed asigna al admin un password aleatorio con force_password_change;
         # los tests entran como admin@transperu.com / admin123. Este script fija
         # esa credencial y clona el viaje sembrado para que TestChecklist
-        # (necesita len(trips) > 1) pueda correr. Lee MONGO_URL / DB_NAME.
+        # (necesita len(trips) > 1) pueda correr.
+        #
+        # Escribe en Postgres, no en Mongo: users y trips ya cruzaron (cortes
+        # 004 y 007). Usa POSTGRES_ADMIN_URL porque no tiene empresa con la que
+        # satisfacer RLS.
         run: python backend/tests/ci_postseed.py
 
       - name: Run tests
