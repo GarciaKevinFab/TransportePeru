@@ -15,8 +15,8 @@ operación diaria de la flota en una sola plataforma:
 
 ## Stack
 
-- **Backend**: FastAPI + MongoDB (async con Motor). JWT para autenticación,
-  bcrypt para contraseñas.
+- **Backend**: FastAPI + PostgreSQL (async con asyncpg), con aislamiento por
+  empresa vía RLS. JWT para autenticación, bcrypt para contraseñas.
 - **Frontend**: React (Create React App vía CRACO) + shadcn/ui + Tailwind CSS.
 - **Almacenamiento de archivos**: disco local (`backend/uploads/`) o AWS S3.
 - **OCR** (opcional): Google Gemini (`google-genai`) para escaneo de facturas/guías.
@@ -25,11 +25,16 @@ operación diaria de la flota en una sola plataforma:
 
 - **Python 3.11+**
 - **Node.js 18+** (el frontend usa **yarn**; hay `yarn.lock`)
-- **MongoDB** (local o remoto)
+- **Docker** — para la base de datos de desarrollo (`scripts/dev-up.sh`)
 
 ## Backend
 
 ```bash
+# 0. Base de datos de desarrollo: levanta Postgres, le aplica el esquema, los
+#    indices, RLS y las migraciones de los cortes, y te dice que DATABASE_URL
+#    poner. Sin esto el backend no arranca ningun endpoint.
+bash scripts/dev-up.sh
+
 cd backend
 
 # 1. Crear y activar entorno virtual
@@ -43,7 +48,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 # 3. Configurar variables de entorno
-cp .env.example .env   # y edita los valores (MONGO_URL, DB_NAME, JWT_SECRET, ...)
+cp .env.example .env   # y edita los valores (DATABASE_URL, JWT_SECRET, ...)
 
 # 4. Levantar el servidor (recarga en caliente)
 uvicorn server:app --reload --port 8001
@@ -58,8 +63,9 @@ Ver `backend/.env.example`. Las principales:
 
 | Variable | Requerida | Descripción |
 | --- | --- | --- |
-| `MONGO_URL` | Sí | URL de conexión a MongoDB |
-| `DB_NAME` | Sí | Nombre de la base de datos |
+| `DATABASE_URL` | Sí | Postgres, con el rol `app_backend` (no `postgres`: ese evade RLS) |
+| `MONGO_URL` | Sí | Heredada. El backend ya no consulta Mongo, pero el cliente se sigue creando al arrancar y sin la variable no levanta |
+| `DB_NAME` | Sí | Idem: nombre de la base de Mongo, ya sin uso |
 | `JWT_SECRET` | Recomendada | Clave para firmar los JWT |
 | `CORS_ORIGINS` | No | Orígenes permitidos separados por comas (`*` en dev) |
 | `INSTALL_TOKEN` | Bootstrap | Token del bootstrap inicial (ver más abajo) |
@@ -101,12 +107,22 @@ Una vez creado el superadmin, se recomienda rotar/retirar el `INSTALL_TOKEN`.
 
 ## Deploy
 
-- **Frontend**: build estático (`yarn build`) desplegado a **cPanel** vía FTP.
-- **Backend**: se ejecuta en un **Windows Server**.
+Todo vive en un VPS, en Docker. **Un solo contenedor sirve las dos cosas**: la
+API bajo `/api` y la SPA de React en el resto de rutas, con el tunel de
+Cloudflare mapeando el dominio contra ese unico puerto. Es el mismo patron que
+los otros proyectos del VPS, y evita tener que separar dominios -- lo que a su
+vez evita reconfigurar el webhook de WhatsApp en Meta.
 
-> **TODO (infra)**: `scripts/start-backend.sh` tiene un dominio de **ngrok
-> hardcodeado** (`NGROK_DOMAIN`). Debería parametrizarse (variable de entorno o
-> argumento) en lugar de estar fijo en el script.
+```bash
+# Aplicacion (compila la SPA, la sube junto al backend y reconstruye)
+bash scripts/deploy-app.sh
+
+# Solo la primera vez: levanta Postgres en el VPS y le aplica el esquema
+bash scripts/deploy-postgres.sh
+```
+
+El frontend se compila **fuera** del VPS a proposito: son dos nucleos con otros
+proyectos en produccion, y un build de CRA los deja pegados varios minutos.
 
 ## Calidad de código (pre-commit)
 
@@ -125,6 +141,8 @@ pre-commit run --all-files
 GitHub Actions (`.github/workflows/ci.yml`) corre en cada `push` y `pull_request`
 a `main`:
 
-- **Backend**: Python 3.11, instala `backend/requirements.txt`, levanta un
-  servicio MongoDB y ejecuta `pytest backend/tests/`.
+- **Backend**: Python 3.11, instala `backend/requirements.txt`, levanta
+  Postgres y Mongo, monta el esquema (`db/schema.sql`, `db/indexes.sql`,
+  `db/rls.sql` y las migraciones de `db/migrations/`), siembra datos demo y
+  ejecuta `pytest backend/tests/`.
 - **Frontend**: Node 18, `yarn install` y `CI=false yarn build`.

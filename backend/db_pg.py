@@ -39,7 +39,19 @@ import asyncpg
 # solo para atrapar una violacion de clave foranea.
 ForeignKeyViolationError = asyncpg.ForeignKeyViolationError
 
-DATABASE_URL = os.environ.get("DATABASE_URL", "")
+def _database_url():
+    """La cadena de conexion, leida EN CADA USO y no al importar el modulo.
+
+    Importa el momento: server.py hace `import db_pg` en la linea 9 y
+    `load_dotenv()` en la 45. Leyendo la variable al importar, lo que hubiera en
+    backend/.env llegaba siempre tarde y el modulo se quedaba con la cadena
+    vacia para toda la vida del proceso.
+
+    En produccion no se notaba -docker-compose inyecta el entorno con env_file
+    antes de arrancar el proceso, asi que la variable ya esta puesta-, pero en
+    local, que es donde se usa el .env, no habia forma de que funcionara.
+    """
+    return os.environ.get("DATABASE_URL", "")
 
 _pool = None
 _pool_lock = asyncio.Lock()
@@ -60,13 +72,15 @@ async def get_pool():
     if _pool is None:
         async with _pool_lock:
             if _pool is None:  # otra corrutina pudo crearlo mientras esperábamos el lock
-                if not DATABASE_URL:
+                dsn = _database_url()
+                if not dsn:
                     raise RuntimeError(
-                        "DATABASE_URL no está configurada — el módulo que la necesita "
-                        "ya migró a Postgres y no puede funcionar sin ella."
+                        "DATABASE_URL no está configurada — el backend habla solo con "
+                        "Postgres desde el corte 013 y no puede funcionar sin ella. "
+                        "En local: bash scripts/dev-up.sh"
                     )
                 _pool = await asyncpg.create_pool(
-                    dsn=DATABASE_URL, min_size=1, max_size=10, init=_init_connection
+                    dsn=dsn, min_size=1, max_size=10, init=_init_connection
                 )
     return _pool
 
