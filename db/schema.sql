@@ -68,7 +68,12 @@ create type issue_severity as enum ('baja', 'media', 'alta', 'critica');
 create type issue_status as enum ('abierto', 'en_proceso', 'cerrado'); -- antes: str libre en Issue.status
 -- balanza: el pesaje en balanza de la ruta. La app del chofer ya lo ofrece
 -- como categoria propia; sin el valor, ese gasto no se puede guardar (ver 008).
-create type expense_category as enum ('alimentacion', 'hospedaje', 'movilidad', 'peajes', 'parqueo', 'combustible', 'balanza', 'otros');
+-- Va DESPUES de 'otros', aunque quede feo, porque asi es como lo dejo el
+-- `alter type ... add value` de la 008 en las bases que ya existian: un valor
+-- nuevo se agrega al final. Ponerlo antes aca haria que una instalacion nueva
+-- tuviera otro enumsortorder que produccion, y un ORDER BY sobre la columna
+-- ordenaria distinto en cada entorno.
+create type expense_category as enum ('alimentacion', 'hospedaje', 'movilidad', 'peajes', 'parqueo', 'combustible', 'otros', 'balanza');
 create type settlement_status as enum ('pendiente', 'en_revision', 'aprobado', 'cerrado');
 create type stock_move_type as enum ('entrada', 'salida', 'ajuste', 'consumo_ot');
 create type block_rule as enum ('bloquea_asignacion', 'bloquea_inicio', 'solo_alerta');
