@@ -211,6 +211,7 @@ class User(BaseModel):
     epp: Dict[str, Any] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    whatsapp_number: Optional[str] = None  # E.164 normalizado (+51...), usado por el bot de WhatsApp
     created_by: Optional[str] = None
 
 class Vehicle(BaseModel):
@@ -238,6 +239,9 @@ class Vehicle(BaseModel):
     created_by: Optional[str] = None
 
 class VehicleEquipment(BaseModel):
+    proveedor_id: Optional[str] = None    # Proveedor/transportista dueño de esta unidad
+                                            # (ver liquidacion_flete.py) — None hasta que se asigne
+    viatico_fijo: Optional[float] = None   # Viático fijo por viaje para esta placa
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     company_id: str
@@ -5390,6 +5394,64 @@ async def upload_file(
     relative_url = f"/uploads/{entity_type}/{entity_id}/{filename}"
     return {"url": relative_url, "filename": filename, "storage": "local"}
 
+async def save_uploaded_content(
+    file_content: bytes,
+    entity_type: str,
+    entity_id: str,
+    content_type: str = "image/jpeg",
+    ext: str = "jpg",
+) -> dict:
+    """Guarda bytes ya decodificados en S3 (si hay credenciales) o disco local.
+
+    Función compartida: usada por /upload/base64 y por módulos nuevos
+    (liquidacion_flete, whatsapp_bot) que necesitan guardar un archivo sin
+    pasar por HTTP. entity_type/entity_id ya deben venir sanitizados por el
+    caller (mismo whitelist de caracteres que usaba /upload/base64 antes).
+    """
+    if len(file_content) > MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=413, detail="Archivo demasiado grande")
+
+    filename = f"{uuid.uuid4()}.{ext}"
+    file_key = f"{entity_type}/{entity_id}/{filename}"
+
+    # Try S3 first
+    s3_client = get_s3_client()
+    bucket_name = os.environ.get('S3_BUCKET_NAME', '')
+
+    if s3_client and bucket_name:
+        try:
+            s3_client.put_object(
+                Bucket=bucket_name,
+                Key=file_key,
+                Body=file_content,
+                ContentType=content_type
+            )
+            url = s3_client.generate_presigned_url(
+                'get_object',
+                Params={'Bucket': bucket_name, 'Key': file_key},
+                ExpiresIn=86400 * 7
+            )
+            return {"url": url, "filename": filename, "storage": "s3"}
+        except ClientError as e:
+            logging.error(f"S3 upload error: {e}")
+    
+    # Fall back to local storage
+    entity_dir = UPLOAD_DIR / entity_type / entity_id
+    entity_dir.mkdir(parents=True, exist_ok=True)
+    file_path = entity_dir / filename
+
+    with open(file_path, "wb") as buffer:
+        buffer.write(file_content)
+
+    relative_url = f"/uploads/{entity_type}/{entity_id}/{filename}"
+    return {"url": relative_url, "filename": filename, "storage": "local"}
+
+# ============== PUSH NOTIFICATIONS ==============
+@api_router.get("/notifications/vapid-public-key")
+async def get_vapid_public_key():
+    """Clave pública VAPID para suscribir Web Push en el navegador."""
+    return {"public_key": os.environ.get("VAPID_PUBLIC_KEY", "")}
+
 @api_router.post("/upload/base64")
 async def upload_base64(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """Upload base64 encoded image (for camera captures)"""
@@ -5410,55 +5472,14 @@ async def upload_base64(request: dict = Body(...), current_user: dict = Depends(
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid base64 data")
 
-    if len(file_content) > MAX_UPLOAD_SIZE:
-        raise HTTPException(status_code=413, detail="Archivo demasiado grande")
+    return await save_uploaded_content(file_content, entity_type, entity_id, "image/jpeg", "jpg")
 
-    filename = f"{uuid.uuid4()}.jpg"
-    file_key = f"{entity_type}/{entity_id}/{filename}"
-    
-    # Try S3 first
-    s3_client = get_s3_client()
-    bucket_name = os.environ.get('S3_BUCKET_NAME', '')
-    
-    if s3_client and bucket_name:
-        try:
-            s3_client.put_object(
-                Bucket=bucket_name,
-                Key=file_key,
-                Body=file_content,
-                ContentType="image/jpeg"
-            )
-            url = s3_client.generate_presigned_url(
-                'get_object',
-                Params={'Bucket': bucket_name, 'Key': file_key},
-                ExpiresIn=86400 * 7
-            )
-            return {"url": url, "filename": filename, "storage": "s3"}
-        except ClientError as e:
-            logging.error(f"S3 upload error: {e}")
-    
-    # Fall back to local storage
-    entity_dir = UPLOAD_DIR / entity_type / entity_id
-    entity_dir.mkdir(parents=True, exist_ok=True)
-    file_path = entity_dir / filename
-    
-    with open(file_path, "wb") as buffer:
-        buffer.write(file_content)
-    
-    relative_url = f"/uploads/{entity_type}/{entity_id}/{filename}"
-    return {"url": relative_url, "filename": filename, "storage": "local"}
-
-# ============== PUSH NOTIFICATIONS ==============
-@api_router.get("/notifications/vapid-public-key")
-async def get_vapid_public_key():
-    """Clave pública VAPID para suscribir Web Push en el navegador."""
-    return {"public_key": os.environ.get("VAPID_PUBLIC_KEY", "")}
 
 @api_router.post("/notifications/subscribe")
 async def subscribe_push(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """Subscribe to push notifications"""
     subscription = request.get("subscription", {})
-    
+
     # Store subscription in user document
     await db.users.update_one(
         {"id": current_user["id"]},
@@ -8076,3 +8097,12 @@ async def start_scheduler():
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+# Módulo Liquidación de Flete (proveedores, tipos de carga, liquidaciones y sus líneas)
+from liquidacion_flete import router as liquidacion_router
+app.include_router(liquidacion_router)
+
+# Bot de WhatsApp (webhook + bandeja de documentos pendientes)
+from whatsapp_bot import router as whatsapp_router
+app.include_router(whatsapp_router)
+
+        await db.users.create_index([("whatsapp_number", 1)], unique=True, sparse=True, background=True)

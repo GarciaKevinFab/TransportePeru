@@ -1,0 +1,59 @@
+services:
+  # Postgres: destino de la migración desde Mongo. NO publica puerto al host
+  # a propósito — solo es alcanzable desde la red interna de Docker (el
+  # backend por el hostname `postgres`) y por `docker exec`. Eso mantiene la
+  # base fuera de internet sin depender de reglas de firewall.
+  postgres:
+    image: postgres:16-alpine
+    container_name: transporteperu-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: transporteperu
+      POSTGRES_USER: postgres
+      # Viene del .env que está junto a este archivo en el VPS (nunca en git).
+      # El `:?` hace que compose falle ruidosamente si falta, en vez de
+      # levantar la base con una contraseña vacía.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD en el .env junto a docker-compose.yml}
+    volumes:
+      - transporteperu_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d transporteperu"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - default
+
+  mongo:
+    image: mongo:8
+    container_name: transporteperu-mongo
+    restart: unless-stopped
+    volumes:
+      - transporteperu_mongo_data:/data/db
+    networks:
+      - default
+
+  backend:
+    build:
+      context: ./backend
+    container_name: transporteperu-backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env.production
+    ports:
+      - "127.0.0.1:8001:8001"
+    volumes:
+      - transporteperu_uploads:/app/uploads
+    depends_on:
+      - mongo
+    networks:
+      - default
+
+volumes:
+  transporteperu_mongo_data:
+  transporteperu_pg_data:
+  transporteperu_uploads:
+
+networks:
+  default:
+    name: transporteperu_default

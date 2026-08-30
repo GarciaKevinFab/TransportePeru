@@ -30,8 +30,9 @@ const NotificationsPopover = () => {
     setLoading(true);
     try {
       const response = await api.get('/notifications?limit=20');
-      setNotifications(response.data);
-      setUnreadCount(response.data.filter(n => !n.is_read).length);
+      const list = Array.isArray(response.data) ? response.data : [];
+      setNotifications(list);
+      setUnreadCount(list.filter(n => !n.is_read).length);
     } catch (error) {
       console.error('Error fetching notifications:', error);
     }

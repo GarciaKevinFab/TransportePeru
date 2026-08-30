@@ -335,6 +335,53 @@ export const cashboxApi = {
   getReportByCategory: (params) => api.get('/cashbox/report-by-category', { params }),
 };
 
+// Proveedores (empresa propia o subcontratistas de flete)
+export const proveedoresApi = {
+  getAll: () => api.get('/proveedores'),
+  getById: (id) => api.get(`/proveedores/${id}`),
+  create: (data) => api.post('/proveedores', data),
+  update: (id, data) => api.put(`/proveedores/${id}`, data),
+  delete: (id) => api.delete(`/proveedores/${id}`),
+};
+
+// Tipos de carga (bolsa, tonelada, ...) — registro editable por empresa
+export const tiposCargaApi = {
+  getAll: () => api.get('/tipos-carga'),
+  create: (data) => api.post('/tipos-carga', data),
+  update: (id, data) => api.put(`/tipos-carga/${id}`, data),
+};
+
+// Liquidación de Flete — cabecera (proveedor + periodo + tipo de carga)
+export const liquidacionesFleteApi = {
+  getAll: (params) => api.get('/liquidaciones-flete', { params }),
+  getById: (id) => api.get(`/liquidaciones-flete/${id}`),
+  getLineas: (id) => api.get(`/liquidaciones-flete/${id}/lineas`),
+  create: (data) => api.post('/liquidaciones-flete', data),
+  update: (id, data) => api.put(`/liquidaciones-flete/${id}`, data),
+  close: (id) => api.post(`/liquidaciones-flete/${id}/close`),
+  delete: (id) => api.delete(`/liquidaciones-flete/${id}`),
+};
+
+// Liquidación de Flete — líneas (un viaje por línea) + documentos adjuntos
+export const liquidacionLineasApi = {
+  getById: (id) => api.get(`/liquidacion-lineas/${id}`),
+  create: (liquidacionId, data) => api.post(`/liquidaciones-flete/${liquidacionId}/lineas`, data),
+  update: (id, data) => api.put(`/liquidacion-lineas/${id}`, data),
+  delete: (id) => api.delete(`/liquidacion-lineas/${id}`),
+  attachDocumento: (id, data) => api.post(`/liquidacion-lineas/${id}/documento`, data),
+};
+
+// OCR generalizado (guía remitente, ticket UNACEM, vale/factura de combustible, vale de entrega)
+export const documentosOcrApi = {
+  extract: (data) => api.post('/documentos/ocr', data),
+};
+
+// Bandeja de documentos recibidos por el bot de WhatsApp, pendientes de asignar
+export const whatsappPendientesApi = {
+  getAll: (status = 'pendiente') => api.get('/whatsapp/pendientes', { params: { status } }),
+  asignar: (id, data) => api.post(`/whatsapp/pendientes/${id}/asignar`, data),
+};
+
 // Dashboard API
 export const dashboardApi = {
   getKPIs: () => api.get('/dashboard/kpis'),

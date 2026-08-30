@@ -26,6 +26,7 @@ import {
   Wallet,
   Coins,
   PiggyBank,
+  FileSpreadsheet,
   Link2,
   Sun,
   Moon,
@@ -52,6 +53,7 @@ const menuGroups = [
       { path: '/settlements', icon: Wallet, label: 'Viáticos', roles: ['superadmin', 'owner', 'admin', 'contabilidad', 'operaciones'] },
       { path: '/fuel', icon: Fuel, label: 'Combustible', roles: ['superadmin', 'owner', 'admin', 'operaciones', 'chofer'] },
       { path: '/cashbox', icon: PiggyBank, label: 'Caja', roles: ['superadmin', 'owner', 'admin', 'contabilidad'] },
+      { path: '/liquidacion-flete', icon: FileSpreadsheet, label: 'Liquidación de Flete', roles: ['superadmin', 'owner', 'admin', 'contabilidad', 'operaciones'] },
     ],
   },
   {

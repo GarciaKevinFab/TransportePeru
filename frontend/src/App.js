@@ -27,6 +27,8 @@ import EquipmentPage from './pages/EquipmentPage';
 import BillingPage from './pages/BillingPage';
 import DetraccionesPage from './pages/DetraccionesPage';
 import CashboxPage from './pages/CashboxPage';
+import LiquidacionFletePage from './pages/LiquidacionFletePage';
+import LiquidacionFleteDetailPage from './pages/LiquidacionFleteDetailPage';
 import OfflineIndicator from './components/OfflineIndicator';
 import { usePush } from './hooks/usePush';
 // Driver Mobile App Pages
@@ -306,6 +308,24 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={['superadmin', 'owner', 'admin', 'contabilidad']}>
             <CashboxPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/liquidacion-flete"
+        element={
+          <ProtectedRoute allowedRoles={['superadmin', 'owner', 'admin', 'contabilidad', 'operaciones']}>
+            <LiquidacionFletePage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/liquidacion-flete/:id"
+        element={
+          <ProtectedRoute allowedRoles={['superadmin', 'owner', 'admin', 'contabilidad', 'operaciones']}>
+            <LiquidacionFleteDetailPage />
           </ProtectedRoute>
         }
       />

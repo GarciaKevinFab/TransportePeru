@@ -1,0 +1,21 @@
+# Tablas cuya fuente de verdad ES Postgres. Una por linea; # es comentario.
+#
+# Este archivo es la UNICA lista autoritativa del avance de la migracion, y lo
+# leen tres cosas distintas que antes no podian contradecirse por accidente:
+#
+#   scripts/migrate_to_postgres.py  las salta al recargar desde Mongo (lo que
+#                                   quedo en Mongo es una foto congelada, y
+#                                   reinsertarla resucitaria filas ya borradas)
+#   scripts/verify_migration.py     no las compara contra Mongo: divergen a
+#                                   proposito
+#   scripts/cutover-modulo.sh       define la frontera para el chequeo de FKs;
+#                                   una FK solo "cruza" cuando une una tabla de
+#                                   esta lista con una que sigue en Mongo
+#
+# Se agrega una tabla ACA en el mismo commit en que su modulo corta.
+
+# --- 001: Liquidacion de Flete ---
+proveedores
+tipos_carga
+liquidaciones_flete
+liquidacion_lineas
