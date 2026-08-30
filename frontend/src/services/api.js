@@ -1,6 +1,11 @@
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+// Vacio = mismo origen, que es como se sirve en produccion: el backend publica
+// la SPA y la API bajo el mismo dominio, asi que basta con pedir /api.
+// El respaldo no es cosmetico: sin el, una compilacion sin la variable deja
+// baseURL en "undefined/api" y todas las llamadas fallan. Los otros ocho
+// lugares que leen esta variable ya usaban `|| ''`.
+const API_URL = process.env.REACT_APP_BACKEND_URL || '';
 
 const api = axios.create({
   baseURL: `${API_URL}/api`,

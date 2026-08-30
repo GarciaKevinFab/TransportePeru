@@ -35,7 +35,11 @@ services:
 
   backend:
     build:
-      context: ./backend
+      # La raiz del repo, no backend/: la imagen tiene que poder copiar
+      # frontend/build, porque este mismo contenedor sirve la SPA ademas de la
+      # API. Ver backend/Dockerfile y .dockerignore.
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: transporteperu-backend
     restart: unless-stopped
     env_file:

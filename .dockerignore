@@ -1,0 +1,44 @@
+# El contexto de build es la raiz del repo: hace falta para meter el build de
+# React en la imagen del backend, que es quien sirve la SPA. Sin esta lista se
+# enviarian al demonio de Docker cientos de megas inutiles -- node_modules, el
+# venv de Python, los volcados de Mongo y todo el historial de git.
+
+.git
+.gitignore
+.claude
+.github
+
+# Dependencias: se reinstalan dentro de la imagen
+**/node_modules
+backend/venv
+**/__pycache__
+**/*.pyc
+
+# Fuente del frontend: a la imagen SOLO entra frontend/build, ya compilado.
+# La compilacion se hace fuera del VPS a proposito: tiene 2 nucleos y tres
+# proyectos en produccion, y un build de CRA ahi deja los dos pegados varios
+# minutos, degradando a los vecinos.
+frontend/src
+frontend/public
+frontend/node_modules
+frontend/package.json
+frontend/yarn.lock
+frontend/craco.config.js
+frontend/tailwind.config.js
+frontend/postcss.config.js
+frontend/jsconfig.json
+frontend/vercel.json
+frontend/.vercel
+
+# Datos y artefactos que no pintan nada en la imagen
+mongo_dump
+backups
+graphify-out
+test_reports
+memory
+docs
+
+# Ruido local
+*.log
+.DS_Store
+Thumbs.db
