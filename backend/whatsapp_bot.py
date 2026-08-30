@@ -100,9 +100,20 @@ async def resolve_driver(wa_id: str) -> Optional[dict]:
     normalized = _normalize_phone(wa_id)
     if not normalized:
         return None
-    return await srv.db.users.find_one(
-        {"whatsapp_number": normalized, "is_active": True}, {"_id": 0}
-    )
+    # Deuda del corte 004: users cruzo a Postgres entonces y esta lectura se
+    # quedo apuntando a Mongo, o sea a la foto congelada de aquel dia. Desde
+    # entonces un chofer dado de alta -o al que le cambiaron el numero- no
+    # existia para el bot. Se cierra aca, con la ultima tabla que quedaba.
+    #
+    # tx_global porque todavia no se sabe de que empresa se trata: resolver el
+    # numero ES lo que lo dice (caso 1 de los documentados en db_pg.tx_global).
+    # El indice unico parcial users_whatsapp_number_idx garantiza a lo sumo una
+    # fila, asi que la busqueda global no puede volverse ambigua.
+    async with db_pg.tx_global("resolver el chofer por su numero de WhatsApp") as conn:
+        return db_pg.to_api(await conn.fetchrow(
+            "select * from users where whatsapp_number = $1 and is_active",
+            normalized,
+        ))
 
 
 async def find_active_trips_for_driver(company_id: str, driver_id: str) -> List[dict]:

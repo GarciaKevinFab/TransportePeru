@@ -279,6 +279,11 @@ _COERCERS = {
     # vencimiento. Llegan del request como lista de JSON, donde un numero puede
     # venir como texto ("30"), asi que cada elemento pasa por as_int.
     "int[]": lambda v: [i for i in (as_int(x) for x in (v or [])) if i is not None],
+    # float[]: tire_inspections.depths son las 2-4 mediciones de profundidad en
+    # milimetros de una misma llanta. Mismo tratamiento que int[]: el request
+    # puede mandar "7.5" como texto, y un elemento que no sea numero se
+    # descarta en vez de meter un NULL en un array declarado not null.
+    "float[]": lambda v: [f for f in (as_float(x) for x in (v or [])) if f is not None],
     # text[]: fotos de un checklist o de una incidencia, que viajan como lista
     # de URLs. Se filtran los None para no meter nulos en un array declarado
     # not null.

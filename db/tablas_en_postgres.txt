@@ -77,3 +77,19 @@ audit_logs
 vehicle_equipment
 maintenance_matrix_plans
 maintenance_matrix_plan_vehicles
+
+# --- 013: Llantas y mantenimiento (un solo componente conectado) ---
+# El ultimo corte. Van juntas por el ciclo work_orders <-> issues y todo lo que
+# cuelga de el; cualquier subconjunto propio dejaba una FK cruzando la frontera.
+# Con estas diez, las 50 tablas tienen a Postgres como fuente de verdad y no
+# queda un solo acceso a Mongo en el backend.
+tires
+tire_mounts
+tire_inspections
+tire_life_events
+tire_rotations
+alignment_records
+maintenance_plans
+work_orders
+downtime_records
+issues

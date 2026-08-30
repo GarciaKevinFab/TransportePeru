@@ -1045,11 +1045,20 @@ async def ensure_default_liquidacion_flete_config():
     TipoCargaConfig por defecto (bolsa, tonelada) — idempotente, mismo patrón
     que ensure_default_document_types en server.py.
 
-    Las empresas se leen de Mongo (companies no ha cortado todavía) y los
-    proveedores/tipos de carga se escriben en Postgres (esos sí cortaron).
-    Una transacción por empresa: si una falla, no arrastra a las demás."""
+    La lista de empresas se lee sin contexto de empresa —es una tarea de
+    arranque, sin request ni JWT: el caso 3 de los que documenta
+    db_pg.tx_global—, y después va una transacción por empresa: si una falla,
+    no arrastra a las demás.
+
+    Hasta el corte 013 esta lectura iba a Mongo, y el comentario decía que
+    companies no había cortado. Cortó en el 004: desde entonces leía la foto
+    congelada de aquel día, así que una empresa creada después nunca recibía
+    su proveedor propio ni sus tipos de carga por defecto."""
     try:
-        companies = await srv.db.companies.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(length=None)
+        async with db_pg.tx_global("sembrar la configuración inicial de cada empresa") as conn:
+            companies = db_pg.rows_to_api(
+                await conn.fetch("select id, name from companies")
+            )
         for comp in companies:
             cid = comp.get("id")
             if not cid:

@@ -219,6 +219,12 @@ create table tires (
   status tire_status not null default 'nuevo',
   life_number int not null default 1, -- VN=1, R1=2, R2=3...
   initial_depth double precision, -- baseline mm de la vida actual
+  last_depth double precision, -- minima de la ultima inspeccion (ver migracion 013)
+  band_brand text, -- marca y modelo de la banda del reencauche
+  band_model text,
+  scrap_reason text, -- motivo, fecha y odometro de la baja
+  scrap_date timestamptz,
+  scrap_odometer int,
   current_vehicle_id uuid references vehicles(id),
   current_position text,
   total_km int not null default 0,
@@ -267,6 +273,7 @@ create table tire_life_events (
   cost double precision not null default 0,
   supplier text,
   notes text,
+  odometer int, -- odometro al momento del evento (ver migracion 013)
   event_date timestamptz not null default now(),
   created_by uuid references users(id)
 );

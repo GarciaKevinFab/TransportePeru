@@ -4,8 +4,8 @@ from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 
-# Postgres: las tablas que ya cortaron. Mongo y Postgres conviven mientras
-# dura la migracion; ver db/tablas_en_postgres.txt para la lista al dia.
+# Postgres: la unica base del backend desde el corte 013. Las 50 tablas
+# cruzaron y ya no queda ningun acceso a Mongo; ver db/tablas_en_postgres.txt.
 import db_pg
 
 import os
@@ -1055,13 +1055,19 @@ async def validate_trip_can_be_assigned(company_id: str, tracto_id: str, carreta
         errors.append(f"Chofer bloqueado: {driver_blocks[0].get('reason', 'Sin razón')}")
     
     # Check critical work orders
-    wo_query = {
-        "company_id": company_id,
-        "vehicle_id": {"$in": [tracto_id, carreta_id] if carreta_id else [tracto_id]},
-        "status": {"$in": ["abierta", "en_proceso"]},
-        "priority": "critica"
-    }
-    critical_wos = await db.work_orders.find(wo_query, {"_id": 0}).to_list(10)
+    unidades = [
+        db_pg.as_uuid(v)
+        for v in ([tracto_id, carreta_id] if carreta_id else [tracto_id])
+        if v
+    ]
+    async with db_pg.tx({"company_id": company_id}) as conn:
+        critical_wos = db_pg.rows_to_api(await conn.fetch(
+            "select * from work_orders where company_id = $1 "
+            "and vehicle_id = any($2::uuid[]) "
+            "and status in ('abierta', 'en_proceso') and priority = 'critica' "
+            "limit 10",
+            db_pg.as_uuid(company_id), unidades,
+        ))
     if critical_wos:
         errors.append(f"OT crítica pendiente: {critical_wos[0].get('description', '')[:50]}")
     
@@ -1488,9 +1494,12 @@ async def compute_tire_projection(company_id: str, tire: dict, vehicle: dict = N
         if vehicle is None and tire.get("current_vehicle_id"):
             vehicle = await _vehiculo_pg(company_id, tire["current_vehicle_id"])
         veh_odo = vehicle.get("odometer") if vehicle else None
-        mount = await db.tire_mounts.find_one(
-            {"tire_id": tire["id"], "unmount_date": None}, {"_id": 0}, sort=[("mount_date", -1)]
-        )
+        async with db_pg.tx({"company_id": company_id}) as conn:
+            mount = db_pg.to_api(await conn.fetchrow(
+                "select * from tire_mounts where tire_id = $1 and company_id = $2 "
+                "and unmount_date is null order by mount_date desc limit 1",
+                db_pg.as_uuid(tire["id"]), db_pg.as_uuid(company_id),
+            ))
         mount_odo = mount.get("mount_odometer") if mount else None
         if veh_odo is not None and mount_odo is not None:
             diff = veh_odo - mount_odo
@@ -1569,10 +1578,16 @@ async def compute_maintenance_status(company_id: str, vehicle: dict) -> dict:
     # 2) Fallback: MaintenancePlan por tipo de vehículo con interval_km
     if interval_km is None:
         vt = vehicle.get("vehicle_type")
-        plan = await db.maintenance_plans.find_one(
-            {"company_id": company_id, "vehicle_type": vt, "interval_km": {"$ne": None, "$gt": 0}},
-            {"_id": 0}, sort=[("interval_km", 1)]
-        )
+        # vehicle_type::text: vt sale de la fila del vehiculo y podria no ser un
+        # valor del enum; comparando como texto eso devuelve "sin plan" en vez
+        # de un 500 en medio del calculo del proximo servicio.
+        async with db_pg.tx({"company_id": company_id}) as conn:
+            plan = db_pg.to_api(await conn.fetchrow(
+                "select * from maintenance_plans where company_id = $1 "
+                "and vehicle_type::text = $2 and interval_km > 0 "
+                "order by interval_km limit 1",
+                db_pg.as_uuid(company_id), vt,
+            ))
         if plan:
             plan_name = plan.get("name")
             interval_km = plan.get("interval_km")
@@ -1623,9 +1638,12 @@ async def check_tire_reviews(company_id: str, vehicle: dict):
     """Revisa las llantas montadas y crea alerta tire_review_due cuando necesitan revisión."""
     try:
         config = await _company_config(company_id)
-        tires = await db.tires.find(
-            {"current_vehicle_id": vehicle["id"], "company_id": company_id}, {"_id": 0}
-        ).to_list(50)
+        async with db_pg.tx({"company_id": company_id}) as conn:
+            tires = db_pg.rows_to_api(await conn.fetch(
+                "select * from tires where company_id = $1 and current_vehicle_id = $2 "
+                "limit 50",
+                db_pg.as_uuid(company_id), db_pg.as_uuid(vehicle["id"]),
+            ))
         for tire in tires:
             proj = await compute_tire_projection(company_id, tire, vehicle, config)
             if proj.get("needs_review"):
@@ -2278,6 +2296,17 @@ async def delete_company(company_id: str, current_user: dict = Depends(require_r
     # no logra avanzar, hay un ciclo y se corta en vez de dejar la empresa a
     # medio eliminar.
     async with db_pg.tx({"company_id": company_id}) as conn:
+        # El corte 013 trajo el unico CICLO de FKs del esquema:
+        # work_orders.issue_id -> issues y issues.work_order_id -> work_orders.
+        # El bucle de mas abajo no puede deshacerlo solo -- ninguna de las dos
+        # llega a borrarse nunca y termina abortando con "dependencias sin
+        # resolver". Se corta una punta antes de empezar: las dos columnas son
+        # nulables y la empresa se va entera igual.
+        await conn.execute(
+            "update work_orders set issue_id = null where company_id = $1",
+            db_pg.as_uuid(company_id),
+        )
+
         pendientes = [r["t"] for r in await conn.fetch(
             "select table_name as t from information_schema.columns "
             "where table_schema = 'public' and column_name = 'company_id'"
@@ -2305,12 +2334,10 @@ async def delete_company(company_id: str, current_user: dict = Depends(require_r
             "delete from companies where id = $1", db_pg.as_uuid(company_id)
         )
 
-    # Lo que todavia vive en Mongo. users ya no esta en esta lista: corto a
-    # Postgres y lo elimina el bucle de arriba.
-    for collection in ["vehicles", "trips", "documents", "work_orders", "issues",
-                       "fuel_vouchers", "fuel_loads", "tires", "inventory_items", "alerts"]:
-        await db[collection].delete_many({"company_id": company_id})
-    
+    # Ya no hay nada que barrer en Mongo: con el corte 013 las 50 tablas viven
+    # en Postgres y el bucle de arriba se las lleva todas. La lista de
+    # colecciones sobrevivientes desaparece junto con la ultima de ellas.
+
     return {"message": "Empresa y todos sus datos eliminados"}
 
 @api_router.get("/companies/{company_id}/stats")
@@ -2319,13 +2346,20 @@ async def get_company_stats(company_id: str, current_user: dict = Depends(get_cu
     if current_user["role"] != "owner" and current_user["company_id"] != company_id:
         raise HTTPException(status_code=403, detail="No autorizado")
     
+    async with db_pg.tx({"company_id": company_id}) as conn:
+        total_ots, ots_abiertas = await conn.fetchrow(
+            "select count(*), count(*) filter (where status <> 'completada') "
+            "from work_orders where company_id = $1",
+            db_pg.as_uuid(company_id),
+        )
+
     stats = {
         "users": await _contar_usuarios(company_id),
         "vehicles": await _contar_vehiculos(company_id),
         "trips": await _contar_viajes(company_id),
         "active_trips": await _contar_viajes(company_id, "en_curso"),
-        "work_orders": await db.work_orders.count_documents({"company_id": company_id}),
-        "open_work_orders": await db.work_orders.count_documents({"company_id": company_id, "status": {"$ne": "completada"}}),
+        "work_orders": total_ots,
+        "open_work_orders": ots_abiertas,
     }
     return stats
 
@@ -2496,8 +2530,7 @@ ROUTE_COLS = {
 # users y proveedores, que ya estaban en Postgres: no tuvo ninguna saliente.
 #
 # Las tablas que la referencian (tires, trips, couplings, units, checklists,
-# work_orders...) siguen en Mongo y se leen por db, que es lo correcto hasta
-# que crucen.
+# work_orders...) tambien cruzaron ya; las ultimas, en el corte 013.
 
 VEHICLE_COLS = {
     "id": "uuid", "company_id": "uuid", "plate": "text",
@@ -3745,6 +3778,143 @@ async def delete_fuel_load(load_id: str, current_user: dict = Depends(require_ro
     
     return {"message": "Carga eliminada"}
 
+# ============== TABLAS EN POSTGRES: LLANTAS Y MANTENIMIENTO ==============
+# Corte 013, el ultimo. Diez tablas que forman un solo componente conectado:
+# el ciclo work_orders <-> issues y todo lo que cuelga de el (ver la migracion
+# 013 para por que no se podia partir en cortes mas chicos).
+
+TIRE_COLS = {
+    "id": "uuid", "company_id": "uuid", "serial": "text", "brand": "text",
+    "model": "text", "dimension": "text", "position_type": "text",
+    "purchase_cost": "float", "purchase_date": "ts", "supplier": "text",
+    "status": "enum:tire_status", "life_number": "int",
+    "initial_depth": "float", "last_depth": "float",
+    "band_brand": "text", "band_model": "text",
+    "scrap_reason": "text", "scrap_date": "ts", "scrap_odometer": "int",
+    "current_vehicle_id": "uuid", "current_position": "text",
+    "total_km": "int", "created_at": "ts", "updated_at": "ts",
+}
+
+TIRE_MOUNT_COLS = {
+    "id": "uuid", "company_id": "uuid", "tire_id": "uuid", "vehicle_id": "uuid",
+    "position_code": "text", "mount_date": "ts", "mount_odometer": "int",
+    "unmount_date": "ts", "unmount_odometer": "int", "reason": "text",
+    "created_by": "uuid",
+}
+
+TIRE_INSPECTION_COLS = {
+    "id": "uuid", "company_id": "uuid", "tire_id": "uuid", "vehicle_id": "uuid",
+    "position_code": "text", "depths": "float[]", "pressure": "float",
+    "irregular_wear": "bool", "wear_type": "text", "photos": "text[]",
+    "odometer": "int", "notes": "text", "inspection_date": "ts",
+    "created_by": "uuid",
+}
+
+TIRE_LIFE_EVENT_COLS = {
+    "id": "uuid", "company_id": "uuid", "tire_id": "uuid", "life_number": "int",
+    "event_type": "text", "cost": "float", "supplier": "text", "notes": "text",
+    "odometer": "int", "event_date": "ts", "created_by": "uuid",
+}
+
+TIRE_ROTATION_COLS = {
+    "id": "uuid", "company_id": "uuid", "vehicle_id": "uuid", "changes": "json",
+    "reason": "text", "odometer": "int", "rotation_date": "ts",
+    "created_by": "uuid",
+}
+
+ALIGNMENT_RECORD_COLS = {
+    "id": "uuid", "company_id": "uuid", "vehicle_id": "uuid", "axle": "text",
+    "workshop": "text", "cost": "float", "notes": "text",
+    "alignment_date": "ts", "created_by": "uuid",
+}
+
+MAINTENANCE_PLAN_COLS = {
+    "id": "uuid", "company_id": "uuid", "name": "text",
+    "vehicle_type": "enum:vehicle_type", "component": "text",
+    "interval_km": "int", "interval_days": "int", "interval_hours": "int",
+    "tasks": "text[]", "created_at": "ts",
+}
+
+WORK_ORDER_COLS = {
+    "id": "uuid", "company_id": "uuid", "order_number": "text",
+    "vehicle_id": "uuid", "order_type": "text",
+    "priority": "enum:work_order_priority", "status": "enum:work_order_status",
+    "description": "text", "maintenance_plan_id": "uuid", "issue_id": "uuid",
+    "items": "json", "labor_cost": "float", "parts_cost": "float",
+    "total_cost": "float", "workshop": "text", "technician": "text",
+    "scheduled_date": "ts", "start_date": "ts", "end_date": "ts",
+    "odometer_at_service": "int", "notes": "text",
+    "created_at": "ts", "updated_at": "ts",
+    "created_by": "uuid", "closed_by": "uuid",
+}
+
+DOWNTIME_RECORD_COLS = {
+    "id": "uuid", "company_id": "uuid", "vehicle_id": "uuid",
+    "work_order_id": "uuid", "reason": "text", "start_time": "ts",
+    "end_time": "ts", "duration_hours": "float", "created_by": "uuid",
+}
+
+ISSUE_COLS = {
+    "id": "uuid", "company_id": "uuid", "issue_number": "text",
+    "trip_id": "uuid", "vehicle_id": "uuid", "driver_id": "uuid",
+    "checklist_id": "uuid", "tire_id": "uuid",
+    "issue_type": "enum:issue_type", "severity": "enum:issue_severity",
+    "status": "enum:issue_status", "title": "text", "description": "text",
+    "location_lat": "float", "location_lng": "float", "photos": "text[]",
+    "cost": "float", "responsible": "text", "resolution": "text",
+    "work_order_id": "uuid", "resolved_by": "uuid", "resolved_at": "ts",
+    "created_at": "ts", "updated_at": "ts", "created_by": "uuid",
+}
+
+
+async def _llanta_pg(company_id: str, tire_id: str):
+    """Una llanta por id, o None. Se repite en casi todos los endpoints del
+    modulo, siempre para validar antes de escribir."""
+    async with db_pg.tx({"company_id": company_id}) as conn:
+        return db_pg.to_api(await conn.fetchrow(
+            "select * from tires where id = $1 and company_id = $2",
+            db_pg.as_uuid(tire_id), db_pg.as_uuid(company_id),
+        ))
+
+
+async def _actualizar_llanta(company_id: str, tire_id: str, datos: dict):
+    """UPDATE de tires por id + empresa. Devuelve si toco alguna fila.
+
+    El filtro por empresa va explicito aunque RLS ya lo garantice: es la regla
+    del modulo (ver db_pg.py). En Mongo varios de estos UPDATE se hacian solo
+    por id, sin empresa -- lo que dejaba a una empresa modificar la llanta de
+    otra si adivinaba el uuid.
+    """
+    fila = dict(datos)
+    fila["id"] = tire_id
+    fila["company_id"] = company_id
+    fila.setdefault("updated_at", datetime.now(timezone.utc))
+    sql, values = db_pg.build_update("tires", TIRE_COLS, fila, ["id", "company_id"])
+    if not sql:
+        return False
+    async with db_pg.tx({"company_id": company_id}) as conn:
+        return (await conn.execute(sql, *values)) != "UPDATE 0"
+
+
+async def _orden_pg(company_id: str, order_id: str):
+    """Una orden de trabajo por id, o None."""
+    async with db_pg.tx({"company_id": company_id}) as conn:
+        return db_pg.to_api(await conn.fetchrow(
+            "select * from work_orders where id = $1 and company_id = $2",
+            db_pg.as_uuid(order_id), db_pg.as_uuid(company_id),
+        ))
+
+
+async def _ultima_inspeccion_pg(company_id: str, tire_id: str):
+    """La inspeccion mas reciente de una llanta, o None."""
+    async with db_pg.tx({"company_id": company_id}) as conn:
+        return db_pg.to_api(await conn.fetchrow(
+            "select * from tire_inspections where tire_id = $1 and company_id = $2 "
+            "order by inspection_date desc limit 1",
+            db_pg.as_uuid(tire_id), db_pg.as_uuid(company_id),
+        ))
+
+
 # ============== TIRE ROUTES ==============
 @api_router.get("/tires")
 async def get_tires(
@@ -3752,24 +3922,23 @@ async def get_tires(
     status: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
-    query = {"company_id": current_user["company_id"]}
-    if vehicle_id:
-        query["current_vehicle_id"] = vehicle_id
-    if status:
-        query["status"] = status
-    
-    tires = await db.tires.find(query, {"_id": 0}).to_list(1000)
-    return [serialize_doc(t) for t in tires]
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(current_user["company_id"]))
+    f.si(vehicle_id, "current_vehicle_id = $?", db_pg.as_uuid(vehicle_id))
+    # status::text y no $?::tire_status: el valor llega de la query string, y
+    # uno que no exista en el enum debe devolver lista vacia, no un 500.
+    f.si(status, "status::text = $?", status)
+    async with db_pg.tx(current_user) as conn:
+        return db_pg.rows_to_api(await conn.fetch(
+            "select * from tires where " + f.where + " order by serial limit 1000",
+            *f.values
+        ))
 
 @api_router.get("/tires/{tire_id}")
 async def get_tire(tire_id: str, current_user: dict = Depends(get_current_user)):
-    tire = await db.tires.find_one(
-        {"id": tire_id, "company_id": current_user["company_id"]},
-        {"_id": 0}
-    )
+    tire = await _llanta_pg(current_user["company_id"], tire_id)
     if not tire:
         raise HTTPException(status_code=404, detail="Llanta no encontrada")
-    return serialize_doc(tire)
+    return tire
 
 @api_router.post("/tires")
 async def create_tire(request: CreateTireRequest, current_user: dict = Depends(require_roles("owner", "admin", "mantenimiento", "flota"))):
@@ -3787,43 +3956,51 @@ async def create_tire(request: CreateTireRequest, current_user: dict = Depends(r
         initial_depth=request.initial_depth
     )
     
-    doc = tire.model_dump()
-    for key, value in doc.items():
-        if isinstance(value, datetime):
-            doc[key] = value.isoformat()
-    
-    await db.tires.insert_one(doc)
+    sql, values = db_pg.build_insert(
+        "tires", TIRE_COLS, _modelo_a_fila(tire.model_dump())
+    )
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(sql, *values)
     return {"id": tire.id, "message": "Llanta creada"}
 
 @api_router.put("/tires/{tire_id}")
 async def update_tire(tire_id: str, request: dict = Body(...), current_user: dict = Depends(require_roles("superadmin", "owner", "admin", "mantenimiento", "flota"))):
     """Update tire details (admin/flota/mantenimiento)"""
-    tire = await db.tires.find_one({"id": tire_id, "company_id": current_user["company_id"]})
+    tire = await _llanta_pg(current_user["company_id"], tire_id)
     if not tire:
         raise HTTPException(status_code=404, detail="Llanta no encontrada")
 
     # Allowed editable fields
     allowed = ["serial", "brand", "model", "dimension", "position_type", "purchase_cost", "purchase_date",
                "supplier", "status", "life_number", "current_position", "total_km", "initial_depth"]
-    update_data = {}
-    for field in allowed:
-        if field in request:
-            update_data[field] = request[field]
-    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
-
-    await db.tires.update_one({"id": tire_id, "company_id": current_user["company_id"]}, {"$set": update_data})
+    update_data = {field: request[field] for field in allowed if field in request}
+    if update_data:
+        await _actualizar_llanta(current_user["company_id"], tire_id, update_data)
     return {"message": "Llanta actualizada"}
 
 @api_router.delete("/tires/{tire_id}")
 async def delete_tire(tire_id: str, current_user: dict = Depends(require_roles("superadmin", "owner", "admin", "flota"))):
     """Delete a tire (only if not mounted)"""
-    tire = await db.tires.find_one({"id": tire_id, "company_id": current_user["company_id"]})
+    tire = await _llanta_pg(current_user["company_id"], tire_id)
     if not tire:
         raise HTTPException(status_code=404, detail="Llanta no encontrada")
     if tire.get("current_vehicle_id"):
         raise HTTPException(status_code=400, detail="No se puede eliminar una llanta montada. Desmonte primero.")
 
-    await db.tires.delete_one({"id": tire_id, "company_id": current_user["company_id"]})
+    # El DELETE puede rebotar contra las FKs de su historial (montajes,
+    # inspecciones, eventos de vida, incidentes). En Mongo se borraba siempre y
+    # ese historial quedaba huerfano apuntando a una llanta inexistente.
+    try:
+        async with db_pg.tx(current_user) as conn:
+            await conn.execute(
+                "delete from tires where id = $1 and company_id = $2",
+                db_pg.as_uuid(tire_id), db_pg.as_uuid(current_user["company_id"]),
+            )
+    except db_pg.ForeignKeyViolationError:
+        raise HTTPException(
+            status_code=400,
+            detail="La llanta tiene historial registrado (montajes, inspecciones o incidentes) y no se puede eliminar. Dela de baja con /scrap.",
+        )
     return {"message": "Llanta eliminada"}
 
 # ============== TIRE / AXLE HELPERS ==============
@@ -3862,17 +4039,24 @@ def _tire_axle_compatible(position_type: Optional[str], axle_type: Optional[str]
 async def mount_tire(request: MountTireRequest, current_user: dict = Depends(require_roles("owner", "admin", "mantenimiento", "flota"))):
 
     # Check if tire exists and is available
-    tire = await db.tires.find_one({"id": request.tire_id, "company_id": current_user["company_id"]})
+    tire = await _llanta_pg(current_user["company_id"], request.tire_id)
     if not tire:
         raise HTTPException(status_code=404, detail="Llanta no encontrada")
     if tire.get("current_vehicle_id"):
         raise HTTPException(status_code=400, detail="Llanta ya está montada en otro vehículo")
 
     # Check if position is available
-    existing = await db.tires.find_one({
-        "current_vehicle_id": request.vehicle_id,
-        "current_position": request.position_code
-    })
+    # El filtro por empresa es nuevo: en Mongo esta consulta no lo llevaba, asi
+    # que una llanta de OTRA empresa montada en esa posicion bloqueaba el
+    # montaje con un "Posición ya ocupada" imposible de entender.
+    async with db_pg.tx(current_user) as conn:
+        existing = await conn.fetchrow(
+            "select id from tires where company_id = $1 and current_vehicle_id = $2 "
+            "and current_position = $3",
+            db_pg.as_uuid(current_user["company_id"]),
+            db_pg.as_uuid(request.vehicle_id),
+            request.position_code,
+        )
     if existing:
         raise HTTPException(status_code=400, detail="Posición ya ocupada")
 
@@ -3893,68 +4077,100 @@ async def mount_tire(request: MountTireRequest, current_user: dict = Depends(req
         created_by=current_user["id"]
     )
     
-    doc = mount.model_dump()
-    doc["mount_date"] = doc["mount_date"].isoformat()
-    
-    await db.tire_mounts.insert_one(doc)
-    
-    # Update tire
-    await db.tires.update_one(
-        {"id": request.tire_id},
-        {"$set": {
-            "current_vehicle_id": request.vehicle_id,
-            "current_position": request.position_code,
-            "status": TireStatus.EN_USO.value,
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        }}
+    # El registro de montaje y el estado de la llanta van en la MISMA
+    # transaccion: una llanta marcada en uso sin su montaje (o al reves) deja
+    # el historial mintiendo y no hay forma de reconstruirlo.
+    sql, values = db_pg.build_insert(
+        "tire_mounts", TIRE_MOUNT_COLS, _modelo_a_fila(mount.model_dump())
     )
-    
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(sql, *values)
+        await conn.execute(
+            "update tires set current_vehicle_id = $1, current_position = $2, "
+            "status = $3::tire_status, updated_at = now() "
+            "where id = $4 and company_id = $5",
+            db_pg.as_uuid(request.vehicle_id),
+            request.position_code,
+            TireStatus.EN_USO.value,
+            db_pg.as_uuid(request.tire_id),
+            db_pg.as_uuid(current_user["company_id"]),
+        )
+
     return {"id": mount.id, "message": "Llanta montada"}
 
 @api_router.post("/tires/{tire_id}/unmount")
 async def unmount_tire(tire_id: str, request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "mantenimiento", "flota"))):
     
-    tire = await db.tires.find_one({"id": tire_id, "company_id": current_user["company_id"]})
+    tire = await _llanta_pg(current_user["company_id"], tire_id)
     if not tire:
         raise HTTPException(status_code=404, detail="Llanta no encontrada")
-    
-    # Update mount record
-    await db.tire_mounts.update_one(
-        {"tire_id": tire_id, "unmount_date": None},
-        {"$set": {
-            "unmount_date": datetime.now(timezone.utc).isoformat(),
-            "unmount_odometer": request.get("odometer", 0),
-            "reason": request.get("reason")
-        }}
-    )
-    
-    # Calculate km traveled
-    mount = await db.tire_mounts.find_one({"tire_id": tire_id}, sort=[("mount_date", -1)])
-    km_traveled = 0
-    if mount:
-        km_traveled = request.get("odometer", 0) - mount.get("mount_odometer", 0)
-    
-    # Update tire
-    await db.tires.update_one(
-        {"id": tire_id},
-        {"$set": {
-            "current_vehicle_id": None,
-            "current_position": None,
-            "status": request.get("new_status", TireStatus.NUEVO.value),
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        },
-        "$inc": {"total_km": km_traveled}}
-    )
-    
+
+    odometro = db_pg.as_int(request.get("odometer"), 0)
+    async with db_pg.tx(current_user) as conn:
+        # Cierra el montaje abierto y devuelve de una vez su odometro de
+        # montaje. En Mongo eran dos consultas: se cerraba el montaje y despues
+        # se releia "el mas reciente" para calcular los km -- que ya era el que
+        # se acababa de cerrar, pero nada lo garantizaba.
+        cerrado = await conn.fetchrow(
+            "update tire_mounts set unmount_date = now(), unmount_odometer = $1, "
+            "reason = $2 "
+            "where id = (select id from tire_mounts "
+            "            where tire_id = $3 and company_id = $4 and unmount_date is null "
+            "            order by mount_date desc limit 1) "
+            "returning mount_odometer",
+            odometro,
+            request.get("reason"),
+            db_pg.as_uuid(tire_id),
+            db_pg.as_uuid(current_user["company_id"]),
+        )
+        km_traveled = max(0, odometro - (cerrado["mount_odometer"] or 0)) if cerrado else 0
+
+        await conn.execute(
+            "update tires set current_vehicle_id = null, current_position = null, "
+            "status = $1::tire_status, total_km = total_km + $2, updated_at = now() "
+            "where id = $3 and company_id = $4",
+            request.get("new_status") or TireStatus.NUEVO.value,
+            km_traveled,
+            db_pg.as_uuid(tire_id),
+            db_pg.as_uuid(current_user["company_id"]),
+        )
+
     return {"message": "Llanta desmontada", "km_traveled": km_traveled}
 
 @api_router.get("/tires/vehicle/{vehicle_id}")
 async def get_vehicle_tires(vehicle_id: str, current_user: dict = Depends(get_current_user)):
     """Get all tires mounted on a vehicle with their positions"""
-    tires = await db.tires.find(
-        {"current_vehicle_id": vehicle_id, "company_id": current_user["company_id"]},
-        {"_id": 0}
-    ).to_list(20)
+    async with db_pg.tx(current_user) as conn:
+        tires = db_pg.rows_to_api(await conn.fetch(
+            "select * from tires where company_id = $1 and current_vehicle_id = $2 "
+            "order by current_position nulls last limit 20",
+            db_pg.as_uuid(current_user["company_id"]), db_pg.as_uuid(vehicle_id),
+        ))
+        # La ultima inspeccion y el montaje vigente de CADA llanta, en dos
+        # consultas en vez de dos por llanta. "distinct on (tire_id)" con el
+        # order by correcto se queda con la primera fila de cada grupo, que es
+        # exactamente el sort+limit 1 que Mongo hacia dentro del bucle.
+        ids = [db_pg.as_uuid(t["id"]) for t in tires]
+        ultimas = {
+            str(r["tire_id"]): db_pg.to_api(r)
+            for r in await conn.fetch(
+                "select distinct on (tire_id) * from tire_inspections "
+                "where company_id = $1 and tire_id = any($2::uuid[]) "
+                "order by tire_id, inspection_date desc",
+                db_pg.as_uuid(current_user["company_id"]), ids,
+            )
+        }
+        montajes = {
+            str(r["tire_id"]): db_pg.to_api(r)
+            for r in await conn.fetch(
+                "select distinct on (tire_id) * from tire_mounts "
+                "where company_id = $1 and tire_id = any($2::uuid[]) "
+                "and vehicle_id = $3 and unmount_date is null "
+                "order by tire_id, mount_date desc",
+                db_pg.as_uuid(current_user["company_id"]), ids,
+                db_pg.as_uuid(vehicle_id),
+            )
+        }
 
     vehicle = await _vehiculo_pg(current_user["company_id"], vehicle_id)
     vehicle_odometer = vehicle.get("odometer") if vehicle else None
@@ -3963,19 +4179,12 @@ async def get_vehicle_tires(vehicle_id: str, current_user: dict = Depends(get_cu
     # Get latest inspection for each tire + computed fields
     result = []
     for tire in tires:
-        tire_data = serialize_doc(tire)
-        inspection = await db.tire_inspections.find_one(
-            {"tire_id": tire["id"]},
-            {"_id": 0},
-            sort=[("inspection_date", -1)]
-        )
-        tire_data["last_inspection"] = serialize_doc(inspection) if inspection else None
+        tire_data = dict(tire)
+        inspection = ultimas.get(tire["id"])
+        tire_data["last_inspection"] = inspection
 
         # Active mount record (montada = current_vehicle_id set)
-        mount = await db.tire_mounts.find_one(
-            {"tire_id": tire["id"], "vehicle_id": vehicle_id, "unmount_date": None},
-            {"_id": 0}, sort=[("mount_date", -1)]
-        )
+        mount = montajes.get(tire["id"])
         mount_odometer = mount.get("mount_odometer") if mount else None
 
         # km_recorridos
@@ -4039,21 +4248,37 @@ async def create_tire_inspection(request: CreateInspectionRequest, current_user:
         created_by=current_user["id"]
     )
     
-    doc = inspection.model_dump()
-    doc["inspection_date"] = doc["inspection_date"].isoformat()
-    
-    await db.tire_inspections.insert_one(doc)
+    sql, values = db_pg.build_insert(
+        "tire_inspections", TIRE_INSPECTION_COLS,
+        _modelo_a_fila(inspection.model_dump()),
+    )
 
     # Check for alerts
     min_depth = min(request.depths) if request.depths else 0
-    tire = await db.tires.find_one({"id": request.tire_id, "company_id": current_user["company_id"]})
 
-    # Esta inspección es la más reciente -> actualizar last_depth de la llanta
-    if request.depths:
-        await db.tires.update_one(
-            {"id": request.tire_id, "company_id": current_user["company_id"]},
-            {"$set": {"last_depth": min_depth, "updated_at": datetime.now(timezone.utc).isoformat()}}
-        )
+    # La inspeccion y el last_depth que deja en la llanta van en la misma
+    # transaccion: son el mismo hecho medido, y si se separan la proyeccion de
+    # vida puede leer una profundidad que no corresponde a ninguna inspeccion.
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(sql, *values)
+
+        # Esta inspección es la más reciente -> actualizar last_depth de la llanta
+        if request.depths:
+            await conn.execute(
+                "update tires set last_depth = $1, updated_at = now() "
+                "where id = $2 and company_id = $3",
+                min_depth,
+                db_pg.as_uuid(request.tire_id),
+                db_pg.as_uuid(current_user["company_id"]),
+            )
+
+        # El serial va en el texto de las alertas de mas abajo. Si la llanta no
+        # existe se usa un dict vacio: antes eso reventaba con AttributeError.
+        tire = db_pg.to_api(await conn.fetchrow(
+            "select * from tires where id = $1 and company_id = $2",
+            db_pg.as_uuid(request.tire_id),
+            db_pg.as_uuid(current_user["company_id"]),
+        )) or {}
 
     # Umbrales desde configuración de empresa (defaults 3/5)
     config = await _company_config(current_user["company_id"])
@@ -4096,26 +4321,23 @@ async def create_tire_inspection(request: CreateInspectionRequest, current_user:
 
 @api_router.get("/tires/{tire_id}/inspections")
 async def get_tire_inspections(tire_id: str, current_user: dict = Depends(get_current_user)):
-    inspections = await db.tire_inspections.find(
-        {"tire_id": tire_id, "company_id": current_user["company_id"]},
-        {"_id": 0}
-    ).sort("inspection_date", -1).to_list(100)
-    return [serialize_doc(i) for i in inspections]
+    async with db_pg.tx(current_user) as conn:
+        return db_pg.rows_to_api(await conn.fetch(
+            "select * from tire_inspections where tire_id = $1 and company_id = $2 "
+            "order by inspection_date desc limit 100",
+            db_pg.as_uuid(tire_id), db_pg.as_uuid(current_user["company_id"]),
+        ))
 
 @api_router.get("/tires/{tire_id}/projection")
 async def get_tire_projection(tire_id: str, current_user: dict = Depends(get_current_user)):
     """Proyección de vida de la llanta: tasa de desgaste, km restantes y fecha estimada de cambio."""
-    tire = await db.tires.find_one(
-        {"id": tire_id, "company_id": current_user["company_id"]}, {"_id": 0}
-    )
+    tire = await _llanta_pg(current_user["company_id"], tire_id)
     if not tire:
         raise HTTPException(status_code=404, detail="Llanta no encontrada")
     vehicle = None
     if tire.get("current_vehicle_id"):
         vehicle = await _vehiculo_pg(current_user["company_id"], tire["current_vehicle_id"])
-    latest = await db.tire_inspections.find_one(
-        {"tire_id": tire_id}, {"_id": 0}, sort=[("inspection_date", -1)]
-    )
+    latest = await _ultima_inspeccion_pg(current_user["company_id"], tire_id)
     return await compute_tire_projection(
         current_user["company_id"], tire, vehicle, latest_inspection=latest
     )
@@ -4123,11 +4345,12 @@ async def get_tire_projection(tire_id: str, current_user: dict = Depends(get_cur
 # ============== MAINTENANCE ROUTES ==============
 @api_router.get("/maintenance/plans")
 async def get_maintenance_plans(current_user: dict = Depends(get_current_user)):
-    plans = await db.maintenance_plans.find(
-        {"company_id": current_user["company_id"]},
-        {"_id": 0}
-    ).to_list(100)
-    return [serialize_doc(p) for p in plans]
+    async with db_pg.tx(current_user) as conn:
+        return db_pg.rows_to_api(await conn.fetch(
+            "select * from maintenance_plans where company_id = $1 "
+            "order by name limit 100",
+            db_pg.as_uuid(current_user["company_id"]),
+        ))
 
 @api_router.get("/vehicles/{vehicle_id}/maintenance-status")
 async def get_vehicle_maintenance_status(vehicle_id: str, current_user: dict = Depends(get_current_user)):
@@ -4151,10 +4374,11 @@ async def create_maintenance_plan(request: dict = Body(...), current_user: dict 
         tasks=request.get("tasks", [])
     )
     
-    doc = plan.model_dump()
-    doc["created_at"] = doc["created_at"].isoformat()
-    
-    await db.maintenance_plans.insert_one(doc)
+    sql, values = db_pg.build_insert(
+        "maintenance_plans", MAINTENANCE_PLAN_COLS, _modelo_a_fila(plan.model_dump())
+    )
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(sql, *values)
     return {"id": plan.id, "message": "Plan creado"}
 
 # ============== MATRIX MAINTENANCE PLANS (E MAX 540 style) ==============
@@ -4356,20 +4580,24 @@ async def get_work_orders(
     status: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
-    query = {"company_id": current_user["company_id"]}
-    if vehicle_id:
-        query["vehicle_id"] = vehicle_id
-    if status:
-        query["status"] = status
-    
-    orders = await db.work_orders.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
-    return [serialize_doc(o) for o in orders]
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(current_user["company_id"]))
+    f.si(vehicle_id, "vehicle_id = $?", db_pg.as_uuid(vehicle_id))
+    f.si(status, "status::text = $?", status)
+    async with db_pg.tx(current_user) as conn:
+        return db_pg.rows_to_api(await conn.fetch(
+            "select * from work_orders where " + f.where
+            + " order by created_at desc limit 500", *f.values
+        ))
 
 @api_router.post("/maintenance/work-orders")
 async def create_work_order(request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "mantenimiento", "flota"))):
     
     # Generate order number
-    count = await db.work_orders.count_documents({"company_id": current_user["company_id"]})
+    async with db_pg.tx(current_user) as conn:
+        count = await conn.fetchval(
+            "select count(*) from work_orders where company_id = $1",
+            db_pg.as_uuid(current_user["company_id"]),
+        )
     order_number = f"OT-{count + 1:05d}"
     
     order = WorkOrder(
@@ -4384,12 +4612,11 @@ async def create_work_order(request: dict = Body(...), current_user: dict = Depe
         created_by=current_user["id"]
     )
     
-    doc = order.model_dump()
-    for key, value in doc.items():
-        if isinstance(value, datetime):
-            doc[key] = value.isoformat()
-    
-    await db.work_orders.insert_one(doc)
+    sql, values = db_pg.build_insert(
+        "work_orders", WORK_ORDER_COLS, _modelo_a_fila(order.model_dump())
+    )
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(sql, *values)
     
     # If critical priority, create block
     if request.get("priority") == "critica":
@@ -4418,11 +4645,11 @@ async def create_work_order(request: dict = Body(...), current_user: dict = Depe
 async def update_work_order(order_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     request.pop("id", None)
     request.pop("company_id", None)
-    request["updated_at"] = datetime.now(timezone.utc).isoformat()
-    
+    request["updated_at"] = datetime.now(timezone.utc)
+
     # If completing order, set vehicle to available
     if request.get("status") == "completada":
-        order = await db.work_orders.find_one({"id": order_id, "company_id": current_user["company_id"]})
+        order = await _orden_pg(current_user["company_id"], order_id)
         if order:
             await _actualizar_vehiculo(
                 current_user["company_id"], order["vehicle_id"],
@@ -4439,27 +4666,51 @@ async def update_work_order(order_id: str, request: dict = Body(...), current_us
                     db_pg.as_uuid(order["vehicle_id"]),
                 )
     
-    result = await db.work_orders.update_one(
-        {"id": order_id, "company_id": current_user["company_id"]},
-        {"$set": request}
+    datos = dict(request)
+    datos["id"] = order_id
+    datos["company_id"] = current_user["company_id"]
+    sql, values = db_pg.build_update(
+        "work_orders", WORK_ORDER_COLS, datos, ["id", "company_id"]
     )
-    
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Orden no encontrada")
-    
+    async with db_pg.tx(current_user) as conn:
+        # Sin campos que tocar igual hay que comprobar que la orden existe: el
+        # endpoint respondia 404 y el frontend cuenta con eso.
+        if sql is None:
+            existe = await conn.fetchval(
+                "select 1 from work_orders where id = $1 and company_id = $2",
+                db_pg.as_uuid(order_id), db_pg.as_uuid(current_user["company_id"]),
+            )
+            if not existe:
+                raise HTTPException(status_code=404, detail="Orden no encontrada")
+        elif (await conn.execute(sql, *values)) == "UPDATE 0":
+            raise HTTPException(status_code=404, detail="Orden no encontrada")
+
     return {"message": "Orden actualizada"}
 
 @api_router.delete("/maintenance/work-orders/{order_id}")
 async def delete_work_order(order_id: str, current_user: dict = Depends(require_roles("owner", "admin", "mantenimiento"))):
-    order = await db.work_orders.find_one({"id": order_id, "company_id": current_user["company_id"]})
+    order = await _orden_pg(current_user["company_id"], order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Orden no encontrada")
-    
+
     if order.get("status") != "abierta":
         raise HTTPException(status_code=400, detail="Solo se pueden eliminar órdenes abiertas")
-    
-    await db.work_orders.delete_one({"id": order_id, "company_id": current_user["company_id"]})
-    
+
+    # Una OT abierta puede tener ya consumos de repuestos, indisponibilidad o
+    # un incidente que la referencia. En Mongo el borrado se hacia igual y esas
+    # filas quedaban apuntando a una orden inexistente.
+    try:
+        async with db_pg.tx(current_user) as conn:
+            await conn.execute(
+                "delete from work_orders where id = $1 and company_id = $2",
+                db_pg.as_uuid(order_id), db_pg.as_uuid(current_user["company_id"]),
+            )
+    except db_pg.ForeignKeyViolationError:
+        raise HTTPException(
+            status_code=400,
+            detail="La orden tiene movimientos asociados (consumos, indisponibilidad o incidentes) y no se puede eliminar. Cancélela en su lugar.",
+        )
+
     return {"message": "Orden eliminada"}
 
 # ============== ISSUE ROUTES ==============
@@ -4469,14 +4720,17 @@ async def get_issues(
     issue_type: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
-    query = {"company_id": current_user["company_id"]}
-    if status:
-        query["status"] = status
-    if issue_type:
-        query["issue_type"] = issue_type
-    
-    issues = await db.issues.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
-    return [serialize_doc(i) for i in issues]
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(current_user["company_id"]))
+    # ::text en los dos: los valores llegan de la query string y uno que no
+    # exista en el enum debe devolver lista vacia, no un 500.
+    f.si(status, "status::text = $?", status)
+    f.si(issue_type, "issue_type::text = $?", issue_type)
+    async with db_pg.tx(current_user) as conn:
+        filas = db_pg.rows_to_api(await conn.fetch(
+            "select * from issues where " + f.where
+            + " order by created_at desc limit 500", *f.values
+        ))
+    return [_api_con_ubicacion(i) for i in filas]
 
 @api_router.post("/issues")
 async def create_issue(request: dict = Body(...), current_user: dict = Depends(get_current_user)):
@@ -4486,7 +4740,11 @@ async def create_issue(request: dict = Body(...), current_user: dict = Depends(g
         driver_id = current_user["id"]
 
     # Número de incidente
-    count = await db.issues.count_documents({"company_id": current_user["company_id"]})
+    async with db_pg.tx(current_user) as conn:
+        count = await conn.fetchval(
+            "select count(*) from issues where company_id = $1",
+            db_pg.as_uuid(current_user["company_id"]),
+        )
     issue_number = f"INC-{count + 1:05d}"
 
     issue = Issue(
@@ -4508,12 +4766,15 @@ async def create_issue(request: dict = Body(...), current_user: dict = Depends(g
         created_by=current_user["id"]
     )
 
-    doc = issue.model_dump()
-    for key, value in doc.items():
-        if isinstance(value, datetime):
-            doc[key] = value.isoformat()
-
-    await db.issues.insert_one(doc)
+    # La ubicacion viaja como {lat, lng} y en la tabla son dos columnas: sin
+    # _fila_con_ubicacion la lista blanca de build_insert la descartaria en
+    # silencio (misma traduccion que checklists y fuel_loads).
+    sql, values = db_pg.build_insert(
+        "issues", ISSUE_COLS,
+        _fila_con_ubicacion(_modelo_a_fila(issue.model_dump())),
+    )
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(sql, *values)
 
     # Notificar al admin de incidentes críticos/altos
     if issue.severity in ("critica", "alta"):
@@ -4533,16 +4794,23 @@ async def create_issue(request: dict = Body(...), current_user: dict = Depends(g
 async def update_issue(issue_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     request.pop("id", None)
     request.pop("company_id", None)
-    request["updated_at"] = datetime.now(timezone.utc).isoformat()
-    
-    result = await db.issues.update_one(
-        {"id": issue_id, "company_id": current_user["company_id"]},
-        {"$set": request}
-    )
-    
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Incidente no encontrado")
-    
+    request["updated_at"] = datetime.now(timezone.utc)
+
+    datos = _fila_con_ubicacion(request)
+    datos["id"] = issue_id
+    datos["company_id"] = current_user["company_id"]
+    sql, values = db_pg.build_update("issues", ISSUE_COLS, datos, ["id", "company_id"])
+    async with db_pg.tx(current_user) as conn:
+        if sql is None:
+            existe = await conn.fetchval(
+                "select 1 from issues where id = $1 and company_id = $2",
+                db_pg.as_uuid(issue_id), db_pg.as_uuid(current_user["company_id"]),
+            )
+            if not existe:
+                raise HTTPException(status_code=404, detail="Incidente no encontrado")
+        elif (await conn.execute(sql, *values)) == "UPDATE 0":
+            raise HTTPException(status_code=404, detail="Incidente no encontrado")
+
     return {"message": "Incidente actualizado"}
 
 # ============== CHECKLIST TEMPLATE ROUTES ==============
@@ -4734,7 +5002,11 @@ async def submit_checklist(checklist_id: str, request: dict = Body(...), current
     
     # Create issue if critical
     if result == "critico":
-        issue_count = await db.issues.count_documents({"company_id": current_user["company_id"]})
+        async with db_pg.tx(current_user) as conn:
+            issue_count = await conn.fetchval(
+                "select count(*) from issues where company_id = $1",
+                db_pg.as_uuid(current_user["company_id"]),
+            )
         issue = Issue(
             company_id=current_user["company_id"],
             issue_number=f"ISS-{issue_count + 1:05d}",
@@ -4749,12 +5021,13 @@ async def submit_checklist(checklist_id: str, request: dict = Body(...), current
             photos=photos,
             created_by=current_user["id"]
         )
-        issue_doc = issue.model_dump()
-        for k, v in issue_doc.items():
-            if isinstance(v, datetime):
-                issue_doc[k] = v.isoformat()
-        await db.issues.insert_one(issue_doc)
-    
+        sql, values = db_pg.build_insert(
+            "issues", ISSUE_COLS,
+            _fila_con_ubicacion(_modelo_a_fila(issue.model_dump())),
+        )
+        async with db_pg.tx(current_user) as conn:
+            await conn.execute(sql, *values)
+
     # Audit log
     await create_audit_log(
         current_user["company_id"],
@@ -4879,12 +5152,13 @@ async def submit_trip_checklist(trip_id: str, request: dict = Body(...), current
             description=f"Checklist crítico: {len(critical_items)} items críticos detectados",
             created_by=current_user["id"]
         )
-        issue_doc = issue.model_dump()
-        for k, v in issue_doc.items():
-            if isinstance(v, datetime):
-                issue_doc[k] = v.isoformat()
-        await db.issues.insert_one(issue_doc)
-    
+        sql, values = db_pg.build_insert(
+            "issues", ISSUE_COLS,
+            _fila_con_ubicacion(_modelo_a_fila(issue.model_dump())),
+        )
+        async with db_pg.tx(current_user) as conn:
+            await conn.execute(sql, *values)
+
     return {
         "message": "Checklist enviado",
         "result": result,
@@ -5177,9 +5451,9 @@ async def get_kardex(item_id: str, current_user: dict = Depends(get_current_user
 
 # ============== TABLAS EN POSTGRES: INVENTARIO ==============
 # Las cuatro tablas del modulo ya cortaron
-# (db/migrations/005_corte_inventario.sql). work_orders y alerts siguen en
-# Mongo: lo que se lea o escriba de ellas va por db, que es lo correcto
-# mientras no crucen.
+# (db/migrations/005_corte_inventario.sql). alerts cruzo en el 012 y
+# work_orders en el 013, asi que el consumo de repuestos de una OT y el cierre
+# de la orden ya caben en una sola transaccion.
 
 SUPPLIER_COLS = {
     "id": "uuid", "company_id": "uuid", "name": "text", "ruc": "text",
@@ -5366,23 +5640,10 @@ async def receive_purchase_order(order_id: str, request: dict = Body(...), curre
 async def start_work_order(order_id: str, request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "mantenimiento"))):
     """Start a work order"""
     
-    order = await db.work_orders.find_one({
-        "id": order_id,
-        "company_id": current_user["company_id"]
-    })
+    order = await _orden_pg(current_user["company_id"], order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Orden no encontrada")
-    
-    await db.work_orders.update_one(
-        {"id": order_id},
-        {"$set": {
-            "status": "en_proceso",
-            "start_date": datetime.now(timezone.utc).isoformat(),
-            "technician": request.get("technician"),
-            "odometer_at_service": request.get("odometer")
-        }}
-    )
-    
+
     # Create downtime record
     downtime = DowntimeRecord(
         company_id=current_user["company_id"],
@@ -5391,9 +5652,23 @@ async def start_work_order(order_id: str, request: dict = Body(...), current_use
         reason=order.get("description", "Mantenimiento"),
         created_by=current_user["id"]
     )
-    dt_doc = downtime.model_dump()
-    dt_doc["start_time"] = dt_doc["start_time"].isoformat()
-    await db.downtime_records.insert_one(dt_doc)
+    sql, values = db_pg.build_insert(
+        "downtime_records", DOWNTIME_RECORD_COLS, _modelo_a_fila(downtime.model_dump())
+    )
+
+    # La orden pasa a en_proceso y nace su registro de indisponibilidad en la
+    # misma transaccion: si solo entrara uno de los dos, el vehiculo quedaria
+    # parado sin nada que lo explique, o al reves.
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(
+            "update work_orders set status = 'en_proceso', start_date = now(), "
+            "technician = $1, odometer_at_service = $2, updated_at = now() "
+            "where id = $3 and company_id = $4",
+            request.get("technician"),
+            db_pg.as_int(request.get("odometer")),
+            db_pg.as_uuid(order_id), db_pg.as_uuid(current_user["company_id"]),
+        )
+        await conn.execute(sql, *values)
     
     # Update vehicle status
     await _actualizar_vehiculo(
@@ -5406,71 +5681,72 @@ async def start_work_order(order_id: str, request: dict = Body(...), current_use
 async def complete_work_order(order_id: str, request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin", "mantenimiento"))):
     """Complete a work order"""
     
-    order = await db.work_orders.find_one({
-        "id": order_id,
-        "company_id": current_user["company_id"]
-    })
+    order = await _orden_pg(current_user["company_id"], order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Orden no encontrada")
-    
+
     labor_cost = request.get("labor_cost", 0)
     parts_cost = request.get("parts_cost", 0)
     total_cost = labor_cost + parts_cost
-    
-    await db.work_orders.update_one(
-        {"id": order_id},
-        {"$set": {
-            "status": "completada",
-            "end_date": datetime.now(timezone.utc).isoformat(),
-            "labor_cost": labor_cost,
-            "parts_cost": parts_cost,
-            "total_cost": total_cost,
-            "items": request.get("items", order.get("items", [])),
-            "notes": request.get("notes"),
-            "closed_by": current_user["id"]
-        }}
-    )
-    
-    # Consume parts from inventory
-    # Los consumos van en una sola transaccion. La orden de trabajo en si
-    # sigue en Mongo (work_orders no ha cortado), asi que ese par de escrituras
-    # no puede ser atomico entre las dos bases: lo era tampoco antes.
+
     consumos = [
         i for i in request.get("consumed_items", [])
         if i.get("item_id") and i.get("quantity")
     ]
-    if consumos:
-        async with db_pg.tx(current_user) as conn:
-            for item in consumos:
-                move = StockMove(
-                    company_id=current_user["company_id"],
-                    item_id=item["item_id"],
-                    move_type="consumo_ot",
-                    quantity=item["quantity"],
-                    work_order_id=order_id,
-                    notes=f"Consumo OT {order.get('order_number', '')}",
-                    created_by=current_user["id"]
-                )
-                sql, values = db_pg.build_insert(
-                    "stock_moves", STOCK_MOVE_COLS, _modelo_a_fila(move.model_dump())
-                )
-                await conn.execute(sql, *values)
 
-                await conn.execute(
-                    "update inventory_items set current_stock = current_stock - $1, "
-                    "updated_at = now() where id = $2 and company_id = $3",
-                    item["quantity"],
-                    db_pg.as_uuid(item["item_id"]),
-                    db_pg.as_uuid(current_user["company_id"]),
-                )
-    
-    # Close downtime
-    await db.downtime_records.update_one(
-        {"work_order_id": order_id, "end_time": None},
-        {"$set": {
-            "end_time": datetime.now(timezone.utc).isoformat()
-        }}
-    )
+    # Cerrar la OT, descontar los repuestos y cerrar la indisponibilidad son
+    # ahora UNA sola transaccion. Hasta el corte 013 no podia serlo: la orden
+    # vivia en Mongo y el inventario en Postgres, asi que un fallo entre medio
+    # dejaba stock descontado contra una orden que seguia abierta.
+    cid = db_pg.as_uuid(current_user["company_id"])
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(
+            "update work_orders set status = 'completada', end_date = now(), "
+            "labor_cost = $1, parts_cost = $2, total_cost = $3, items = $4, "
+            "notes = $5, closed_by = $6, updated_at = now() "
+            "where id = $7 and company_id = $8",
+            db_pg.as_float(labor_cost, 0.0),
+            db_pg.as_float(parts_cost, 0.0),
+            db_pg.as_float(total_cost, 0.0),
+            request.get("items", order.get("items", [])),
+            request.get("notes"),
+            db_pg.as_uuid(current_user["id"]),
+            db_pg.as_uuid(order_id), cid,
+        )
+
+        # Consume parts from inventory
+        for item in consumos:
+            move = StockMove(
+                company_id=current_user["company_id"],
+                item_id=item["item_id"],
+                move_type="consumo_ot",
+                quantity=item["quantity"],
+                work_order_id=order_id,
+                notes=f"Consumo OT {order.get('order_number', '')}",
+                created_by=current_user["id"]
+            )
+            sql, values = db_pg.build_insert(
+                "stock_moves", STOCK_MOVE_COLS, _modelo_a_fila(move.model_dump())
+            )
+            await conn.execute(sql, *values)
+
+            await conn.execute(
+                "update inventory_items set current_stock = current_stock - $1, "
+                "updated_at = now() where id = $2 and company_id = $3",
+                item["quantity"],
+                db_pg.as_uuid(item["item_id"]),
+                cid,
+            )
+
+        # Close downtime
+        # duration_hours se calcula al cerrar en vez de quedarse en 0: la
+        # columna existia desde el principio y nadie la llenaba.
+        await conn.execute(
+            "update downtime_records set end_time = now(), "
+            "duration_hours = extract(epoch from (now() - start_time)) / 3600.0 "
+            "where work_order_id = $1 and company_id = $2 and end_time is null",
+            db_pg.as_uuid(order_id), cid,
+        )
     
     # Update vehicle
     # last_maintenance_km y last_maintenance_date son columnas nuevas de la
@@ -5527,22 +5803,6 @@ async def rotate_tires(request: dict = Body(...), current_user: dict = Depends(r
     changes = request.get("changes", [])  # [{from_position, to_position, tire_id}]
     odometer = request.get("odometer", 0)
     
-    # Validate all tires exist and are mounted
-    for change in changes:
-        tire = await db.tires.find_one({
-            "id": change["tire_id"],
-            "current_vehicle_id": vehicle_id
-        })
-        if not tire:
-            raise HTTPException(status_code=400, detail=f"Llanta {change['tire_id']} no está montada en este vehículo")
-    
-    # Perform rotation
-    for change in changes:
-        await db.tires.update_one(
-            {"id": change["tire_id"]},
-            {"$set": {"current_position": change["to_position"]}}
-        )
-    
     # Create rotation record
     rotation = TireRotation(
         company_id=current_user["company_id"],
@@ -5552,10 +5812,39 @@ async def rotate_tires(request: dict = Body(...), current_user: dict = Depends(r
         odometer=odometer,
         created_by=current_user["id"]
     )
-    doc = rotation.model_dump()
-    doc["rotation_date"] = doc["rotation_date"].isoformat()
-    await db.tire_rotations.insert_one(doc)
-    
+    sql, values = db_pg.build_insert(
+        "tire_rotations", TIRE_ROTATION_COLS, _modelo_a_fila(rotation.model_dump())
+    )
+
+    # Validar, mover y registrar, todo en UNA transaccion. En Mongo eran N
+    # validaciones, N updates y un insert sueltos: si algo fallaba en el medio
+    # quedaba media rotacion aplicada y ningun registro de que habia pasado.
+    # El filtro por empresa en la validacion tambien es nuevo.
+    async with db_pg.tx(current_user) as conn:
+        # Validate all tires exist and are mounted
+        for change in changes:
+            montada = await conn.fetchrow(
+                "select id from tires where id = $1 and company_id = $2 "
+                "and current_vehicle_id = $3",
+                db_pg.as_uuid(change["tire_id"]),
+                db_pg.as_uuid(current_user["company_id"]),
+                db_pg.as_uuid(vehicle_id),
+            )
+            if not montada:
+                raise HTTPException(status_code=400, detail=f"Llanta {change['tire_id']} no está montada en este vehículo")
+
+        # Perform rotation
+        for change in changes:
+            await conn.execute(
+                "update tires set current_position = $1, updated_at = now() "
+                "where id = $2 and company_id = $3",
+                change["to_position"],
+                db_pg.as_uuid(change["tire_id"]),
+                db_pg.as_uuid(current_user["company_id"]),
+            )
+
+        await conn.execute(sql, *values)
+
     return {"id": rotation.id, "message": "Rotación realizada"}
 
 @api_router.post("/tires/align")
@@ -5571,13 +5860,15 @@ async def record_alignment(request: dict = Body(...), current_user: dict = Depen
         notes=request.get("notes"),
         created_by=current_user["id"]
     )
-    doc = alignment.model_dump()
-    doc["alignment_date"] = doc["alignment_date"].isoformat()
-    await db.alignment_records.insert_one(doc)
-    
+    sql, values = db_pg.build_insert(
+        "alignment_records", ALIGNMENT_RECORD_COLS,
+        _modelo_a_fila(alignment.model_dump()),
+    )
+
     # Resolve any alignment alerts
     # resolved_at no es una columna de alerts (si la tienen blocks): se omite.
     async with db_pg.tx(current_user) as conn:
+        await conn.execute(sql, *values)
         await conn.execute(
             "update alerts set resolved = true where company_id = $1 "
             "and entity_id = $2 "
@@ -5601,10 +5892,12 @@ async def get_tires_required_report(current_user: dict = Depends(get_current_use
     warning_depth = config.get("tire_warning_depth", 5)
     
     # Get all tires in use with their latest inspection
-    tires = await db.tires.find({
-        "company_id": company_id,
-        "status": "en_uso"
-    }, {"_id": 0}).to_list(1000)
+    async with db_pg.tx(current_user) as conn:
+        tires = db_pg.rows_to_api(await conn.fetch(
+            "select * from tires where company_id = $1 and status = 'en_uso' "
+            "order by serial limit 1000",
+            db_pg.as_uuid(company_id),
+        ))
     
     replace_needed = []
     retread_needed = []
@@ -5645,22 +5938,33 @@ async def get_tires_required_report(current_user: dict = Depends(get_current_use
 @api_router.get("/tires/{tire_id}/history")
 async def get_tire_history(tire_id: str, current_user: dict = Depends(get_current_user)):
     """Get complete history of a tire"""
-    tire = await db.tires.find_one({
-        "id": tire_id,
-        "company_id": current_user["company_id"]
-    }, {"_id": 0})
+    tire = await _llanta_pg(current_user["company_id"], tire_id)
     if not tire:
         raise HTTPException(status_code=404, detail="Llanta no encontrada")
-    
-    mounts = await db.tire_mounts.find({"tire_id": tire_id}, {"_id": 0}).sort("mount_date", -1).to_list(100)
-    inspections = await db.tire_inspections.find({"tire_id": tire_id}, {"_id": 0}).sort("inspection_date", -1).to_list(100)
-    life_events = await db.tire_life_events.find({"tire_id": tire_id}, {"_id": 0}).sort("event_date", -1).to_list(100)
-    
+
+    # Las tres consultas de historial llevan ahora filtro por empresa, que en
+    # Mongo no tenian: bastaba el uuid de una llanta ajena para leerlo entero.
+    cid = db_pg.as_uuid(current_user["company_id"])
+    tid = db_pg.as_uuid(tire_id)
+    async with db_pg.tx(current_user) as conn:
+        mounts = db_pg.rows_to_api(await conn.fetch(
+            "select * from tire_mounts where tire_id = $1 and company_id = $2 "
+            "order by mount_date desc limit 100", tid, cid,
+        ))
+        inspections = db_pg.rows_to_api(await conn.fetch(
+            "select * from tire_inspections where tire_id = $1 and company_id = $2 "
+            "order by inspection_date desc limit 100", tid, cid,
+        ))
+        life_events = db_pg.rows_to_api(await conn.fetch(
+            "select * from tire_life_events where tire_id = $1 and company_id = $2 "
+            "order by event_date desc limit 100", tid, cid,
+        ))
+
     return {
-        "tire": serialize_doc(tire),
-        "mounts": [serialize_doc(m) for m in mounts],
-        "inspections": [serialize_doc(i) for i in inspections],
-        "life_events": [serialize_doc(e) for e in life_events]
+        "tire": tire,
+        "mounts": mounts,
+        "inspections": inspections,
+        "life_events": life_events
     }
 
 @api_router.get("/tires/vehicle/{vehicle_id}/diagnostics")
@@ -5676,9 +5980,24 @@ async def get_vehicle_tire_diagnostics(
         raise HTTPException(status_code=404, detail="Vehículo no encontrado")
 
     axle_config = vehicle.get("axle_config") or []
-    tires = await db.tires.find(
-        {"current_vehicle_id": vehicle_id, "company_id": company_id}, {"_id": 0}
-    ).to_list(50)
+    async with db_pg.tx(current_user) as conn:
+        tires = db_pg.rows_to_api(await conn.fetch(
+            "select * from tires where company_id = $1 and current_vehicle_id = $2 "
+            "limit 50",
+            db_pg.as_uuid(company_id), db_pg.as_uuid(vehicle_id),
+        ))
+        # Igual que en /tires/vehicle/{id}: una sola consulta para la ultima
+        # inspeccion de todas las llantas, en vez de una por llanta.
+        ultimas = {
+            str(r["tire_id"]): db_pg.to_api(r)
+            for r in await conn.fetch(
+                "select distinct on (tire_id) * from tire_inspections "
+                "where company_id = $1 and tire_id = any($2::uuid[]) "
+                "order by tire_id, inspection_date desc",
+                db_pg.as_uuid(company_id),
+                [db_pg.as_uuid(t["id"]) for t in tires],
+            )
+        }
 
     config = await _company_config(company_id)
     critical_depth = config.get("tire_critical_depth", DEFAULT_TIRE_CRITICAL_DEPTH)
@@ -5696,9 +6015,7 @@ async def get_vehicle_tire_diagnostics(
         else:
             axle_name = "SIN_EJE"
 
-        inspection = await db.tire_inspections.find_one(
-            {"tire_id": tire["id"]}, {"_id": 0}, sort=[("inspection_date", -1)]
-        )
+        inspection = ultimas.get(tire["id"])
         depths = inspection.get("depths") if inspection else None
         min_depth = min(depths) if depths else None
         irregular = bool(inspection.get("irregular_wear")) if inspection else False
@@ -5754,29 +6071,42 @@ async def update_tire_inspection(
 ):
     """Modifica una inspección existente y recalcula last_depth si es la más reciente."""
     company_id = current_user["company_id"]
-    inspection = await db.tire_inspections.find_one({"id": inspection_id, "company_id": company_id})
-    if not inspection:
-        raise HTTPException(status_code=404, detail="Inspección no encontrada")
+    cid = db_pg.as_uuid(company_id)
+    async with db_pg.tx(current_user) as conn:
+        inspection = db_pg.to_api(await conn.fetchrow(
+            "select * from tire_inspections where id = $1 and company_id = $2",
+            db_pg.as_uuid(inspection_id), cid,
+        ))
+        if not inspection:
+            raise HTTPException(status_code=404, detail="Inspección no encontrada")
 
-    allowed = ["depths", "pressure", "irregular_wear", "wear_type", "notes"]
-    update_data = {k: request[k] for k in allowed if k in request}
-    if update_data:
-        await db.tire_inspections.update_one(
-            {"id": inspection_id, "company_id": company_id}, {"$set": update_data}
-        )
-
-    # Recalcular last_depth de la llanta si esta inspección es la más reciente
-    latest = await db.tire_inspections.find_one(
-        {"tire_id": inspection["tire_id"], "company_id": company_id},
-        {"_id": 0}, sort=[("inspection_date", -1)]
-    )
-    if latest and latest.get("id") == inspection_id:
-        depths = update_data.get("depths", inspection.get("depths") or [])
-        if depths:
-            await db.tires.update_one(
-                {"id": inspection["tire_id"], "company_id": company_id},
-                {"$set": {"last_depth": min(depths), "updated_at": datetime.now(timezone.utc).isoformat()}}
+        allowed = ["depths", "pressure", "irregular_wear", "wear_type", "notes"]
+        update_data = {k: request[k] for k in allowed if k in request}
+        if update_data:
+            datos = dict(update_data)
+            datos["id"] = inspection_id
+            datos["company_id"] = company_id
+            sql, values = db_pg.build_update(
+                "tire_inspections", TIRE_INSPECTION_COLS, datos, ["id", "company_id"]
             )
+            if sql:
+                await conn.execute(sql, *values)
+
+        # Recalcular last_depth de la llanta si esta inspección es la más reciente
+        latest = await conn.fetchrow(
+            "select id from tire_inspections where tire_id = $1 and company_id = $2 "
+            "order by inspection_date desc limit 1",
+            db_pg.as_uuid(inspection["tire_id"]), cid,
+        )
+        if latest and str(latest["id"]) == inspection_id:
+            depths = update_data.get("depths", inspection.get("depths") or [])
+            if depths:
+                await conn.execute(
+                    "update tires set last_depth = $1, updated_at = now() "
+                    "where id = $2 and company_id = $3",
+                    min(db_pg.as_float(d, 0.0) for d in depths),
+                    db_pg.as_uuid(inspection["tire_id"]), cid,
+                )
 
     return {"message": "Inspección actualizada"}
 
@@ -5788,7 +6118,7 @@ async def retread_tire(
 ):
     """Reencauche: incrementa life_number, reinicia baseline de profundidad, deja la llanta en almacén."""
     company_id = current_user["company_id"]
-    tire = await db.tires.find_one({"id": tire_id, "company_id": company_id})
+    tire = await _llanta_pg(company_id, tire_id)
     if not tire:
         raise HTTPException(status_code=404, detail="Llanta no encontrada")
     if tire.get("current_vehicle_id"):
@@ -5797,19 +6127,6 @@ async def retread_tire(
     new_life = (tire.get("life_number", 1) or 1) + 1
     new_baseline = request.get("new_depth")  # profundidad inicial del reencauche (opcional)
 
-    await db.tires.update_one(
-        {"id": tire_id, "company_id": company_id},
-        {"$set": {
-            "life_number": new_life,
-            "initial_depth": new_baseline,
-            "last_depth": new_baseline,
-            "band_brand": request.get("band_brand"),
-            "band_model": request.get("band_model"),
-            "status": TireStatus.ALMACEN.value,
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        }}
-    )
-
     event = TireLifeEvent(
         company_id=company_id, tire_id=tire_id, life_number=new_life,
         event_type="reencauche", cost=request.get("cost", 0) or 0,
@@ -5817,12 +6134,27 @@ async def retread_tire(
         notes=f"Reencauche R{new_life - 1} banda={request.get('band_brand')} {request.get('band_model') or ''}".strip(),
         created_by=current_user["id"]
     )
-    doc = event.model_dump()
-    doc["event_date"] = doc["event_date"].isoformat()
+    doc = _modelo_a_fila(event.model_dump())
     if request.get("date"):
         doc["event_date"] = request["date"]
     doc["odometer"] = request.get("odometer")
-    await db.tire_life_events.insert_one(doc)
+    sql, values = db_pg.build_insert("tire_life_events", TIRE_LIFE_EVENT_COLS, doc)
+
+    # La llanta y su evento de vida, juntos: si el evento no queda escrito, el
+    # life_number sube igual y la vida R2 no tiene de donde reconstruirse.
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(
+            "update tires set life_number = $1, initial_depth = $2, last_depth = $2, "
+            "band_brand = $3, band_model = $4, status = $5::tire_status, "
+            "updated_at = now() where id = $6 and company_id = $7",
+            new_life,
+            db_pg.as_float(new_baseline),
+            request.get("band_brand"),
+            request.get("band_model"),
+            TireStatus.ALMACEN.value,
+            db_pg.as_uuid(tire_id), db_pg.as_uuid(company_id),
+        )
+        await conn.execute(sql, *values)
 
     return {"id": event.id, "message": "Reencauche registrado", "life_number": new_life}
 
@@ -5834,7 +6166,7 @@ async def regroove_tire(
 ):
     """Reesculturado/regrabado: registra el evento sin cambiar life_number."""
     company_id = current_user["company_id"]
-    tire = await db.tires.find_one({"id": tire_id, "company_id": company_id})
+    tire = await _llanta_pg(company_id, tire_id)
     if not tire:
         raise HTTPException(status_code=404, detail="Llanta no encontrada")
 
@@ -5845,11 +6177,12 @@ async def regroove_tire(
         notes=request.get("notes"),
         created_by=current_user["id"]
     )
-    doc = event.model_dump()
-    doc["event_date"] = doc["event_date"].isoformat()
+    doc = _modelo_a_fila(event.model_dump())
     if request.get("date"):
         doc["event_date"] = request["date"]
-    await db.tire_life_events.insert_one(doc)
+    sql, values = db_pg.build_insert("tire_life_events", TIRE_LIFE_EVENT_COLS, doc)
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(sql, *values)
 
     return {"id": event.id, "message": "Reesculturado registrado"}
 
@@ -5861,22 +6194,9 @@ async def scrap_tire(
 ):
     """Baja / fin de vida de la llanta."""
     company_id = current_user["company_id"]
-    tire = await db.tires.find_one({"id": tire_id, "company_id": company_id})
+    tire = await _llanta_pg(company_id, tire_id)
     if not tire:
         raise HTTPException(status_code=404, detail="Llanta no encontrada")
-
-    await db.tires.update_one(
-        {"id": tire_id, "company_id": company_id},
-        {"$set": {
-            "status": TireStatus.BAJA.value,
-            "current_vehicle_id": None,
-            "current_position": None,
-            "scrap_reason": request.get("reason"),
-            "scrap_date": request.get("date") or datetime.now(timezone.utc).isoformat(),
-            "scrap_odometer": request.get("odometer"),
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        }}
-    )
 
     event = TireLifeEvent(
         company_id=company_id, tire_id=tire_id,
@@ -5884,10 +6204,25 @@ async def scrap_tire(
         event_type="baja", notes=request.get("reason"),
         created_by=current_user["id"]
     )
-    doc = event.model_dump()
-    doc["event_date"] = request.get("date") or doc["event_date"].isoformat()
+    doc = _modelo_a_fila(event.model_dump())
+    if request.get("date"):
+        doc["event_date"] = request["date"]
     doc["odometer"] = request.get("odometer")
-    await db.tire_life_events.insert_one(doc)
+    sql, values = db_pg.build_insert("tire_life_events", TIRE_LIFE_EVENT_COLS, doc)
+
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(
+            "update tires set status = $1::tire_status, current_vehicle_id = null, "
+            "current_position = null, scrap_reason = $2, "
+            "scrap_date = coalesce($3, now()), scrap_odometer = $4, "
+            "updated_at = now() where id = $5 and company_id = $6",
+            TireStatus.BAJA.value,
+            request.get("reason"),
+            db_pg.as_ts(request.get("date")),
+            db_pg.as_int(request.get("odometer")),
+            db_pg.as_uuid(tire_id), db_pg.as_uuid(company_id),
+        )
+        await conn.execute(sql, *values)
 
     return {"message": "Llanta dada de baja"}
 
@@ -5895,9 +6230,12 @@ async def scrap_tire(
 async def get_scrap_pile_report(current_user: dict = Depends(get_current_user)):
     """Listado de llantas dadas de baja con análisis por motivo y marca."""
     company_id = current_user["company_id"]
-    tires = await db.tires.find(
-        {"company_id": company_id, "status": TireStatus.BAJA.value}, {"_id": 0}
-    ).to_list(1000)
+    async with db_pg.tx(current_user) as conn:
+        tires = db_pg.rows_to_api(await conn.fetch(
+            "select * from tires where company_id = $1 and status = $2::tire_status "
+            "order by scrap_date desc nulls last limit 1000",
+            db_pg.as_uuid(company_id), TireStatus.BAJA.value,
+        ))
 
     by_reason: Dict[str, Dict[str, Any]] = {}
     by_brand: Dict[str, Dict[str, Any]] = {}
@@ -6207,10 +6545,12 @@ async def get_dashboard_kpis(current_user: dict = Depends(get_current_user)):
         )
     
     # Open work orders
-    open_work_orders = await db.work_orders.count_documents({
-        "company_id": company_id,
-        "status": {"$in": ["abierta", "en_proceso"]}
-    })
+    async with db_pg.tx({"company_id": company_id}) as conn:
+        open_work_orders = await conn.fetchval(
+            "select count(*) from work_orders where company_id = $1 "
+            "and status in ('abierta', 'en_proceso')",
+            db_pg.as_uuid(company_id),
+        )
     
     return {
         "vehicles": {
@@ -6264,10 +6604,12 @@ async def get_recent_activity(current_user: dict = Depends(get_current_user)):
         ))
     
     # Get recent work orders
-    recent_orders = await db.work_orders.find(
-        {"company_id": company_id},
-        {"_id": 0}
-    ).sort("created_at", -1).limit(5).to_list(5)
+    async with db_pg.tx({"company_id": company_id}) as conn:
+        recent_orders = db_pg.rows_to_api(await conn.fetch(
+            "select * from work_orders where company_id = $1 "
+            "order by created_at desc limit 5",
+            db_pg.as_uuid(company_id),
+        ))
     
     return {
         "trips": [serialize_doc(t) for t in recent_trips],
@@ -6983,11 +7325,11 @@ async def seed_demo_data(_: bool = Depends(require_install_token)):
                 current_vehicle_id=tracto_id,
                 current_position=pos
             )
-            tire_doc = tire.model_dump()
-            for key, value in tire_doc.items():
-                if isinstance(value, datetime):
-                    tire_doc[key] = value.isoformat()
-            await db.tires.insert_one(tire_doc)
+            sql, values = db_pg.build_insert(
+                "tires", TIRE_COLS, _modelo_a_fila(tire.model_dump())
+            )
+            async with db_pg.tx({"company_id": company.id}) as conn:
+                await conn.execute(sql, *values)
     
     # Create a sample trip
     trip = Trip(
@@ -7385,15 +7727,15 @@ async def get_maintenance_report(
     current_user: dict = Depends(get_current_user)
 ):
     """Get maintenance report"""
-    query = {"company_id": current_user["company_id"]}
-    if start_date:
-        query["created_at"] = {"$gte": start_date}
-    if end_date:
-        query.setdefault("created_at", {})["$lte"] = end_date
-    if vehicle_id:
-        query["vehicle_id"] = vehicle_id
-    
-    work_orders = await db.work_orders.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
+    f = db_pg.Filtros("company_id = $?", db_pg.as_uuid(current_user["company_id"]))
+    f.si(start_date, "created_at >= $?", db_pg.as_ts(start_date))
+    f.si(end_date, "created_at <= $?", db_pg.as_ts(end_date))
+    f.si(vehicle_id, "vehicle_id = $?", db_pg.as_uuid(vehicle_id))
+    async with db_pg.tx(current_user) as conn:
+        work_orders = db_pg.rows_to_api(await conn.fetch(
+            "select * from work_orders where " + f.where
+            + " order by created_at desc limit 500", *f.values
+        ))
     
     # Calculate totals
     total_cost = sum(wo.get("total_cost", 0) for wo in work_orders)
@@ -8021,19 +8363,30 @@ async def get_cost_per_km_report(
         fuel = sum(l.get("total_amount", 0) or 0 for l in loads)
 
         # Llantas (montajes en el periodo -> costo de compra de la llanta)
-        mq = {"company_id": company_id, "vehicle_id": vid}
-        mq.update(_date_range_query("mount_date", from_, to))
-        mounts = await db.tire_mounts.find(mq, {"_id": 0}).to_list(2000)
-        tires = 0.0
-        for m in mounts:
-            tire = await db.tires.find_one({"id": m.get("tire_id"), "company_id": company_id}, {"_id": 0, "purchase_cost": 1})
-            if tire:
-                tires += tire.get("purchase_cost", 0) or 0
+        # El JOIN reemplaza al bucle que pedia la llanta de cada montaje una
+        # por una: era una consulta por montaje, hasta 2000 por vehiculo.
+        fm = db_pg.Filtros("m.company_id = $?", db_pg.as_uuid(company_id))
+        fm.agregar("m.vehicle_id = $?", db_pg.as_uuid(vid))
+        fm.si(from_, "m.mount_date >= $?", db_pg.as_ts(from_))
+        fm.si(to, "m.mount_date <= $?", db_pg.as_ts(to))
 
-        # Mantenimiento
-        wq = {"company_id": company_id, "vehicle_id": vid}
-        wq.update(_date_range_query("created_at", from_, to))
-        work_orders = await db.work_orders.find(wq, {"_id": 0}).to_list(2000)
+        fw = db_pg.Filtros("company_id = $?", db_pg.as_uuid(company_id))
+        fw.agregar("vehicle_id = $?", db_pg.as_uuid(vid))
+        fw.si(from_, "created_at >= $?", db_pg.as_ts(from_))
+        fw.si(to, "created_at <= $?", db_pg.as_ts(to))
+
+        async with db_pg.tx({"company_id": company_id}) as conn:
+            tires = float(await conn.fetchval(
+                "select coalesce(sum(t.purchase_cost), 0) from tire_mounts m "
+                "join tires t on t.id = m.tire_id and t.company_id = m.company_id "
+                "where " + fm.where, *fm.values
+            ) or 0)
+
+            # Mantenimiento
+            work_orders = db_pg.rows_to_api(await conn.fetch(
+                "select * from work_orders where " + fw.where + " limit 2000",
+                *fw.values
+            ))
         maintenance = sum(wo.get("total_cost", 0) or 0 for wo in work_orders)
 
         # Km recorridos (rango de odómetro observado en el periodo)
@@ -9397,7 +9750,8 @@ async def create_indexes():
         # migracion 006, que es donde se versionan.
         # El indice de trips ya no se crea aca: la tabla corto a Postgres y sus
         # indices viven en db/schema.sql y en la migracion 007.
-        await db.tires.create_index([("company_id", 1), ("current_vehicle_id", 1)], background=True)
+        # El indice de tires ya no se crea aca: la tabla corto a Postgres y sus
+        # indices viven en db/schema.sql y en la migracion 013.
         # El indice de documents ya no se crea aca: la tabla corto a Postgres y
         # sus indices viven en db/schema.sql y en la migracion 009.
         logger.info("Índices de MongoDB verificados/creados")
