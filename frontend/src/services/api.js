@@ -120,6 +120,9 @@ api.interceptors.response.use(
 // Auth API
 export const authApi = {
   login: (credentials) => api.post('/auth/login', credentials),
+  // Alta de una transportista nueva. Publico: no lleva token, porque la
+  // empresa y su dueno se crean en esta misma llamada.
+  signup: (datos) => api.post('/auth/signup', datos),
   refresh: (refreshToken) => api.post('/auth/refresh', { refresh_token: refreshToken }),
   getMe: () => api.get('/auth/me'),
 };

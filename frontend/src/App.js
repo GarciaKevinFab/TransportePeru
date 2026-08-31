@@ -6,6 +6,8 @@ import { Toaster } from './components/ui/sonner';
 import MainLayout from './layouts/MainLayout';
 import MobileLayout from './layouts/MobileLayout';
 import LoginPage from './pages/LoginPage';
+import LandingPage from './pages/LandingPage';
+import SignupPage from './pages/SignupPage';
 import DashboardPage from './pages/DashboardPage';
 import VehiclesPage from './pages/VehiclesPage';
 import UnitsPage from './pages/UnitsPage';
@@ -113,6 +115,27 @@ function AppRoutes() {
     <Suspense fallback={<SuspenseFallback />}>
     <Routes>
       {/* Public Routes */}
+      {/* La raiz es la landing del producto. Antes redirigia a /dashboard, que
+          sin sesion rebotaba a /login: quien llegaba al dominio se encontraba
+          un formulario de acceso y ninguna explicacion de que es esto.
+          Va dentro de PublicRoute para que a quien YA tiene sesion se le lleve
+          a su tablero en vez de a la pagina de venta. */}
+      <Route
+        path="/"
+        element={
+          <PublicRoute>
+            <LandingPage />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/registro"
+        element={
+          <PublicRoute>
+            <SignupPage />
+          </PublicRoute>
+        }
+      />
       <Route
         path="/login"
         element={
@@ -436,7 +459,6 @@ function AppRoutes() {
       />
       
       {/* Default Routes */}
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
     </Suspense>

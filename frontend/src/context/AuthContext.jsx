@@ -62,6 +62,28 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  // El alta devuelve el mismo TokenResponse que el login, asi que deja la
+  // sesion abierta: quien se registra entra directo a su sistema recien
+  // creado, sin volver a escribir la contrasena que acaba de elegir.
+  const signup = useCallback(async (datos) => {
+    try {
+      setError(null);
+      const response = await authApi.signup(datos);
+      const { access_token, refresh_token, user: userData } = response.data;
+
+      localStorage.setItem('access_token', access_token);
+      localStorage.setItem('refresh_token', refresh_token);
+      setAuthToken(access_token);
+
+      setUser(userData);
+      return { success: true, user: userData };
+    } catch (err) {
+      const message = err.response?.data?.detail || 'No se pudo crear la cuenta';
+      setError(message);
+      return { success: false, error: message };
+    }
+  }, []);
+
   const loginDriver = useCallback(async (dni, pin) => {
     try {
       setError(null);
@@ -109,6 +131,7 @@ export const AuthProvider = ({ children }) => {
     loading,
     error,
     login,
+    signup,
     loginDriver,
     logout,
     isAuthenticated: !!user,
