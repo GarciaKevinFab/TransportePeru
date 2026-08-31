@@ -1,0 +1,172 @@
+INFO:     Started server process [103644]
+INFO:     Waiting for application startup.
+2026-08-30 19:20:56,491 - server - INFO - Proveedores/tipos de carga por defecto verificados/creados
+2026-08-30 19:20:56,491 - server - INFO - Índices de MongoDB verificados/creados
+2026-08-30 19:20:56,554 - server - INFO - Tipos de documento por defecto verificados
+2026-08-30 19:20:56,554 - server - INFO - Scheduler de mantenimiento/alertas iniciado
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8001 (Press CTRL+C to quit)
+INFO:     127.0.0.1:53994 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53996 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53997 - "POST /api/auth/signup HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53998 - "POST /api/vehicles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53999 - "POST /api/vehicles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54000 - "POST /api/vehicles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54001 - "POST /api/vehicles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54002 - "POST /api/vehicles HTTP/1.1" 403 Forbidden
+INFO:     127.0.0.1:54003 - "POST /api/vehicles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54004 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54005 - "POST /api/vehicles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49726 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49727 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49728 - "POST /api/auth/login HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:49729 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49730 - "GET /api/dashboard/kpis HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49732 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49735 - "GET /api/issues HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49736 - "GET /api/vehicles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49737 - "GET /api/users?role=chofer HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49738 - "POST /api/issues HTTP/1.1" 200 OK
+2026-08-30 19:21:25,051 - root - WARNING - pywebpush not installed, skipping push notifications
+INFO:     127.0.0.1:49739 - "POST /api/issues HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49740 - "PUT /api/issues/21c93cf3-760f-40d5-91dd-886887351f99 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49741 - "GET /api/issues HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49742 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49745 - "GET /api/fuel/vouchers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49746 - "GET /api/vehicles?vehicle_type=tracto HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49747 - "POST /api/fuel/vouchers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49748 - "GET /api/fuel/loads HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49749 - "POST /api/fuel/loads HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49750 - "GET /api/fuel/kpis HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49751 - "GET /api/fuel/conciliation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49752 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49753 - "GET /api/maintenance/work-orders HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49754 - "GET /api/vehicles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49755 - "POST /api/maintenance/work-orders HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49856 - "POST /api/maintenance/work-orders HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49857 - "POST /api/maintenance/work-orders/0178ae93-6d8b-4ef6-872e-9043d842401d/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49858 - "POST /api/maintenance/work-orders HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49859 - "POST /api/maintenance/work-orders/d7555b68-f1a2-4d5f-9c49-c0b02d2bd8e0/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49860 - "POST /api/maintenance/work-orders/d7555b68-f1a2-4d5f-9c49-c0b02d2bd8e0/complete HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49861 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49862 - "GET /api/inventory/items HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49863 - "POST /api/inventory/items HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49864 - "POST /api/inventory/items HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49865 - "POST /api/inventory/moves HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49866 - "GET /api/inventory/items HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49867 - "GET /api/suppliers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49868 - "POST /api/suppliers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49869 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49870 - "GET /api/tires HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49871 - "POST /api/tires HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49872 - "GET /api/vehicles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49873 - "GET /api/tires/vehicle/88ebf5c7-04be-4cf7-a4fc-2cbaa0e5db68 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49874 - "GET /api/tires/reports/required HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49875 - "POST /api/tires HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49876 - "POST /api/tires/mount HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49877 - "POST /api/tires/1184a307-b6ac-4b77-a15e-9f65d29f7572/unmount HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49878 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49881 - "GET /api/vehicles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49882 - "GET /api/trips HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49883 - "GET /api/users HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49885 - "GET /api/documents HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49886 - "GET /api/alerts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49887 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49893 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49897 - "GET /api/notifications?limit=20 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49898 - "GET /api/notifications?limit=5 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49899 - "PUT /api/notifications/2691f6c7-55ab-4dfe-aa4e-b63df5e0063f/read HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49901 - "PUT /api/notifications/read-all HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49902 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49906 - "GET /api/dashboard/kpis HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49908 - "GET /api/dashboard/recent-activity HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49909 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49912 - "GET /api/vehicles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49913 - "GET /api/vehicles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49914 - "PUT /api/vehicles/88ebf5c7-04be-4cf7-a4fc-2cbaa0e5db68 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49915 - "GET /api/vehicles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49916 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49919 - "GET /api/trips HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49921 - "GET /api/trips HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49922 - "PUT /api/trips/6619a757-d79f-4906-8daa-69aadba295e4 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49923 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49926 - "GET /api/users HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49927 - "GET /api/users HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49928 - "PUT /api/users/8436d497-a4d5-48f3-ba8a-fdb24b43af2d HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49929 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49932 - "GET /api/maintenance/work-orders HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49934 - "GET /api/maintenance/work-orders HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49935 - "PUT /api/maintenance/work-orders/0178ae93-6d8b-4ef6-872e-9043d842401d HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49936 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49940 - "GET /api/fuel/vouchers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49941 - "GET /api/fuel/loads HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49942 - "POST /api/auth/login HTTP/1.1" 200 OK
+2026-08-30 19:21:33,151 - root - ERROR - OCR error: 400: Se requiere imagen en base64
+INFO:     127.0.0.1:49943 - "POST /api/fuel/ocr HTTP/1.1" 500 Internal Server Error
+INFO:     127.0.0.1:49944 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49945 - "GET /api/alerts?resolved=false HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49946 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49948 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49949 - "GET /api/reports/trips HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49950 - "GET /api/reports/trips?start_date=2025-01-01&end_date=2026-12-31 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49951 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49952 - "GET /api/reports/trips/export/excel HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49953 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50766 - "GET /api/trips HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50767 - "GET /api/reports/settlements/export/pdf/6619a757-d79f-4906-8daa-69aadba295e4 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50769 - "GET /api/reports/settlements/export/pdf/invalid-trip-id HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:50770 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50771 - "GET /api/reports/fuel HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50772 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50773 - "GET /api/reports/maintenance HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50774 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50775 - "GET /api/config/company HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50776 - "GET /api/config/company HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50779 - "PUT /api/config/company HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50780 - "GET /api/config/company HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50781 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50883 - "GET /api/config/document-types HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50884 - "POST /api/config/document-types HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50885 - "POST /api/config/document-types HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50886 - "PUT /api/config/document-types/5b57762a-2721-4bc6-9be9-ca862b01f610 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50887 - "POST /api/config/document-types HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50888 - "DELETE /api/config/document-types/13269d9f-a612-4040-bb13-25d2f2f504d0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50889 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50890 - "GET /api/config/checklist-templates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50891 - "POST /api/config/checklist-templates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50892 - "POST /api/config/checklist-templates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50893 - "PUT /api/config/checklist-templates/73901c88-9a8f-4a90-8675-f5ab420e7a4f HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50894 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50895 - "GET /api/config/document-types HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50897 - "DELETE /api/config/document-types/2e069b1a-fcdf-43a0-bcc3-0307187e266f HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50899 - "DELETE /api/config/document-types/5b57762a-2721-4bc6-9be9-ca862b01f610 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50900 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50901 - "GET /api/trips HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50902 - "GET /api/trips HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50903 - "GET /api/trips/6619a757-d79f-4906-8daa-69aadba295e4/advances HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50904 - "GET /api/trips/6619a757-d79f-4906-8daa-69aadba295e4/expenses HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50905 - "POST /api/trips/6619a757-d79f-4906-8daa-69aadba295e4/advances HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50906 - "GET /api/trips/6619a757-d79f-4906-8daa-69aadba295e4/advances HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50907 - "POST /api/trips/6619a757-d79f-4906-8daa-69aadba295e4/expenses HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50909 - "GET /api/trips/6619a757-d79f-4906-8daa-69aadba295e4/expenses HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50910 - "GET /api/settlements HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50911 - "POST /api/trips/6619a757-d79f-4906-8daa-69aadba295e4/settlement HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:50912 - "POST /api/trips/6619a757-d79f-4906-8daa-69aadba295e4/settlement HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:50913 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50914 - "GET /api/checklist-templates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50915 - "GET /api/trips HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50916 - "GET /api/checklists/trip/f0727a89-f1bc-4f71-8245-ea023969e371 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50917 - "POST /api/trip/f0727a89-f1bc-4f71-8245-ea023969e371/checklist HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:50918 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50919 - "GET /api/dashboard/kpis HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50920 - "GET /api/vehicles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50921 - "GET /api/documents HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50922 - "GET /api/trips HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50923 - "GET /api/fuel/vouchers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50924 - "GET /api/tires HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50925 - "GET /api/maintenance/work-orders HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50926 - "GET /api/inventory/items HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50927 - "GET /api/issues HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50928 - "GET /api/users HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50929 - "GET /api/settlements HTTP/1.1" 200 OK
+2026-08-30 19:22:57,066 - server - INFO - Barrido de alertas/mantenimiento ejecutado

@@ -60,6 +60,7 @@ COMPANY_COLS = {
     # la clave, build_insert lo omitiria del INSERT y chocaria contra el NOT
     # NULL de la columna en cuanto se cree la primera empresa.
     "slug": "text",
+    # Si ese subdominio esta publicado en el tunel (migracion 017).
     "phone": "text", "email": "text", "logo_url": "text", "brand_color": "text",
     # Suscripcion (migracion 015). Sin estas tres, el alta por la web dejaria
     # la empresa con los defaults del esquema y no habria prueba que vencer.
@@ -868,14 +869,6 @@ class TokenResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     user: Dict[str, Any]
-    # A donde mandar al navegador despues de entrar, cuando la casa del usuario
-    # es OTRO origen (ver _destino_tras_entrar). None = quedarse donde esta,
-    # que es el caso de siempre.
-    redirect_to: Optional[str] = None
-
-class CanjeRequest(BaseModel):
-    codigo: str
-
 
 class RefreshRequest(BaseModel):
     refresh_token: str
@@ -1147,77 +1140,6 @@ async def _exigir_suscripcion_al_dia(request: Request, user: dict):
                    "registrando informacion; tus datos siguen disponibles "
                    "para consulta.",
         )
-
-# ---------------------------------------------------------------------------
-# TRASPASO DE SESION ENTRE ORIGENES
-# ---------------------------------------------------------------------------
-# Quien entra por fletepro.sisac.pe y pertenece a una empresa tiene que acabar
-# en <empresa>.sisac.pe. Y ahi hay un problema que un redirect no resuelve:
-# localStorage es POR ORIGEN. Los tokens que acaba de guardar el login viven en
-# fletepro.sisac.pe y no existen en el otro dominio, asi que el navegador
-# llegaria sin sesion y volveria al login. Es la misma pared que separa a los
-# inquilinos entre si; aqui hay que cruzarla una vez, a proposito y con cuidado.
-#
-# El token NO viaja en la URL. Va un codigo de un solo uso, que el origen de
-# destino canjea contra el backend. Diferencia practica: una URL queda en el
-# historial, en el Referer y en los logs de cualquier proxy; este codigo, aunque
-# se filtre entero, ya esta gastado.
-#
-# En memoria y no en una tabla porque el backend corre en UN proceso
-# (Dockerfile: uvicorn sin --workers) y estos codigos viven 60 segundos. Lo que
-# se pierde en un reinicio es un traspaso a medias: el usuario vuelve a entrar.
-# El dia que haya mas de un worker esto tiene que pasar a Postgres o a Redis, o
-# fallara de forma intermitente segun a que worker caiga el canje.
-_TRASPASOS: Dict[str, dict] = {}
-_VIDA_DEL_TRASPASO = 60.0  # segundos
-
-
-def _emitir_traspaso(user_id: str, company_id: str) -> str:
-    """Un codigo de un solo uso para llevar la sesion al dominio de la empresa."""
-    import time as _t
-    ahora = _t.monotonic()
-    # Barrido de caducados aprovechando el paso: sin esto el diccionario solo
-    # crece, y un login fallido a medias nunca lo limpiaria.
-    for viejo in [c for c, d in _TRASPASOS.items() if d["expira"] <= ahora]:
-        _TRASPASOS.pop(viejo, None)
-
-    codigo = secrets.token_urlsafe(32)
-    _TRASPASOS[codigo] = {
-        "user_id": str(user_id),
-        "company_id": str(company_id),
-        "expira": ahora + _VIDA_DEL_TRASPASO,
-    }
-    return codigo
-
-
-async def _destino_tras_entrar(request: Request, user: dict) -> Optional[str]:
-    """La URL a la que mandar al navegador tras un login, o None para quedarse.
-
-    Solo devuelve algo cuando se entro por un host que NO es de ninguna empresa
-    -la landing, fletepro.sisac.pe- y el usuario si tiene una. Entrando ya por
-    el subdominio propio no hay nada que hacer.
-
-    El superadmin nunca se mueve: su sitio es la consola, y mandarlo al
-    subdominio de un cliente seria justo lo contrario de lo que necesita.
-    """
-    if user.get("role") == "superadmin":
-        return None
-    if tenant_host.slug_desde_host(request.headers.get("host")):
-        return None  # ya esta en un subdominio de empresa
-
-    async with db_pg.tx_global("resolver la direccion propia del usuario tras entrar") as conn:
-        slug = await conn.fetchval(
-            "select slug from companies where id = $1",
-            db_pg.as_uuid(user["company_id"]),
-        )
-    # Un slug reservado no es un host de inquilino (la empresa de la plataforma
-    # usa 'fletepro'): ahi no hay a donde ir.
-    if not slug or slug in tenant_host.RESERVADOS or not tenant_host.DOMINIO_BASE:
-        return None
-
-    codigo = _emitir_traspaso(user["id"], user["company_id"])
-    return f"https://{slug}.{tenant_host.DOMINIO_BASE}/entrar?c={codigo}"
-
 
 def _slug_pedido(valor: str) -> str:
     """Valida un slug elegido a mano y traduce el motivo a un 400 legible.
@@ -2375,22 +2297,23 @@ async def signup(request: Request, datos: SignupRequest):
 async def login(request: Request, login_data: LoginRequest):
     user = None
 
-    # El host acota la busqueda cuando la direccion es la de una empresa
-    # (<slug>.sisac.pe). En la landing, en el acceso de rescate y en local
-    # devuelve None y se busca en todo el sistema, igual que antes.
+    # HOY ESTO SIEMPRE ES None: no hay subdominio por empresa, todo el mundo
+    # entra por la misma direccion (ver tenant_host.DOMINIO_BASE). La busqueda
+    # es, por tanto, en todo el sistema, y de que eso siga siendo correcto se
+    # encarga cada rama de aqui abajo: el correo es unico globalmente, y el DNI
+    # lo desambigua el PIN.
     #
-    # Donde mas se nota es en el login por DNI: users_dni_idx NO es unico, asi
-    # que sin empresa el fetchrow se queda con la fila que le toque y el
-    # segundo chofer que comparta DNI con otro no puede entrar nunca, sin
-    # ningun mensaje que lo explique.
+    # Se deja el filtro porque no cuesta nada y es lo unico que haria falta el
+    # dia que una empresa entre por su propia direccion.
     empresa_host = await tenant_host.empresa_desde_host(request.headers.get("host"))
     empresa_id = db_pg.as_uuid(empresa_host["id"]) if empresa_host else None
 
     # Admin login (email + password)
     if login_data.email and login_data.password:
-        # Sin empresa en el host, el email identifica al usuario en TODO el
-        # sistema. Con empresa, dentro de ella - que es lo que el indice unico
-        # (company_id, email) siempre dio por supuesto.
+        # El correo identifica al usuario en TODO el sistema, y puede: el alta
+        # comprueba que no exista ya en ninguna empresa antes de crearlo. Por
+        # eso una sola pantalla de acceso funciona para el login por correo sin
+        # necesitar nada mas.
         async with db_pg.tx_global("autenticacion: resolver la identidad antes de conocer la empresa") as conn:
             user = db_pg.to_api(await conn.fetchrow(
                 "select * from users where email = $1 "
@@ -2406,40 +2329,87 @@ async def login(request: Request, login_data: LoginRequest):
 
     # Driver login (DNI + PIN)
     elif login_data.dni and login_data.pin:
+        # Con UNA sola direccion para todos, el DNI no identifica a nadie por si
+        # solo: users_dni_idx no es unico, y dos empresas pueden emplear a
+        # personas con el mismo documento -o, en este sector, a la misma persona
+        # en las dos-.
+        #
+        # Esto era un fetchrow que se quedaba con la fila que le tocara. El
+        # segundo chofer con ese DNI no podia entrar NUNCA, y no habia error que
+        # lo explicara: su PIN "no funcionaba" y punto. Con un cliente no se
+        # nota; con veinte es una incidencia al mes que nadie sabe reproducir.
+        #
+        # Se traen TODOS los que tienen ese documento y decide el PIN.
         async with db_pg.tx_global("autenticacion: resolver la identidad antes de conocer la empresa") as conn:
-            user = db_pg.to_api(await conn.fetchrow(
+            candidatos = db_pg.rows_to_api(await conn.fetch(
                 "select * from users where dni = $1 "
-                "  and ($2::uuid is null or company_id = $2)",
+                "  and ($2::uuid is null or company_id = $2) "
+                "order by created_at",
                 login_data.dni, empresa_id,
             ))
-        if not user:
+        if not candidatos:
             raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
-        # Check lockout
-        if user.get("locked_until"):
-            locked_until = user["locked_until"]
-            if isinstance(locked_until, str):
-                locked_until = datetime.fromisoformat(locked_until)
-            if datetime.now(timezone.utc) < locked_until:
-                raise HTTPException(status_code=403, detail="Cuenta bloqueada temporalmente")
+        ahora = datetime.now(timezone.utc)
 
-        if not user.get("pin_hash"):
-            raise HTTPException(status_code=401, detail="PIN no configurado")
+        def _esta_bloqueado(u):
+            hasta = u.get("locked_until")
+            if not hasta:
+                return False
+            if isinstance(hasta, str):
+                hasta = datetime.fromisoformat(hasta)
+            return ahora < hasta
 
-        if not verify_password(login_data.pin, user["pin_hash"]):
-            # Increment failed attempts
-            failed_attempts = (user.get("failed_attempts") or 0) + 1
-            bloqueo = (
-                datetime.now(timezone.utc) + timedelta(minutes=15)
-                if failed_attempts >= 5 else None
+        # Una cuenta bloqueada no entra aunque acierte el PIN, pero tampoco
+        # puede impedir que entre otra persona que comparta su documento.
+        disponibles = [u for u in candidatos if not _esta_bloqueado(u)]
+        if not disponibles:
+            raise HTTPException(status_code=403, detail="Cuenta bloqueada temporalmente")
+
+        aciertan = [
+            u for u in disponibles
+            if u.get("pin_hash") and verify_password(login_data.pin, u["pin_hash"])
+        ]
+
+        if len(aciertan) > 1:
+            # Mismo documento Y mismo PIN en dos empresas. Es rarisimo -cuatro
+            # digitos coincidiendo ademas del DNI- pero elegir nosotros seria
+            # meter a alguien en la empresa equivocada, que es peor que no
+            # dejarle entrar. Se para y queda en el log para poder arreglarlo.
+            logger.warning(
+                "login por DNI ambiguo: %s cuentas comparten documento y PIN",
+                len(aciertan),
             )
+            raise HTTPException(
+                status_code=409,
+                detail="Tu documento esta registrado en mas de una empresa. "
+                       "Pide a tu administrador que te cambie el PIN.",
+            )
+
+        if not aciertan:
+            if not any(u.get("pin_hash") for u in disponibles):
+                # Nadie con ese documento tiene PIN puesto: no es un fallo de
+                # credenciales, es una cuenta a medio crear.
+                raise HTTPException(status_code=401, detail="PIN no configurado")
+
+            # El intento fallido se apunta a TODOS los que comparten documento:
+            # no sabemos a cual iba dirigido, y un bloqueo por intentos que se
+            # esquiva teniendo un homonimo no protege de nada. El precio es que
+            # alguien puede provocar el bloqueo de un tocayo; dura 15 minutos, y
+            # se prefiere eso a dejar el PIN sin defensa contra fuerza bruta.
             async with db_pg.tx_global("autenticacion: el intento fallido se registra antes de conocer la empresa") as conn:
-                await conn.execute(
-                    "update users set failed_attempts = $1, "
-                    "locked_until = coalesce($2, locked_until) where id = $3",
-                    failed_attempts, bloqueo, db_pg.as_uuid(user["id"]),
-                )
+                for u in disponibles:
+                    intentos = (u.get("failed_attempts") or 0) + 1
+                    await conn.execute(
+                        "update users set failed_attempts = $1, "
+                        "locked_until = coalesce($2, locked_until) where id = $3",
+                        intentos,
+                        ahora + timedelta(minutes=15) if intentos >= 5 else None,
+                        db_pg.as_uuid(u["id"]),
+                    )
             raise HTTPException(status_code=401, detail="Credenciales inválidas")
+
+        user = aciertan[0]
 
         # Reset failed attempts on successful login
         async with db_pg.tx_global("autenticacion: el intento fallido se registra antes de conocer la empresa") as conn:
@@ -2478,72 +2448,6 @@ async def login(request: Request, login_data: LoginRequest):
         access_token=access_token,
         refresh_token=refresh_token,
         user=user_response,
-        redirect_to=await _destino_tras_entrar(request, user),
-    )
-
-
-@api_router.post("/auth/canjear", response_model=TokenResponse)
-@limiter.limit("20/minute")
-async def canjear_traspaso(request: Request, datos: CanjeRequest):
-    """Cambia un codigo de traspaso por la sesion, ya en el dominio correcto.
-
-    Lo llama /entrar del frontend, desde el origen de la empresa, con el codigo
-    que le llego en la URL. Publico y sin token: es justo lo que va a crear la
-    sesion en este origen.
-
-    Tres comprobaciones, y la tercera es la que importa:
-
-      - el codigo existe y no caduco (60 s),
-      - se gasta al usarlo -se saca del diccionario ANTES de comprobar nada
-        mas, para que dos peticiones simultaneas no puedan canjearlo las dos-.
-        Eso significa que un intento en el dominio equivocado tambien lo quema,
-        y es deliberado: un codigo llega al host correcto solo, por el redirect,
-        asi que un canje en otro sitio no es un despiste sino un intento. Ante
-        la duda se cierra la puerta y el usuario vuelve a entrar,
-      - EL HOST TIENE QUE SER EL DE LA EMPRESA DEL CODIGO. Sin esto, un codigo
-        emitido para una empresa podria canjearse desde el subdominio de otra:
-        no daria acceso a datos ajenos -el company_id sigue saliendo de la fila
-        del usuario- pero dejaria una sesion valida en un origen que no le
-        corresponde, que es exactamente lo que el resto de este trabajo evita.
-    """
-    datos_del_codigo = _TRASPASOS.pop(datos.codigo, None)
-    if not datos_del_codigo:
-        raise HTTPException(status_code=401, detail="Enlace caducado o ya usado. Vuelve a entrar.")
-
-    import time as _t
-    if datos_del_codigo["expira"] <= _t.monotonic():
-        raise HTTPException(status_code=401, detail="Enlace caducado. Vuelve a entrar.")
-
-    empresa_host = await tenant_host.empresa_desde_host(request.headers.get("host"))
-    if not empresa_host or str(empresa_host["id"]) != datos_del_codigo["company_id"]:
-        raise HTTPException(status_code=403, detail="Este enlace no es de esta direccion")
-
-    async with db_pg.tx_global("canje del traspaso: resolver la identidad") as conn:
-        fila = await conn.fetchrow(
-            "select * from users where id = $1",
-            db_pg.as_uuid(datos_del_codigo["user_id"]),
-        )
-    user = db_pg.to_api(fila)
-    if not user or not user.get("is_active"):
-        raise HTTPException(status_code=401, detail="Usuario no valido")
-
-    token_data = {
-        "user_id": user["id"],
-        "company_id": user["company_id"],
-        "role": user["role"],
-    }
-    return TokenResponse(
-        access_token=create_access_token(token_data),
-        refresh_token=create_refresh_token(token_data),
-        user={
-            "id": user["id"],
-            "company_id": user["company_id"],
-            "name": user["name"],
-            "email": user.get("email"),
-            "dni": user.get("dni"),
-            "role": user["role"],
-            "force_password_change": user.get("force_password_change", False),
-        },
     )
 
 

@@ -45,11 +45,23 @@ from typing import Optional
 
 import db_pg
 
-# El dominio bajo el que cuelgan los inquilinos. Es configurable porque en
-# local no hay ninguno: con TENANT_BASE_DOMAIN=localhost, `gye.localhost:8001`
-# resuelve igual que `gye.sisac.pe` en produccion y sin tocar /etc/hosts (los
-# navegadores mandan *.localhost a 127.0.0.1 por su cuenta).
-DOMINIO_BASE = os.environ.get("TENANT_BASE_DOMAIN", "sisac.pe").strip().lower().strip(".")
+# El dominio bajo el que colgarian los inquilinos, si los hubiera.
+#
+# VACIO POR DEFECTO, Y ESO ES LA DECISION DE PRODUCTO: no hay subdominio por
+# empresa. Todo el mundo entra por fletepro.sisac.pe/login y cae en su empresa
+# por su usuario, que es mas simple de explicar a un cliente y de operar para
+# nosotros: una sola direccion que recordar, un solo certificado, ningun
+# hostname que crear en Cloudflare por cada alta.
+#
+# Vacio, slug_desde_host() devuelve None para CUALQUIER host y todo lo que
+# cuelga de el se apaga solo: /api/tenant responde 404 siempre, el login busca
+# en todo el sistema y la comprobacion de host no compara nada.
+#
+# Poniendo TENANT_BASE_DOMAIN=sisac.pe vuelve a activarse entero. Se deja asi
+# -y no borrado- porque la maquinaria esta escrita y probada, y el dia que un
+# cliente pida su propia direccion es una variable de entorno y un hostname en
+# Cloudflare, no un desarrollo.
+DOMINIO_BASE = os.environ.get("TENANT_BASE_DOMAIN", "").strip().lower().strip(".")
 
 # Etiquetas que NUNCA pueden ser de una empresa, porque son -o van a ser- del
 # servicio. Reservar de mas es gratis; reservar de menos significa quitarle
@@ -186,7 +198,8 @@ def slug_desde_host(host: Optional[str]) -> Optional[str]:
     todos los subdominios de servicio. Ahi el inquilino se resuelve solo por el
     token, como siempre.
     """
-    if not host:
+    if not host or not DOMINIO_BASE:
+        # Sin dominio base no hay subdominios por empresa: es el modo normal.
         return None
 
     h = host.strip().lower().rstrip(".")

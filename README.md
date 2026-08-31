@@ -68,7 +68,7 @@ Ver `backend/.env.example`. Las principales:
 | `DB_NAME` | Sí | Idem: nombre de la base de Mongo, ya sin uso |
 | `JWT_SECRET` | Recomendada | Clave para firmar los JWT |
 | `CORS_ORIGINS` | No | Orígenes permitidos separados por comas (`*` en dev). Los subdominios de inquilino se aceptan aparte, por expresión regular |
-| `TENANT_BASE_DOMAIN` | No | Dominio de los subdominios por empresa (`sisac.pe`). En local, `localhost` hace funcionar `http://gye.localhost:8001` |
+| `TENANT_BASE_DOMAIN` | No | Vacío (por defecto) = una sola dirección de acceso para todas las empresas. Con un dominio (`sisac.pe`) se activa el modo `<empresa>.sisac.pe`, que además exige un hostname por empresa en Cloudflare |
 | `TENANT_RESERVED_SLUGS` | No | Subdominios extra que ninguna empresa puede tomar, además de los de `backend/tenant_host.py` |
 | `INSTALL_TOKEN` | Bootstrap | Token del bootstrap inicial (ver más abajo) |
 | `GOOGLE_API_KEY` | Opcional | OCR con Google Gemini |

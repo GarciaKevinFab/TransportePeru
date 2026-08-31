@@ -25,8 +25,47 @@ import tenant_host  # noqa: E402
 
 @pytest.fixture(autouse=True)
 def dominio_fijo(monkeypatch):
-    """El dominio sale del entorno; los tests no dependen de como este puesto."""
+    """Los tests de abajo prueban el modo <empresa>.sisac.pe, que HOY esta
+    apagado (DOMINIO_BASE nace vacio: una sola direccion para todos). Se fija a
+    mano para que sigan cubriendo la maquinaria, que es lo que hay que tener
+    probado el dia que se encienda."""
     monkeypatch.setattr(tenant_host, "DOMINIO_BASE", "sisac.pe")
+
+
+@pytest.mark.parametrize(
+    "host",
+    [
+        "gyetransporta.sisac.pe",
+        "loquesea.sisac.pe",
+        "fletepro.sisac.pe",
+        "sisac.pe",
+        "localhost:3000",
+    ],
+)
+def test_sin_dominio_base_ningun_host_es_de_una_empresa(host, monkeypatch):
+    """El modo por defecto: una sola direccion para todo el mundo.
+
+    Es el test que protege la decision de producto. Si alguien pusiera un valor
+    por defecto en DOMINIO_BASE, el sistema empezaria a resolver empresas por
+    el dominio sin que nadie lo pidiera, y el sintoma seria que a los usuarios
+    de una empresa les deja de funcionar el acceso comun.
+    """
+    monkeypatch.setattr(tenant_host, "DOMINIO_BASE", "")
+    assert tenant_host.slug_desde_host(host) is None
+
+
+def test_el_valor_por_defecto_es_una_sola_direccion():
+    """Sin TENANT_BASE_DOMAIN en el entorno, no hay subdominios por empresa."""
+    import importlib
+    import os
+
+    previo = os.environ.pop("TENANT_BASE_DOMAIN", None)
+    try:
+        assert importlib.reload(tenant_host).DOMINIO_BASE == ""
+    finally:
+        if previo is not None:
+            os.environ["TENANT_BASE_DOMAIN"] = previo
+        importlib.reload(tenant_host)
 
 
 @pytest.mark.parametrize(

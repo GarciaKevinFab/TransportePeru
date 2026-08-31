@@ -9,7 +9,6 @@ import MobileLayout from './layouts/MobileLayout';
 import LoginPage from './pages/LoginPage';
 import LandingPage from './pages/LandingPage';
 import SignupPage from './pages/SignupPage';
-import EntrarPage from './pages/EntrarPage';
 import DashboardPage from './pages/DashboardPage';
 import VehiclesPage from './pages/VehiclesPage';
 import UnitsPage from './pages/UnitsPage';
@@ -165,11 +164,6 @@ function AppRoutes() {
           </PublicRoute>
         }
       />
-      {/* Recogida de la sesion que viene del host de la marca. Fuera de
-          PublicRoute a proposito: PublicRoute manda al tablero a quien ya
-          tiene sesion, y aqui llega justo quien NO la tiene todavia en este
-          origen - es lo que viene a conseguir. */}
-      <Route path="/entrar" element={<EntrarPage />} />
       <Route
         path="/login"
         element={

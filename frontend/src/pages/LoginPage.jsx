@@ -157,7 +157,7 @@ const LoginPage = () => {
 
         {/* Bottom: Footer */}
         <div className="relative z-10 text-slate-400 text-xs">
-          &copy; 2026 G&amp;E Transporta S.A.C. &mdash; by Star Insights IT
+          &copy; 2026 {marca} &mdash; by Star Insights IT
         </div>
       </div>
 
@@ -320,7 +320,7 @@ const LoginPage = () => {
 
           {/* Mobile footer */}
           <p className="lg:hidden text-center text-slate-400 text-xs mt-6">
-            &copy; 2026 G&amp;E Transporta S.A.C. &mdash; by Star Insights IT
+            &copy; 2026 {marca} &mdash; by Star Insights IT
           </p>
         </div>
       </div>
