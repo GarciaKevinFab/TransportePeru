@@ -1,5 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { ComparativaPlanes, Preguntas } from '../components/landing/Comparativa';
+import Testimonio from '../components/landing/Testimonio';
 import {
   Truck, Route as RouteIcon, Fuel, Wrench, CircleDot, FileText,
   ShieldCheck, Smartphone, MessageCircle, ScanLine, Building2,
@@ -53,7 +55,7 @@ const MODULOS = [
   { icono: RouteIcon, nombre: 'Viajes y rutas', texto: 'Programación, enganches y cierre con liquidación.' },
   { icono: Fuel, nombre: 'Combustible', texto: 'Vales, cargas y consumo por unidad.' },
   { icono: CircleDot, nombre: 'Llantas', texto: 'Esquema por eje, inspecciones, rotación y reencauche.' },
-  { icono: Wrench, nombre: 'Mantenimiento', texto: '@Ordenes de trabajo, planes preventivos e indisponibilidad.' },
+  { icono: Wrench, nombre: 'Mantenimiento', texto: 'Órdenes de trabajo, planes preventivos e indisponibilidad.' },
   { icono: FileText, nombre: 'Documentos', texto: 'Vencimientos, alertas y bloqueos operativos.' },
   { icono: Building2, nombre: 'SUNAT', texto: 'Guias de transportista, facturas y detracciones.' },
 ];
@@ -291,6 +293,9 @@ const LandingPage = () => (
             </div>
           ))}
         </dl>
+        <div className="empty:hidden mt-12 border-t border-white/5 pt-10">
+          <Testimonio />
+        </div>
       </div>
     </Seccion>
 
@@ -408,6 +413,15 @@ const LandingPage = () => (
           </div>
         ))}
       </div>
+
+      <ComparativaPlanes />
+    </Seccion>
+
+    <Seccion id="preguntas" className="border-t border-white/5">
+      <h2 className="font-heading max-w-3xl text-3xl font-black tracking-tight md:text-4xl">
+        Lo que todos preguntan.
+      </h2>
+      <Preguntas />
     </Seccion>
 
     <Seccion className="border-t border-white/5">

@@ -7458,6 +7458,61 @@ async def get_dashboard_kpis(current_user: dict = Depends(get_current_user)):
         }
     }
 
+@api_router.get("/dashboard/series")
+async def dashboard_series(
+    semanas: int = 12,
+    current_user: dict = Depends(get_current_user),
+):
+    """Viajes y gasto de combustible por semana, para las graficas del panel.
+
+    El panel eran solo contadores: numeros sueltos que dicen COMO esta hoy la
+    flota pero no HACIA DONDE va. Un 6 no significa nada; seis semanas seguidas
+    bajando, si.
+
+    Se generan las semanas con generate_series y se hace LEFT JOIN contra ellas,
+    en vez de agrupar solo lo que existe. La diferencia importa: agrupando, una
+    semana sin viajes simplemente no aparece y la grafica la dibuja como si no
+    hubiera pasado, uniendo los dos puntos vecinos. Una parada de una semana se
+    veria como una linea recta. Asi sale como lo que es: un cero.
+    """
+    semanas = max(4, min(semanas, 52))
+    async with db_pg.tx(current_user) as conn:
+        filas = await conn.fetch(
+            """
+            with cal as (
+              select generate_series(
+                       date_trunc('week', now()) - make_interval(weeks => $2::int - 1),
+                       date_trunc('week', now()),
+                       interval '1 week')::date as semana
+            )
+            select cal.semana,
+                   coalesce(v.n, 0)     as viajes,
+                   coalesce(c.soles, 0) as combustible
+              from cal
+              left join (
+                select date_trunc('week', coalesce(scheduled_date, created_at))::date sem,
+                       count(*) n
+                  from trips where company_id = $1 group by 1
+              ) v on v.sem = cal.semana
+              left join (
+                select date_trunc('week', created_at)::date sem,
+                       sum(total_amount) soles
+                  from fuel_loads where company_id = $1 group by 1
+              ) c on c.sem = cal.semana
+             order by cal.semana
+            """,
+            db_pg.as_uuid(current_user["company_id"]), semanas,
+        )
+    return [
+        {
+            "semana": f["semana"].isoformat(),
+            "viajes": int(f["viajes"]),
+            "combustible": round(float(f["combustible"]), 2),
+        }
+        for f in filas
+    ]
+
+
 @api_router.get("/dashboard/recent-activity")
 async def get_recent_activity(current_user: dict = Depends(get_current_user)):
     company_id = current_user["company_id"]

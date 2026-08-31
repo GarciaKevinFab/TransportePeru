@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { dashboardApi, alertsApi, tripsApi } from '../services/api';
+import PanelGraficas from '../components/PanelGraficas';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
@@ -605,6 +606,16 @@ const DashboardPage = () => {
               </Button>
             </CardContent>
           </Card>
+        </div>
+      )}
+
+      {/* Tendencia. Va DESPUES de los contadores y antes de las listas: los
+          numeros dicen como esta la flota hoy, esto dice hacia donde va, y las
+          listas son el detalle. Solo para quien decide sobre la operacion; a un
+          chofer no le sirve de nada. */}
+      {(isAdmin || isOperaciones || isFlota) && (
+        <div className="section-enter section-stagger-3">
+          <PanelGraficas />
         </div>
       )}
 
