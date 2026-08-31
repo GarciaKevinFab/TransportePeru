@@ -51,7 +51,7 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex bg-slate-50 smooth-appear">
+    <div className="min-h-screen flex bg-slate-950 smooth-appear">
       {/* LEFT — Brand / Illustration panel (hidden on mobile) */}
       <div
         className="hidden lg:flex relative flex-1 flex-col justify-between p-12 text-white overflow-hidden"
@@ -114,7 +114,9 @@ const LoginPage = () => {
 
         {/* Top: Brand mark */}
         <div className="relative z-10 logo-appear">
-          <div className="flex items-center gap-3 group">
+          {/* El logo vuelve al inicio, igual que en el registro: las tres
+              paginas publicas se conectan por la marca. */}
+          <a href="/" className="flex items-center gap-3 group">
             <div
               className="w-12 h-12 rounded-lg flex items-center justify-center icon-3d glow-brand-soft transition-transform"
               style={{ backgroundColor: 'var(--brand-color)' }}
@@ -124,7 +126,7 @@ const LoginPage = () => {
             <span className="font-heading text-xl font-black tracking-tight uppercase">
               {marca}
             </span>
-          </div>
+          </a>
         </div>
 
         {/* Middle: Headline */}
@@ -175,36 +177,36 @@ const LoginPage = () => {
             >
               <Truck className="w-8 h-8 text-white" />
             </div>
-            <h1 className="font-heading text-3xl font-black text-slate-900 tracking-tight uppercase">
+            <h1 className="font-heading text-3xl font-black text-slate-100 tracking-tight uppercase">
               {marca}
             </h1>
-            <p className="text-slate-500 text-sm mt-1">
+            <p className="text-slate-400 text-sm mt-1">
               Sistema de Gestión de Flota
             </p>
           </div>
 
-          <Card className="glass-strong border border-white/60 shadow-2xl rounded-2xl login-card-enter">
+          <Card className="border border-white/10 bg-slate-900/70 shadow-2xl shadow-black/50 rounded-2xl login-card-enter">
             <CardHeader className="pb-4 space-y-2">
-              <CardTitle className="font-heading text-2xl font-bold tracking-tight text-slate-900">
+              <CardTitle className="font-heading text-2xl font-bold tracking-tight text-slate-100">
                 Bienvenido de nuevo
               </CardTitle>
-              <CardDescription className="text-slate-500">
+              <CardDescription className="text-slate-400">
                 Selecciona tu tipo de usuario para continuar
               </CardDescription>
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="admin" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 mb-6 bg-slate-100 rounded-lg p-1 h-11">
+                <TabsList className="grid w-full grid-cols-2 mb-6 bg-white/5 border border-white/10 rounded-lg p-1 h-11">
                   <TabsTrigger
                     value="admin"
-                    className="rounded-md data-[state=inactive]:text-slate-600 dark:data-[state=inactive]:text-slate-300 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm font-semibold text-sm transition-all"
+                    className="rounded-md data-[state=inactive]:text-slate-400 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm font-semibold text-sm transition-all"
                   >
                     <User className="w-4 h-4 mr-2" />
                     Admin
                   </TabsTrigger>
                   <TabsTrigger
                     value="driver"
-                    className="rounded-md data-[state=inactive]:text-slate-600 dark:data-[state=inactive]:text-slate-300 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm font-semibold text-sm transition-all"
+                    className="rounded-md data-[state=inactive]:text-slate-400 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm font-semibold text-sm transition-all"
                   >
                     <Truck className="w-4 h-4 mr-2" />
                     Chofer
@@ -215,7 +217,7 @@ const LoginPage = () => {
                 <TabsContent value="admin">
                   <form onSubmit={handleAdminLogin} className="space-y-4">
                     <div className="space-y-1.5">
-                      <Label htmlFor="admin-email" className="text-xs font-semibold text-slate-700">
+                      <Label htmlFor="admin-email" className="text-xs font-semibold text-slate-300">
                         Correo Electrónico
                       </Label>
                       <Input
@@ -225,12 +227,12 @@ const LoginPage = () => {
                         value={adminEmail}
                         onChange={(e) => setAdminEmail(e.target.value)}
                         required
-                        className="rounded-md border-slate-300 h-11 input-focus-ring transition-all duration-200"
+                        className="rounded-md h-11 input-focus-ring transition-all duration-200 bg-slate-950/60 border-white/15 text-slate-100 placeholder:text-slate-500"
                         data-testid="admin-email-input"
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="admin-password" className="text-xs font-semibold text-slate-700">
+                      <Label htmlFor="admin-password" className="text-xs font-semibold text-slate-300">
                         Contraseña
                       </Label>
                       <Input
@@ -240,7 +242,7 @@ const LoginPage = () => {
                         value={adminPassword}
                         onChange={(e) => setAdminPassword(e.target.value)}
                         required
-                        className="rounded-md border-slate-300 h-11 input-focus-ring transition-all duration-200"
+                        className="rounded-md h-11 input-focus-ring transition-all duration-200 bg-slate-950/60 border-white/15 text-slate-100 placeholder:text-slate-500"
                         data-testid="admin-password-input"
                       />
                     </div>
@@ -274,7 +276,7 @@ const LoginPage = () => {
                 <TabsContent value="driver">
                   <form onSubmit={handleDriverLogin} className="space-y-4">
                     <div className="space-y-1.5">
-                      <Label htmlFor="driver-dni" className="text-xs font-semibold text-slate-700">
+                      <Label htmlFor="driver-dni" className="text-xs font-semibold text-slate-300">
                         DNI
                       </Label>
                       <Input
@@ -285,12 +287,12 @@ const LoginPage = () => {
                         onChange={(e) => setDriverDni(e.target.value.replace(/\D/g, '').slice(0, 8))}
                         required
                         maxLength={8}
-                        className="rounded-md border-slate-300 h-11 input-focus-ring transition-all duration-200 font-mono text-lg tracking-wider"
+                        className="rounded-md h-11 input-focus-ring transition-all duration-200 font-mono text-lg tracking-wider bg-slate-950/60 border-white/15 text-slate-100 placeholder:text-slate-500"
                         data-testid="driver-dni-input"
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="driver-pin" className="text-xs font-semibold text-slate-700">
+                      <Label htmlFor="driver-pin" className="text-xs font-semibold text-slate-300">
                         PIN (6 dígitos)
                       </Label>
                       <Input
@@ -301,7 +303,7 @@ const LoginPage = () => {
                         onChange={(e) => setDriverPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
                         required
                         maxLength={6}
-                        className="rounded-md border-slate-300 h-11 input-focus-ring transition-all duration-200 font-mono text-lg tracking-[0.4em] text-center"
+                        className="rounded-md h-11 input-focus-ring transition-all duration-200 font-mono text-lg tracking-[0.4em] text-center bg-slate-950/60 border-white/15 text-slate-100 placeholder:text-slate-500"
                         data-testid="driver-pin-input"
                       />
                     </div>
