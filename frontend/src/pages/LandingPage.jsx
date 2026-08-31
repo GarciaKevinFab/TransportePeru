@@ -1,11 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ComparativaPlanes, Preguntas } from '../components/landing/Comparativa';
 import Testimonio from '../components/landing/Testimonio';
+import { Revelado, Cifra, CapturaTilt } from '../components/landing/animaciones';
 import {
   Truck, Route as RouteIcon, Fuel, Wrench, CircleDot, FileText,
   ShieldCheck, Smartphone, MessageCircle, ScanLine, Building2,
-  ArrowRight, Check,
+  ArrowRight, Check, Menu, X,
 } from 'lucide-react';
 
 /**
@@ -131,34 +132,90 @@ const Etiqueta = ({ children }) => (
   </div>
 );
 
-const LandingPage = () => (
-  <div className="min-h-screen bg-slate-950 text-slate-100 antialiased">
+const ENLACES_NAV = [
+  ['#como-funciona', 'Cómo funciona'],
+  ['#modulos', 'Módulos'],
+  ['#planes', 'Planes'],
+  ['#preguntas', 'Preguntas'],
+];
+
+/* El header vive en su propio componente porque el menu movil necesita estado.
+   Hasta ahora los enlaces eran hidden md:flex Y NO HABIA HAMBURGUESA: en un
+   telefono no se podia llegar a Planes ni a Entrar mas que llegando al pie.
+   Para el trafico de este producto, que es mayormente movil, eso era esconder
+   la navegacion justo a quien mas la usa. */
+const Cabecera = () => {
+  const [abierto, setAbierto] = useState(false);
+
+  return (
     <header className="sticky top-0 z-50 border-b border-white/5 bg-slate-950/80 backdrop-blur">
-      <nav className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-4">
-        <div className="flex items-center gap-2.5">
+      <nav className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
+        <Link to="/" className="flex items-center gap-2.5" onClick={() => setAbierto(false)}>
           <span className="grid h-9 w-9 place-items-center rounded-lg bg-orange-500">
             <Truck className="h-5 w-5 text-white" />
           </span>
           <span className="font-heading text-lg font-black uppercase tracking-tight">
             {PRODUCTO}
           </span>
-        </div>
+        </Link>
 
         <div className="hidden items-center gap-8 md:flex">
-          <a href="#como-funciona" className="text-sm text-slate-300 transition hover:text-white">Cómo funciona</a>
-          <a href="#modulos" className="text-sm text-slate-300 transition hover:text-white">Módulos</a>
-          <a href="#planes" className="text-sm text-slate-300 transition hover:text-white">Planes</a>
+          {ENLACES_NAV.map(([href, texto]) => (
+            <a key={href} href={href} className="text-sm text-slate-300 transition hover:text-white">
+              {texto}
+            </a>
+          ))}
           <Link to="/login" className="text-sm text-slate-300 transition hover:text-white">Entrar</Link>
         </div>
 
-        <Link
-          to="/registro"
-          className="inline-flex items-center gap-2 rounded-full bg-orange-500 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-orange-400"
-        >
-          Empezar <ArrowRight className="h-4 w-4" />
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/registro"
+            className="inline-flex items-center gap-2 rounded-full bg-orange-500 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-orange-400 sm:px-5"
+          >
+            Empezar <ArrowRight className="hidden h-4 w-4 sm:block" />
+          </Link>
+          <button
+            type="button"
+            onClick={() => setAbierto((v) => !v)}
+            aria-expanded={abierto}
+            aria-controls="menu-movil"
+            aria-label={abierto ? 'Cerrar menú' : 'Abrir menú'}
+            className="grid h-10 w-10 place-items-center rounded-lg border border-white/10 text-slate-300 transition hover:text-white md:hidden"
+          >
+            {abierto ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        </div>
       </nav>
+
+      {abierto && (
+        <div id="menu-movil" className="border-t border-white/5 px-4 pb-4 md:hidden">
+          {ENLACES_NAV.map(([href, texto]) => (
+            <a
+              key={href}
+              href={href}
+              onClick={() => setAbierto(false)}
+              className="block border-b border-white/5 py-3.5 text-[15px] text-slate-200"
+            >
+              {texto}
+            </a>
+          ))}
+          <Link
+            to="/login"
+            onClick={() => setAbierto(false)}
+            className="block py-3.5 text-[15px] font-semibold text-orange-400"
+          >
+            Entrar al sistema
+          </Link>
+        </div>
+      )}
     </header>
+  );
+};
+
+const LandingPage = () => (
+  <div className="min-h-screen bg-slate-950 text-slate-100 antialiased">
+    <Cabecera />
 
     <Seccion className="pt-20 md:pt-28">
       <Etiqueta>Gestión de flota para transportistas del Perú</Etiqueta>
@@ -214,6 +271,7 @@ const LandingPage = () => (
           className="pointer-events-none absolute -inset-x-8 -top-8 bottom-10 rounded-[2rem]
                      bg-[radial-gradient(60%_60%_at_50%_0%,rgba(249,115,22,0.16),transparent_70%)] blur-2xl"
         />
+        <CapturaTilt>
         <div className="relative overflow-hidden rounded-xl border border-white/10 bg-slate-900/60 shadow-2xl shadow-black/60 ring-1 ring-white/5">
           <img
             src="/capturas/panel.webp"
@@ -225,6 +283,7 @@ const LandingPage = () => (
             className="block w-full"
           />
         </div>
+        </CapturaTilt>
         <figcaption className="mt-4 text-center text-sm text-slate-500">
           El panel al abrir el sistema: qué está en ruta, qué vence y qué está parado.
         </figcaption>
@@ -247,7 +306,8 @@ const LandingPage = () => (
             alt: 'Gestión de llantas con inventario, posición y estado de cada llanta',
           },
         ].map((c) => (
-          <figure key={c.src} className="group">
+          <Revelado key={c.src} retraso={0}>
+          <figure className="group">
             <div className="overflow-hidden rounded-lg border border-white/10 bg-slate-900/60 transition group-hover:border-white/20">
               <img
                 src={c.src}
@@ -266,6 +326,7 @@ const LandingPage = () => (
               <p className="mt-1.5 text-sm leading-relaxed text-slate-400">{c.texto}</p>
             </figcaption>
           </figure>
+          </Revelado>
         ))}
       </div>
     </Seccion>
@@ -287,7 +348,7 @@ const LandingPage = () => (
           ].map(([cifra, texto]) => (
             <div key={texto}>
               <dt className="font-heading text-4xl font-black tracking-tight text-orange-400">
-                {cifra}
+                <Cifra valor={cifra} />
               </dt>
               <dd className="mt-1.5 text-sm leading-snug text-slate-400">{texto}</dd>
             </div>
@@ -329,12 +390,14 @@ const LandingPage = () => (
       </h2>
 
       <div className="mt-14 grid gap-x-10 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
-        {MODULOS.map(({ icono: Icono, nombre, texto }) => (
-          <div key={nombre} className="border-t border-white/10 pt-5">
-            <Icono className="h-5 w-5 text-orange-500" />
-            <h3 className="mt-3 font-bold">{nombre}</h3>
-            <p className="mt-1.5 text-sm leading-relaxed text-slate-400">{texto}</p>
-          </div>
+        {MODULOS.map(({ icono: Icono, nombre, texto }, i) => (
+          <Revelado key={nombre} retraso={(i % 3) * 90}>
+            <div className="border-t border-white/10 pt-5">
+              <Icono className="h-5 w-5 text-orange-500" />
+              <h3 className="mt-3 font-bold">{nombre}</h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-slate-400">{texto}</p>
+            </div>
+          </Revelado>
         ))}
       </div>
     </Seccion>
@@ -443,16 +506,72 @@ const LandingPage = () => (
       </div>
     </Seccion>
 
-    <footer className="border-t border-white/5 px-6 py-10">
-      <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-between gap-4 text-sm text-slate-500 sm:flex-row">
-        <div className="flex items-center gap-2">
-          <Truck className="h-4 w-4 text-orange-500" />
-          <span className="font-bold text-slate-300">{PRODUCTO}</span>
+    {/* El pie era una sola linea apretada. Con las secciones nuevas -preguntas,
+        legales, recuperacion- ya hay sitio que organizar: producto, cuenta y
+        legal, mas el contacto real. Es tambien el mapa del sitio para quien
+        llego hasta abajo sin decidirse. */}
+    <footer className="border-t border-white/5 px-6 pb-24 pt-14">
+      <div className="mx-auto w-full max-w-6xl">
+        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <div className="flex items-center gap-2.5">
+              <span className="grid h-9 w-9 place-items-center rounded-lg bg-orange-500">
+                <Truck className="h-5 w-5 text-white" />
+              </span>
+              <span className="font-heading text-lg font-black uppercase tracking-tight text-slate-100">
+                {PRODUCTO}
+              </span>
+            </div>
+            <p className="mt-4 max-w-xs text-sm leading-relaxed text-slate-500">
+              Gestión de flota para transportistas del Perú. Viajes, llantas,
+              mantenimiento y SUNAT en un solo sitio.
+            </p>
+          </div>
+
+          {[
+            ['Producto', [
+              ['#como-funciona', 'Cómo funciona'],
+              ['#modulos', 'Módulos'],
+              ['#planes', 'Planes'],
+              ['#preguntas', 'Preguntas frecuentes'],
+            ]],
+            ['Tu cuenta', [
+              ['/login', 'Entrar'],
+              ['/registro', 'Crear empresa'],
+              ['/olvide', 'Recuperar contraseña'],
+            ]],
+            ['Legal y contacto', [
+              ['/privacidad', 'Privacidad'],
+              ['/terminos', 'Términos del servicio'],
+              ['mailto:soporte@sisac.pe', 'soporte@sisac.pe'],
+            ]],
+          ].map(([titulo, enlaces]) => (
+            <nav key={titulo} aria-label={titulo}>
+              <h3 className="font-heading text-sm font-bold uppercase tracking-wide text-slate-400">
+                {titulo}
+              </h3>
+              <ul className="mt-4 space-y-2.5">
+                {enlaces.map(([href, texto]) => (
+                  <li key={href}>
+                    {href.startsWith('/') ? (
+                      <Link to={href} className="text-sm text-slate-500 transition hover:text-white">
+                        {texto}
+                      </Link>
+                    ) : (
+                      <a href={href} className="text-sm text-slate-500 transition hover:text-white">
+                        {texto}
+                      </a>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          ))}
         </div>
-        <span>&copy; {new Date().getFullYear()} Star Insights IT</span>
-        <Link to="/privacidad" className="transition hover:text-white">Privacidad</Link>
-        <Link to="/terminos" className="transition hover:text-white">Términos</Link>
-        <Link to="/login" className="transition hover:text-white">Entrar</Link>
+
+        <p className="mt-12 border-t border-white/5 pt-6 text-sm text-slate-600">
+          &copy; {new Date().getFullYear()} Star Insights IT. Hecho en Perú.
+        </p>
       </div>
     </footer>
   </div>

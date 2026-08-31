@@ -331,6 +331,21 @@ const LoginPage = () => {
             </CardContent>
           </Card>
 
+          <p className="mt-6 text-center text-sm text-slate-400">
+            ¿Tu empresa aún no usa FletePro?{' '}
+            <a
+              href="/registro"
+              className="font-semibold text-orange-500 underline underline-offset-4 hover:text-orange-400"
+            >
+              Crear cuenta gratis
+            </a>
+          </p>
+          <p className="mt-2 text-center text-sm">
+            <a href="/" className="text-slate-500 underline underline-offset-4 hover:text-slate-300">
+              Volver al inicio
+            </a>
+          </p>
+
           {/* Mobile footer */}
           <p className="lg:hidden text-center text-slate-400 text-xs mt-6">
             &copy; 2026 {marca} &mdash;{' '}
