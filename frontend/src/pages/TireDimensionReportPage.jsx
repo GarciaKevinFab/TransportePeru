@@ -88,7 +88,7 @@ const TireDimensionReportPage = () => {
       toast.info('No hay datos para exportar');
       return;
     }
-    const header = ['Dimension', 'Tipo de posicion', 'Reemplazar', 'Reencauchar'];
+    const header = ['Dimensión', 'Tipo de posición', 'Reemplazar', 'Reencauchar'];
     const lines = aggregatedRows.map((r) => [
       r.dimension,
       positionLabel(r.posType),

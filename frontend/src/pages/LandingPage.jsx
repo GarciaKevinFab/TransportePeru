@@ -39,7 +39,7 @@ const PASOS = [
     n: '02',
     titulo: 'Flota',
     icono: Wrench,
-    texto: 'Vehiculos, unidades, llantas e inventario. Cada llanta lleva su historial: montaje, rotación, inspecciones con profundidad, reencauche y baja, con su costo por kilómetro.',
+    texto: 'Vehículos, unidades, llantas e inventario. Cada llanta lleva su historial: montaje, rotación, inspecciones con profundidad, reencauche y baja, con su costo por kilómetro.',
   },
   {
     n: '03',
@@ -62,7 +62,7 @@ const DIFERENCIAS = [
   {
     icono: Smartphone,
     titulo: 'El chofer carga desde el celular, con o sin señal',
-    texto: 'Checklist previo al viaje, gastos, incidentes y fotos. Si no hay cobertura se guarda y sube despues, que en carretera es la mitad del tiempo.',
+    texto: 'Checklist previo al viaje, gastos, incidentes y fotos. Si no hay cobertura se guarda y sube después, que en carretera es la mitad del tiempo.',
   },
   {
     icono: MessageCircle,
@@ -159,7 +159,7 @@ const LandingPage = () => (
     </header>
 
     <Seccion className="pt-20 md:pt-28">
-      <Etiqueta>Gestion de flota para transportistas del Peru</Etiqueta>
+      <Etiqueta>Gestión de flota para transportistas del Perú</Etiqueta>
 
       <h1 className="font-heading max-w-4xl text-5xl font-black leading-[1.05] tracking-tight md:text-7xl">
         Tu flota ya genera los datos.

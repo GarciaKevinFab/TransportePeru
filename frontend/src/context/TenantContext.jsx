@@ -12,7 +12,7 @@ import api from '../services/api';
  * direccion de un cliente, o al reves.
  *
  * null NO es un error: es lo que devuelven la landing, fletepro.sisac.pe y el
- * desarrollo en local. Significa "aqui no hay una empresa concreta", y la app
+ * desarrollo en local. Significa "aquí no hay una empresa concreta", y la app
  * se comporta como siempre, resolviendo el inquilino solo por el token.
  */
 const TenantContext = createContext({ tenant: null, loading: true });

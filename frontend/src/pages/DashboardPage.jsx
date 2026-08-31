@@ -234,7 +234,7 @@ const DashboardPage = () => {
           <KPICard
             title="Viajes Programados"
             value={scheduledTrips.length}
-            subtitle="proximos"
+            subtitle="próximos"
             icon={Calendar}
             color="blue"
             stagger={2}
@@ -407,7 +407,7 @@ const DashboardPage = () => {
         {/* Admin/Owner sees everything */}
         {(isAdmin || isFlota) && (
           <KPICard
-            title="Vehiculos Disponibles"
+            title="Vehículos Disponibles"
             value={kpis?.vehicles?.available || 0}
             subtitle={`de ${kpis?.vehicles?.total || 0} totales`}
             icon={Truck}
@@ -433,7 +433,7 @@ const DashboardPage = () => {
           <KPICard
             title="Alertas Activas"
             value={kpis?.alerts?.total || 0}
-            subtitle={`${kpis?.alerts?.critical || 0} criticas`}
+            subtitle={`${kpis?.alerts?.critical || 0} críticas`}
             icon={AlertTriangle}
             color="red"
             stagger={3}
@@ -444,7 +444,7 @@ const DashboardPage = () => {
           <KPICard
             title="Documentos por Vencer"
             value={kpis?.documents?.expiring || 0}
-            subtitle="proximos 30 dias"
+            subtitle="próximos 30 días"
             icon={FileText}
             color="yellow"
             onClick={() => navigate('/documents')}
@@ -464,7 +464,7 @@ const DashboardPage = () => {
               stagger={1}
             />
             <KPICard
-              title="Vehiculos en Mant."
+              title="Vehículos en Mant."
               value={kpis?.vehicles?.in_maintenance || 0}
               subtitle="en taller"
               icon={Truck}
@@ -473,7 +473,7 @@ const DashboardPage = () => {
               stagger={2}
             />
             <KPICard
-              title="OT Criticas"
+              title="OT Críticas"
               value={kpis?.maintenance?.critical_orders || 0}
               subtitle="prioridad alta"
               icon={AlertTriangle}

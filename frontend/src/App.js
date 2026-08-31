@@ -73,7 +73,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   // y esa asimetria se nota justo cuando el superadmin entra en una empresa
   // para atenderla: el backend le responde y la interfaz lo rebota al tablero,
   // asi que la mitad del sistema le parece rota sin que nada falle.
-  // Contrasena puesta por otra persona: no se entra a ningun sitio hasta
+  // Contraseña puesta por otra persona: no se entra a ningun sitio hasta
   // cambiarla. Va ANTES del filtro de roles a proposito -da igual a que
   // pantalla apuntara, la respuesta es la misma- y sustituye al sistema en
   // vez de avisar encima: un aviso que se puede cerrar se cierra, y la clave
