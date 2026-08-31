@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
+import { PROVEEDOR } from '../config/proveedor';
 import { Truck, ArrowLeft, BookOpen, Loader2, CheckCircle, Send } from 'lucide-react';
 
 /**
@@ -157,9 +158,33 @@ const ReclamacionesPage = () => {
             <p className="mt-3 max-w-2xl leading-relaxed text-slate-400">
               Conforme a la Ley 29571, Código de Protección y Defensa del
               Consumidor. Aquí registras por escrito un reclamo o una queja
-              sobre FletePro, servicio de <strong className="text-slate-200">Star Insights IT</strong>.
+              sobre <strong className="text-slate-200">{PROVEEDOR.producto}</strong>.
               Al enviarlo recibes un código de hoja: guárdalo.
             </p>
+
+            {/* Identificacion del proveedor. La ley la exige en la hoja y no
+                es formalismo: sin razon social, RUC y domicilio, quien reclama
+                no sabe a quien esta reclamando ni puede llevarlo a INDECOPI. */}
+            <section
+              className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-sm leading-relaxed text-slate-400"
+              aria-label="Datos del proveedor"
+            >
+              <h2 className="font-heading text-xs font-bold uppercase tracking-widest text-slate-500">
+                Datos del proveedor
+              </h2>
+              <p className="mt-3">
+                <strong className="text-slate-200">{PROVEEDOR.razonSocial}</strong>
+                <br />
+                RUC {PROVEEDOR.ruc}
+                <br />
+                {PROVEEDOR.domicilio}
+                <br />
+                {PROVEEDOR.telefono} ·{' '}
+                <a href={`mailto:${PROVEEDOR.email}`} className="text-orange-400 underline-offset-2 hover:underline">
+                  {PROVEEDOR.email}
+                </a>
+              </p>
+            </section>
 
             <form onSubmit={enviar} className="mt-8 space-y-6" noValidate>
               {/* 1. Tipo. La ley exige que el consumidor pueda elegir, y que se

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { PROVEEDOR } from '../config/proveedor';
 import { Truck, ArrowLeft } from 'lucide-react';
 
 /**
@@ -81,10 +82,19 @@ const Marco = ({ titulo, children }) => (
 export const PrivacidadPage = () => (
   <Marco titulo="Política de privacidad">
     <p>
-      FletePro es un servicio de <strong>Star Insights IT</strong> para empresas de
+      {PROVEEDOR.producto} es un servicio de <strong>{PROVEEDOR.razonSocial}</strong> (RUC{' '}
+      {PROVEEDOR.ruc}), con domicilio en {PROVEEDOR.domicilio}, para empresas de
       transporte en Perú. Esta política explica qué datos tratamos, para qué y
       durante cuánto tiempo, conforme a la Ley 29733 de Protección de Datos
       Personales y su reglamento.
+    </p>
+    <p>
+      {/* Quien es el responsable del tratamiento tiene que estar dicho con
+          nombre y RUC: es a quien se le ejercen los derechos ARCO, y sin eso
+          la politica no sirve para ejercerlos. */}
+      A efectos de la Ley 29733, el <strong>responsable del tratamiento</strong> es{' '}
+      {PROVEEDOR.razonSocial}, y puedes dirigirte a nosotros en{' '}
+      <a href={`mailto:${PROVEEDOR.email}`}>{PROVEEDOR.email}</a> o al {PROVEEDOR.telefono}.
     </p>
 
     <h2>Quién responde por cada dato</h2>
@@ -303,10 +313,37 @@ export const TerminosPage = () => (
     <h2>Ley aplicable</h2>
     <p>Estos términos se rigen por las leyes de la República del Perú.</p>
 
+    <h2>Marcas y propiedad intelectual</h2>
+    <p>
+      {/* El aviso de marca va en los terminos y no solo en el pie: aqui es
+          donde el cliente acepta que el uso del servicio no le transfiere
+          ningun derecho sobre ella. */}
+      <strong>{PROVEEDOR.marcaRegistrada}®</strong> es marca registrada de{' '}
+      {PROVEEDOR.razonSocial} ante INDECOPI. El software, la marca, el logotipo
+      y los contenidos del servicio son de su propiedad. Contratar el servicio
+      te da derecho a usarlo mientras dure tu plan, no a usar la marca ni a
+      copiar el software.
+    </p>
+    <p>
+      Lo que cargas tú —tus viajes, tu flota, tus documentos, tus fotos— sigue
+      siendo tuyo. Ver <Link to="/privacidad">política de privacidad</Link>.
+    </p>
+
+    <h2>Quién presta el servicio</h2>
+    <p>
+      {/* Con quien contrata el cliente, dicho donde se pueda encontrar. Es lo
+          que exige identificar la Ley 29571, y lo primero que mira una
+          pasarela de pago al validar el comercio. */}
+      <strong>{PROVEEDOR.razonSocial}</strong>, RUC {PROVEEDOR.ruc}, con domicilio en{' '}
+      {PROVEEDOR.domicilio}. Teléfono {PROVEEDOR.telefono}.
+    </p>
+
     <h2>Contacto</h2>
     <p>
-      <a href="mailto:soporte@sisac.pe">soporte@sisac.pe</a> — Star Insights IT.
-      Ver también la <Link to="/privacidad">política de privacidad</Link>.
+      <a href={`mailto:${PROVEEDOR.email}`}>{PROVEEDOR.email}</a> —{' '}
+      {PROVEEDOR.razonSocial}. Ver también la{' '}
+      <Link to="/privacidad">política de privacidad</Link> y el{' '}
+      <Link to="/reclamaciones">Libro de Reclamaciones</Link>.
     </p>
   </Marco>
 );

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { PROVEEDOR, AVISO_DE_MARCA } from '../config/proveedor';
 import { ComparativaPlanes, Preguntas } from '../components/landing/Comparativa';
 import Testimonio from '../components/landing/Testimonio';
 import { Revelado, Cifra, CapturaTilt } from '../components/landing/animaciones';
@@ -580,8 +581,15 @@ const LandingPage = () => (
             enlace de texto perdido en una columna no lo sustituye. Va en la
             linea del copyright para no alterar la reticula de arriba. */}
         <div className="mt-12 flex flex-col-reverse items-start gap-6 border-t border-white/5 pt-6 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-slate-600">
-            &copy; {new Date().getFullYear()} Star Insights IT. Hecho en Perú.
+          {/* La razon social y el RUC en el pie: es lo que identifica a quien
+              vende, y una web que cobra tiene que decirlo sin que haya que
+              buscarlo dentro de los terminos. */}
+          <p className="text-sm leading-relaxed text-slate-600">
+            &copy; {new Date().getFullYear()} {PROVEEDOR.razonSocial} — RUC {PROVEEDOR.ruc}
+            <br />
+            {PROVEEDOR.ciudad}, Perú.
+            <br />
+            <span className="text-xs">{AVISO_DE_MARCA}</span>
           </p>
           <Link
             to="/reclamaciones"

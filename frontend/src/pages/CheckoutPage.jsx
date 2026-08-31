@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
+import { PROVEEDOR } from '../config/proveedor';
 import { Truck, Lock, ShieldCheck, ArrowLeft, Loader2, CheckCircle, CreditCard, Clock } from 'lucide-react';
 
 /**
@@ -314,6 +315,21 @@ const CheckoutPage = () => {
                   <p className="flex items-center justify-center gap-1.5 text-xs text-slate-500">
                     <ShieldCheck className="h-4 w-4 text-slate-400" />
                     Pago con tarjeta procesado por Izipay sobre conexión cifrada.
+                  </p>
+                  {/* A quien se le paga, en la misma pantalla del cobro. En el
+                      cargo de la tarjeta aparecera esta razon social, no la
+                      marca: verla antes evita el desconcierto -y la
+                      reclamacion- de no reconocer el cobro en el estado de
+                      cuenta. */}
+                  <p className="text-center text-[11px] leading-relaxed text-slate-600">
+                    Contratas con {PROVEEDOR.razonSocial} — RUC {PROVEEDOR.ruc}.{' '}
+                    <Link to="/terminos" className="underline underline-offset-2 hover:text-slate-400">
+                      Términos
+                    </Link>{' '}
+                    y{' '}
+                    <Link to="/privacidad" className="underline underline-offset-2 hover:text-slate-400">
+                      privacidad
+                    </Link>.
                   </p>
                 </form>
               </section>
