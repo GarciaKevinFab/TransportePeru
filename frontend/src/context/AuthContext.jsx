@@ -56,9 +56,24 @@ export const AuthProvider = ({ children }) => {
       setUser(userData);
       return { success: true, user: userData };
     } catch (err) {
+      // Se DEVUELVE el fallo, no se lanza. LoginPage hace:
+      //
+      //     const result = await login(...);
+      //     setLoading(false);
+      //     if (!result.success) toast.error(result.error);
+      //
+      // Lanzando desde aqui, ese setLoading(false) no llegaba a ejecutarse
+      // nunca: el boton se quedaba girando para siempre y no aparecia ningun
+      // mensaje. Una contrasena mal escrita, una cuenta bloqueada o el 409 de
+      // DNI repetido se veian todos igual - como si el sistema estuviera
+      // colgado-, que es la peor forma de decirle a alguien que se equivoco de
+      // clave.
+      //
+      // Es el mismo contrato que ya usaba signup(). loginDriver() si lanza, y
+      // esta bien: DriverLoginPage lo envuelve en try/catch.
       const message = err.response?.data?.detail || 'Error al iniciar sesión';
       setError(message);
-      throw err;
+      return { success: false, error: message };
     }
   }, []);
 
