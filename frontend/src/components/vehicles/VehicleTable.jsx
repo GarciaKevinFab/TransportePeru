@@ -52,6 +52,72 @@ const VehicleTable = ({
   onShowCoupledPartner,
   onDelete,
 }) => {
+  /* Un solo menu para la tabla (escritorio) y las tarjetas (movil), igual que
+     AccionesViaje en TripsPage: una accion nueva aparece en ambas vistas o en
+     ninguna. */
+  const AccionesVehiculo = ({ vehicle }) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" data-testid={`vehicle-actions-${vehicle.plate}`}>
+          <MoreVertical className="w-4 h-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => onViewDetail(vehicle)}>
+          <Eye className="w-4 h-4 mr-2" />
+          Ver Detalles
+        </DropdownMenuItem>
+        {isAdmin && (
+          <DropdownMenuItem onClick={() => onEdit(vehicle)}>
+            <Edit className="w-4 h-4 mr-2" />
+            Editar
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem onClick={() => onViewTires(vehicle)}>
+          <CircleDot className="w-4 h-4 mr-2" />
+          Ver Llantas
+        </DropdownMenuItem>
+        {isAdmin && (
+          <DropdownMenuItem onClick={() => onAssignDriver(vehicle)}>
+            <UserCheck className="w-4 h-4 mr-2" />
+            Asignar Chofer
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem onClick={() => onOpenEquipment(vehicle)}>
+          <Shield className="w-4 h-4 mr-2" />
+          Equipamiento EPP
+        </DropdownMenuItem>
+        {vehicle.vehicle_type === 'tracto' && !isVehicleCoupled(vehicle.id) && (
+          <DropdownMenuItem onClick={() => onOpenCoupling(vehicle)}>
+            <LinkIcon className="w-4 h-4 mr-2" />
+            Acoplar Carreta
+          </DropdownMenuItem>
+        )}
+        {isVehicleCoupled(vehicle.id) && (
+          <DropdownMenuItem onClick={() => onUncouple(vehicle)}>
+            <Unlink className="w-4 h-4 mr-2" />
+            Desacoplar
+          </DropdownMenuItem>
+        )}
+        {vehicle.vehicle_type === 'carreta' && isVehicleCoupled(vehicle.id) && (
+          <DropdownMenuItem onClick={() => onShowCoupledPartner(vehicle)}>
+            <Eye className="w-4 h-4 mr-2" />
+            Ver Tracto Acoplado
+          </DropdownMenuItem>
+        )}
+        {isAdmin && (
+          <DropdownMenuItem
+            className="text-red-600"
+            onClick={() => onDelete(vehicle)}
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Eliminar
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
   return (
     <Card className="bg-white section-enter section-stagger-1">
       <CardContent className="p-0 overflow-x-auto">
@@ -76,6 +142,48 @@ const VehicleTable = ({
             />
           )
         ) : (
+          <>
+          {/* Movil: tarjetas. Ocho columnas en 375px esconden estado y
+              acciones tras un arrastre lateral que nadie descubre. */}
+          <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+            {vehicles.map((vehicle) => (
+              <div key={vehicle.id} className="flex items-start gap-3 px-4 py-3.5">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-mono font-bold text-slate-900 dark:text-slate-100">
+                      {vehicle.plate}
+                    </span>
+                    {getStatusBadge(vehicle.status)}
+                    {isVehicleCoupled(vehicle.id) && (
+                      <Badge variant="outline" className="border-purple-300 text-purple-700 bg-purple-50 text-[10px]">
+                        <LinkIcon className="w-3 h-3 mr-1" />
+                        {getCoupledPartnerPlate(vehicle) || 'Acoplado'}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="mt-0.5 truncate text-xs text-slate-500">
+                    {[vehicle.brand, vehicle.model, vehicle.year].filter(Boolean).join(' · ') || '-'}
+                  </p>
+                  <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                    {getTypeBadge(vehicle.vehicle_type)}
+                    <span className="font-mono">{vehicle.odometer?.toLocaleString() || 0} km</span>
+                    {getDriverName(vehicle.assigned_driver_id) ? (
+                      <span className="inline-flex items-center gap-1 truncate">
+                        <User className="h-3 w-3 text-green-600" />
+                        {getDriverName(vehicle.assigned_driver_id)}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">Sin chofer</span>
+                    )}
+                  </p>
+                </div>
+                <AccionesVehiculo vehicle={vehicle} />
+              </div>
+            ))}
+          </div>
+
+          {/* Escritorio: la tabla de siempre */}
+          <div className="hidden md:block">
           <Table>
             <TableHeader>
               <TableRow className="table-dense">
@@ -130,71 +238,14 @@ const VehicleTable = ({
                   </TableCell>
                   <TableCell>{getStatusBadge(vehicle.status)}</TableCell>
                   <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" data-testid={`vehicle-actions-${vehicle.plate}`}>
-                          <MoreVertical className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => onViewDetail(vehicle)}>
-                          <Eye className="w-4 h-4 mr-2" />
-                          Ver Detalles
-                        </DropdownMenuItem>
-                        {isAdmin && (
-                          <DropdownMenuItem onClick={() => onEdit(vehicle)}>
-                            <Edit className="w-4 h-4 mr-2" />
-                            Editar
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem onClick={() => onViewTires(vehicle)}>
-                          <CircleDot className="w-4 h-4 mr-2" />
-                          Ver Llantas
-                        </DropdownMenuItem>
-                        {isAdmin && (
-                          <DropdownMenuItem onClick={() => onAssignDriver(vehicle)}>
-                            <UserCheck className="w-4 h-4 mr-2" />
-                            Asignar Chofer
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem onClick={() => onOpenEquipment(vehicle)}>
-                          <Shield className="w-4 h-4 mr-2" />
-                          Equipamiento EPP
-                        </DropdownMenuItem>
-                        {vehicle.vehicle_type === 'tracto' && !isVehicleCoupled(vehicle.id) && (
-                          <DropdownMenuItem onClick={() => onOpenCoupling(vehicle)}>
-                            <LinkIcon className="w-4 h-4 mr-2" />
-                            Acoplar Carreta
-                          </DropdownMenuItem>
-                        )}
-                        {isVehicleCoupled(vehicle.id) && (
-                          <DropdownMenuItem onClick={() => onUncouple(vehicle)}>
-                            <Unlink className="w-4 h-4 mr-2" />
-                            Desacoplar
-                          </DropdownMenuItem>
-                        )}
-                        {vehicle.vehicle_type === 'carreta' && isVehicleCoupled(vehicle.id) && (
-                          <DropdownMenuItem onClick={() => onShowCoupledPartner(vehicle)}>
-                            <Eye className="w-4 h-4 mr-2" />
-                            Ver Tracto Acoplado
-                          </DropdownMenuItem>
-                        )}
-                        {isAdmin && (
-                          <DropdownMenuItem
-                            className="text-red-600"
-                            onClick={() => onDelete(vehicle)}
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Eliminar
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <AccionesVehiculo vehicle={vehicle} />
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
+          </div>
+          </>
         )}
       </CardContent>
     </Card>

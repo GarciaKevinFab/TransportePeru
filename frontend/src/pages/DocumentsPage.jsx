@@ -44,6 +44,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, differenceInDays } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
+import EstadoVacio from '../components/EstadoVacio';
 
 // Los archivos locales se sirven en `${BACKEND_URL}/uploads/...` (URL relativa);
 // los de S3 ya vienen como URL absoluta.
@@ -55,6 +57,7 @@ const resolveFileUrl = (url) => {
 };
 
 const DocumentsPage = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [matrix, setMatrix] = useState(null);
   const [documentTypes, setDocumentTypes] = useState([]);
@@ -323,11 +326,59 @@ const DocumentsPage = () => {
                   <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
                 </div>
               ) : !matrix?.matrix?.length ? (
-                <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-                  <FileText className="w-12 h-12 mb-2" />
-                  <p>No hay datos para mostrar</p>
-                </div>
+                /* La matriz vacia no es "sin documentos": es que aun no hay
+                   filas (vehiculos o choferes) a las que colgarlos. La guia
+                   lleva a crear el requisito, no a un formulario que va a
+                   fallar. */
+                entityType === 'vehicle' ? (
+                  <EstadoVacio
+                    icono={FileText}
+                    titulo="Antes de cargar documentos, registra tus vehículos"
+                    texto="Cada fila de esta matriz es un vehículo con sus SOAT, revisiones y permisos. Carga primero tu flota y vuelve aquí."
+                    enlace={{ texto: 'Ir a Vehículos', onClick: () => navigate('/vehicles') }}
+                  />
+                ) : (
+                  <EstadoVacio
+                    icono={FileText}
+                    titulo="Antes de cargar documentos, registra a tus choferes"
+                    texto="Cada fila de esta matriz es un chofer con su licencia y demás documentos. Créalos en Usuarios y vuelve aquí."
+                    enlace={{ texto: 'Ir a Usuarios', onClick: () => navigate('/users') }}
+                  />
+                )
               ) : (
+                <>
+                {/* Movil: tarjetas por entidad. La matriz entera no cabe en
+                    375px, y el scroll lateral esconde justo los vencimientos
+                    que la pagina existe para mostrar. */}
+                <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+                  {matrix.matrix.map((row) => (
+                    <div key={row.entity.id} className="px-4 py-3.5">
+                      <p className="font-medium">
+                        {entityType === 'vehicle' ? (
+                          <span className="font-mono">{row.entity.plate}</span>
+                        ) : (
+                          row.entity.name
+                        )}
+                      </p>
+                      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2">
+                        {matrix.document_types.map((dt) => (
+                          <div key={dt.id} className="min-w-0">
+                            <p className="truncate text-[11px] uppercase tracking-wide text-slate-500">
+                              {dt.name}
+                            </p>
+                            <div className="mt-0.5 flex items-center gap-1">
+                              {getStatusCell(row.documents[dt.id], dt, row.entity)}
+                              <FileLink doc={row.documents[dt.id]} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Escritorio: la matriz de siempre */}
+                <div className="hidden md:block">
                 <Table>
                   <TableHeader>
                     <TableRow className="table-dense">
@@ -370,6 +421,8 @@ const DocumentsPage = () => {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
+                </>
               )}
             </CardContent>
           </Card>

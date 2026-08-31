@@ -295,6 +295,67 @@ const UsersPage = () => {
 
   const isDriver = formData.role === 'chofer';
 
+  /* Un solo menu para la tabla (escritorio) y las tarjetas (movil), igual que
+     AccionesViaje en TripsPage: una accion nueva aparece en ambas vistas o en
+     ninguna. */
+  const AccionesUsuario = ({ userItem }) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon">
+          <MoreVertical className="w-4 h-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {isAdmin && (
+          <DropdownMenuItem onClick={() => handleEditUser(userItem)}>
+            <Edit className="w-4 h-4 mr-2" />
+            Editar
+          </DropdownMenuItem>
+        )}
+        {userItem.role === 'chofer' && (
+          <DropdownMenuItem
+            onClick={() => {
+              setSelectedUser(userItem);
+              setShowResetPinDialog(true);
+            }}
+          >
+            <Key className="w-4 h-4 mr-2" />
+            Resetear PIN
+          </DropdownMenuItem>
+        )}
+        {/* Los choferes entran con DNI y PIN; los demas con correo y
+            contrasena. Cada uno ve solo el reseteo que le sirve. */}
+        {userItem.role !== 'chofer' && isAdmin && (
+          <DropdownMenuItem
+            onClick={() => {
+              setSelectedUser(userItem);
+              setNewPassword('');
+              setShowResetPasswordDialog(true);
+            }}
+          >
+            <Key className="w-4 h-4 mr-2" />
+            Resetear contraseña
+          </DropdownMenuItem>
+        )}
+        {userItem.role === 'chofer' && isAdmin && (
+          <DropdownMenuItem onClick={() => openEppDialog(userItem)}>
+            <HardHat className="w-4 h-4 mr-2" />
+            Asignar EPP
+          </DropdownMenuItem>
+        )}
+        {isAdmin && userItem.role !== 'owner' && (
+          <DropdownMenuItem
+            onClick={() => handleDeleteUser(userItem.id)}
+            className="text-red-600"
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Eliminar
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
   return (
     <div className="space-y-6 page-fade-in" data-testid="users-page">
       {/* Header */}
@@ -352,13 +413,56 @@ const UsersPage = () => {
               <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
             </div>
           ) : filteredUsers.length === 0 ? (
-            <EstadoVacio
-              icono={Users}
-              titulo="Sin resultados"
-              texto="Ningún usuario coincide con la búsqueda o el filtro."
-              filtrado
-            />
+            users.length > 0 ? (
+              <EstadoVacio
+                icono={Users}
+                titulo="Sin resultados"
+                texto="Ningún usuario coincide con la búsqueda o el filtro."
+                filtrado
+              />
+            ) : (
+              <EstadoVacio
+                icono={Users}
+                titulo="Registra a tu equipo"
+                texto="Empieza por tus choferes: sin al menos uno no podrás asignar viajes. Los choferes entran con DNI y PIN; el resto con correo y contraseña."
+                accion={isAdmin ? { texto: 'Nuevo usuario', onClick: () => setShowCreateDialog(true) } : undefined}
+              />
+            )
           ) : (
+            <>
+            {/* Movil: tarjetas. Seis columnas en 375px esconden el estado y
+                las acciones tras un arrastre lateral que nadie descubre. */}
+            <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+              {filteredUsers.map((userItem) => (
+                <div key={userItem.id} className="flex items-start gap-3 px-4 py-3.5">
+                  <div className="w-10 h-10 shrink-0 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 font-bold">
+                    {userItem.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium truncate">{userItem.name}</span>
+                      {getRoleBadge(userItem.role)}
+                      {!userItem.is_active && (
+                        <Badge className="bg-red-100 text-red-800">Inactivo</Badge>
+                      )}
+                    </div>
+                    <p className="mt-0.5 truncate text-xs text-slate-500">
+                      {userItem.email || (userItem.dni ? `DNI: ${userItem.dni}` : '-')}
+                      {userItem.phone ? ` · ${userItem.phone}` : ''}
+                    </p>
+                    {userItem.license_number && (
+                      <p className="mt-0.5 font-mono text-xs text-slate-500">
+                        Lic. {userItem.license_number}
+                      </p>
+                    )}
+                  </div>
+                  <AccionesUsuario userItem={userItem} />
+                </div>
+              ))}
+            </div>
+
+            {/* Escritorio: la tabla de siempre */}
+            <div className="hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow className="table-dense">
@@ -419,67 +523,14 @@ const UsersPage = () => {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreVertical className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {isAdmin && (
-                            <DropdownMenuItem onClick={() => handleEditUser(userItem)}>
-                              <Edit className="w-4 h-4 mr-2" />
-                              Editar
-                            </DropdownMenuItem>
-                          )}
-                          {userItem.role === 'chofer' && (
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setSelectedUser(userItem);
-                                setShowResetPinDialog(true);
-                              }}
-                            >
-                              <Key className="w-4 h-4 mr-2" />
-                              Resetear PIN
-                            </DropdownMenuItem>
-                          )}
-                          {/* Los choferes entran con DNI y PIN; los demas con
-                              correo y contrasena. Cada uno ve solo el reseteo
-                              que le sirve. */}
-                          {userItem.role !== 'chofer' && isAdmin && (
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setSelectedUser(userItem);
-                                setNewPassword('');
-                                setShowResetPasswordDialog(true);
-                              }}
-                            >
-                              <Key className="w-4 h-4 mr-2" />
-                              Resetear contraseña
-                            </DropdownMenuItem>
-                          )}
-                          {userItem.role === 'chofer' && isAdmin && (
-                            <DropdownMenuItem onClick={() => openEppDialog(userItem)}>
-                              <HardHat className="w-4 h-4 mr-2" />
-                              Asignar EPP
-                            </DropdownMenuItem>
-                          )}
-                          {isAdmin && userItem.role !== 'owner' && (
-                            <DropdownMenuItem
-                              onClick={() => handleDeleteUser(userItem.id)}
-                              className="text-red-600"
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Eliminar
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <AccionesUsuario userItem={userItem} />
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
+            </div>
+            </>
           )}
         </CardContent>
       </Card>

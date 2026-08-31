@@ -43,6 +43,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import EstadoVacio from '../components/EstadoVacio';
 
 const TiresPage = () => {
   const navigate = useNavigate();
@@ -258,10 +259,59 @@ const TiresPage = () => {
   const inspectionRequired = requiredReport?.inspection_required || 0;
 
   const positions = [
-    'EJE1-IZQ', 'EJE1-DER', 
+    'EJE1-IZQ', 'EJE1-DER',
     'EJE2-IZQ-EXT', 'EJE2-IZQ-INT', 'EJE2-DER-INT', 'EJE2-DER-EXT',
     'EJE3-IZQ-EXT', 'EJE3-IZQ-INT', 'EJE3-DER-INT', 'EJE3-DER-EXT',
   ];
+
+  /* Un solo cluster de acciones para la tabla (escritorio) y las tarjetas
+     (movil), igual que AccionesViaje en TripsPage: una accion nueva aparece
+     en ambas vistas o en ninguna. */
+  const AccionesLlanta = ({ tire }) => (
+    <div className="flex justify-end gap-2 flex-wrap">
+      {tire.status === 'almacen' || tire.status === 'nuevo' ? (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            setSelectedTire(tire);
+            setShowMountDialog(true);
+          }}
+        >
+          <Plus className="w-4 h-4 mr-1" />
+          Montar
+        </Button>
+      ) : tire.status === 'en_uso' ? (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => handleUnmountTire(tire)}
+        >
+          <RotateCcw className="w-4 h-4 mr-1" />
+          Desmontar
+        </Button>
+      ) : null}
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => openEditDialog(tire)}
+        title="Editar"
+      >
+        <Pencil className="w-4 h-4" />
+      </Button>
+      {!tire.current_vehicle_id && (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => handleDeleteTire(tire)}
+          title="Eliminar"
+          className="text-red-600 hover:bg-red-50"
+        >
+          <Trash2 className="w-4 h-4" />
+        </Button>
+      )}
+    </div>
+  );
 
   return (
     <div className="space-y-6 page-fade-in" data-testid="tires-page">
@@ -395,11 +445,58 @@ const TiresPage = () => {
                   <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
                 </div>
               ) : filteredTires.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-                  <CircleDot className="w-12 h-12 mb-2" />
-                  <p>No hay llantas registradas</p>
-                </div>
+                tires.length > 0 ? (
+                  <EstadoVacio
+                    icono={CircleDot}
+                    titulo="Sin resultados"
+                    texto="Ninguna llanta coincide con la búsqueda o el filtro."
+                    filtrado
+                  />
+                ) : (
+                  <EstadoVacio
+                    icono={CircleDot}
+                    titulo="Registra tu primera llanta"
+                    texto="Cada llanta se sigue por serial: montajes, kilómetros, inspecciones y reencauches. Regístrala aquí y luego móntala en un vehículo."
+                    accion={{ texto: 'Nueva llanta', onClick: () => setShowCreateDialog(true) }}
+                  />
+                )
               ) : (
+                <>
+                {/* Movil: tarjetas. Nueve columnas en 375px esconden estado y
+                    acciones tras un arrastre lateral que nadie descubre. */}
+                <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+                  {filteredTires.map((tire) => (
+                    <div key={tire.id} className="px-4 py-3.5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono font-bold">{tire.serial}</span>
+                        <Badge className={getStatusInfo(tire.status).color}>
+                          {getStatusInfo(tire.status).label}
+                        </Badge>
+                        <Badge variant="outline">
+                          {tire.life_number === 1 ? 'VN' : `R${tire.life_number - 1}`}
+                        </Badge>
+                      </div>
+                      <p className="mt-0.5 truncate text-xs text-slate-500">
+                        {[tire.brand, tire.model, tire.dimension].filter(Boolean).join(' · ')}
+                      </p>
+                      <p className="mt-1 flex flex-wrap items-center gap-x-3 text-xs text-slate-500">
+                        <span>{tire.total_km?.toLocaleString() || 0} km</span>
+                        {tire.current_vehicle_id && (
+                          <span className="font-mono">
+                            {getVehiclePlate(tire.current_vehicle_id)}
+                            {tire.current_position ? ` · ${tire.current_position}` : ''}
+                          </span>
+                        )}
+                      </p>
+                      <div className="mt-2">
+                        <AccionesLlanta tire={tire} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Escritorio: la tabla de siempre */}
+                <div className="hidden md:block">
                 <Table>
                   <TableHeader>
                     <TableRow className="table-dense">
@@ -443,54 +540,14 @@ const TiresPage = () => {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-2 flex-wrap">
-                            {tire.status === 'almacen' || tire.status === 'nuevo' ? (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  setSelectedTire(tire);
-                                  setShowMountDialog(true);
-                                }}
-                              >
-                                <Plus className="w-4 h-4 mr-1" />
-                                Montar
-                              </Button>
-                            ) : tire.status === 'en_uso' ? (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleUnmountTire(tire)}
-                              >
-                                <RotateCcw className="w-4 h-4 mr-1" />
-                                Desmontar
-                              </Button>
-                            ) : null}
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => openEditDialog(tire)}
-                              title="Editar"
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </Button>
-                            {!tire.current_vehicle_id && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleDeleteTire(tire)}
-                                title="Eliminar"
-                                className="text-red-600 hover:bg-red-50"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            )}
-                          </div>
+                          <AccionesLlanta tire={tire} />
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
+                </div>
+                </>
               )}
             </CardContent>
           </Card>
@@ -498,6 +555,18 @@ const TiresPage = () => {
 
         {/* By Vehicle Tab */}
         <TabsContent value="vehicles" className="mt-4">
+          {!loading && vehicles.filter(v => v.vehicle_type === 'tracto').length === 0 && (
+            <Card className="bg-white">
+              <CardContent className="p-0">
+                <EstadoVacio
+                  icono={Truck}
+                  titulo="Antes de ver llantas por vehículo, registra tus tractos"
+                  texto="Esta vista muestra el esquema de llantas de cada tracto. Carga primero tu flota y vuelve aquí."
+                  enlace={{ texto: 'Ir a Vehículos', onClick: () => navigate('/vehicles') }}
+                />
+              </CardContent>
+            </Card>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {vehicles.filter(v => v.vehicle_type === 'tracto').map(vehicle => {
               const vehicleTires = tires.filter(t => t.current_vehicle_id === vehicle.id);
