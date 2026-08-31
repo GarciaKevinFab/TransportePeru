@@ -268,8 +268,34 @@ const LandingPage = () => (
       </div>
     </Seccion>
 
+    <Seccion className="border-t border-white/5">
+      <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-8 md:p-12">
+        <p className="font-mono text-xs uppercase tracking-[0.2em] text-orange-400">
+          En producción, no en demostración
+        </p>
+        <p className="font-heading mt-5 max-w-2xl text-2xl font-bold leading-snug tracking-tight md:text-3xl">
+          G&amp;E Transporta S.A.C. mueve su flota con FletePro desde marzo de 2026.
+        </p>
+        <dl className="mt-10 grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-4">
+          {[
+            ['6', 'unidades en operación'],
+            ['19', 'llantas con su historial'],
+            ['12', 'documentos con vencimiento controlado'],
+            ['5', 'meses sin volver al cuaderno'],
+          ].map(([cifra, texto]) => (
+            <div key={texto}>
+              <dt className="font-heading text-4xl font-black tracking-tight text-orange-400">
+                {cifra}
+              </dt>
+              <dd className="mt-1.5 text-sm leading-snug text-slate-400">{texto}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    </Seccion>
+
     <Seccion id="como-funciona" className="border-t border-white/5">
-      <h2 className="font-heading max-w-3xl text-4xl font-black tracking-tight md:text-5xl">
+      <h2 className="font-heading max-w-3xl text-3xl font-black tracking-tight md:text-4xl">
         Operar, mantener, cumplir.
       </h2>
       <p className="mt-5 max-w-2xl text-slate-400">
@@ -285,7 +311,7 @@ const LandingPage = () => (
               <span className="h-px flex-1 bg-white/10" />
               <Icono className="h-5 w-5 text-orange-500" />
             </div>
-            <h3 className="font-heading text-2xl font-bold tracking-tight">{titulo}</h3>
+            <h3 className="font-heading text-xl font-bold tracking-tight">{titulo}</h3>
             <p className="mt-3 leading-relaxed text-slate-400">{texto}</p>
           </div>
         ))}
@@ -293,7 +319,7 @@ const LandingPage = () => (
     </Seccion>
 
     <Seccion id="modulos" className="border-t border-white/5 bg-slate-900/40">
-      <h2 className="font-heading max-w-3xl text-4xl font-black tracking-tight md:text-5xl">
+      <h2 className="font-heading max-w-3xl text-3xl font-black tracking-tight md:text-4xl">
         Todo lo que hoy está en un cuaderno.
       </h2>
 
@@ -309,7 +335,7 @@ const LandingPage = () => (
     </Seccion>
 
     <Seccion className="border-t border-white/5">
-      <h2 className="font-heading max-w-3xl text-4xl font-black tracking-tight md:text-5xl">
+      <h2 className="font-heading max-w-3xl text-3xl font-black tracking-tight md:text-4xl">
         Hecho para como se trabaja en carretera.
       </h2>
 
@@ -329,7 +355,7 @@ const LandingPage = () => (
     </Seccion>
 
     <Seccion id="planes" className="border-t border-white/5 bg-slate-900/40">
-      <h2 className="font-heading max-w-3xl text-4xl font-black tracking-tight md:text-5xl">
+      <h2 className="font-heading max-w-3xl text-3xl font-black tracking-tight md:text-4xl">
         Un viaje mal liquidado cuesta más.
       </h2>
       <p className="mt-5 max-w-2xl text-slate-400">
@@ -351,7 +377,7 @@ const LandingPage = () => (
                 El mas elegido
               </span>
             )}
-            <h3 className="font-heading text-2xl font-black tracking-tight">{p.nombre}</h3>
+            <h3 className="font-heading text-xl font-bold tracking-tight">{p.nombre}</h3>
             <p className="mt-1 text-sm text-slate-400">{p.para}</p>
 
             <div className="mt-6 flex items-baseline gap-1">
@@ -386,7 +412,7 @@ const LandingPage = () => (
 
     <Seccion className="border-t border-white/5">
       <div className="rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-transparent p-10 text-center md:p-16">
-        <h2 className="font-heading mx-auto max-w-2xl text-4xl font-black tracking-tight md:text-5xl">
+        <h2 className="font-heading mx-auto max-w-2xl text-3xl font-black tracking-tight md:text-4xl">
           Tu próximo viaje puede estar acá dentro.
         </h2>
         <p className="mx-auto mt-5 max-w-xl text-slate-400">
