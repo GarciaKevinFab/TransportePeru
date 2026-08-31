@@ -17,7 +17,7 @@ import {
  * NOMBRE DEL PRODUCTO
  *
  *   El repo no traia ninguno: todo estaba marcado como "G&E Transporta S.A.C",
- *   que es UN INQUILINO, no el producto. Se usa FlotaPro por coherencia con
+ *   que es UN INQUILINO, no el producto. Se usa FletePro por coherencia con
  *   LicitaPro, de la misma casa. Cambiarlo es tocar esta constante y nada mas.
  *
  * TEMA FIJO EN OSCURO
@@ -26,7 +26,7 @@ import {
  *   conmutador de tema: es una pagina de venta, se disena para una sola
  *   lectura, y quien la ve todavia no tiene preferencia guardada.
  */
-const PRODUCTO = 'FlotaPro';
+const PRODUCTO = 'FletePro';
 
 const PASOS = [
   {

@@ -82,7 +82,7 @@ const SignupPage = () => {
             <span className="grid h-9 w-9 place-items-center rounded-lg bg-orange-500">
               <Truck className="h-5 w-5 text-white" />
             </span>
-            <span className="font-heading text-lg font-black uppercase tracking-tight">FlotaPro</span>
+            <span className="font-heading text-lg font-black uppercase tracking-tight">FletePro</span>
           </Link>
           <Link to="/login" className="text-sm text-slate-300 transition hover:text-white">
             Ya tengo cuenta

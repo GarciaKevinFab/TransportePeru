@@ -67,6 +67,38 @@ COMPANY_COLS = {
 # aqui tiene que cambiar alli: es la misma promesa.
 DIAS_DE_PRUEBA = 14
 
+# Vehiculos que admite cada plan. La landing publica estas cifras, asi que
+# tienen que cumplirse: un limite anunciado y no aplicado es una cifra
+# decorativa, y el cliente lo descubre el dia que quiere pagar mas.
+#
+# Lo que NO esta en el mapa no tiene limite, y es intencionado: 'trial' -para
+# que se pueda probar con la flota entera, que es de lo que depende la venta- y
+# 'activa', que es como quedaron las empresas que ya operaban antes de que
+# existieran los planes. Ante un plan desconocido se deja pasar, por lo mismo
+# que el corte por suscripcion falla abierto.
+LIMITE_VEHICULOS = {"gratis": 3, "pro": 20}
+
+
+async def _exigir_cupo_de_vehiculos(current_user: dict):
+    """403 cuando la empresa ya llego al tope de su plan."""
+    async with db_pg.tx(current_user) as conn:
+        fila = await conn.fetchrow(
+            "select c.plan, count(v.id) as usados "
+            "  from companies c left join vehicles v on v.company_id = c.id "
+            " where c.id = $1 group by c.plan",
+            db_pg.as_uuid(current_user["company_id"]),
+        )
+    if not fila:
+        return
+    tope = LIMITE_VEHICULOS.get(fila["plan"])
+    if tope is not None and fila["usados"] >= tope:
+        raise HTTPException(
+            status_code=403,
+            detail=("El plan %s admite hasta %d vehiculos y ya tienes %d. "
+                    "Cambia de plan para agregar mas."
+                    % (fila["plan"], tope, fila["usados"])),
+        )
+
 USER_COLS = {
     "id": "uuid", "company_id": "uuid", "email": "text", "dni": "text",
     "name": "text", "role": "enum:user_role",
@@ -2539,6 +2571,8 @@ async def get_vehicle(vehicle_id: str, current_user: dict = Depends(get_current_
 
 @api_router.post("/vehicles")
 async def create_vehicle(request: CreateVehicleRequest, current_user: dict = Depends(require_roles("owner", "admin", "flota"))):
+    await _exigir_cupo_de_vehiculos(current_user)
+
     # Check if plate already exists
     async with db_pg.tx(current_user) as conn:
         existing = await conn.fetchval(
