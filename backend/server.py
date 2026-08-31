@@ -10625,6 +10625,71 @@ async def delete_cash_movement(
         raise HTTPException(status_code=404, detail="Movimiento de caja no encontrado")
     return {"message": "Movimiento de caja eliminado"}
 
+# ============================================================================
+# Checkout de planes: el pedido que Izipay necesita ver
+# ============================================================================
+# La pasarela valida el comercio mirando la web: sin carrito, checkout o boton
+# de pago no activan la integracion. /comprar (frontend) arma el resumen del
+# pedido y este endpoint lo registra al pulsar "Pagar". Cuando Izipay active
+# el comercio, su widget cobrara contra la orden que ya quedo aqui.
+#
+# Publico y sin token, como /auth/signup: comprar es lo primero que hace
+# alguien que todavia no tiene cuenta.
+
+# El precio vive en el SERVIDOR. El navegador manda el plan y nada mas: un
+# monto que viajara hasta una pasarela de pago no puede venir editable en el
+# payload.
+PRECIOS_CHECKOUT = {"pro": ("Plan Pro (mensual)", 199.00)}
+
+
+class OrdenCheckoutRequest(BaseModel):
+    plan: str
+    razon_social: str
+    ruc: Optional[str] = None
+    email: str
+    telefono: Optional[str] = None
+
+
+@api_router.post("/checkout/ordenes")
+@limiter.limit("10/hour")
+async def crear_orden_checkout(request: Request, datos: OrdenCheckoutRequest):
+    plan = (datos.plan or "").strip().lower()
+    if plan not in PRECIOS_CHECKOUT:
+        raise HTTPException(status_code=400, detail="Plan no disponible para compra en línea")
+    razon = (datos.razon_social or "").strip()
+    if len(razon) < 2:
+        raise HTTPException(status_code=400, detail="Falta la razón social o nombre")
+    email = (datos.email or "").strip().lower()
+    if "@" not in email or "." not in email.split("@")[-1]:
+        raise HTTPException(status_code=400, detail="El correo no es válido")
+    ruc = (datos.ruc or "").strip() or None
+    if ruc and (not ruc.isdigit() or len(ruc) != 11):
+        raise HTTPException(status_code=400, detail="El RUC debe tener 11 dígitos")
+
+    nombre_plan, monto = PRECIOS_CHECKOUT[plan]
+    async with db_pg.tx_global("registrar una orden de checkout (publico, sin sesion)") as conn:
+        fila = await conn.fetchrow(
+            "insert into checkout_orders "
+            "(plan, monto, moneda, razon_social, ruc, email, telefono, ip_solicitud) "
+            "values ($1, $2, 'PEN', $3, $4, $5, $6, $7) "
+            "returning id, numero, estado",
+            plan, monto, razon, ruc, email,
+            (datos.telefono or "").strip() or None,
+            request.client.host if request.client else None,
+        )
+    orden = db_pg.to_api(fila)
+    logger.info("checkout: orden %s registrada (plan %s)", orden["numero"], plan)
+    return {
+        "id": orden["id"],
+        "numero": orden["numero"],
+        "estado": orden["estado"],
+        "plan": plan,
+        "descripcion": nombre_plan,
+        "monto": float(monto),
+        "moneda": "PEN",
+    }
+
+
 # Include router (DESPUÉS de definir TODAS las rutas @api_router, incluidas SUNAT)
 app.include_router(api_router)
 

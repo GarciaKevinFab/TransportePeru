@@ -93,6 +93,7 @@ const PLANES = [
     para: 'Para empezar y ver si encaja.',
     incluye: ['Viajes y liquidaciónes', 'Llantas y mantenimiento', 'Documentos y vencimientos', 'App del chofer'],
     cta: 'Empezar gratis',
+    ruta: '/registro',
     destacado: false,
   },
   {
@@ -102,7 +103,10 @@ const PLANES = [
     limite: 'Hasta 20 vehículos',
     para: 'Para la flota que ya factura todos los días.',
     incluye: ['Todo lo del plan Gratis', 'SUNAT: guías y facturas', 'Detracciones', 'Bot de WhatsApp', 'Lectura de facturas', 'Reportes y costo por kilómetro'],
-    cta: 'Empezar gratis',
+    // Al checkout, no al registro: quien elige Pro viene a COMPRAR, y ahi
+    // esta el resumen del pedido y el boton de pago (Izipay).
+    cta: 'Elegir Pro',
+    ruta: '/comprar?plan=pro',
     destacado: true,
   },
   {
@@ -113,6 +117,7 @@ const PLANES = [
     para: 'Para varias sedes o más de una razón social.',
     incluye: ['Todo lo del plan Pro', 'Varias empresas en una cuenta', 'Integraciones a medida', 'Soporte dedicado'],
     cta: 'Hablemos',
+    ruta: '/registro',
     destacado: false,
   },
 ];
@@ -464,7 +469,7 @@ const LandingPage = () => (
             </ul>
 
             <Link
-              to="/registro"
+              to={p.ruta}
               className={`mt-8 inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 font-bold transition ${
                 p.destacado
                   ? 'bg-orange-500 text-white hover:bg-orange-400'

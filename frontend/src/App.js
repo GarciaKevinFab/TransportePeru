@@ -9,6 +9,7 @@ import MobileLayout from './layouts/MobileLayout';
 import LoginPage from './pages/LoginPage';
 import LandingPage from './pages/LandingPage';
 import SignupPage from './pages/SignupPage';
+import CheckoutPage from './pages/CheckoutPage';
 import { OlvidePage, RestablecerPage } from './pages/RecuperarPage';
 import CambiarPasswordPage from './pages/CambiarPasswordPage';
 import { PrivacidadPage, TerminosPage } from './pages/LegalPage';
@@ -185,6 +186,10 @@ function AppRoutes() {
           sesion vieja abierta, y PublicRoute lo mandaria al tablero sin
           dejarle cambiar la contrasena que vino a cambiar. */}
       <Route path="/restablecer" element={<RestablecerPage />} />
+      {/* Checkout del plan Pro. Tambien fuera de PublicRoute: un cliente con
+          sesion abierta que quiere pasarse a Pro tiene que poder pagar sin
+          que se le rebote al tablero. */}
+      <Route path="/comprar" element={<CheckoutPage />} />
       <Route
         path="/login"
         element={
