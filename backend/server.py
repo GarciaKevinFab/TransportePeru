@@ -24,12 +24,39 @@ import re
 import secrets
 import asyncio
 
+def ip_del_cliente(request) -> str:
+    """La IP real de quien pide, no la del tunel.
+
+    ESTO ERA UN FALLO SILENCIOSO Y SERIO. slowapi venia con
+    key_func=get_remote_address, que devuelve request.client.host. Pero al
+    backend NO llega nadie directamente: el puerto 8001 esta atado a 127.0.0.1
+    y todo entra por el tunel de Cloudflare, asi que request.client.host es
+    SIEMPRE 172.21.0.1 -la puerta de la red de Docker-.
+
+    Consecuencia: los cuatro limites no eran por IP, eran GLOBALES. El de login
+    era "10 por minuto para todo el sistema": con un cliente no se nota, pero
+    con tres empresas y sus choferes entrando al cambio de turno empieza a
+    devolver 429 a gente que no ha hecho nada. Un incidente que aparece al
+    crecer y no se parece a un problema de limites.
+
+    CF-Connecting-IP la pone Cloudflare y aqui es de fiar precisamente porque
+    no hay otra forma de llegar: nada externo puede alcanzar el puerto para
+    falsificarla. Si algun dia el backend se expone directo, esta cabecera deja
+    de merecer confianza y hay que revisar esto.
+    """
+    for cabecera in ("cf-connecting-ip", "x-forwarded-for"):
+        valor = request.headers.get(cabecera)
+        if valor:
+            # X-Forwarded-For puede traer una cadena; el cliente es el primero.
+            return valor.split(",")[0].strip()
+    return request.client.host if request.client else "desconocida"
+
+
 # Rate limiting (slowapi). Add "slowapi" to backend/requirements.txt.
 try:
     from slowapi import Limiter, _rate_limit_exceeded_handler
-    from slowapi.util import get_remote_address
     from slowapi.errors import RateLimitExceeded
-    limiter = Limiter(key_func=get_remote_address)
+    limiter = Limiter(key_func=ip_del_cliente)
     SLOWAPI_AVAILABLE = True
 except ImportError:
     # slowapi no instalado: limiter no-op para que el server siga arrancando
@@ -2240,7 +2267,7 @@ async def signup(request: Request, datos: SignupRequest):
     if "@" not in email or "." not in email.split("@")[-1]:
         raise HTTPException(status_code=400, detail="El correo no es valido")
     if len(datos.password or "") < 8:
-        raise HTTPException(status_code=400, detail="La contrasena necesita al menos 8 caracteres")
+        raise HTTPException(status_code=400, detail="La contraseña necesita al menos 8 caracteres")
 
     ahora = datetime.now(timezone.utc)
     company = Company(
@@ -2491,7 +2518,7 @@ async def olvide_mi_password(request: Request, datos: OlvideRequest):
     """
     generico = {
         "message": "Si ese correo tiene una cuenta, te enviamos un enlace para "
-                   "crear una contrasena nueva. Revisa tambien la carpeta de spam."
+                   "crear una contraseña nueva. Revisa también la carpeta de spam."
     }
     email = (datos.email or "").strip().lower()
     if "@" not in email:
@@ -2542,7 +2569,7 @@ async def olvide_mi_password(request: Request, datos: OlvideRequest):
             "values ($1, $2, $3, $4)",
             db_pg.as_uuid(usuario["id"]), _huella(token),
             ahora + VIDA_DEL_ENLACE,
-            (request.client.host if request.client else None),
+            ip_del_cliente(request),
         )
 
     base = os.environ.get("APP_BASE_URL", "").rstrip("/") or "https://fletepro.sisac.pe"
@@ -2552,21 +2579,21 @@ async def olvide_mi_password(request: Request, datos: OlvideRequest):
 
     texto = (
         nombre + ",\n\n"
-        "Pediste crear una contrasena nueva para tu cuenta de FletePro.\n\n"
+        "Pediste crear una contraseña nueva para tu cuenta de FletePro.\n\n"
         "Abre este enlace y elige una:\n" + enlace + "\n\n"
         "Caduca en " + str(minutos) + " minutos y solo se puede usar una vez.\n\n"
-        "Si no fuiste tu, ignora este correo: tu contrasena sigue igual.\n"
+        "Si no fuiste tú, ignora este correo: tu contraseña sigue igual.\n"
     )
     html = (
         "<p>" + nombre + ",</p>"
-        "<p>Pediste crear una contrasena nueva para tu cuenta de FletePro.</p>"
+        "<p>Pediste crear una contraseña nueva para tu cuenta de FletePro.</p>"
         "<p><a href=\"" + enlace + "\" style=\"display:inline-block;background:#f97316;"
         "color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;"
-        "font-weight:600\">Crear contrasena nueva</a></p>"
+        "font-weight:600\">Crear contraseña nueva</a></p>"
         "<p style=\"color:#64748b;font-size:13px\">O copia este enlace:<br>" + enlace + "</p>"
         "<p style=\"color:#64748b;font-size:13px\">Caduca en " + str(minutos) + " minutos y "
-        "solo se puede usar una vez. Si no fuiste tu, ignora este correo: tu "
-        "contrasena sigue igual.</p>"
+        "solo se puede usar una vez. Si no fuiste tú, ignora este correo: tu "
+        "contraseña sigue igual.</p>"
     )
     await correo.enviar(usuario["email"], "Recupera el acceso a FletePro", texto, html)
     return generico
@@ -2578,7 +2605,7 @@ async def restablecer_password(request: Request, datos: RestablecerRequest):
     """Canjea el enlace por una contrasena nueva."""
     nueva = (datos.password or "").strip()
     if len(nueva) < 8:
-        raise HTTPException(status_code=400, detail="La contrasena necesita al menos 8 caracteres")
+        raise HTTPException(status_code=400, detail="La contraseña necesita al menos 8 caracteres")
 
     ahora = datetime.now(timezone.utc)
     async with db_pg.tx_global("recuperacion: canjear el enlace antes de tener sesion") as conn:
@@ -2595,7 +2622,7 @@ async def restablecer_password(request: Request, datos: RestablecerRequest):
         if not fila:
             raise HTTPException(
                 status_code=400,
-                detail="Este enlace ya se uso o caduco. Pide uno nuevo.",
+                detail="Este enlace ya se usó o caducó. Pide uno nuevo.",
             )
         # force_password_change se apaga: la contrasena la acaba de elegir su
         # dueno, obligarle a cambiarla otra vez seria absurdo.
@@ -2604,7 +2631,7 @@ async def restablecer_password(request: Request, datos: RestablecerRequest):
             "failed_attempts = 0, locked_until = null, updated_at = now() where id = $2",
             hash_password(nueva), fila["user_id"],
         )
-    return {"message": "Contrasena actualizada. Ya puedes entrar."}
+    return {"message": "Contraseña actualizada. Ya puedes entrar."}
 
 
 @api_router.post("/auth/cambiar-password")
@@ -2624,11 +2651,11 @@ async def cambiar_mi_password(
     """
     nueva = (datos.password_nueva or "").strip()
     if len(nueva) < 8:
-        raise HTTPException(status_code=400, detail="La contrasena necesita al menos 8 caracteres")
+        raise HTTPException(status_code=400, detail="La contraseña necesita al menos 8 caracteres")
     if not current_user.get("password_hash") or not verify_password(
         datos.password_actual or "", current_user["password_hash"]
     ):
-        raise HTTPException(status_code=400, detail="La contrasena actual no es correcta")
+        raise HTTPException(status_code=400, detail="La contraseña actual no es correcta")
     if verify_password(nueva, current_user["password_hash"]):
         raise HTTPException(status_code=400, detail="La nueva tiene que ser distinta de la actual")
 
@@ -2639,7 +2666,7 @@ async def cambiar_mi_password(
             hash_password(nueva), db_pg.as_uuid(current_user["id"]),
             db_pg.as_uuid(current_user["company_id"]),
         )
-    return {"message": "Contrasena actualizada"}
+    return {"message": "Contraseña actualizada"}
 
 
 @api_router.post("/auth/refresh", response_model=TokenResponse)
@@ -2932,7 +2959,7 @@ async def reset_user_password(
     nueva = (request.get("password") or "").strip()
     if len(nueva) < 8:
         raise HTTPException(
-            status_code=400, detail="La contrasena necesita al menos 8 caracteres"
+            status_code=400, detail="La contraseña necesita al menos 8 caracteres"
         )
 
     async with db_pg.tx(current_user) as conn:
@@ -2978,7 +3005,7 @@ async def reset_user_password(
         entity_id=user_id,
         details={"email": objetivo.get("email")},
     )
-    return {"message": "Contrasena actualizada. Entregasela al usuario por un canal seguro."}
+    return {"message": "Contraseña actualizada. Entrégasela al usuario por un canal seguro."}
 
 
 @api_router.post("/users/{user_id}/reset-pin")
