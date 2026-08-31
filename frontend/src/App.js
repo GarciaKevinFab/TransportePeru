@@ -65,7 +65,12 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     return <Navigate to="/login" replace />;
   }
   
-  if (allowedRoles && !allowedRoles.includes(user?.role)) {
+  // El superadmin pasa siempre, igual que en el backend: require_roles() lo
+  // autoriza en TODOS los endpoints, esten o no en su lista de roles. Aqui no,
+  // y esa asimetria se nota justo cuando el superadmin entra en una empresa
+  // para atenderla: el backend le responde y la interfaz lo rebota al tablero,
+  // asi que la mitad del sistema le parece rota sin que nada falle.
+  if (allowedRoles && user?.role !== 'superadmin' && !allowedRoles.includes(user?.role)) {
     return <Navigate to="/dashboard" replace />;
   }
   
