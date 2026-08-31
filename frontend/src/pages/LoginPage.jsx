@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTenant } from '../context/TenantContext';
+import PanelMarca from '../components/PanelMarca';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -52,121 +53,24 @@ const LoginPage = () => {
 
   return (
     <div className="min-h-screen flex bg-slate-950 smooth-appear">
-      {/* LEFT — Brand / Illustration panel (hidden on mobile) */}
-      <div
-        className="hidden lg:flex relative flex-1 flex-col justify-between p-12 text-white overflow-hidden"
-        style={{
-          backgroundImage:
-            'linear-gradient(135deg, #0f172a 0%, #1e293b 55%, color-mix(in srgb, var(--brand-color) 35%, #1e293b) 100%)',
-        }}
-      >
-        {/* Decorative pattern */}
-        <div
-          aria-hidden
-          className="absolute inset-0 opacity-[0.07]"
-          style={{
-            backgroundImage:
-              'radial-gradient(circle at 1px 1px, #ffffff 1px, transparent 0)',
-            backgroundSize: '24px 24px',
-          }}
-        />
-        {/* Glow accent */}
-        <div
-          aria-hidden
-          className="absolute -top-32 -right-32 w-[480px] h-[480px] rounded-full blur-3xl opacity-30 float-animation"
-          style={{ background: 'var(--brand-color)' }}
-        />
-        <div
-          aria-hidden
-          className="absolute -bottom-40 -left-20 w-[420px] h-[420px] rounded-full blur-3xl opacity-20 float-rotate"
-          style={{ background: 'var(--brand-color)' }}
-        />
-
-        {/* Animated geometric shapes */}
-        <div aria-hidden className="absolute inset-0 pointer-events-none">
-          <div
-            className="absolute top-[18%] right-[14%] w-32 h-32 rounded-3xl border border-white/10 slow-spin"
-            style={{
-              backgroundImage:
-                'linear-gradient(135deg, rgba(255,255,255,0.06) 0%, transparent 100%)',
-            }}
-          />
-          <div
-            className="absolute top-[55%] right-[8%] w-20 h-20 rounded-full border border-white/10 slow-spin-reverse"
-            style={{
-              backgroundImage:
-                'linear-gradient(135deg, color-mix(in srgb, var(--brand-color) 18%, transparent) 0%, transparent 100%)',
-            }}
-          />
-          <div
-            className="absolute bottom-[22%] right-[28%] w-14 h-14 rounded-xl border border-white/15 float-rotate"
-            style={{
-              backgroundImage:
-                'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 100%)',
-            }}
-          />
-          {/* Particle dots */}
-          <div className="absolute top-[30%] left-[10%] w-1.5 h-1.5 rounded-full bg-white/40 float-animation" />
-          <div className="absolute top-[60%] left-[18%] w-1 h-1 rounded-full bg-white/30 float-animation" style={{ animationDelay: '1.2s' }} />
-          <div className="absolute top-[75%] left-[40%] w-2 h-2 rounded-full bg-white/25 float-animation" style={{ animationDelay: '2.4s' }} />
-          <div className="absolute top-[20%] left-[55%] w-1 h-1 rounded-full bg-white/35 float-animation" style={{ animationDelay: '0.6s' }} />
-        </div>
-
-        {/* Top: Brand mark */}
-        <div className="relative z-10 logo-appear">
-          {/* El logo vuelve al inicio, igual que en el registro: las tres
-              paginas publicas se conectan por la marca. */}
-          <a href="/" className="flex items-center gap-3 group">
-            <div
-              className="w-12 h-12 rounded-lg flex items-center justify-center icon-3d glow-brand-soft transition-transform"
-              style={{ backgroundColor: 'var(--brand-color)' }}
-            >
-              <Truck className="w-7 h-7 text-white" />
-            </div>
-            <span className="font-heading text-xl font-black tracking-tight uppercase">
-              {marca}
-            </span>
-          </a>
-        </div>
-
-        {/* Middle: Headline */}
-        <div className="relative z-10 max-w-lg login-card-enter">
-          <h2 className="font-heading text-5xl xl:text-6xl font-black tracking-tight leading-[1.05] uppercase">
+      {/* Panel de marca compartido con el registro: misma concha, distinto
+          mensaje. Aqui se recibe a quien vuelve. */}
+      <PanelMarca
+        marca={marca}
+        titulo={
+          <>
             Tu flota,<br />
             <span className="gradient-text">bajo control.</span>
-          </h2>
-          <p className="mt-6 text-slate-300 text-lg leading-relaxed">
-            Gestiona vehículos, viajes, mantenimiento y documentación
-            en una sola plataforma diseñada para empresas de transporte.
-          </p>
+          </>
+        }
+        descripcion="Gestiona vehículos, viajes, mantenimiento y documentación en una sola plataforma diseñada para empresas de transporte."
+        puntos={[
+          'Control de combustible, llantas y mantenimiento',
+          'Documentos SUNAT, MTC y vencimientos al día',
+          'Liquidaciones y viáticos automatizados',
+        ]}
+      />
 
-          <ul className="mt-8 space-y-3">
-            {[
-              'Control de combustible, llantas y mantenimiento',
-              'Documentos SUNAT, MTC y vencimientos al día',
-              'Liquidaciones y viáticos automatizados',
-            ].map((feature) => (
-              <li key={feature} className="flex items-center gap-3 text-slate-200">
-                <CheckCircle2
-                  className="w-5 h-5 flex-shrink-0"
-                  style={{ color: 'var(--brand-color)' }}
-                />
-                <span className="text-sm">{feature}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {/* Bottom: Footer */}
-        <div className="relative z-10 text-slate-400 text-xs">
-          &copy; 2026 {marca} &mdash;{' '}
-            <a href="/privacidad" className="underline underline-offset-4 hover:text-orange-500">Privacidad</a>{' '}
-            &middot;{' '}
-            <a href="/terminos" className="underline underline-offset-4 hover:text-orange-500">Términos</a>
-        </div>
-      </div>
-
-      {/* RIGHT — Form panel */}
       <div className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-12">
         <div className="w-full max-w-md">
           {/* Mobile brand header */}

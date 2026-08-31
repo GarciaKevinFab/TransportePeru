@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Truck, ArrowRight, Loader2, Check } from 'lucide-react';
+import PanelMarca from '../components/PanelMarca';
+import { Truck, ArrowRight, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 /**
@@ -75,48 +76,46 @@ const SignupPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 antialiased">
-      <header className="border-b border-white/5">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-4">
-          <Link to="/" className="flex items-center gap-2.5">
-            <span className="grid h-9 w-9 place-items-center rounded-lg bg-orange-500">
-              <Truck className="h-5 w-5 text-white" />
-            </span>
-            <span className="font-heading text-lg font-black uppercase tracking-tight">FletePro</span>
-          </Link>
-          <Link to="/login" className="text-sm text-slate-300 transition hover:text-white">
-            Ya tengo cuenta
-          </Link>
-        </div>
-      </header>
+    <div className="min-h-screen flex bg-slate-950 text-slate-100 antialiased smooth-appear">
+      {/* La misma concha que el login: panel de marca a la izquierda, tarjeta a
+          la derecha. Antes el registro tenia OTRA estructura -cabecera fina y
+          columna de texto- y las dos puertas del producto parecian de productos
+          distintos. Solo cambia el mensaje: aqui se convence a quien llega. */}
+      <PanelMarca
+        titulo={
+          <>
+            14 días para probarlo<br />
+            <span className="gradient-text">con tu flota de verdad.</span>
+          </>
+        }
+        descripcion="Sin tarjeta y sin compromiso. Cargas tus unidades y tus choferes, y si no te sirve, no pagas nada."
+        puntos={[
+          'Todos los módulos durante la prueba',
+          'Tus datos, aislados del resto de empresas',
+          'App del chofer con modo sin señal',
+          'Al terminar eliges plan: desde S/ 0',
+        ]}
+      />
 
-      <main className="mx-auto grid w-full max-w-6xl gap-14 px-6 py-14 pb-28 lg:grid-cols-[1fr_460px] lg:py-20 lg:pb-28">
-        {/* Lo que se lleva, para que el formulario no sea un salto al vacio */}
-        <div className="hidden lg:block">
-          <h1 className="font-heading text-4xl font-black leading-tight tracking-tight">
-            14 días para probarlo
-            <span className="block text-slate-500">con tu flota de verdad.</span>
-          </h1>
-          <p className="mt-6 max-w-md leading-relaxed text-slate-400">
-            Sin tarjeta y sin compromiso. Cargas tus unidades y tus choferes, y
-            si no te sirve, no pagas nada.
-          </p>
-          <ul className="mt-9 space-y-4">
-            {[
-              'Todos los módulos durante la prueba',
-              'Tus datos, aislados del resto de empresas',
-              'App del chofer con modo sin señal',
-              'Al terminar eliges plan: desde S/ 0',
-            ].map((t) => (
-              <li key={t} className="flex items-start gap-3 text-slate-300">
-                <Check className="mt-0.5 h-5 w-5 shrink-0 text-orange-500" />
-                {t}
-              </li>
-            ))}
-          </ul>
-        </div>
+      <div className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-12">
+        <div className="w-full max-w-md">
+          {/* Cabecera de marca en movil, identica a la del login */}
+          <div className="lg:hidden text-center mb-8 logo-appear">
+            <Link to="/" className="inline-flex flex-col items-center">
+              <span
+                className="inline-flex items-center justify-center w-14 h-14 rounded-xl mb-3 icon-3d glow-brand-soft"
+                style={{ backgroundColor: 'var(--brand-color)' }}
+              >
+                <Truck className="w-8 h-8 text-white" />
+              </span>
+              <span className="font-heading text-3xl font-black text-slate-100 tracking-tight uppercase">
+                FletePro
+              </span>
+            </Link>
+            <p className="text-slate-400 text-sm mt-1">Sistema de Gestión de Flota</p>
+          </div>
 
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-8">
+        <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-8 shadow-2xl shadow-black/50 login-card-enter">
           <h2 className="font-heading text-2xl font-black tracking-tight">Crea tu cuenta</h2>
           <p className="mt-1 text-sm text-slate-400">Empiezas con 14 días de prueba.</p>
 
@@ -167,7 +166,27 @@ const SignupPage = () => {
             </p>
           </form>
         </div>
-      </main>
+
+          <p className="mt-6 text-center text-sm text-slate-400">
+            ¿Ya tienes cuenta?{' '}
+            <Link to="/login" className="font-semibold text-orange-500 underline underline-offset-4 hover:text-orange-400">
+              Entrar
+            </Link>
+          </p>
+          <p className="mt-2 text-center text-sm">
+            <Link to="/" className="text-slate-500 underline underline-offset-4 hover:text-slate-300">
+              Volver al inicio
+            </Link>
+          </p>
+
+          <p className="lg:hidden text-center text-slate-400 text-xs mt-6">
+            &copy; 2026 FletePro &mdash;{' '}
+            <Link to="/privacidad" className="underline underline-offset-4 hover:text-orange-500">Privacidad</Link>{' '}
+            &middot;{' '}
+            <Link to="/terminos" className="underline underline-offset-4 hover:text-orange-500">Términos</Link>
+          </p>
+        </div>
+      </div>
     </div>
   );
 };
