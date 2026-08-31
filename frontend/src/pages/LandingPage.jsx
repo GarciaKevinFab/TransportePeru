@@ -194,6 +194,80 @@ const LandingPage = () => (
       </p>
     </Seccion>
 
+    {/* El producto, visto.
+        Faltaba lo mas basico de una landing de software: ver el software. Se
+        describian seis modulos sin ensenar ni una pantalla, y un plan de S/199
+        no se vende de oidas.
+
+        Las capturas son del sistema de verdad, con datos de una empresa de
+        demostracion. Nunca de un cliente: las placas, los choferes y los
+        viajes de G&E son datos de su operacion, y una pagina publica no es
+        sitio para ellos. */}
+    <Seccion id="el-producto" className="border-t border-white/5 !py-0 pb-20 md:pb-28">
+      <figure className="relative -mt-6 md:-mt-10">
+        {/* Resplandor detras del marco: separa la captura del fondo sin
+            necesidad de un borde grueso. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -inset-x-8 -top-8 bottom-10 rounded-[2rem]
+                     bg-[radial-gradient(60%_60%_at_50%_0%,rgba(249,115,22,0.16),transparent_70%)] blur-2xl"
+        />
+        <div className="relative overflow-hidden rounded-xl border border-white/10 bg-slate-900/60 shadow-2xl shadow-black/60 ring-1 ring-white/5">
+          <img
+            src="/capturas/panel.webp"
+            alt="Panel de FletePro: vehículos disponibles, viajes activos, alertas y documentos por vencer"
+            width={1600}
+            height={1000}
+            loading="lazy"
+            decoding="async"
+            className="block w-full"
+          />
+        </div>
+        <figcaption className="mt-4 text-center text-sm text-slate-500">
+          El panel al abrir el sistema: qué está en ruta, qué vence y qué está parado.
+        </figcaption>
+      </figure>
+
+      <div className="mt-16 grid gap-8 md:mt-20 md:grid-cols-2">
+        {[
+          {
+            src: '/capturas/viajes.webp',
+            titulo: 'Cada viaje, con su chofer y su unidad',
+            texto:
+              'Programado, en curso o cerrado. Al cerrarlo, la liquidación sale con lo que ya cargaron el chofer y el taller.',
+            alt: 'Listado de viajes con cliente, ruta, tracto, chofer y estado',
+          },
+          {
+            src: '/capturas/llantas.webp',
+            titulo: 'Las llantas, una por una',
+            texto:
+              'Serial, marca, dimensión, posición en el eje y kilómetros. Con su historial de rotación y reencauche.',
+            alt: 'Gestión de llantas con inventario, posición y estado de cada llanta',
+          },
+        ].map((c) => (
+          <figure key={c.src} className="group">
+            <div className="overflow-hidden rounded-lg border border-white/10 bg-slate-900/60 transition group-hover:border-white/20">
+              <img
+                src={c.src}
+                alt={c.alt}
+                width={1600}
+                height={1000}
+                loading="lazy"
+                decoding="async"
+                className="block w-full"
+              />
+            </div>
+            <figcaption className="mt-4">
+              <h3 className="font-heading text-lg font-bold tracking-tight text-slate-100">
+                {c.titulo}
+              </h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-slate-400">{c.texto}</p>
+            </figcaption>
+          </figure>
+        ))}
+      </div>
+    </Seccion>
+
     <Seccion id="como-funciona" className="border-t border-white/5">
       <h2 className="font-heading max-w-3xl text-4xl font-black tracking-tight md:text-5xl">
         Operar, mantener, cumplir.

@@ -10587,6 +10587,24 @@ from fastapi.responses import FileResponse
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 # Serve React frontend build
+# Tipos que la imagen base de Python no conoce y que esta app SI sirve.
+#
+# Sin esto, FileResponse no adivina el tipo y Starlette cae a text/plain: el
+# fichero llega entero, con 200 y su tamano correcto, y el navegador no lo
+# pinta. Paso justo con las capturas .webp de la landing -imagenes servidas
+# como texto plano-, y es de los fallos que cuesta ver porque la peticion de
+# red parece perfecta.
+#
+# La lista incluye lo que hoy no se usa pero se usara en cuanto alguien
+# arrastre un fichero moderno a public/: es mas barato que volver a perder una
+# tarde con el mismo sintoma.
+import mimetypes
+for _tipo, _ext in [
+    ("image/webp", ".webp"), ("image/avif", ".avif"), ("image/svg+xml", ".svg"),
+    ("font/woff2", ".woff2"), ("font/woff", ".woff"), ("application/manifest+json", ".webmanifest"),
+]:
+    mimetypes.add_type(_tipo, _ext)
+
 FRONTEND_BUILD = ROOT_DIR.parent / "frontend" / "build"
 if FRONTEND_BUILD.exists():
     app.mount("/static", StaticFiles(directory=str(FRONTEND_BUILD / "static")), name="react-static")
