@@ -91,7 +91,7 @@ const PLANES = [
     periodo: '',
     limite: 'Hasta 3 vehículos',
     para: 'Para empezar y ver si encaja.',
-    incluye: ['Viajes y liquidaciónes', 'Llantas y mantenimiento', 'Documentos y vencimientos', 'App del chofer'],
+    incluye: ['Viajes y liquidaciones', 'Llantas y mantenimiento', 'Documentos y vencimientos', 'App del chofer'],
     cta: 'Empezar gratis',
     ruta: '/registro',
     destacado: false,
