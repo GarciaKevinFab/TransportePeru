@@ -56,9 +56,16 @@ db = client[os.environ['DB_NAME']]
 COMPANY_COLS = {
     "id": "uuid", "name": "text", "ruc": "text", "address": "text",
     "phone": "text", "email": "text", "logo_url": "text", "brand_color": "text",
+    # Suscripcion (migracion 015). Sin estas tres, el alta por la web dejaria
+    # la empresa con los defaults del esquema y no habria prueba que vencer.
+    "plan": "text", "subscription_status": "text", "trial_ends_at": "ts",
     "config": "json", "sunat_config": "json",
     "created_at": "ts", "updated_at": "ts",
 }
+
+# Dias de prueba de un alta nueva. La landing lo anuncia, asi que si cambia
+# aqui tiene que cambiar alli: es la misma promesa.
+DIAS_DE_PRUEBA = 14
 
 USER_COLS = {
     "id": "uuid", "company_id": "uuid", "email": "text", "dni": "text",
@@ -917,7 +924,10 @@ def decode_token(token: str) -> dict:
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Token inválido")
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
+async def get_current_user(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+) -> dict:
     token = credentials.credentials
     payload = decode_token(token)
     if payload.get("type") != "access":
@@ -937,7 +947,56 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     user = db_pg.to_api(fila)
     if not user.get("is_active"):
         raise HTTPException(status_code=401, detail="Usuario desactivado")
+    await _exigir_suscripcion_al_dia(request, user)
     return user
+
+
+# Metodos que solo leen. Una suscripcion vencida deja mirar pero no escribir:
+# los datos son del cliente, y cortarle la lectura de su propia operacion seria
+# retenerselos, no cobrarle.
+_METODOS_DE_LECTURA = {"GET", "HEAD", "OPTIONS"}
+
+
+async def _exigir_suscripcion_al_dia(request: Request, user: dict):
+    """402 cuando la empresa dejo de estar al dia Y la peticion escribe.
+
+    FALLA ABIERTO a proposito. Solo corta ante un vencimiento comprobado; ante
+    cualquier otra cosa -empresa que no aparece, columna sin valor- deja pasar.
+    Un fallo aca bloquearia a clientes que si pagaron, y eso es mucho peor que
+    regalar un dia de mas.
+    """
+    if user.get("role") == "superadmin":
+        return  # gestiona las empresas: no puede quedar fuera por una de ellas
+    if request.method in _METODOS_DE_LECTURA:
+        return
+    company_id = user.get("company_id")
+    if not company_id:
+        return
+
+    async with db_pg.tx_global("comprobar la suscripcion de la empresa") as conn:
+        fila = await conn.fetchrow(
+            "select subscription_status, trial_ends_at from companies where id = $1",
+            db_pg.as_uuid(company_id),
+        )
+    if not fila:
+        return
+
+    estado = fila["subscription_status"]
+    fin = fila["trial_ends_at"]
+    if estado in ("vencida", "cancelada"):
+        vencida = True
+    elif estado == "trial" and fin is not None:
+        vencida = fin < datetime.now(timezone.utc)
+    else:
+        vencida = False
+
+    if vencida:
+        raise HTTPException(
+            status_code=402,
+            detail="La prueba gratuita termino. Activa un plan para seguir "
+                   "registrando informacion; tus datos siguen disponibles "
+                   "para consulta.",
+        )
 
 def require_roles(*roles):
     """Dependency reutilizable para exigir uno de los roles dados.
@@ -1877,6 +1936,93 @@ async def run_maintenance_sweep():
 
 
 # ============== AUTH ROUTES ==============
+class SignupRequest(BaseModel):
+    company_name: str
+    ruc: str
+    name: str
+    email: str
+    password: str
+    phone: Optional[str] = None
+
+
+@api_router.post("/auth/signup", response_model=TokenResponse)
+@limiter.limit("5/hour")
+async def signup(request: Request, datos: SignupRequest):
+    """Alta de una transportista con prueba gratuita. Publico y sin token.
+
+    Crea la empresa y su usuario dueno en UNA transaccion: una empresa sin
+    dueno no se puede administrar ni borrar por la interfaz, y quedaria como
+    basura que solo se limpia a mano en la base.
+
+    Va con tx_global porque todavia no hay empresa a la que fijar el contexto
+    -se esta creando en esta misma llamada-, que es el caso 2 de los que
+    documenta db_pg.tx_global.
+    """
+    nombre_empresa = (datos.company_name or "").strip()
+    ruc = re.sub(r"\D", "", datos.ruc or "")
+    nombre = (datos.name or "").strip()
+    email = (datos.email or "").strip().lower()
+
+    if len(nombre_empresa) < 2:
+        raise HTTPException(status_code=400, detail="Falta el nombre de la empresa")
+    if len(ruc) != 11:
+        raise HTTPException(status_code=400, detail="El RUC debe tener 11 digitos")
+    if len(nombre) < 2:
+        raise HTTPException(status_code=400, detail="Falta tu nombre")
+    if "@" not in email or "." not in email.split("@")[-1]:
+        raise HTTPException(status_code=400, detail="El correo no es valido")
+    if len(datos.password or "") < 8:
+        raise HTTPException(status_code=400, detail="La contrasena necesita al menos 8 caracteres")
+
+    ahora = datetime.now(timezone.utc)
+    company = Company(
+        name=nombre_empresa,
+        ruc=ruc,
+        email=email,
+        phone=datos.phone,
+    )
+    fila_empresa = _modelo_a_fila(company.model_dump())
+    fila_empresa["plan"] = "trial"
+    fila_empresa["subscription_status"] = "trial"
+    fila_empresa["trial_ends_at"] = ahora + timedelta(days=DIAS_DE_PRUEBA)
+
+    owner = User(
+        company_id=company.id,
+        email=email,
+        name=nombre,
+        role=UserRole.OWNER,
+        password_hash=hash_password(datos.password),
+    )
+
+    sql_empresa, val_empresa = db_pg.build_insert("companies", COMPANY_COLS, fila_empresa)
+    sql_owner, val_owner = db_pg.build_insert("users", USER_COLS, _modelo_a_fila(owner.model_dump()))
+
+    async with db_pg.tx_global("alta de una empresa nueva: aun no hay contexto de empresa") as conn:
+        # El correo se comprueba en TODO el sistema, no dentro de la empresa.
+        # El indice unico es (company_id, email), pero /auth/login busca
+        # `where email = $1` sin empresa y se queda con la primera fila: dos
+        # usuarios con el mismo correo en empresas distintas dejarian a uno de
+        # los dos sin poder entrar nunca.
+        if await conn.fetchval("select 1 from users where lower(email) = $1", email):
+            raise HTTPException(status_code=409, detail="Ese correo ya tiene una cuenta")
+        if await conn.fetchval("select 1 from companies where ruc = $1", ruc):
+            raise HTTPException(status_code=409, detail="Ese RUC ya esta registrado")
+        await conn.execute(sql_empresa, *val_empresa)
+        await conn.execute(sql_owner, *val_owner)
+
+    payload = {"user_id": owner.id, "company_id": company.id, "role": UserRole.OWNER.value}
+    return TokenResponse(
+        access_token=create_access_token(payload),
+        refresh_token=create_refresh_token(payload),
+        user={
+            "id": owner.id, "name": nombre, "email": email,
+            "role": UserRole.OWNER.value, "company_id": company.id,
+            "company_name": nombre_empresa,
+            "trial_ends_at": fila_empresa["trial_ends_at"].isoformat(),
+        },
+    )
+
+
 @api_router.post("/auth/login", response_model=TokenResponse)
 @limiter.limit("10/minute")
 async def login(request: Request, login_data: LoginRequest):

@@ -99,6 +99,11 @@ create table companies (
   email text,
   logo_url text,
   brand_color text not null default '#f97316',
+  -- Suscripcion (ver migracion 015). El plan es texto libre: los niveles y sus
+  -- precios son catalogo comercial, no esquema.
+  plan text not null default 'trial',
+  subscription_status text not null default 'trial', -- trial|activa|vencida|cancelada
+  trial_ends_at timestamptz, -- NULL = sin vencimiento
   config jsonb not null default '{}'::jsonb, -- freeform (detraccion_rate, tire_critical_depth, etc.)
   sunat_config jsonb not null default '{}'::jsonb, -- token y URL de la API de facturacion electronica
   created_at timestamptz not null default now(),
