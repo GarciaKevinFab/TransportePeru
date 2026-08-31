@@ -90,7 +90,7 @@ const SignupPage = () => {
         </div>
       </header>
 
-      <main className="mx-auto grid w-full max-w-6xl gap-14 px-6 py-14 lg:grid-cols-[1fr_460px] lg:py-20">
+      <main className="mx-auto grid w-full max-w-6xl gap-14 px-6 py-14 pb-28 lg:grid-cols-[1fr_460px] lg:py-20 lg:pb-28">
         {/* Lo que se lleva, para que el formulario no sea un salto al vacio */}
         <div className="hidden lg:block">
           <h1 className="font-heading text-4xl font-black leading-tight tracking-tight">
@@ -154,7 +154,16 @@ const SignupPage = () => {
             </button>
 
             <p className="text-center text-xs text-slate-500">
-              Sin tarjeta. Puedes dejarlo cuando quieras.
+              Sin tarjeta. Puedes dejarlo cuando quieras. Al crear la cuenta
+              aceptas los{' '}
+              <Link to="/terminos" className="text-slate-400 underline underline-offset-4 hover:text-orange-400">
+                términos
+              </Link>{' '}
+              y la{' '}
+              <Link to="/privacidad" className="text-slate-400 underline underline-offset-4 hover:text-orange-400">
+                política de privacidad
+              </Link>
+              .
             </p>
           </form>
         </div>

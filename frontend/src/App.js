@@ -11,6 +11,7 @@ import LandingPage from './pages/LandingPage';
 import SignupPage from './pages/SignupPage';
 import { OlvidePage, RestablecerPage } from './pages/RecuperarPage';
 import CambiarPasswordPage from './pages/CambiarPasswordPage';
+import { PrivacidadPage, TerminosPage } from './pages/LegalPage';
 import DashboardPage from './pages/DashboardPage';
 import VehiclesPage from './pages/VehiclesPage';
 import UnitsPage from './pages/UnitsPage';
@@ -175,6 +176,10 @@ function AppRoutes() {
           </PublicRoute>
         }
       />
+      {/* Legales: publicas y sin PublicRoute. Tienen que poder leerse con la
+          sesion abierta o sin ella, y desde un correo o un buscador. */}
+      <Route path="/privacidad" element={<PrivacidadPage />} />
+      <Route path="/terminos" element={<TerminosPage />} />
       <Route path="/olvide" element={<OlvidePage />} />
       {/* Fuera de PublicRoute: quien llega con el enlace puede tener una
           sesion vieja abierta, y PublicRoute lo mandaria al tablero sin

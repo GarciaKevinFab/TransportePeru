@@ -31,29 +31,29 @@ const PRODUCTO = 'FletePro';
 const PASOS = [
   {
     n: '01',
-    titulo: 'Operacion',
+    titulo: 'Operación',
     icono: RouteIcon,
-    texto: 'Viajes, viaticos, combustible y caja. La liquidacion de flete sale con lo que ya cargaron el chofer y el taller, en vez de rearmarse en una hoja de calculo a fin de mes.',
+    texto: 'Viajes, viáticos, combustible y caja. La liquidación de flete sale con lo que ya cargaron el chofer y el taller, en vez de rearmarse en una hoja de cálculo a fin de mes.',
   },
   {
     n: '02',
     titulo: 'Flota',
     icono: Wrench,
-    texto: 'Vehiculos, unidades, llantas e inventario. Cada llanta lleva su historial: montaje, rotacion, inspecciones con profundidad, reencauche y baja, con su costo por kilometro.',
+    texto: 'Vehiculos, unidades, llantas e inventario. Cada llanta lleva su historial: montaje, rotación, inspecciones con profundidad, reencauche y baja, con su costo por kilómetro.',
   },
   {
     n: '03',
     titulo: 'Cumplimiento',
     icono: ShieldCheck,
-    texto: 'Documentos con sus vencimientos, incidentes, guias de transportista y facturas electronicas para SUNAT, y detracciones. Un documento vencido bloquea la salida antes de que sea una multa.',
+    texto: 'Documentos con sus vencimientos, incidentes, guías de transportista y facturas electronicas para SUNAT, y detracciones. Un documento vencido bloquea la salida antes de que sea una multa.',
   },
 ];
 
 const MODULOS = [
-  { icono: RouteIcon, nombre: 'Viajes y rutas', texto: 'Programacion, enganches y cierre con liquidacion.' },
+  { icono: RouteIcon, nombre: 'Viajes y rutas', texto: 'Programación, enganches y cierre con liquidación.' },
   { icono: Fuel, nombre: 'Combustible', texto: 'Vales, cargas y consumo por unidad.' },
-  { icono: CircleDot, nombre: 'Llantas', texto: 'Esquema por eje, inspecciones, rotacion y reencauche.' },
-  { icono: Wrench, nombre: 'Mantenimiento', texto: 'Ordenes de trabajo, planes preventivos e indisponibilidad.' },
+  { icono: CircleDot, nombre: 'Llantas', texto: 'Esquema por eje, inspecciones, rotación y reencauche.' },
+  { icono: Wrench, nombre: 'Mantenimiento', texto: '@Ordenes de trabajo, planes preventivos e indisponibilidad.' },
   { icono: FileText, nombre: 'Documentos', texto: 'Vencimientos, alertas y bloqueos operativos.' },
   { icono: Building2, nombre: 'SUNAT', texto: 'Guias de transportista, facturas y detracciones.' },
 ];
@@ -61,18 +61,18 @@ const MODULOS = [
 const DIFERENCIAS = [
   {
     icono: Smartphone,
-    titulo: 'El chofer carga desde el celular, con o sin senal',
+    titulo: 'El chofer carga desde el celular, con o sin señal',
     texto: 'Checklist previo al viaje, gastos, incidentes y fotos. Si no hay cobertura se guarda y sube despues, que en carretera es la mitad del tiempo.',
   },
   {
     icono: MessageCircle,
-    titulo: 'Tambien por WhatsApp',
-    texto: 'El chofer manda la foto de la factura por WhatsApp y entra al sistema. Sin instalar nada y sin capacitacion.',
+    titulo: 'También por WhatsApp',
+    texto: 'El chofer manda la foto de la factura por WhatsApp y entra al sistema. Sin instalar nada y sin capacitación.',
   },
   {
     icono: ScanLine,
     titulo: 'Las facturas se leen solas',
-    texto: 'La foto de una factura o una guia se convierte en datos: monto, RUC y fecha, sin teclear.',
+    texto: 'La foto de una factura o una guía se convierte en datos: monto, RUC y fecha, sin teclear.',
   },
   {
     icono: ShieldCheck,
@@ -86,9 +86,9 @@ const PLANES = [
     nombre: 'Gratis',
     precio: 'S/ 0',
     periodo: '',
-    limite: 'Hasta 3 vehiculos',
+    limite: 'Hasta 3 vehículos',
     para: 'Para empezar y ver si encaja.',
-    incluye: ['Viajes y liquidaciones', 'Llantas y mantenimiento', 'Documentos y vencimientos', 'App del chofer'],
+    incluye: ['Viajes y liquidaciónes', 'Llantas y mantenimiento', 'Documentos y vencimientos', 'App del chofer'],
     cta: 'Empezar gratis',
     destacado: false,
   },
@@ -96,9 +96,9 @@ const PLANES = [
     nombre: 'Pro',
     precio: 'S/ 199',
     periodo: '/mes',
-    limite: 'Hasta 20 vehiculos',
-    para: 'Para la flota que ya factura todos los dias.',
-    incluye: ['Todo lo del plan Gratis', 'SUNAT: guias y facturas', 'Detracciones', 'Bot de WhatsApp', 'Lectura de facturas', 'Reportes y costo por kilometro'],
+    limite: 'Hasta 20 vehículos',
+    para: 'Para la flota que ya factura todos los días.',
+    incluye: ['Todo lo del plan Gratis', 'SUNAT: guías y facturas', 'Detracciones', 'Bot de WhatsApp', 'Lectura de facturas', 'Reportes y costo por kilómetro'],
     cta: 'Empezar gratis',
     destacado: true,
   },
@@ -106,8 +106,8 @@ const PLANES = [
     nombre: 'Empresa',
     precio: 'A medida',
     periodo: '',
-    limite: 'Sin limite de vehiculos',
-    para: 'Para varias sedes o mas de una razon social.',
+    limite: 'Sin límite de vehículos',
+    para: 'Para varias sedes o más de una razón social.',
     incluye: ['Todo lo del plan Pro', 'Varias empresas en una cuenta', 'Integraciones a medida', 'Soporte dedicado'],
     cta: 'Hablemos',
     destacado: false,
@@ -143,8 +143,8 @@ const LandingPage = () => (
         </div>
 
         <div className="hidden items-center gap-8 md:flex">
-          <a href="#como-funciona" className="text-sm text-slate-300 transition hover:text-white">Como funciona</a>
-          <a href="#modulos" className="text-sm text-slate-300 transition hover:text-white">Modulos</a>
+          <a href="#como-funciona" className="text-sm text-slate-300 transition hover:text-white">Cómo funciona</a>
+          <a href="#modulos" className="text-sm text-slate-300 transition hover:text-white">Módulos</a>
           <a href="#planes" className="text-sm text-slate-300 transition hover:text-white">Planes</a>
           <Link to="/login" className="text-sm text-slate-300 transition hover:text-white">Entrar</Link>
         </div>
@@ -169,8 +169,8 @@ const LandingPage = () => (
 
       <p className="mt-8 max-w-2xl text-lg leading-relaxed text-slate-400">
         Viajes, combustible, llantas, mantenimiento y documentos en un solo
-        sitio. El chofer carga desde el celular, la liquidacion sale sola y el
-        SOAT vencido te avisa antes de que lo pare la policia.
+        sitio. El chofer carga desde el celular, la liquidación sale sola y el
+        SOAT vencido te avisa antes de que lo pare la policía.
       </p>
 
       <div className="mt-10 flex flex-wrap items-center gap-4">
@@ -184,13 +184,13 @@ const LandingPage = () => (
           href="#como-funciona"
           className="inline-flex items-center rounded-full border border-white/15 px-7 py-3.5 font-bold text-white transition hover:bg-white/5"
         >
-          Ver como funciona
+          Ver cómo funciona
         </a>
       </div>
 
       <p className="mt-6 flex items-center gap-2 text-sm text-slate-500">
         <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
-        14 dias de prueba. Sin tarjeta.
+        14 días de prueba. Sin tarjeta.
       </p>
     </Seccion>
 
@@ -199,7 +199,7 @@ const LandingPage = () => (
         Operar, mantener, cumplir.
       </h2>
       <p className="mt-5 max-w-2xl text-slate-400">
-        Las tres cosas que hacen que un camion salga hoy y siga saliendo el mes
+        Las tres cosas que hacen que un camión salga hoy y siga saliendo el mes
         que viene.
       </p>
 
@@ -220,7 +220,7 @@ const LandingPage = () => (
 
     <Seccion id="modulos" className="border-t border-white/5 bg-slate-900/40">
       <h2 className="font-heading max-w-3xl text-4xl font-black tracking-tight md:text-5xl">
-        Todo lo que hoy esta en un cuaderno.
+        Todo lo que hoy está en un cuaderno.
       </h2>
 
       <div className="mt-14 grid gap-x-10 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
@@ -256,7 +256,7 @@ const LandingPage = () => (
 
     <Seccion id="planes" className="border-t border-white/5 bg-slate-900/40">
       <h2 className="font-heading max-w-3xl text-4xl font-black tracking-tight md:text-5xl">
-        Un viaje mal liquidado cuesta mas.
+        Un viaje mal liquidado cuesta más.
       </h2>
       <p className="mt-5 max-w-2xl text-slate-400">
         Empiezas gratis y sin tarjeta. Si no te sirve, no pagas nada.
@@ -313,7 +313,7 @@ const LandingPage = () => (
     <Seccion className="border-t border-white/5">
       <div className="rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-transparent p-10 text-center md:p-16">
         <h2 className="font-heading mx-auto max-w-2xl text-4xl font-black tracking-tight md:text-5xl">
-          Tu proximo viaje puede estar aca dentro.
+          Tu próximo viaje puede estar acá dentro.
         </h2>
         <p className="mx-auto mt-5 max-w-xl text-slate-400">
           Se configura en una tarde: cargas tus unidades, tus choferes y tus
@@ -325,7 +325,7 @@ const LandingPage = () => (
         >
           Empezar gratis <ArrowRight className="h-4 w-4" />
         </Link>
-        <p className="mt-5 text-sm text-slate-500">14 dias de prueba. Sin tarjeta.</p>
+        <p className="mt-5 text-sm text-slate-500">14 días de prueba. Sin tarjeta.</p>
       </div>
     </Seccion>
 
@@ -336,6 +336,8 @@ const LandingPage = () => (
           <span className="font-bold text-slate-300">{PRODUCTO}</span>
         </div>
         <span>&copy; {new Date().getFullYear()} Star Insights IT</span>
+        <Link to="/privacidad" className="transition hover:text-white">Privacidad</Link>
+        <Link to="/terminos" className="transition hover:text-white">Términos</Link>
         <Link to="/login" className="transition hover:text-white">Entrar</Link>
       </div>
     </footer>
