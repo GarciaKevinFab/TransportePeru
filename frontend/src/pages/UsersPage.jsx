@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { usersApi } from '../services/api';
+import EstadoVacio from '../components/EstadoVacio';
 import api from '../services/api';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -351,10 +352,12 @@ const UsersPage = () => {
               <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
             </div>
           ) : filteredUsers.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-              <Users className="w-12 h-12 mb-2" />
-              <p>No se encontraron usuarios</p>
-            </div>
+            <EstadoVacio
+              icono={Users}
+              titulo="Sin resultados"
+              texto="Ningún usuario coincide con la búsqueda o el filtro."
+              filtrado
+            />
           ) : (
             <Table>
               <TableHeader>

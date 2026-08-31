@@ -1,5 +1,6 @@
 import React from 'react';
 import { Card, CardContent } from '../ui/card';
+import EstadoVacio from '../EstadoVacio';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import {
@@ -34,6 +35,8 @@ import { getStatusBadge, getTypeBadge } from './vehicleBadges';
 
 const VehicleTable = ({
   vehicles,
+  totalVehiculos = 0,
+  onCreate,
   loading,
   isAdmin,
   isVehicleCoupled,
@@ -57,10 +60,21 @@ const VehicleTable = ({
             <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
           </div>
         ) : vehicles.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-            <Truck className="w-12 h-12 mb-2" />
-            <p>No se encontraron vehículos</p>
-          </div>
+          totalVehiculos === 0 ? (
+            <EstadoVacio
+              icono={Truck}
+              titulo="Registra tu primer vehículo"
+              texto="Con tus tractos y carretas cargados podrás programar viajes, controlar llantas y recibir alertas de vencimientos."
+              accion={onCreate ? { texto: 'Nuevo vehículo', onClick: onCreate } : undefined}
+            />
+          ) : (
+            <EstadoVacio
+              icono={Truck}
+              titulo="Sin resultados"
+              texto="Ningún vehículo coincide con la búsqueda o el filtro. Límpialos para ver la flota completa."
+              filtrado
+            />
+          )
         ) : (
           <Table>
             <TableHeader>

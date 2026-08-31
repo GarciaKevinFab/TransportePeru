@@ -211,6 +211,8 @@ const VehiclesPage = () => {
       {/* Table */}
       <VehicleTable
         vehicles={filteredVehicles}
+        totalVehiculos={vehicles.length}
+        onCreate={isAdmin ? () => setShowCreateDialog(true) : undefined}
         loading={loading}
         isAdmin={isAdmin}
         isVehicleCoupled={isVehicleCoupled}

@@ -56,6 +56,7 @@ import {
 } from '../components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import EstadoVacio from '../components/EstadoVacio';
 import { es } from 'date-fns/locale';
 import { useAuth } from '../context/AuthContext';
 
@@ -325,6 +326,53 @@ const TripsPage = () => {
     return route ? `${route.origin} → ${route.destination}` : '-';
   };
 
+
+  /* Un solo menu de acciones para la tabla (escritorio) y las tarjetas
+     (movil). Si viviera copiado, la proxima accion nueva apareceria en una
+     vista y en la otra no, y nadie sabria por que. */
+  const AccionesViaje = ({ trip }) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon">
+              <MoreVertical className="w-4 h-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => navigate(`/trips/${trip.id}`)}>
+              <Eye className="w-4 h-4 mr-2" />
+              Ver Detalles
+            </DropdownMenuItem>
+            {isAdmin && (
+              <DropdownMenuItem onClick={() => handleEditTrip(trip)}>
+                <Edit className="w-4 h-4 mr-2" />
+                Editar
+              </DropdownMenuItem>
+            )}
+            {trip.status === 'programado' && (
+              <DropdownMenuItem onClick={() => openStartDialog(trip)}>
+                <Play className="w-4 h-4 mr-2" />
+                Iniciar Viaje
+              </DropdownMenuItem>
+            )}
+            {trip.status === 'en_curso' && (
+              <DropdownMenuItem onClick={() => openCompleteDialog(trip)}>
+                <CheckCircle className="w-4 h-4 mr-2" />
+                Completar Viaje
+              </DropdownMenuItem>
+            )}
+            {isAdmin && trip.status !== 'en_curso' && (
+              <DropdownMenuItem 
+                onClick={() => handleDeleteTrip(trip.id)}
+                className="text-red-600"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Eliminar
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+  );
+
   const tractos = vehicles.filter((v) => v.vehicle_type === 'tracto' && v.status === 'disponible');
   const carretas = vehicles.filter((v) => v.vehicle_type === 'carreta' && v.status === 'disponible');
 
@@ -384,11 +432,76 @@ const TripsPage = () => {
               <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
             </div>
           ) : filteredTrips.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-              <Route className="w-12 h-12 mb-2" />
-              <p>No se encontraron viajes</p>
-            </div>
+            /* El orden de las guias sigue el orden real del arranque: sin
+               tractos no hay viaje posible, sin choferes tampoco. Mandar a la
+               persona al formulario de viaje sin eso es dejarla frente a dos
+               selectores vacios sin explicacion. */
+            trips.length > 0 ? (
+              <EstadoVacio
+                icono={Route}
+                titulo="Sin resultados"
+                texto="Ningún viaje coincide con la búsqueda o el filtro."
+                filtrado
+              />
+            ) : tractos.length === 0 ? (
+              <EstadoVacio
+                icono={Route}
+                titulo="Antes de programar viajes, registra tus vehículos"
+                texto="Un viaje necesita un tracto asignado. Carga primero tu flota y vuelve aquí."
+                enlace={{ texto: 'Ir a Vehículos', onClick: () => navigate('/vehicles') }}
+              />
+            ) : drivers.length === 0 ? (
+              <EstadoVacio
+                icono={Route}
+                titulo="Ahora registra a tus choferes"
+                texto="Ya tienes vehículos. Falta al menos un chofer para poder asignarle el viaje."
+                enlace={{ texto: 'Ir a Usuarios', onClick: () => navigate('/users') }}
+              />
+            ) : (
+              <EstadoVacio
+                icono={Route}
+                titulo="Programa tu primer viaje"
+                texto="Vehículos y choferes listos. Al cerrar el viaje, la liquidación saldrá con lo que carguen el chofer y el taller."
+                accion={isAdmin ? { texto: 'Nuevo viaje', onClick: () => setShowCreateDialog(true) } : undefined}
+              />
+            )
           ) : (
+            <>
+            {/* Movil: tarjetas. Una fila de 7 columnas en 375px esconde el
+                estado y las acciones tras un arrastre lateral que nadie
+                descubre. */}
+            <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+              {filteredTrips.map((trip) => (
+                <div key={trip.id} className="flex items-start gap-3 px-4 py-3.5">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium truncate">{trip.client_name || 'Sin cliente'}</span>
+                      {getStatusBadge(trip.status)}
+                    </div>
+                    <p className="mt-0.5 truncate text-xs text-slate-500">
+                      {trip.cargo_description || '-'}
+                    </p>
+                    <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                      <span className="inline-flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        {format(new Date(trip.scheduled_date), 'dd/MM/yyyy', { locale: es })}
+                      </span>
+                      <span className="font-mono font-bold text-slate-700 dark:text-slate-300">
+                        {getVehiclePlate(trip.tracto_id)}
+                      </span>
+                      <span className="inline-flex items-center gap-1 truncate">
+                        <User className="h-3 w-3" />
+                        {getDriverName(trip.driver_id)}
+                      </span>
+                    </p>
+                  </div>
+                  <AccionesViaje trip={trip} />
+                </div>
+              ))}
+            </div>
+
+            {/* Escritorio: la tabla de siempre */}
+            <div className="hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow className="table-dense">
@@ -433,51 +546,14 @@ const TripsPage = () => {
                     </TableCell>
                     <TableCell>{getStatusBadge(trip.status)}</TableCell>
                     <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreVertical className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => navigate(`/trips/${trip.id}`)}>
-                            <Eye className="w-4 h-4 mr-2" />
-                            Ver Detalles
-                          </DropdownMenuItem>
-                          {isAdmin && (
-                            <DropdownMenuItem onClick={() => handleEditTrip(trip)}>
-                              <Edit className="w-4 h-4 mr-2" />
-                              Editar
-                            </DropdownMenuItem>
-                          )}
-                          {trip.status === 'programado' && (
-                            <DropdownMenuItem onClick={() => openStartDialog(trip)}>
-                              <Play className="w-4 h-4 mr-2" />
-                              Iniciar Viaje
-                            </DropdownMenuItem>
-                          )}
-                          {trip.status === 'en_curso' && (
-                            <DropdownMenuItem onClick={() => openCompleteDialog(trip)}>
-                              <CheckCircle className="w-4 h-4 mr-2" />
-                              Completar Viaje
-                            </DropdownMenuItem>
-                          )}
-                          {isAdmin && trip.status !== 'en_curso' && (
-                            <DropdownMenuItem 
-                              onClick={() => handleDeleteTrip(trip.id)}
-                              className="text-red-600"
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Eliminar
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <AccionesViaje trip={trip} />
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
+            </div>
+            </>
           )}
         </CardContent>
       </Card>
