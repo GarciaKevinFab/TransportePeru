@@ -1,17 +1,34 @@
 import React, { useState } from 'react';
 import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
-import { Truck, Lock, ShieldCheck, ArrowLeft, Loader2, CheckCircle, CreditCard } from 'lucide-react';
+import { Truck, Lock, ShieldCheck, ArrowLeft, Loader2, CheckCircle, CreditCard, Clock } from 'lucide-react';
 
 /**
  * Checkout publico del plan Pro: resumen del pedido, datos de facturacion y
- * boton de pago.
+ * pago con tarjeta.
  *
  * Existe por dos razones que son la misma: quien quiere pagar necesita DONDE,
  * e Izipay valida el comercio mirando la web -sin carrito, checkout o boton de
- * pago no activan la pasarela-. El boton registra la orden en el backend
- * (numero de pedido real) y deja montado el paso de pago donde ira el widget
- * de Izipay cuando el comercio quede activado.
+ * pago no activan la pasarela-.
+ *
+ * COMO ES EL PAGO
+ *
+ *   El formulario de tarjeta lo pinta Izipay dentro de #izipay-form a partir
+ *   de un formToken que pide el backend. Los datos de la tarjeta NO pasan por
+ *   nuestro servidor ni por este componente en ningun momento: van del
+ *   navegador a Izipay.
+ *
+ *   Y lo que se ve aqui al terminar NO es lo que decide si esta pagado. Eso lo
+ *   escribe el webhook que Izipay manda al backend; esta pantalla pregunta por
+ *   el estado del pedido hasta que ese aviso llega. Si el navegador se cierra
+ *   antes, el cobro se registra igual.
+ *
+ * MIENTRAS IZIPAY NO ACTIVE EL COMERCIO
+ *
+ *   El backend responde 503 al pedir el formToken y aqui se muestra el aviso
+ *   honesto: el pedido queda registrado y no se hizo ningun cargo. Es el mismo
+ *   camino que si un dia la pasarela se cae, y por eso no es un caso especial
+ *   sino el respaldo normal.
  *
  * El monto NO viaja desde aqui: el navegador manda solo el plan y el servidor
  * pone el precio. Lo que se pinta es informativo.
@@ -25,6 +42,26 @@ const PLANES_COMPRABLES = {
     periodo: 'al mes',
   },
 };
+
+// El cliente JavaScript de Izipay (plataforma micuentaweb). Se cargan a mano y
+// no con una etiqueta en index.html para no pedirle estos ficheros a todo el
+// que entra en la web: solo hacen falta en el paso de pago.
+const IZIPAY_SDK = 'https://static.micuentaweb.pe/static/js/krypton-client/V4.0/stable/kr-payment-form.min.js';
+const IZIPAY_TEMA_JS = 'https://static.micuentaweb.pe/static/js/krypton-client/V4.0/ext/neon.js';
+const IZIPAY_TEMA_CSS = 'https://static.micuentaweb.pe/static/js/krypton-client/V4.0/ext/neon-reset.min.css';
+
+const cargarRecurso = (etiqueta, atributos) =>
+  new Promise((resolve, reject) => {
+    // Marcado con data-izipay para no volver a inyectarlo si la persona
+    // reintenta el pago: dos veces el mismo SDK deja dos formularios.
+    const yaEsta = document.head.querySelector(`${etiqueta}[data-izipay="${atributos['data-izipay']}"]`);
+    if (yaEsta) return resolve();
+    const el = document.createElement(etiqueta);
+    Object.entries(atributos).forEach(([k, v]) => el.setAttribute(k, v));
+    el.onload = () => resolve();
+    el.onerror = () => reject(new Error('No se pudo cargar el formulario de pago'));
+    document.head.appendChild(el);
+  });
 
 const Campo = ({ etiqueta, children }) => (
   <div>
@@ -46,6 +83,11 @@ const CheckoutPage = () => {
   const [error, setError] = useState(null);
   const [enviando, setEnviando] = useState(false);
   const [orden, setOrden] = useState(null);
+  // null = todavia no se sabe; 'tarjeta' = el formulario de Izipay esta
+  // montado; 'pendiente' = la pasarela no esta activa; 'confirmando',
+  // 'pagado' y 'rechazado' = despues de enviar la tarjeta.
+  const [pasarela, setPasarela] = useState(null);
+  const [avisoPasarela, setAvisoPasarela] = useState('');
 
   // El plan Gratis no se compra: se empieza. Y "Empresa" se cotiza a medida.
   if (planKey === 'gratis') return <Navigate to="/registro" replace />;
@@ -58,6 +100,63 @@ const CheckoutPage = () => {
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(datos.email.trim())) return 'El correo no es válido';
     if (datos.ruc && datos.ruc.replace(/\D/g, '').length !== 11) return 'El RUC debe tener 11 dígitos';
     return null;
+  };
+
+  /* Pregunta por el estado del pedido hasta que el webhook de Izipay lo mueva.
+     Se consulta al backend y no se cree lo que dice el navegador: el resultado
+     que vale es el que Izipay firmo contra el servidor. */
+  const esperarConfirmacion = async (ordenId) => {
+    for (let intento = 0; intento < 10; intento += 1) {
+      try {
+        const r = await api.get(`/checkout/ordenes/${ordenId}`);
+        if (r.data.estado === 'pagado') {
+          setPasarela('pagado');
+          return;
+        }
+        if (r.data.estado === 'rechazado') {
+          setPasarela('rechazado');
+          return;
+        }
+      } catch {
+        // Un fallo de red aqui no cambia nada: el cobro ya esta hecho o no, y
+        // el correo de Izipay llega igual. Se reintenta y, si no, se queda en
+        // "confirmando", que es la verdad.
+      }
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+  };
+
+  const montarFormularioDeTarjeta = async (ordenCreada) => {
+    try {
+      const { data } = await api.post(`/checkout/ordenes/${ordenCreada.id}/pago`);
+      await cargarRecurso('link', { rel: 'stylesheet', href: IZIPAY_TEMA_CSS, 'data-izipay': 'css' });
+      await cargarRecurso('script', {
+        src: IZIPAY_SDK,
+        'kr-public-key': data.public_key,
+        'kr-language': 'es-ES',
+        'data-izipay': 'sdk',
+      });
+      await cargarRecurso('script', { src: IZIPAY_TEMA_JS, 'data-izipay': 'tema' });
+
+      const KR = window.KR;
+      if (!KR) throw new Error('No se pudo cargar el formulario de pago');
+      await KR.setFormConfig({ formToken: data.form_token, 'kr-language': 'es-ES' });
+      KR.onSubmit(() => {
+        // Se devuelve false para que Izipay no redirija: la confirmacion la
+        // damos aqui, preguntando al backend por el aviso firmado.
+        setPasarela('confirmando');
+        esperarConfirmacion(ordenCreada.id);
+        return false;
+      });
+      await KR.renderElements('#izipay-form');
+      setPasarela('tarjeta');
+    } catch (err) {
+      // 503 = la pasarela todavia no esta activa. Cualquier otro fallo se
+      // trata igual, y a proposito: el pedido ya esta guardado, asi que lo
+      // honesto es decir que se completara por correo y no perder la venta.
+      setAvisoPasarela(err.response?.data?.detail || '');
+      setPasarela('pendiente');
+    }
   };
 
   const pagar = async (e) => {
@@ -78,6 +177,7 @@ const CheckoutPage = () => {
         telefono: datos.telefono.trim() || null,
       });
       setOrden(r.data);
+      await montarFormularioDeTarjeta(r.data);
     } catch (err) {
       setError(err.response?.data?.detail || 'No se pudo registrar el pedido. Inténtalo de nuevo.');
     }
@@ -220,33 +320,103 @@ const CheckoutPage = () => {
             </div>
           </>
         ) : (
-          /* Paso de pago: la orden ya existe con su numero. Aqui se montara el
-             formulario de Izipay cuando el comercio quede activado; mientras,
-             se dice la verdad en vez de fingir un cobro. */
-          <div className="mx-auto max-w-xl rounded-2xl border border-white/10 bg-white/[0.03] p-8 text-center" data-testid="checkout-orden-ok">
-            <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-green-500/10">
-              <CheckCircle className="h-7 w-7 text-green-400" />
-            </span>
-            <h1 className="font-heading mt-5 text-2xl font-black tracking-tight">
-              Pedido N° {orden.numero} registrado
-            </h1>
-            <p className="mt-3 leading-relaxed text-slate-400">
-              {orden.descripcion} — S/ {Number(orden.monto).toFixed(2)} {orden.moneda}
-            </p>
-            {/* Contenedor del widget de pago. Izipay montara aqui su formulario
-                de tarjeta; el id es el punto de anclaje acordado. */}
-            <div id="izipay-form" className="mt-6 rounded-xl border border-dashed border-white/15 p-5 text-sm leading-relaxed text-slate-400">
-              Estamos activando el pago con tarjeta vía <strong className="text-slate-200">Izipay</strong>.
-              Tu pedido quedó registrado y te escribiremos a{' '}
-              <strong className="text-slate-200">{datos.email.trim()}</strong> para completar el pago
-              y activar tu plan. No se ha realizado ningún cargo.
+          <div className="mx-auto max-w-xl" data-testid="checkout-orden-ok">
+            {/* El pedido ya existe con su numero. Lo que se pinta debajo
+                depende de como acabo el cobro. */}
+            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-8 text-center">
+              {pasarela === 'pagado' ? (
+                <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-green-500/10">
+                  <CheckCircle className="h-7 w-7 text-green-400" />
+                </span>
+              ) : pasarela === 'confirmando' ? (
+                <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-orange-500/10">
+                  <Loader2 className="h-7 w-7 animate-spin text-orange-400" />
+                </span>
+              ) : (
+                <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-orange-500/10">
+                  <Clock className="h-7 w-7 text-orange-400" />
+                </span>
+              )}
+
+              <h1 className="font-heading mt-5 text-2xl font-black tracking-tight">
+                {pasarela === 'pagado'
+                  ? `¡Listo! Pedido N° ${orden.numero} pagado`
+                  : `Pedido N° ${orden.numero} registrado`}
+              </h1>
+              <p className="mt-3 leading-relaxed text-slate-400">
+                {orden.descripcion} — S/ {Number(orden.monto).toFixed(2)} {orden.moneda}
+              </p>
+
+              {pasarela === 'pagado' && (
+                <>
+                  <p className="mt-4 leading-relaxed text-slate-400">
+                    Tu plan quedó activo y te enviamos el comprobante a{' '}
+                    <strong className="text-slate-200">{datos.email.trim()}</strong>.
+                  </p>
+                  <Link
+                    to="/login"
+                    className="mt-7 inline-flex items-center justify-center gap-2 rounded-full bg-orange-500 px-6 py-3 font-bold text-white transition hover:bg-orange-400"
+                  >
+                    Entrar a mi cuenta
+                  </Link>
+                </>
+              )}
+
+              {pasarela === 'confirmando' && (
+                <p className="mt-4 leading-relaxed text-slate-400">
+                  Estamos confirmando el pago con el banco. Puede tardar unos segundos;
+                  no cierres esta página.
+                </p>
+              )}
+
+              {pasarela === 'rechazado' && (
+                <p className="mt-4 leading-relaxed text-red-300">
+                  El banco rechazó el pago y no se hizo ningún cargo. Puedes intentarlo
+                  con otra tarjeta desde{' '}
+                  <Link to="/comprar?plan=pro" className="underline underline-offset-2">
+                    la página de compra
+                  </Link>.
+                </p>
+              )}
+
+              {pasarela === 'pendiente' && (
+                <p className="mt-6 rounded-xl border border-dashed border-white/15 p-5 text-sm leading-relaxed text-slate-400">
+                  {avisoPasarela || 'El pago con tarjeta aún no está disponible.'}{' '}
+                  Te escribiremos a <strong className="text-slate-200">{datos.email.trim()}</strong>{' '}
+                  para completar el pago y activar tu plan.{' '}
+                  <strong className="text-slate-200">No se ha realizado ningún cargo.</strong>
+                </p>
+              )}
+
+              {/* Donde Izipay pinta el formulario de tarjeta. Se mantiene
+                  siempre en el arbol -aunque este vacio- porque el SDK lo
+                  busca por id al montar, y un contenedor que aparece despues
+                  llega tarde. */}
+              <div id="izipay-form" className={pasarela === 'tarjeta' ? 'mt-6 text-left' : 'hidden'} />
+
+              {pasarela === null && (
+                <p className="mt-6 flex items-center justify-center gap-2 text-sm text-slate-400">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Preparando el pago…
+                </p>
+              )}
+
+              {pasarela !== 'pagado' && (
+                <Link
+                  to="/"
+                  className="mt-7 inline-flex items-center justify-center gap-2 rounded-full border border-white/15 px-6 py-3 font-bold text-white transition hover:bg-white/5"
+                >
+                  Volver al inicio
+                </Link>
+              )}
             </div>
-            <Link
-              to="/"
-              className="mt-7 inline-flex items-center justify-center gap-2 rounded-full border border-white/15 px-6 py-3 font-bold text-white transition hover:bg-white/5"
-            >
-              Volver al inicio
-            </Link>
+
+            <p className="mt-5 text-center text-xs text-slate-500">
+              ¿Algún problema con tu compra? Escríbenos o usa el{' '}
+              <Link to="/reclamaciones" className="text-orange-400 underline-offset-2 hover:underline">
+                Libro de Reclamaciones
+              </Link>.
+            </p>
           </div>
         )}
       </main>

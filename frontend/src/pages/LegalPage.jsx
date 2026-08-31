@@ -64,9 +64,13 @@ const Marco = ({ titulo, children }) => (
           soporte@sisac.pe
         </a>
         .
-        <div className="mt-4 flex gap-5">
+        {/* El Libro de Reclamaciones va aqui tambien: la ley pide que se llegue
+            a el desde cualquier punto de la web, y quien esta leyendo las
+            condiciones es justo quien puede necesitarlo. */}
+        <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2">
           <Link to="/privacidad" className="hover:text-slate-300">Privacidad</Link>
           <Link to="/terminos" className="hover:text-slate-300">Términos</Link>
+          <Link to="/reclamaciones" className="hover:text-slate-300">Libro de Reclamaciones</Link>
           <Link to="/" className="hover:text-slate-300">Inicio</Link>
         </div>
       </footer>
@@ -213,6 +217,55 @@ export const TerminosPage = () => (
       </li>
       <li>Los precios pueden cambiar avisando con 30 días de antelación.</li>
     </ul>
+
+    {/* Devoluciones. Vender en linea en Peru obliga a publicar las condiciones
+        de reversion del pago ANTES de cobrar -es informacion relevante segun la
+        Ley 29571- y la pasarela (Izipay) revisa que la web la tenga antes de
+        activar el comercio. Sin esto no hay cobro con tarjeta.
+
+        El texto describe lo que el negocio hace de verdad: 14 dias de prueba
+        sin tarjeta, cobro mensual por adelantado, y ningun prorrateo. Prometer
+        una devolucion mas generosa de la que se va a cumplir seria un
+        incumplimiento por escrito. */}
+    <h2>Devoluciones y reembolsos</h2>
+    <p>
+      Antes que nada: <strong>los 14 días de prueba son la devolución</strong>. No
+      pedimos tarjeta ni cobramos nada hasta que eliges plan, así que nadie
+      compra a ciegas. Cuando llegas al pago ya sabes exactamente qué estás
+      pagando.
+    </p>
+    <p>Aun así, esto es lo que aplica una vez que hay un cobro:</p>
+    <ul>
+      <li>
+        <strong>Desistimiento.</strong> Dentro de los <strong>7 días naturales</strong>{' '}
+        desde tu primer pago, si no has usado el servicio de forma sustancial,
+        te devolvemos el importe íntegro del mes en curso.
+      </li>
+      <li>
+        <strong>Cancelación.</strong> Puedes cancelar cuando quieras. El servicio
+        sigue funcionando hasta que termine el periodo que ya pagaste y no se
+        cobra el siguiente. Los meses empezados no se prorratean, salvo el caso
+        de desistimiento de arriba.
+      </li>
+      <li>
+        <strong>Cobros duplicados o erróneos.</strong> Se devuelven íntegros
+        siempre, sin plazo. Si te cobramos algo que no correspondía, el error es
+        nuestro y se corrige.
+      </li>
+    </ul>
+    <p>
+      Para pedir una devolución escríbenos a{' '}
+      <a href="mailto:soporte@sisac.pe">soporte@sisac.pe</a> indicando el correo
+      de la cuenta y el cobro en cuestión. Respondemos en un plazo máximo de{' '}
+      <strong>15 días hábiles</strong> y la devolución se hace por el mismo medio
+      de pago con el que se cobró.
+    </p>
+    <p>
+      Nada de esto recorta los derechos que te da el{' '}
+      <strong>Código de Protección y Defensa del Consumidor (Ley 29571)</strong>.
+      Si no quedas conforme con nuestra respuesta, puedes dejarlo por escrito en
+      el <Link to="/reclamaciones">Libro de Reclamaciones</Link>.
+    </p>
 
     <h2>Tus datos son tuyos</h2>
     <p>

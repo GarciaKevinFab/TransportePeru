@@ -10,7 +10,12 @@ import requests
 import os
 import base64
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
+# Sin el respaldo, y con REACT_APP_BACKEND_URL sin definir, a `requests` le
+# llega "/api/auth/login" a secas y la suite entera muere con "MissingSchema:
+# Invalid URL: No scheme supplied" -un error que no nombra la variable que
+# falta-. 8001 es el puerto del backend en local (scripts/dev-up.sh).
+# El motivo largo esta en tests/conftest.py.
+BASE_URL = (os.environ.get('REACT_APP_BACKEND_URL') or 'http://127.0.0.1:8001').rstrip('/')
 
 class TestAuth:
     """Authentication tests"""

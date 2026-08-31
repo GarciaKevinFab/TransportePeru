@@ -5,9 +5,15 @@ Tests for Viáticos (Settlements) and Checklist del Chofer modules
 import pytest
 import requests
 import os
+import uuid
 from datetime import datetime
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'http://localhost:8001')
+# Sin el respaldo, y con REACT_APP_BACKEND_URL sin definir, a `requests` le
+# llega "/api/auth/login" a secas y la suite entera muere con "MissingSchema:
+# Invalid URL: No scheme supplied" -un error que no nombra la variable que
+# falta-. 8001 es el puerto del backend en local (scripts/dev-up.sh).
+# El motivo largo esta en tests/conftest.py.
+BASE_URL = (os.environ.get('REACT_APP_BACKEND_URL') or 'http://127.0.0.1:8001').rstrip('/')
 
 
 class TestSettlements:
@@ -25,13 +31,74 @@ class TestSettlements:
     
     @pytest.fixture(scope="class")
     def trip_id(self, auth_headers):
-        """Get a trip ID for testing"""
-        response = requests.get(f"{BASE_URL}/api/trips", headers=auth_headers)
-        assert response.status_code == 200
-        trips = response.json()
-        assert len(trips) > 0, "No trips found for testing"
-        return trips[0]["id"]
-    
+        """Un viaje recien creado, propiedad de ESTA ejecucion.
+
+        Antes esto devolvia trips[0]: el primer viaje que hubiera en la base.
+        Como los tests de abajo cierran la liquidacion del viaje, y una
+        liquidacion cerrada no admite ni actualizacion ni un segundo cierre
+        (400 "Liquidacion ya cerrada"), la primera pasada dejaba ese viaje
+        inservible y la segunda fallaba. El servidor hacia lo correcto: el que
+        no era repetible era el test, por trabajar sobre datos que no eran
+        suyos.
+
+        La fecha va deliberadamente en el pasado: /api/trips ordena por
+        scheduled_date descendente, y otros modulos de la suite dan por hecho
+        que trips[0] y trips[1] son los viajes de siempre. Asi el viaje de
+        prueba entra por el final y no le mueve el suelo a nadie.
+
+        No se borra al terminar: sus anticipos, gastos y liquidacion lo
+        referencian con claves ajenas sin borrado en cascada. Un viaje de mas
+        por ejecucion en la base de desarrollo es el precio de la
+        repetibilidad.
+        """
+        marca = uuid.uuid4().hex[:8]
+
+        tractos = requests.get(
+            f"{BASE_URL}/api/vehicles?vehicle_type=tracto", headers=auth_headers
+        )
+        assert tractos.status_code == 200, f"No se pudieron listar tractos: {tractos.text}"
+        tractos = tractos.json()
+        assert tractos, "No hay tractos en la base: sin uno no se puede crear un viaje"
+
+        choferes = requests.get(f"{BASE_URL}/api/users?role=chofer", headers=auth_headers)
+        assert choferes.status_code == 200, f"No se pudieron listar choferes: {choferes.text}"
+        choferes = choferes.json()
+        assert choferes, "No hay choferes en la base: sin uno no se puede crear un viaje"
+
+        # La asignacion puede rechazar una combinacion concreta (vehiculo o
+        # chofer bloqueado, OT critica abierta sobre la unidad), asi que se
+        # prueban varias antes de darse por vencido.
+        rechazos = []
+        for tracto in tractos[:5]:
+            for chofer in choferes[:5]:
+                creado = requests.post(
+                    f"{BASE_URL}/api/trips",
+                    json={
+                        "tracto_id": tracto["id"],
+                        "driver_id": chofer["id"],
+                        "client_name": f"TEST_Cliente_{marca}",
+                        "cargo_description": f"TEST_Carga_{marca}",
+                        "scheduled_date": "2020-01-01T08:00:00Z",
+                        "is_round_trip": False,
+                        "notes": f"TEST_Viaje de la suite ({marca})",
+                    },
+                    headers=auth_headers,
+                )
+                if creado.status_code == 200:
+                    nuevo = creado.json()["id"]
+                    print(f"Viaje de prueba creado para esta ejecucion: {nuevo} ({marca})")
+                    return nuevo
+                rechazos.append(
+                    f"{tracto.get('plate', tracto['id'])} + "
+                    f"{chofer.get('name', chofer['id'])}: "
+                    f"{creado.status_code} {creado.text}"
+                )
+
+        pytest.fail(
+            "No se pudo crear el viaje de prueba con ninguna combinacion "
+            "tracto/chofer:\n  " + "\n  ".join(rechazos)
+        )
+
     def test_get_trips(self, auth_headers):
         """Test getting all trips"""
         response = requests.get(f"{BASE_URL}/api/trips", headers=auth_headers)
@@ -130,8 +197,7 @@ class TestSettlements:
         data = response.json()
         assert "id" in data
         print(f"Created/updated settlement with ID: {data['id']}")
-        return data["id"]
-    
+
     def test_close_settlement(self, auth_headers, trip_id):
         """Test closing a settlement"""
         # First create/update the settlement
@@ -141,18 +207,29 @@ class TestSettlements:
             json=settlement_data,
             headers=auth_headers
         )
-        assert create_response.status_code == 200
+        assert create_response.status_code == 200, \
+            f"Create settlement failed: {create_response.text}"
         settlement_id = create_response.json()["id"]
-        
-        # Now close it
+
+        # Now close it. Se exige el 200: el viaje lo creo esta misma ejecucion,
+        # asi que su liquidacion esta abierta con seguridad. El "400 tambien
+        # vale, igual ya estaba cerrada" de antes era lo que tapaba que el test
+        # venia arrastrando el viaje de la ejecucion anterior.
         close_response = requests.post(
             f"{BASE_URL}/api/settlements/{settlement_id}/close",
             json={},
             headers=auth_headers
         )
-        # May fail if already closed, which is acceptable
-        assert close_response.status_code in [200, 400], f"Close settlement failed: {close_response.text}"
-        print(f"Settlement close response: {close_response.status_code}")
+        assert close_response.status_code == 200, \
+            f"Close settlement failed: {close_response.text}"
+
+        # Y quedo cerrada de verdad, no solo respondio que si.
+        verify_response = requests.get(
+            f"{BASE_URL}/api/trips/{trip_id}/settlement", headers=auth_headers
+        )
+        assert verify_response.status_code == 200
+        assert verify_response.json()["status"] == "cerrado"
+        print(f"Settlement {settlement_id} cerrada")
 
 
 class TestChecklist:

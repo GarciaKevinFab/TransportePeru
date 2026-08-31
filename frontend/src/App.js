@@ -13,6 +13,7 @@ import CheckoutPage from './pages/CheckoutPage';
 import { OlvidePage, RestablecerPage } from './pages/RecuperarPage';
 import CambiarPasswordPage from './pages/CambiarPasswordPage';
 import { PrivacidadPage, TerminosPage } from './pages/LegalPage';
+import ReclamacionesPage from './pages/ReclamacionesPage';
 import DashboardPage from './pages/DashboardPage';
 import VehiclesPage from './pages/VehiclesPage';
 import UnitsPage from './pages/UnitsPage';
@@ -181,6 +182,11 @@ function AppRoutes() {
           sesion abierta o sin ella, y desde un correo o un buscador. */}
       <Route path="/privacidad" element={<PrivacidadPage />} />
       <Route path="/terminos" element={<TerminosPage />} />
+      {/* Libro de Reclamaciones: igual, publico y fuera de PublicRoute. La Ley
+          29571 obliga a que cualquiera pueda llegar a el desde la web, tenga o
+          no cuenta -y el cliente molesto que quiere reclamar suele tener la
+          sesion abierta: rebotarlo al tablero seria justo lo contrario-. */}
+      <Route path="/reclamaciones" element={<ReclamacionesPage />} />
       <Route path="/olvide" element={<OlvidePage />} />
       {/* Fuera de PublicRoute: quien llega con el enlace puede tener una
           sesion vieja abierta, y PublicRoute lo mandaria al tablero sin

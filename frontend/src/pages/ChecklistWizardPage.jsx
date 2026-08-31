@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { tripsApi, vehiclesApi } from '../services/api';
 import api from '../services/api';
@@ -27,6 +27,33 @@ import { toast } from 'sonner';
 import SignatureCanvas from 'react-signature-canvas';
 import { useOffline } from '../hooks/useOffline';
 
+// Checklist por defecto cuando el tenant todavia no tiene plantilla propia.
+// Vive a nivel de modulo (y no dentro del componente) porque fetchData lo lee:
+// recrear el array en cada render daria una dependencia nueva cada vez y el
+// useCallback de fetchData no se estabilizaria nunca.
+const defaultChecklistItems = [
+  { id: '1', category: 'Documentación', item: 'SOAT vigente', requires_photo: false, is_critical: true },
+  { id: '2', category: 'Documentación', item: 'Revisión técnica vigente', requires_photo: false, is_critical: true },
+  { id: '3', category: 'Documentación', item: 'Tarjeta de circulación', requires_photo: false, is_critical: true },
+  { id: '4', category: 'Cabina', item: 'Luces frontales funcionan', requires_photo: false, is_critical: true },
+  { id: '5', category: 'Cabina', item: 'Luces traseras funcionan', requires_photo: false, is_critical: true },
+  { id: '6', category: 'Cabina', item: 'Luces direccionales funcionan', requires_photo: false, is_critical: false },
+  { id: '7', category: 'Cabina', item: 'Limpiaparabrisas funciona', requires_photo: false, is_critical: false },
+  { id: '8', category: 'Cabina', item: 'Claxon funciona', requires_photo: false, is_critical: false },
+  { id: '9', category: 'Cabina', item: 'Espejos en buen estado', requires_photo: false, is_critical: false },
+  { id: '10', category: 'Motor', item: 'Nivel de aceite OK', requires_photo: false, is_critical: true },
+  { id: '11', category: 'Motor', item: 'Nivel de refrigerante OK', requires_photo: false, is_critical: true },
+  { id: '12', category: 'Motor', item: 'Sin fugas visibles', requires_photo: true, is_critical: true },
+  { id: '13', category: 'Frenos', item: 'Freno de servicio funciona', requires_photo: false, is_critical: true },
+  { id: '14', category: 'Frenos', item: 'Freno de estacionamiento funciona', requires_photo: false, is_critical: true },
+  { id: '15', category: 'Llantas', item: 'Estado general de llantas', requires_photo: true, is_critical: true },
+  { id: '16', category: 'Llantas', item: 'Presión de aire correcta', requires_photo: false, is_critical: true },
+  { id: '17', category: 'Seguridad', item: 'Extintor presente y vigente', requires_photo: false, is_critical: true },
+  { id: '18', category: 'Seguridad', item: 'Triángulos de seguridad', requires_photo: false, is_critical: false },
+  { id: '19', category: 'Seguridad', item: 'Botiquín completo', requires_photo: false, is_critical: false },
+  { id: '20', category: 'Carrocería', item: 'Sin daños visibles', requires_photo: true, is_critical: false },
+];
+
 const ChecklistWizardPage = () => {
   const { tripId } = useParams();
   const navigate = useNavigate();
@@ -49,30 +76,6 @@ const ChecklistWizardPage = () => {
   const [kmStart, setKmStart] = useState('');
   const [notes, setNotes] = useState('');
 
-  // Default checklist items if no template
-  const defaultChecklistItems = [
-    { id: '1', category: 'Documentación', item: 'SOAT vigente', requires_photo: false, is_critical: true },
-    { id: '2', category: 'Documentación', item: 'Revisión técnica vigente', requires_photo: false, is_critical: true },
-    { id: '3', category: 'Documentación', item: 'Tarjeta de circulación', requires_photo: false, is_critical: true },
-    { id: '4', category: 'Cabina', item: 'Luces frontales funcionan', requires_photo: false, is_critical: true },
-    { id: '5', category: 'Cabina', item: 'Luces traseras funcionan', requires_photo: false, is_critical: true },
-    { id: '6', category: 'Cabina', item: 'Luces direccionales funcionan', requires_photo: false, is_critical: false },
-    { id: '7', category: 'Cabina', item: 'Limpiaparabrisas funciona', requires_photo: false, is_critical: false },
-    { id: '8', category: 'Cabina', item: 'Claxon funciona', requires_photo: false, is_critical: false },
-    { id: '9', category: 'Cabina', item: 'Espejos en buen estado', requires_photo: false, is_critical: false },
-    { id: '10', category: 'Motor', item: 'Nivel de aceite OK', requires_photo: false, is_critical: true },
-    { id: '11', category: 'Motor', item: 'Nivel de refrigerante OK', requires_photo: false, is_critical: true },
-    { id: '12', category: 'Motor', item: 'Sin fugas visibles', requires_photo: true, is_critical: true },
-    { id: '13', category: 'Frenos', item: 'Freno de servicio funciona', requires_photo: false, is_critical: true },
-    { id: '14', category: 'Frenos', item: 'Freno de estacionamiento funciona', requires_photo: false, is_critical: true },
-    { id: '15', category: 'Llantas', item: 'Estado general de llantas', requires_photo: true, is_critical: true },
-    { id: '16', category: 'Llantas', item: 'Presión de aire correcta', requires_photo: false, is_critical: true },
-    { id: '17', category: 'Seguridad', item: 'Extintor presente y vigente', requires_photo: false, is_critical: true },
-    { id: '18', category: 'Seguridad', item: 'Triángulos de seguridad', requires_photo: false, is_critical: false },
-    { id: '19', category: 'Seguridad', item: 'Botiquín completo', requires_photo: false, is_critical: false },
-    { id: '20', category: 'Carrocería', item: 'Sin daños visibles', requires_photo: true, is_critical: false },
-  ];
-
   const steps = [
     { id: 'info', title: 'Información', icon: Truck },
     { id: 'checklist', title: 'Inspección', icon: CheckCircle },
@@ -81,23 +84,7 @@ const ChecklistWizardPage = () => {
     { id: 'signature', title: 'Firma', icon: Pen },
   ];
 
-  useEffect(() => {
-    fetchData();
-    // Get location
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setLocation({
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-          });
-        },
-        (err) => console.error('Location error:', err)
-      );
-    }
-  }, [tripId]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const tripRes = await tripsApi.getById(tripId);
@@ -170,7 +157,26 @@ const ChecklistWizardPage = () => {
       navigate('/trips');
     }
     setLoading(false);
-  };
+  }, [tripId, navigate]);
+
+  // Mismo disparo que antes: fetchData solo cambia de identidad si cambia el
+  // tripId de la URL (navigate es estable en react-router), asi que esto sigue
+  // siendo "cargar el viaje una vez y recargar si cambia el id".
+  useEffect(() => {
+    fetchData();
+    // Get location
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setLocation({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+          });
+        },
+        (err) => console.error('Location error:', err)
+      );
+    }
+  }, [fetchData]);
 
   const handleResponseChange = (index, field, value) => {
     const newResponses = [...responses];

@@ -1,24 +1,43 @@
 /* eslint-disable no-restricted-globals */
 
-const CACHE_NAME = 'transperu-v1';
+// Subir este numero al cambiar lo que se precachea. El activate de abajo borra
+// toda cache que no se llame asi, y esa es la unica forma de limpiar lo viejo
+// en un navegador que ya visito la web.
+const CACHE_NAME = 'transperu-v2';
 const OFFLINE_URL = '/offline.html';
 
-// Assets to cache on install
+// Lo minimo para que la aplicacion abra sin red. NO va aqui ningun /static/js:
+// en una compilacion de produccion esos ficheros llevan un hash en el nombre
+// (main.61dddf16.js) que cambia en cada despliegue y no se puede escribir a
+// mano. Se cachean solos al pedirlos, mas abajo.
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
   '/offline.html',
   '/manifest.json',
-  '/static/js/bundle.js',
 ];
 
 // Install event - cache essential assets
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('Opened cache');
-      return cache.addAll(PRECACHE_ASSETS);
-    })
+    caches.open(CACHE_NAME).then((cache) =>
+      // Uno a uno y tolerando fallos, en vez de cache.addAll: addAll es
+      // todo-o-nada, asi que un solo recurso que devuelva 404 rechaza la
+      // promesa, el install FALLA y el service worker viejo se queda al mando
+      // -sirviendo la version anterior de la aplicacion a quien ya habia
+      // entrado alguna vez, despliegue tras despliegue-.
+      //
+      // Aqui pasaba exactamente eso: la lista traia '/static/js/bundle.js',
+      // que solo existe con el servidor de desarrollo. En produccion era un
+      // 404 en cada intento de instalacion.
+      Promise.all(
+        PRECACHE_ASSETS.map((url) =>
+          cache.add(url).catch((err) => {
+            console.warn('No se pudo precachear', url, err);
+          })
+        )
+      )
+    )
   );
   self.skipWaiting();
 });

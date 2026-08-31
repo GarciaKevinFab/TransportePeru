@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { maintenanceApi, vehiclesApi } from '../services/api';
 import api from '../services/api';
@@ -139,25 +139,10 @@ const MaintenancePage = () => {
     return date.toISOString().substring(0, 10);
   };
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const [ordersRes, vehiclesRes] = await Promise.all([
-        maintenanceApi.getWorkOrders(),
-        vehiclesApi.getAll(),
-      ]);
-      setWorkOrders(ordersRes.data);
-      setVehicles(vehiclesRes.data);
-      fetchMaintStatuses(vehiclesRes.data);
-    } catch (error) {
-      toast.error('Error al cargar datos');
-    }
-    setLoading(false);
-  };
-
   // Carga el estado de mantenimiento de cada vehículo en paralelo.
   // Los vehículos sin plan asignado devuelven error/404 y se ignoran silenciosamente.
-  const fetchMaintStatuses = async (vehicleList) => {
+  // Se declara antes que fetchData porque ahora es una dependencia suya.
+  const fetchMaintStatuses = useCallback(async (vehicleList) => {
     if (!vehicleList || vehicleList.length === 0) return;
     setMaintLoading(true);
     const results = await Promise.allSettled(
@@ -171,11 +156,31 @@ const MaintenancePage = () => {
     });
     setMaintStatuses(map);
     setMaintLoading(false);
-  };
+  }, []);
 
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [ordersRes, vehiclesRes] = await Promise.all([
+        maintenanceApi.getWorkOrders(),
+        vehiclesApi.getAll(),
+      ]);
+      setWorkOrders(ordersRes.data);
+      setVehicles(vehiclesRes.data);
+      fetchMaintStatuses(vehiclesRes.data);
+    } catch (error) {
+      toast.error('Error al cargar datos');
+    }
+    setLoading(false);
+  }, [fetchMaintStatuses]);
+
+  // fetchMaintStatuses no lee nada de fuera (recibe la lista por parametro) y
+  // fetchData solo depende de el: las dos identidades son fijas, asi que esto
+  // sigue disparandose una sola vez al montar, igual que con el array vacio.
+  // El filtro de estado (statusFilter) se aplica en cliente y no recarga nada.
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   const filteredOrders = statusFilter === 'all' 
     ? workOrders 

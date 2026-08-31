@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { tiresApi, vehiclesApi } from '../services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -94,7 +94,7 @@ const TireSchemaPage = () => {
     notes: '',
   });
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const [vehicleRes, tiresRes, availableRes] = await Promise.all([
@@ -113,22 +113,24 @@ const TireSchemaPage = () => {
       navigate('/vehicles');
     }
     setLoading(false);
-  };
+  }, [vehicleId, navigate]);
 
   // Diagnostics are optional: never block the page if the endpoint fails.
-  const fetchDiagnostics = async () => {
+  const fetchDiagnostics = useCallback(async () => {
     try {
       const res = await tiresApi.getDiagnostics(vehicleId);
       setDiagnostics(res.data);
     } catch (error) {
       setDiagnostics(null);
     }
-  };
+  }, [vehicleId]);
 
+  // Equivalente al array [vehicleId] anterior: las dos funciones solo leen el
+  // vehicleId de la URL (navigate es estable en react-router).
   useEffect(() => {
     fetchData();
     fetchDiagnostics();
-  }, [vehicleId]);
+  }, [fetchData, fetchDiagnostics]);
 
   const getTireByPosition = (positionCode) => {
     return tires.find((t) => t.current_position === positionCode);

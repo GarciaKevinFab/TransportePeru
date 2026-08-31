@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import api, { tripsApi } from '../../services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -82,11 +82,7 @@ const DriverExpensesPage = () => {
     ruc: '',
   });
 
-  useEffect(() => {
-    fetchActiveTrip();
-  }, []);
-
-  const fetchActiveTrip = async () => {
+  const fetchActiveTrip = useCallback(async () => {
     setLoading(true);
     try {
       const tripsRes = await tripsApi.getAll();
@@ -111,7 +107,14 @@ const DriverExpensesPage = () => {
       console.error('Error fetching trips:', error);
     }
     setLoading(false);
-  };
+  }, [user?.id]);
+
+  // Sigue siendo una unica carga al montar: la sesion ya esta resuelta cuando
+  // esta pantalla aparece (ProtectedRoute espera a AuthContext), asi que
+  // user.id no cambia mientras la pagina vive.
+  useEffect(() => {
+    fetchActiveTrip();
+  }, [fetchActiveTrip]);
 
   // Camera / Photo handling
   const handleCameraCapture = () => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { documentsApi, documentTypesApi, vehiclesApi, usersApi, uploadApi } from '../services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -85,7 +85,7 @@ const DocumentsPage = () => {
     file_url: '',
   });
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const appliesTo = entityType === 'vehicle' ? 'vehiculo' : 'chofer';
@@ -104,11 +104,13 @@ const DocumentsPage = () => {
       toast.error('Error al cargar documentos');
     }
     setLoading(false);
-  };
+  }, [entityType]);
 
+  // Equivalente exacto al array [entityType] anterior: lo unico que fetchData
+  // lee de fuera es entityType.
   useEffect(() => {
     fetchData();
-  }, [entityType]);
+  }, [fetchData]);
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];

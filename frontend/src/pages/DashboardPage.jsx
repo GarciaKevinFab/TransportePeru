@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { dashboardApi, alertsApi, tripsApi } from '../services/api';
 import PanelGraficas from '../components/PanelGraficas';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -46,7 +46,7 @@ const DashboardPage = () => {
   const isAlmacen = user?.role === 'almacen';
   const isChofer = user?.role === 'chofer';
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       if (isChofer) {
@@ -68,11 +68,15 @@ const DashboardPage = () => {
       console.error('Error fetching dashboard data:', error);
     }
     setLoading(false);
-  };
+  }, [isChofer, user]);
 
+  // La sesion ya esta resuelta cuando esta pagina se monta (ProtectedRoute
+  // espera a que AuthContext termine de cargar), asi que `user` -y con el
+  // isChofer y la identidad de fetchData- no cambia mientras la pagina vive:
+  // esto sigue siendo una sola carga al montar, como con el array vacio.
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   // Map semantic color → concrete CSS color (avoids dynamic Tailwind classes that get purged)
   const colorMap = {

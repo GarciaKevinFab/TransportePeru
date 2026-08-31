@@ -6,7 +6,7 @@ import { Revelado, Cifra, CapturaTilt } from '../components/landing/animaciones'
 import {
   Truck, Route as RouteIcon, Fuel, Wrench, CircleDot, FileText,
   ShieldCheck, Smartphone, MessageCircle, ScanLine, Building2,
-  ArrowRight, Check, Menu, X,
+  ArrowRight, Check, Menu, X, BookOpen,
 } from 'lucide-react';
 
 /**
@@ -548,6 +548,7 @@ const LandingPage = () => (
             ['Legal y contacto', [
               ['/privacidad', 'Privacidad'],
               ['/terminos', 'Términos del servicio'],
+              ['/reclamaciones', 'Libro de Reclamaciones'],
               ['mailto:soporte@sisac.pe', 'soporte@sisac.pe'],
             ]],
           ].map(([titulo, enlaces]) => (
@@ -574,9 +575,31 @@ const LandingPage = () => (
           ))}
         </div>
 
-        <p className="mt-12 border-t border-white/5 pt-6 text-sm text-slate-600">
-          &copy; {new Date().getFullYear()} Star Insights IT. Hecho en Perú.
-        </p>
+        {/* El distintivo del libro. En Peru el consumidor lo busca con la vista
+            -es el sello que dice que el comercio cumple la Ley 29571- y un
+            enlace de texto perdido en una columna no lo sustituye. Va en la
+            linea del copyright para no alterar la reticula de arriba. */}
+        <div className="mt-12 flex flex-col-reverse items-start gap-6 border-t border-white/5 pt-6 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-slate-600">
+            &copy; {new Date().getFullYear()} Star Insights IT. Hecho en Perú.
+          </p>
+          <Link
+            to="/reclamaciones"
+            className="group inline-flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 transition hover:border-white/20 hover:bg-white/[0.06]"
+          >
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-orange-500/15">
+              <BookOpen className="h-4 w-4 text-orange-400" />
+            </span>
+            <span className="leading-tight">
+              <span className="block text-[11px] font-bold uppercase tracking-widest text-slate-500">
+                Libro de
+              </span>
+              <span className="font-heading block text-sm font-bold text-slate-300 transition group-hover:text-white">
+                Reclamaciones
+              </span>
+            </span>
+          </Link>
+        </div>
       </div>
     </footer>
   </div>

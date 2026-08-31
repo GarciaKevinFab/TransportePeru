@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { inventoryApi, suppliersApi } from '../services/api';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -82,7 +82,7 @@ const InventoryPage = () => {
     category: '',
   });
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const [itemsRes, suppliersRes] = await Promise.all([
@@ -95,11 +95,14 @@ const InventoryPage = () => {
       console.error(error);
     }
     setLoading(false);
-  };
+  }, [showLowStock]);
 
+  // Equivalente exacto al array [showLowStock] anterior. El buscador
+  // (searchTerm) NO entra aqui: filtra en cliente sobre `items` y nunca
+  // dispara peticiones.
   useEffect(() => {
     fetchData();
-  }, [showLowStock]);
+  }, [fetchData]);
 
   const filteredItems = items.filter(
     item => 

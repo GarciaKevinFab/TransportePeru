@@ -4,10 +4,15 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <!-- script-src incluye el host de assets de PostHog: el snippet de abajo
-         carga array.js desde ahi, y sin la entrada el CSP lo bloqueaba en
-         silencio -analitica muerta y un error de consola en cada carga-. -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://us-assets.i.posthog.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https: http: ws: wss:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+    <!-- Cada host de aqui esta porque algo concreto lo necesita, y quitarlo
+         rompe eso en silencio -el CSP no avisa al usuario, solo deja de
+         funcionar-:
+           us-assets.i.posthog.com     analitica (array.js y sus modulos)
+           static.micuentaweb.pe       formulario de tarjeta de Izipay (JS, CSS y tipografia)
+           *.micuentaweb.pe en frame   los campos de la tarjeta van en iframes suyos
+           static.cloudflareinsights.com  el beacon que inyecta el proxy de Cloudflare
+         connect-src ya permite https:, que cubre la API de Izipay. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://us-assets.i.posthog.com https://static.micuentaweb.pe https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://static.micuentaweb.pe; font-src 'self' https://fonts.gstatic.com https://static.micuentaweb.pe; img-src 'self' data: blob: https:; connect-src 'self' https: http: ws: wss:; frame-src 'self' https://*.micuentaweb.pe; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
     <meta name="referrer" content="no-referrer" />
     <meta name="theme-color" content="#f97316" />
     <meta name="description" content="FletePro - Sistema de gestión de flota para empresas de transporte" />

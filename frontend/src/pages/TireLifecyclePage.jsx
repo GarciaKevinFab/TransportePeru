@@ -41,6 +41,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import EstadoVacio from '../components/EstadoVacio';
 
 const today = () => new Date().toISOString().substring(0, 10);
 
@@ -345,10 +346,27 @@ const TireLifecyclePage = () => {
                   <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
                 </div>
               ) : filteredTires.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-                  <CircleDot className="w-12 h-12 mb-2" />
-                  <p>No hay llantas para el estado seleccionado</p>
-                </div>
+                // Dos vacios distintos, y el codigo ya sabe cual es cual sin
+                // pedir nada mas al servidor: si `tires` viene vacio no hay
+                // NINGUNA llanta registrada (esto es un reporte, no se crean
+                // llantas aqui: se manda a la pagina que si las crea); si hay
+                // llantas pero ninguna pasa el filtro, es un "sin resultados"
+                // y ofrecer crear una seria justo lo contrario de lo que toca.
+                tires.length === 0 ? (
+                  <EstadoVacio
+                    icono={CircleDot}
+                    titulo="Aún no hay llantas registradas"
+                    texto="Este reporte sigue el ciclo de vida de cada llanta: reencauche, regrabado y baja. Registra las llantas de tu flota y aparecerán aquí."
+                    enlace={{ texto: 'Ir a Llantas', onClick: () => navigate('/tires') }}
+                  />
+                ) : (
+                  <EstadoVacio
+                    icono={CircleDot}
+                    titulo="Sin resultados"
+                    texto="Ninguna llanta coincide con el estado seleccionado. Prueba con «Todos los estados»."
+                    filtrado
+                  />
+                )
               ) : (
                 <Table>
                   <TableHeader>

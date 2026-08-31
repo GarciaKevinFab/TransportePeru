@@ -2240,14 +2240,57 @@ async def tenant_logo_del_host(request: Request):
     )
 
 
+# Los documentos que toda transportista peruana lleva encima. Una empresa
+# recien creada tiene que encontrarlos ya puestos: la matriz de Documentos es
+# una rejilla de entidades por TIPO, y sin tipos no tiene columnas -la pagina
+# se ve vacia y rota aunque la flota este cargada, y el dialogo "Nuevo
+# documento" abre con el selector de tipo en blanco-.
+#
+# La lista vive aca arriba y no dentro de la funcion de arranque porque la usan
+# dos sitios: el alta (para la empresa que se acaba de crear) y el barrido de
+# arranque (que repara las que ya existian). Duplicarla era garantizar que un
+# dia dijeran cosas distintas.
+TIPOS_DOCUMENTO_ESTANDAR = [
+    {"name": "SOAT", "applies_to": "vehiculo", "is_critical": True, "block_rule": "bloquea_inicio"},
+    {"name": "Revisión Técnica (CITV)", "applies_to": "vehiculo", "is_critical": True, "block_rule": "bloquea_inicio"},
+    {"name": "Tarjeta de Propiedad", "applies_to": "vehiculo", "is_critical": True, "block_rule": "bloquea_asignacion"},
+    {"name": "Tarjeta de Circulación", "applies_to": "vehiculo", "is_critical": False, "block_rule": "solo_alerta"},
+    {"name": "Bonificación", "applies_to": "vehiculo", "is_critical": False, "block_rule": "solo_alerta"},
+    {"name": "Póliza de Seguro", "applies_to": "vehiculo", "is_critical": False, "block_rule": "solo_alerta"},
+    {"name": "Licencia de Conducir", "applies_to": "chofer", "is_critical": True, "block_rule": "bloquea_asignacion"},
+    {"name": "DNI", "applies_to": "chofer", "is_critical": True, "block_rule": "bloquea_asignacion"},
+    {"name": "Certificado Médico", "applies_to": "chofer", "is_critical": False, "block_rule": "solo_alerta"},
+]
+
+
+def _sql_tipos_documento_estandar(company_id: str):
+    """Los INSERT de los tipos estandar para una empresa, listos para ejecutar.
+
+    Devuelve pares (sql, valores) en vez de ejecutar: quien llama decide en que
+    transaccion van. En el alta eso importa -van en la MISMA que crea la
+    empresa, para que no exista el estado intermedio "empresa creada, sin
+    tipos"-.
+    """
+    sentencias = []
+    for dt in TIPOS_DOCUMENTO_ESTANDAR:
+        doc_type = DocumentType(
+            company_id=company_id, name=dt["name"], applies_to=dt["applies_to"],
+            is_critical=dt["is_critical"], block_rule=BlockRule(dt["block_rule"]),
+        )
+        sentencias.append(db_pg.build_insert(
+            "document_types", DOCUMENT_TYPE_COLS, _modelo_a_fila(doc_type.model_dump()),
+        ))
+    return sentencias
+
+
 @api_router.post("/auth/signup", response_model=TokenResponse)
 @limiter.limit("5/hour")
 async def signup(request: Request, datos: SignupRequest):
     """Alta de una transportista con prueba gratuita. Publico y sin token.
 
-    Crea la empresa y su usuario dueno en UNA transaccion: una empresa sin
-    dueno no se puede administrar ni borrar por la interfaz, y quedaria como
-    basura que solo se limpia a mano en la base.
+    Crea la empresa, su usuario dueno y sus tipos de documento en UNA
+    transaccion: una empresa sin dueno no se puede administrar ni borrar por la
+    interfaz, y quedaria como basura que solo se limpia a mano en la base.
 
     Va con tx_global porque todavia no hay empresa a la que fijar el contexto
     -se esta creando en esta misma llamada-, que es el caso 2 de los que
@@ -2310,6 +2353,13 @@ async def signup(request: Request, datos: SignupRequest):
             raise HTTPException(status_code=409, detail="Ese RUC ya esta registrado")
         await conn.execute(sql_empresa, *val_empresa)
         await conn.execute(sql_owner, *val_owner)
+        # Los tipos de documento, en esta misma transaccion. Antes solo los
+        # sembraba el arranque recorriendo empresas existentes: quien se daba
+        # de alta con el servidor ya en marcha -o sea, todo el mundo- se
+        # encontraba la matriz de Documentos sin una sola columna hasta el
+        # siguiente reinicio.
+        for sql_tipo, val_tipo in _sql_tipos_documento_estandar(company.id):
+            await conn.execute(sql_tipo, *val_tipo)
 
     # La cache de hosts guarda tambien los negativos, para que un barrido de
     # subdominios inexistentes no sea una consulta por intento. Sin invalidar,
@@ -10690,6 +10740,399 @@ async def crear_orden_checkout(request: Request, datos: OrdenCheckoutRequest):
     }
 
 
+# ---------------------------------------------------------------------------
+# Cobro con Izipay
+# ---------------------------------------------------------------------------
+# Izipay opera en Peru sobre la plataforma micuentaweb (Lyra). El flujo tiene
+# tres pasos y cada uno vive en un sitio distinto a proposito:
+#
+#   1. El navegador pide un formToken para SU pedido   -> POST .../pago
+#   2. Izipay pinta el formulario de tarjeta con ese token. Los datos de la
+#      tarjeta NO pasan por este servidor ni una sola vez: van del navegador a
+#      Izipay. Por eso no hay nada que cumplir de PCI mas alla de no estorbar.
+#   3. Izipay avisa del resultado por su webhook       -> POST .../ipn
+#
+# El paso 3 es el que manda. El navegador tambien ve el resultado, pero un
+# navegador se cierra, pierde la red o miente: el estado 'pagado' SOLO lo
+# escribe el webhook, y solo despues de comprobar su firma.
+#
+# Sin credenciales configuradas, esto responde 503 con un mensaje que la web
+# sabe leer, y el checkout sigue funcionando como hoy -pedido registrado y
+# aviso de que el cobro todavia no esta activo-.
+import hmac
+import hashlib
+import json as _json
+import httpx
+
+IZIPAY_ENDPOINT = os.environ.get("IZIPAY_ENDPOINT", "https://api.micuentaweb.pe").rstrip("/")
+IZIPAY_USERNAME = os.environ.get("IZIPAY_USERNAME", "").strip()      # numero de tienda
+IZIPAY_PASSWORD = os.environ.get("IZIPAY_PASSWORD", "").strip()      # clave de la API REST
+IZIPAY_PUBLIC_KEY = os.environ.get("IZIPAY_PUBLIC_KEY", "").strip()  # se incrusta en la pagina
+IZIPAY_HMAC_KEY = os.environ.get("IZIPAY_HMAC_KEY", "").strip()      # firma lo que vuelve por el navegador
+
+
+def izipay_configurado() -> bool:
+    """Hay credenciales para cobrar de verdad."""
+    return bool(IZIPAY_USERNAME and IZIPAY_PASSWORD and IZIPAY_PUBLIC_KEY)
+
+
+@api_router.get("/checkout/config")
+async def config_checkout():
+    """Lo que el navegador necesita saber antes de pintar el paso de pago.
+
+    Publico, y sin secretos: la clave publica de Izipay se incrusta en la
+    pagina por diseno. `izipay_activo` es lo que decide si el checkout muestra
+    el formulario de tarjeta o el aviso de "todavia no esta activo".
+    """
+    return {
+        "izipay_activo": izipay_configurado(),
+        "public_key": IZIPAY_PUBLIC_KEY,
+        "endpoint": IZIPAY_ENDPOINT,
+    }
+
+
+@api_router.get("/checkout/ordenes/{orden_id}")
+async def estado_orden_checkout(orden_id: str):
+    """Estado del pedido, para que la pantalla de confirmacion diga la verdad.
+
+    Publico y por id: el id es un uuid, no se adivina probando numeros -el
+    correlativo `numero` si, y por eso no sirve para buscar aca-. No devuelve
+    datos de contacto: solo lo que quien acaba de pagar ya sabe.
+    """
+    orden = await _buscar_orden(orden_id)
+    return {
+        "numero": orden["numero"],
+        "estado": orden["estado"],
+        "plan": orden["plan"],
+        "monto": float(orden["monto"]),
+        "moneda": orden["moneda"],
+    }
+
+
+async def _buscar_orden(orden_id: str) -> dict:
+    try:
+        oid = db_pg.as_uuid(orden_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Pedido no encontrado")
+    async with db_pg.tx_global("checkout: leer un pedido publico (aun sin sesion)") as conn:
+        fila = await conn.fetchrow("select * from checkout_orders where id = $1", oid)
+    orden = db_pg.to_api(fila)
+    if not orden:
+        raise HTTPException(status_code=404, detail="Pedido no encontrado")
+    return orden
+
+
+@api_router.post("/checkout/ordenes/{orden_id}/pago")
+@limiter.limit("20/hour")
+async def iniciar_pago_izipay(request: Request, orden_id: str):
+    """Pide a Izipay el formToken con el que el navegador pinta la tarjeta."""
+    if not izipay_configurado():
+        raise HTTPException(
+            status_code=503,
+            detail="El pago con tarjeta aún no está activo. Tu pedido quedó "
+                   "registrado y te escribiremos para completarlo.",
+        )
+    orden = await _buscar_orden(orden_id)
+    if orden["estado"] == "pagado":
+        raise HTTPException(status_code=409, detail="Este pedido ya está pagado")
+
+    # Izipay cobra en la unidad mas pequena de la moneda: S/ 199.00 son 19900.
+    # El monto sale de la BASE, no del navegador: es el precio que se fijo al
+    # crear el pedido, y nadie por el camino puede cambiarlo.
+    cuerpo = {
+        "amount": int(round(float(orden["monto"]) * 100)),
+        "currency": orden["moneda"],
+        # El correlativo es lo que devolvera el webhook para reencontrar esta
+        # fila. Con prefijo para que en el panel de Izipay se distinga de los
+        # pedidos de cualquier otro sistema de la casa.
+        "orderId": "FP-%s" % orden["numero"],
+        "customer": {
+            "email": orden["email"],
+            "billingDetails": {"legalName": orden["razon_social"]},
+        },
+    }
+    try:
+        async with httpx.AsyncClient(timeout=20) as cliente:
+            r = await cliente.post(
+                f"{IZIPAY_ENDPOINT}/api-payment/V4/Charge/CreatePayment",
+                json=cuerpo,
+                auth=(IZIPAY_USERNAME, IZIPAY_PASSWORD),
+            )
+        respuesta = r.json()
+    except Exception as e:
+        # No se filtra el detalle al navegador: puede llevar dentro parte de la
+        # peticion, credenciales incluidas.
+        logger.error("izipay: fallo al pedir el formToken del pedido %s: %s", orden["numero"], e)
+        raise HTTPException(status_code=502, detail="No se pudo iniciar el pago. Inténtalo de nuevo.")
+
+    if respuesta.get("status") != "SUCCESS":
+        logger.error("izipay: CreatePayment respondio %s para el pedido %s",
+                     respuesta.get("answer"), orden["numero"])
+        raise HTTPException(status_code=502, detail="No se pudo iniciar el pago. Inténtalo de nuevo.")
+
+    return {
+        "form_token": (respuesta.get("answer") or {}).get("formToken"),
+        "public_key": IZIPAY_PUBLIC_KEY,
+        "endpoint": IZIPAY_ENDPOINT,
+    }
+
+
+async def _activar_plan_por_correo(conn, orden: dict):
+    """Enlaza el pago con la empresa del comprador y le activa el plan.
+
+    Se busca por el correo del dueno porque es lo unico que hay: el checkout es
+    publico y se puede pagar ANTES de tener cuenta. Que no haya coincidencia no
+    es un error -es alguien que se registrara despues-, asi que el pedido queda
+    pagado y sin empresa, y se concilia a mano. Lo que no puede pasar es
+    perder el pago por eso.
+    """
+    fila = await conn.fetchrow(
+        "select company_id from users where lower(email) = $1 and role = 'owner' limit 1",
+        (orden.get("email") or "").lower(),
+    )
+    if not fila or not fila["company_id"]:
+        logger.info("izipay: pedido %s pagado sin empresa que enlazar (correo no registrado)",
+                    orden["numero"])
+        return None
+    cid = fila["company_id"]
+    await conn.execute(
+        "update companies set plan = $1, subscription_status = 'activa' where id = $2",
+        orden["plan"], cid,
+    )
+    await conn.execute(
+        "update checkout_orders set company_id = $1 where id = $2",
+        cid, db_pg.as_uuid(orden["id"]),
+    )
+    logger.info("izipay: pedido %s activo el plan %s", orden["numero"], orden["plan"])
+    return str(cid)
+
+
+@api_router.post("/checkout/izipay/ipn")
+async def izipay_ipn(request: Request):
+    """Webhook de Izipay. El unico sitio donde un pedido pasa a 'pagado'.
+
+    Sin limite de peticiones a proposito: los reintentos son parte del
+    protocolo -Izipay reintenta hasta que respondamos 200- y limitar esto seria
+    perder avisos de cobro. Lo que protege no es un contador, es la firma.
+    """
+    form = await request.form()
+    kr_answer = form.get("kr-answer")
+    kr_hash = form.get("kr-hash")
+    kr_hash_key = form.get("kr-hash-key") or "password"
+    if not kr_answer or not kr_hash:
+        raise HTTPException(status_code=400, detail="Falta la firma")
+
+    # Quien firma decide con que clave: el servidor de Izipay firma con la
+    # clave de la API REST; lo que vuelve por el navegador va firmado con la
+    # HMAC, que es publica-ish y por eso NO sirve para dar por bueno un cobro.
+    clave = IZIPAY_PASSWORD if kr_hash_key == "password" else IZIPAY_HMAC_KEY
+    if not clave:
+        raise HTTPException(status_code=503, detail="Pasarela no configurada")
+    calculado = hmac.new(clave.encode(), kr_answer.encode(), hashlib.sha256).hexdigest()
+    # compare_digest y no ==: comparar firmas con salida temprana revela, por el
+    # tiempo de respuesta, cuanto de la firma era correcta.
+    if not hmac.compare_digest(calculado, kr_hash):
+        logger.warning("izipay: firma invalida en el webhook")
+        raise HTTPException(status_code=401, detail="Firma inválida")
+
+    datos = _json.loads(kr_answer)
+    order_id = ((datos.get("orderDetails") or {}).get("orderId") or "")
+    coincide = re.match(r"^FP-(\d+)$", order_id)
+    if not coincide:
+        # 200 y no error: si se responde error, Izipay reintenta para siempre
+        # un aviso que nunca vamos a poder atender.
+        logger.warning("izipay: webhook con orderId desconocido %r", order_id)
+        return {"received": True}
+
+    numero = int(coincide.group(1))
+    transacciones = datos.get("transactions") or []
+    tx_id = (transacciones[0] or {}).get("uuid") if transacciones else None
+    pagado = datos.get("orderStatus") == "PAID"
+
+    async with db_pg.tx_global("webhook de izipay: conciliar un cobro (sin sesion)") as conn:
+        fila = await conn.fetchrow("select * from checkout_orders where numero = $1", numero)
+        orden = db_pg.to_api(fila)
+        if not orden:
+            logger.warning("izipay: webhook para el pedido %s, que no existe", numero)
+            return {"received": True}
+        # Reintento de un aviso ya procesado: se responde 200 y se sale. Sin
+        # esto, un reintento volveria a activar el plan y a reescribir la fecha
+        # de pago con la de hoy.
+        if orden["estado"] == "pagado":
+            return {"received": True}
+
+        await conn.execute(
+            "update checkout_orders set estado = $1, transaccion_id = $2, "
+            "pagado_en = $3, respuesta_pasarela = $4::jsonb where id = $5",
+            "pagado" if pagado else "rechazado",
+            tx_id,
+            datetime.now(timezone.utc) if pagado else None,
+            kr_answer,
+            db_pg.as_uuid(orden["id"]),
+        )
+        if pagado:
+            await _activar_plan_por_correo(conn, orden)
+
+    logger.info("izipay: pedido %s -> %s", numero, "pagado" if pagado else "rechazado")
+    return {"received": True}
+
+
+# ---------------------------------------------------------------------------
+# Libro de Reclamaciones (Ley 29571 y D.S. 101-2022-PCM)
+# ---------------------------------------------------------------------------
+# Obligatorio para cualquiera que venda a un consumidor en Peru, y la pasarela
+# lo revisa al validar el comercio. La ley pide cuatro cosas concretas, y las
+# cuatro estan aca: hoja con numero correlativo, copia al consumidor, respuesta
+# dentro de plazo y conservacion de lo reclamado.
+
+DIAS_HABILES_RECLAMO = 15
+
+
+class ReclamacionRequest(BaseModel):
+    tipo: str
+    nombre: str
+    documento_tipo: str
+    documento_numero: str
+    email: str
+    telefono: Optional[str] = None
+    direccion: Optional[str] = None
+    es_menor_edad: bool = False
+    apoderado: Optional[str] = None
+    bien_contratado: str = "servicio"
+    descripcion_bien: Optional[str] = None
+    monto_reclamado: Optional[float] = None
+    detalle: str
+    pedido: str
+
+
+def _limite_en_dias_habiles(desde: datetime, dias: int) -> datetime:
+    """La fecha limite de respuesta, contando dias HABILES.
+
+    Contarlos como naturales daria una fecha anterior a la que manda la ley y
+    nos pondriamos en falta antes de tiempo. No se descuentan feriados -no hay
+    calendario peruano en el sistema-, solo fines de semana: el plazo que se
+    guarda es asi el mas exigente de los dos, que es el lado correcto por el
+    que equivocarse.
+    """
+    fecha = desde
+    restantes = dias
+    while restantes > 0:
+        fecha += timedelta(days=1)
+        if fecha.weekday() < 5:
+            restantes -= 1
+    return fecha
+
+
+@api_router.post("/reclamaciones")
+@limiter.limit("10/hour")
+async def crear_reclamacion(request: Request, datos: ReclamacionRequest):
+    """Registra una hoja del Libro de Reclamaciones. Publico y sin sesion.
+
+    Sin sesion a proposito y no por comodidad: la ley da derecho a reclamar a
+    cualquier consumidor, y exigir una cuenta para hacerlo seria ponerle una
+    puerta al derecho.
+    """
+    tipo = (datos.tipo or "").strip().lower()
+    if tipo not in ("reclamo", "queja"):
+        raise HTTPException(status_code=400, detail="Indica si es un reclamo o una queja")
+    nombre = (datos.nombre or "").strip()
+    if len(nombre) < 2:
+        raise HTTPException(status_code=400, detail="Falta tu nombre completo")
+    documento_numero = (datos.documento_numero or "").strip()
+    if not documento_numero:
+        raise HTTPException(status_code=400, detail="Falta el número de documento")
+    email = (datos.email or "").strip().lower()
+    if "@" not in email or "." not in email.split("@")[-1]:
+        raise HTTPException(status_code=400, detail="El correo no es válido")
+    detalle = (datos.detalle or "").strip()
+    pedido = (datos.pedido or "").strip()
+    if len(detalle) < 10:
+        raise HTTPException(status_code=400, detail="Cuéntanos con algo más de detalle qué pasó")
+    if len(pedido) < 5:
+        raise HTTPException(status_code=400, detail="Falta qué pides concretamente")
+    if datos.es_menor_edad and not (datos.apoderado or "").strip():
+        raise HTTPException(status_code=400, detail="Si eres menor de edad, indica a tu padre, madre o apoderado")
+
+    ahora = datetime.now(timezone.utc)
+    async with db_pg.tx_global("libro de reclamaciones: alta publica sin sesion") as conn:
+        fila = await conn.fetchrow(
+            "insert into reclamaciones (tipo, nombre, documento_tipo, documento_numero, "
+            "email, telefono, direccion, es_menor_edad, apoderado, bien_contratado, "
+            "descripcion_bien, monto_reclamado, detalle, pedido, limite_respuesta, ip_solicitud) "
+            "values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) "
+            "returning numero, created_at, limite_respuesta",
+            tipo, nombre, (datos.documento_tipo or "DNI").strip(), documento_numero,
+            email, (datos.telefono or "").strip() or None, (datos.direccion or "").strip() or None,
+            bool(datos.es_menor_edad), (datos.apoderado or "").strip() or None,
+            (datos.bien_contratado or "servicio").strip(),
+            (datos.descripcion_bien or "").strip() or None,
+            datos.monto_reclamado,
+            detalle, pedido,
+            _limite_en_dias_habiles(ahora, DIAS_HABILES_RECLAMO),
+            request.client.host if request.client else None,
+        )
+    registro = db_pg.to_api(fila)
+    codigo = "LR-%06d" % registro["numero"]
+
+    # La copia al consumidor es obligatoria, pero el correo NO puede tumbar el
+    # registro: si el envio falla, la hoja ya esta guardada y el codigo ya se
+    # devolvio, que es lo que le sirve a la persona para acudir a INDECOPI.
+    if correo.configurado():
+        etiqueta = "reclamo" if tipo == "reclamo" else "queja"
+        texto = (
+            f"Hola {nombre}:\n\n"
+            f"Recibimos tu {etiqueta} y quedó registrado con el código {codigo}.\n\n"
+            f"Lo que nos contaste:\n{detalle}\n\n"
+            f"Lo que pides:\n{pedido}\n\n"
+            f"Te responderemos a este correo en un plazo máximo de "
+            f"{DIAS_HABILES_RECLAMO} días hábiles. Guarda este código: es el "
+            f"número de tu hoja en nuestro Libro de Reclamaciones.\n\n"
+            f"Presentar esta hoja no impide acudir a INDECOPI ni a la vía judicial.\n"
+        )
+        try:
+            await correo.enviar(email, f"Tu {etiqueta} {codigo} — FletePro", texto)
+        except Exception as e:
+            logger.error("reclamaciones: no se pudo enviar la copia de %s: %s", codigo, e)
+        # Copia a quien tiene que atenderlo. Sin esto el libro seria un buzon
+        # que nadie abre, y el plazo de 15 dias habiles se cumple solo si
+        # alguien se entera de que el reloj empezo a correr.
+        destino_interno = os.environ.get("RECLAMACIONES_EMAIL", "").strip()
+        if destino_interno:
+            try:
+                await correo.enviar(
+                    destino_interno, f"[{codigo}] {etiqueta} de {nombre}",
+                    f"{texto}\nContacto: {email} / {datos.telefono or 'sin teléfono'}\n"
+                    f"Documento: {datos.documento_tipo} {documento_numero}\n",
+                )
+            except Exception as e:
+                logger.error("reclamaciones: no se pudo avisar internamente de %s: %s", codigo, e)
+
+    logger.info("reclamaciones: %s registrado", codigo)
+    return {
+        "codigo": codigo,
+        "fecha": registro["created_at"],
+        "plazo_habiles": DIAS_HABILES_RECLAMO,
+    }
+
+
+@api_router.get("/reclamaciones")
+async def listar_reclamaciones(current_user: dict = Depends(require_roles("superadmin"))):
+    """Las hojas del libro, para quien tiene que responderlas.
+
+    Solo superadmin: los reclamos son contra el PRODUCTO, no dentro de una
+    empresa cliente, y ninguna empresa tiene por que ver los de las demas.
+    """
+    async with db_pg.tx_global("libro de reclamaciones: listado para atenderlo") as conn:
+        filas = await conn.fetch(
+            "select * from reclamaciones order by numero desc limit 500"
+        )
+    salida = []
+    for r in db_pg.rows_to_api(filas):
+        r["codigo"] = "LR-%06d" % r["numero"]
+        salida.append(r)
+    return salida
+
+
 # Include router (DESPUÉS de definir TODAS las rutas @api_router, incluidas SUNAT)
 app.include_router(api_router)
 
@@ -10821,19 +11264,12 @@ async def create_indexes():
 @app.on_event("startup")
 async def ensure_default_document_types():
     """Asegura los tipos de documento estándar en empresas existentes (idempotente por nombre).
-    Repara instalaciones donde el seed no volvió a correr (p. ej. faltaban Tarjeta de
-    Circulación y Bonificación)."""
-    defaults = [
-        {"name": "SOAT", "applies_to": "vehiculo", "is_critical": True, "block_rule": "bloquea_inicio"},
-        {"name": "Revisión Técnica (CITV)", "applies_to": "vehiculo", "is_critical": True, "block_rule": "bloquea_inicio"},
-        {"name": "Tarjeta de Propiedad", "applies_to": "vehiculo", "is_critical": True, "block_rule": "bloquea_asignacion"},
-        {"name": "Tarjeta de Circulación", "applies_to": "vehiculo", "is_critical": False, "block_rule": "solo_alerta"},
-        {"name": "Bonificación", "applies_to": "vehiculo", "is_critical": False, "block_rule": "solo_alerta"},
-        {"name": "Póliza de Seguro", "applies_to": "vehiculo", "is_critical": False, "block_rule": "solo_alerta"},
-        {"name": "Licencia de Conducir", "applies_to": "chofer", "is_critical": True, "block_rule": "bloquea_asignacion"},
-        {"name": "DNI", "applies_to": "chofer", "is_critical": True, "block_rule": "bloquea_asignacion"},
-        {"name": "Certificado Médico", "applies_to": "chofer", "is_critical": False, "block_rule": "solo_alerta"},
-    ]
+
+    Es la red de REPARACION, no el camino normal: desde que el alta los siembra
+    en su propia transaccion, esto solo tiene trabajo con las empresas que se
+    crearon antes de ese arreglo o a las que alguien borro un tipo a mano.
+    """
+    defaults = TIPOS_DOCUMENTO_ESTANDAR
     try:
         async with db_pg.tx_global("arranque: sembrar tipos de documento en cada empresa") as conn:
             companies = db_pg.rows_to_api(await conn.fetch("select id from companies"))

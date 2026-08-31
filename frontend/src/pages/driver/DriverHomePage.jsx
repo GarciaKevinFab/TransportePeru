@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { tripsApi, alertsApi, vehiclesApi, maintenanceApi } from '../../services/api';
@@ -36,7 +36,7 @@ const DriverHomePage = () => {
   const [myVehicle, setMyVehicle] = useState(null);
   const [maintStatus, setMaintStatus] = useState(null);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const [tripsRes, alertsRes, vehiclesRes] = await Promise.all([
@@ -74,13 +74,15 @@ const DriverHomePage = () => {
       console.error('Error fetching data:', error);
     }
     setLoading(false);
-  };
+  }, [user?.id]);
 
+  // Equivalente al array [user?.id] anterior: fetchData solo cambia si cambia
+  // ese id, y la guarda sigue evitando la peticion sin sesion.
   useEffect(() => {
     if (user?.id) {
       fetchData();
     }
-  }, [user?.id]);
+  }, [user?.id, fetchData]);
 
   const quickActions = [
     { icon: FileText, label: 'Checklist', path: '/driver/checklist', gradient: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)' },

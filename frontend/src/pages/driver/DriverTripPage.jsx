@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { tripsApi } from '../../services/api';
@@ -50,7 +50,7 @@ const DriverTripPage = () => {
   const [kmStart, setKmStart] = useState('');
   const [kmEnd, setKmEnd] = useState('');
 
-  const fetchTrips = async () => {
+  const fetchTrips = useCallback(async () => {
     setLoading(true);
     try {
       const res = await tripsApi.getAll({ driver_id: user?.id });
@@ -60,13 +60,15 @@ const DriverTripPage = () => {
       toast.error('Error al cargar viajes');
     }
     setLoading(false);
-  };
+  }, [user?.id]);
 
+  // Equivalente al array [user?.id] anterior: fetchTrips solo cambia si cambia
+  // ese id, y la guarda sigue evitando la peticion sin sesion.
   useEffect(() => {
     if (user?.id) {
       fetchTrips();
     }
-  }, [user?.id]);
+  }, [user?.id, fetchTrips]);
 
   const handleStartTrip = async () => {
     if (!selectedTrip) return;

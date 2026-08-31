@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import api, { tripsApi } from '../../services/api';
 import { Card, CardContent } from '../../components/ui/card';
@@ -73,7 +73,9 @@ const DriverFuelPage = () => {
     invoice_photo_url: '',
   });
 
-  const fetchViatico = async (tripId) => {
+  // Recibe el tripId por parametro: no lee nada de fuera, por eso sus
+  // dependencias son vacias y su identidad es fija.
+  const fetchViatico = useCallback(async (tripId) => {
     try {
       const res = await tripsApi.getViaticoStatus(tripId);
       setViatico(res.data);
@@ -81,9 +83,9 @@ const DriverFuelPage = () => {
       // Endpoint no disponible: se usa cálculo local con los datos del viaje
       setViatico(null);
     }
-  };
+  }, []);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const [vehiclesRes, loadsRes, tripsRes] = await Promise.all([
@@ -108,11 +110,14 @@ const DriverFuelPage = () => {
       toast.error('Error al cargar datos');
     }
     setLoading(false);
-  };
+  }, [user?.id, fetchViatico]);
 
+  // Sigue siendo una unica carga al montar: la sesion ya esta resuelta cuando
+  // esta pantalla aparece (ProtectedRoute espera a AuthContext), asi que
+  // user.id no cambia mientras la pagina vive.
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   const handlePhotoCapture = (slot) => async (event) => {
     const file = event.target.files?.[0];
