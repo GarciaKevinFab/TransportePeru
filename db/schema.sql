@@ -93,6 +93,16 @@ create type notification_type as enum ('info', 'warning', 'alert', 'success'); -
 create table companies (
   id uuid primary key default gen_random_uuid(),
   name text not null,
+  -- Subdominio de la empresa (ver migracion 016): <slug>.sisac.pe. NO es la
+  -- frontera de seguridad -esa sigue siendo el company_id del token mas RLS-;
+  -- es como se ELIGE la empresa antes de tener token, y lo que acota la
+  -- busqueda del login para que no barra el sistema entero.
+  slug text not null
+    constraint companies_slug_formato check (
+      slug ~ '^[a-z0-9][a-z0-9-]*[a-z0-9]$'
+      and slug !~ '--'          -- posiciones 3-4 reservadas para punycode (xn--)
+      and length(slug) between 2 and 30
+    ),
   ruc text not null,
   address text,
   phone text,
@@ -136,6 +146,7 @@ create table users (
 -- Parcial: varios choferes de la misma empresa comparten email='' (login por
 -- DNI+PIN, no todos usan correo) - un único estricto sobre (company_id,email)
 -- rechazaría esos duplicados legítimos.
+create unique index companies_slug_idx on companies(slug);
 create unique index users_company_email_idx on users(company_id, email) where email is not null and email <> '';
 create index users_dni_idx on users(dni);
 create unique index users_whatsapp_number_idx on users(whatsapp_number) where whatsapp_number is not null;

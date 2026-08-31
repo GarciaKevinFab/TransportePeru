@@ -66,6 +66,20 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+    // La sesion es de otra empresa: se entro por el subdominio equivocado, o
+    // el slug de la empresa cambio. Ningun refresh arregla esto -el token
+    // renovado seguiria siendo de la misma empresa-, asi que lo unico util es
+    // cerrar sesion y volver al login DE ESTE host, que es el de la empresa
+    // correcta. Se mira la cabecera y no el texto del error para no atar el
+    // frontend a la redaccion de un mensaje.
+    if (error.response?.status === 403 && error.response?.headers?.['x-tenant-mismatch']) {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      clearAuthToken();
+      window.location.href = '/login';
+      return Promise.reject(error);
+    }
+
     if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
       const refreshToken = localStorage.getItem('refresh_token');
       if (!refreshToken) {

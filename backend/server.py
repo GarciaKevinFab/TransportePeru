@@ -7,6 +7,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 # Postgres: la unica base del backend desde el corte 013. Las 50 tablas
 # cruzaron y ya no queda ningun acceso a Mongo; ver db/tablas_en_postgres.txt.
 import db_pg
+import tenant_host
 
 import os
 import logging
@@ -55,6 +56,10 @@ db = client[os.environ['DB_NAME']]
 
 COMPANY_COLS = {
     "id": "uuid", "name": "text", "ruc": "text", "address": "text",
+    # Subdominio de la empresa (migracion 016). Tiene que estar en el mapa: sin
+    # la clave, build_insert lo omitiria del INSERT y chocaria contra el NOT
+    # NULL de la columna en cuanto se cree la primera empresa.
+    "slug": "text",
     "phone": "text", "email": "text", "logo_url": "text", "brand_color": "text",
     # Suscripcion (migracion 015). Sin estas tres, el alta por la web dejaria
     # la empresa con los defaults del esquema y no habria prueba que vencer.
@@ -249,6 +254,11 @@ class Company(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
+    # Opcional en el modelo aunque la columna sea NOT NULL: se decide con
+    # tenant_host.slug_libre(), que consulta la base, y por lo tanto no puede
+    # salir de un default de Pydantic. Quien construye un Company lo asigna
+    # antes de insertar.
+    slug: Optional[str] = None
     ruc: str
     address: Optional[str] = None
     phone: Optional[str] = None
@@ -979,8 +989,102 @@ async def get_current_user(
     user = db_pg.to_api(fila)
     if not user.get("is_active"):
         raise HTTPException(status_code=401, detail="Usuario desactivado")
+    await _aplicar_empresa_del_token(payload, user)
+    await _exigir_host_de_la_empresa(request, user)
     await _exigir_suscripcion_al_dia(request, user)
     return user
+
+
+async def _aplicar_empresa_del_token(payload: dict, user: dict):
+    """Hace efectivo el /companies/{id}/switch de un superadmin.
+
+    Hasta ahora ese endpoint emitia un token con la empresa destino y NADIE
+    leia ese campo: get_current_user devolvia la fila del usuario y todos los
+    endpoints usan current_user["company_id"]. O sea que el superadmin
+    "cambiaba de empresa" y seguia viendo la suya, sin ningun error - la peor
+    forma de fallar, porque parece que funciona.
+
+    Aqui es donde el campo empieza a valer. A partir de esta linea,
+    current_user["company_id"] es la empresa en la que se esta trabajando, y
+    todo lo demas -incluido el SET LOCAL de db_pg.tx() que fija el contexto de
+    RLS- va detras de ella sin enterarse de que hubo un cambio.
+
+    TRES CANDADOS, y ninguno sobra:
+
+      1. El rol se lee de la FILA, no del token. Un token viejo emitido cuando
+         el usuario era superadmin deja de servir en cuanto se le baja el rol
+         en la base; si mirasemos el `role` del token, seguiria entrando en
+         cualquier empresa hasta que caducara.
+      2. La empresa destino tiene que existir. Si se borro mientras habia una
+         sesion dentro, la sesion muere en vez de quedar apuntando al vacio.
+      3. RLS NO se abre. El contexto se fija en la empresa destino y las
+         politicas siguen aplicando con la misma fuerza: el superadmin ve esa
+         empresa y solo esa, igual que cualquier usuario suyo. Entrar a una
+         empresa no es apagar el aislamiento, es mudarse a otro lado de el.
+
+    Para todos los demas roles, el campo del token se ignora por completo.
+    """
+    empresa_del_token = payload.get("company_id")
+    if not empresa_del_token or user.get("role") != "superadmin":
+        return
+    if str(empresa_del_token) == str(user.get("company_id")):
+        return  # su propia empresa: no hay nada que cambiar
+
+    try:
+        destino = db_pg.as_uuid(empresa_del_token)
+    except (ValueError, AttributeError, TypeError):
+        raise HTTPException(status_code=401, detail="Token invalido")
+
+    async with db_pg.tx_global("superadmin: comprobar la empresa en la que esta trabajando") as conn:
+        existe = await conn.fetchval("select 1 from companies where id = $1", destino)
+    if not existe:
+        raise HTTPException(
+            status_code=401,
+            detail="La empresa de esta sesion ya no existe. Vuelve a entrar.",
+        )
+
+    # Se conserva de donde viene para poder volver, y para que la interfaz
+    # pueda avisar de que se esta dentro de otra empresa. Un superadmin que se
+    # olvida de que esta en los datos de un cliente es un incidente esperando.
+    user["company_id_propio"] = user["company_id"]
+    user["en_otra_empresa"] = True
+    user["company_id"] = str(empresa_del_token)
+
+
+async def _exigir_host_de_la_empresa(request: Request, user: dict):
+    """403 cuando la direccion es de una empresa y la sesion es de otra.
+
+    Solo actua si el host resuelve a un inquilino. En la landing, en el acceso
+    de rescate (fletepro.sisac.pe) y en local no hay empresa en el host y no
+    hay nada que comparar: se sigue como siempre.
+
+    ESTO NO ES LO QUE IMPIDE VER DATOS AJENOS. De eso se encargan el company_id
+    del usuario y las politicas RLS, y siguen intactos: un token de la empresa
+    A servido desde el origen de B nunca vio datos de B. Lo que evita es que la
+    sesion de un inquilino siga viva en el origen de otro, que confunde a
+    cualquiera que lo lea en un log y no tiene ninguna razon de ser.
+
+    Sin excepcion para superadmin, a proposito. Su empresa es la del sistema,
+    asi que un subdominio de cliente le responde 403 y su sitio es la consola
+    en fletepro.sisac.pe. Una excepcion aqui significaria que el superadmin ve
+    en gye.sisac.pe los datos de la empresa del sistema, que es peor que el
+    403: parece que la direccion funciona cuando no lo hace.
+    """
+    empresa = await tenant_host.empresa_desde_host(request.headers.get("host"))
+    if empresa is None:
+        return
+    if str(user.get("company_id")) == str(empresa["id"]):
+        return
+    raise HTTPException(
+        status_code=403,
+        detail="Esta sesion es de otra empresa. Vuelve a entrar desde la "
+               "direccion de la tuya.",
+        # El interceptor del frontend lo usa para cerrar la sesion y mandar al
+        # login en vez de mostrar un error que el usuario no puede resolver.
+        # Se comprueba la cabecera y no el texto para no atar el frontend a la
+        # redaccion de un mensaje.
+        headers={"X-Tenant-Mismatch": "1"},
+    )
 
 
 # Metodos que solo leen. Una suscripcion vencida deja mirar pero no escribir:
@@ -1029,6 +1133,18 @@ async def _exigir_suscripcion_al_dia(request: Request, user: dict):
                    "registrando informacion; tus datos siguen disponibles "
                    "para consulta.",
         )
+
+def _slug_pedido(valor: str) -> str:
+    """Valida un slug elegido a mano y traduce el motivo a un 400 legible.
+
+    tenant_host levanta SlugInvalido (un ValueError) porque no sabe nada de
+    HTTP; la traduccion vive aca, que es donde empieza la web.
+    """
+    try:
+        return tenant_host.validar_slug(valor)
+    except tenant_host.SlugInvalido as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 
 def require_roles(*roles):
     """Dependency reutilizable para exigir uno de los roles dados.
@@ -1977,6 +2093,104 @@ class SignupRequest(BaseModel):
     phone: Optional[str] = None
 
 
+@api_router.get("/tenant")
+async def tenant_del_host(request: Request):
+    """La empresa duena de esta direccion, para que el acceso lleve su marca.
+
+    Publico y sin token a proposito: se consulta ANTES de autenticar, que es
+    justo el problema que resuelve -hasta ahora la pantalla de acceso no podia
+    saber de quien era-.
+
+    Devuelve solo nombre, logo y color. NO devuelve subscription_status ni nada
+    operativo, y desde luego no sunat_config, que lleva el token de la API de
+    facturacion electronica.
+
+    404 cuando el host no es de nadie, que es lo que responde en la landing, en
+    fletepro.sisac.pe y en local. El frontend lo lee como "aqui no hay empresa,
+    pinta la marca del producto", no como un fallo.
+
+    Si: esto permite averiguar si un subdominio existe. Es el mismo dato que ya
+    revela el DNS y que ve cualquiera que abra la direccion en el navegador, y
+    es el precio de que un chofer reconozca la pantalla donde pone su PIN.
+    """
+    empresa = await tenant_host.empresa_desde_host(request.headers.get("host"))
+    if not empresa:
+        raise HTTPException(
+            status_code=404, detail="Esta direccion no corresponde a ninguna empresa"
+        )
+    # El logo NO viaja aqui dentro. companies.logo_url guarda el PNG como
+    # data-URI en base64, y el de G&E pesa 286 KB: devolverlo en este JSON
+    # significaba 286 KB sin autenticar en CADA carga del login, imposibles de
+    # cachear (el navegador no cachea un campo de un JSON) y regalados a
+    # cualquiera que haga un bucle sobre el endpoint.
+    #
+    # Se manda una ruta, y el navegador la pide una vez y la guarda. Si el logo
+    # ya es una URL normal -no un data-URI-, se devuelve tal cual: ahi no hay
+    # nada que proxyar.
+    logo = empresa.get("logo_url") or ""
+    return {
+        "slug": empresa["slug"],
+        "name": empresa["name"],
+        "logo_url": ("/api/tenant/logo" if logo.startswith("data:") else (logo or None)),
+        "brand_color": empresa.get("brand_color"),
+    }
+
+
+# Tipos que este endpoint acepta servir. Es una lista blanca, no un filtro:
+# logo_url lo escribe el admin de la empresa, y devolver el MIME que venga de
+# la base permitiria guardar `data:text/html;...` y hacer que NUESTRO origen
+# sirva HTML del inquilino. Eso es XSS almacenado, y en el origen donde vive su
+# propia sesion. La cabecera nosniff global ayuda, pero no sustituye a esto.
+_TIPOS_DE_LOGO = {"image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml"}
+
+
+@api_router.get("/tenant/logo")
+async def tenant_logo_del_host(request: Request):
+    """El logo de la empresa de este host, como imagen y cacheable.
+
+    Publico, igual que /api/tenant y por el mismo motivo: se pinta antes de
+    autenticar. La diferencia es que esto SI se puede cachear, asi que el coste
+    es una peticion por navegador y no una por carga de pagina.
+    """
+    import base64
+    import binascii
+    import hashlib
+
+    from fastapi import Response
+
+    empresa = await tenant_host.empresa_desde_host(request.headers.get("host"))
+    logo = (empresa or {}).get("logo_url") or ""
+    if not logo.startswith("data:"):
+        raise HTTPException(status_code=404, detail="Esta empresa no tiene logo")
+
+    cabecera, _, datos = logo.partition(",")
+    tipo = cabecera[len("data:"):].split(";")[0].strip().lower()
+    if tipo not in _TIPOS_DE_LOGO or ";base64" not in cabecera:
+        raise HTTPException(status_code=404, detail="Esta empresa no tiene logo")
+
+    try:
+        crudo = base64.b64decode(datos, validate=True)
+    except (binascii.Error, ValueError):
+        # Un data-URI corrupto en la base no es un 500: es una empresa sin logo.
+        raise HTTPException(status_code=404, detail="Esta empresa no tiene logo")
+
+    # ETag sobre el contenido: si el admin cambia el logo, cambia el ETag y el
+    # navegador se lo baja de nuevo sin esperar a que venza la cache.
+    etag = '"' + hashlib.sha256(crudo).hexdigest()[:16] + '"'
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers={"ETag": etag})
+
+    return Response(
+        content=crudo,
+        media_type=tipo,
+        headers={
+            "ETag": etag,
+            # setdefault en el middleware de seguridad deja que este gane.
+            "Cache-Control": "public, max-age=3600",
+        },
+    )
+
+
 @api_router.post("/auth/signup", response_model=TokenResponse)
 @limiter.limit("5/hour")
 async def signup(request: Request, datos: SignupRequest):
@@ -2026,6 +2240,12 @@ async def signup(request: Request, datos: SignupRequest):
         password_hash=hash_password(datos.password),
     )
 
+    # El subdominio se elige ANTES de abrir la transaccion, no dentro: ver que
+    # empresas ocupan que slug es una pregunta que cruza inquilinos, y aca
+    # dentro la transaccion ya estaria acotada a la que se esta creando. La
+    # ventana entre elegir y usar la cierra el indice unico de slug.
+    fila_empresa["slug"] = await tenant_host.slug_libre(nombre_empresa, ruc)
+
     sql_empresa, val_empresa = db_pg.build_insert("companies", COMPANY_COLS, fila_empresa)
     sql_owner, val_owner = db_pg.build_insert("users", USER_COLS, _modelo_a_fila(owner.model_dump()))
 
@@ -2042,6 +2262,12 @@ async def signup(request: Request, datos: SignupRequest):
         await conn.execute(sql_empresa, *val_empresa)
         await conn.execute(sql_owner, *val_owner)
 
+    # La cache de hosts guarda tambien los negativos, para que un barrido de
+    # subdominios inexistentes no sea una consulta por intento. Sin invalidar,
+    # quien abriera su direccion recien creada dentro de esa ventana se
+    # encontraria un 404 en la puerta de su propia empresa.
+    tenant_host.invalidar_cache(fila_empresa["slug"])
+
     payload = {"user_id": owner.id, "company_id": company.id, "role": UserRole.OWNER.value}
     return TokenResponse(
         access_token=create_access_token(payload),
@@ -2050,6 +2276,10 @@ async def signup(request: Request, datos: SignupRequest):
             "id": owner.id, "name": nombre, "email": email,
             "role": UserRole.OWNER.value, "company_id": company.id,
             "company_name": nombre_empresa,
+            # La direccion propia de la empresa. El alta ocurre en el host de
+            # la marca, asi que es el unico momento en que se le puede decir al
+            # cliente cual es la suya.
+            "company_slug": fila_empresa["slug"],
             "trial_ends_at": fila_empresa["trial_ends_at"].isoformat(),
         },
     )
@@ -2060,13 +2290,27 @@ async def signup(request: Request, datos: SignupRequest):
 async def login(request: Request, login_data: LoginRequest):
     user = None
 
+    # El host acota la busqueda cuando la direccion es la de una empresa
+    # (<slug>.sisac.pe). En la landing, en el acceso de rescate y en local
+    # devuelve None y se busca en todo el sistema, igual que antes.
+    #
+    # Donde mas se nota es en el login por DNI: users_dni_idx NO es unico, asi
+    # que sin empresa el fetchrow se queda con la fila que le toque y el
+    # segundo chofer que comparta DNI con otro no puede entrar nunca, sin
+    # ningun mensaje que lo explique.
+    empresa_host = await tenant_host.empresa_desde_host(request.headers.get("host"))
+    empresa_id = db_pg.as_uuid(empresa_host["id"]) if empresa_host else None
+
     # Admin login (email + password)
     if login_data.email and login_data.password:
-        # El email identifica a un usuario en todo el sistema, no dentro de una
-        # empresa: en el login todavia no hay empresa que conocer.
+        # Sin empresa en el host, el email identifica al usuario en TODO el
+        # sistema. Con empresa, dentro de ella - que es lo que el indice unico
+        # (company_id, email) siempre dio por supuesto.
         async with db_pg.tx_global("autenticacion: resolver la identidad antes de conocer la empresa") as conn:
             user = db_pg.to_api(await conn.fetchrow(
-                "select * from users where email = $1", login_data.email
+                "select * from users where email = $1 "
+                "  and ($2::uuid is null or company_id = $2)",
+                login_data.email, empresa_id,
             ))
         if not user:
             raise HTTPException(status_code=401, detail="Credenciales inválidas")
@@ -2079,7 +2323,9 @@ async def login(request: Request, login_data: LoginRequest):
     elif login_data.dni and login_data.pin:
         async with db_pg.tx_global("autenticacion: resolver la identidad antes de conocer la empresa") as conn:
             user = db_pg.to_api(await conn.fetchrow(
-                "select * from users where dni = $1", login_data.dni
+                "select * from users where dni = $1 "
+                "  and ($2::uuid is null or company_id = $2)",
+                login_data.dni, empresa_id,
             ))
         if not user:
             raise HTTPException(status_code=401, detail="Credenciales inválidas")
@@ -2162,7 +2408,14 @@ async def refresh_token(request: RefreshRequest):
     user = db_pg.to_api(fila)
     if not user or not user.get("is_active"):
         raise HTTPException(status_code=401, detail="Usuario no válido")
-    
+
+    # Sin esto, el switch del superadmin se evaporaba a los 15 minutos: el
+    # access token caduca, el frontend renueva en silencio, y token_data se
+    # reconstruia desde la fila del usuario -o sea, desde su empresa propia-.
+    # Volveria a la empresa del sistema a mitad de trabajo y sin avisar, que es
+    # justo la clase de cosa que hace desconfiar de una herramienta.
+    await _aplicar_empresa_del_token(payload, user)
+
     token_data = {
         "user_id": user["id"],
         "company_id": user["company_id"],
@@ -2211,10 +2464,26 @@ async def get_current_company(current_user: dict = Depends(get_current_user)):
     return serialize_doc(company)
 
 @api_router.post("/companies/{company_id}/switch")
-async def switch_company(company_id: str, current_user: dict = Depends(get_current_user)):
+async def switch_company(
+    request: Request,
+    company_id: str,
+    current_user: dict = Depends(get_current_user),
+):
     """Superadmin can switch to any company context to manage it"""
     if current_user["role"] != "superadmin":
         raise HTTPException(status_code=403, detail="Solo superadmin puede cambiar de empresa")
+
+    # Desde el subdominio de una empresa no: el token que sale de aca es de la
+    # empresa destino, y la peticion siguiente a este mismo host lo rechazaria
+    # por no coincidir (_exigir_host_de_la_empresa). Seria cambiar de empresa
+    # para quedarse fuera. La consola del superadmin vive en el host de la
+    # marca, que es donde esto funciona.
+    if tenant_host.slug_desde_host(request.headers.get("host")):
+        raise HTTPException(
+            status_code=409,
+            detail="Cambia de empresa desde la consola, no desde el subdominio "
+                   "de un cliente",
+        )
 
     # La empresa destino es, por definicion, distinta de la actual: hay que
     # mirarla desde fuera del aislamiento.
@@ -2225,9 +2494,30 @@ async def switch_company(company_id: str, current_user: dict = Depends(get_curre
     if not company:
         raise HTTPException(status_code=404, detail="Empresa no encontrada")
 
-    # Issue new tokens with the target company_id
+    # Que un superadmin entre en los datos de un cliente tiene que dejar
+    # rastro, y el rastro va DENTRO de la empresa visitada: es su registro de
+    # auditoria el que debe poder responder "quien de la plataforma entro aca y
+    # cuando". Si no falla el switch por esto: un fallo al escribir el log no
+    # es motivo para dejar sin herramienta a quien esta atendiendo una
+    # incidencia.
+    try:
+        await create_audit_log(
+            company_id=company_id,
+            user_id=current_user["id"],
+            user_name=current_user.get("name") or "superadmin",
+            action="entrar_a_empresa",
+            entity_type="company",
+            entity_id=company_id,
+            details={"empresa": company.get("name"), "slug": company.get("slug")},
+        )
+    except Exception:
+        logger.exception("no se pudo registrar la entrada del superadmin a %s", company_id)
+
+    # current_user es la FILA de users, o sea que la clave es "id". Con
+    # ["user_id"] esto levantaba KeyError y el endpoint respondia 500: el
+    # switch no es que no surtiera efecto, es que nunca llegaba a completarse.
     token_data = {
-        "user_id": current_user["user_id"],
+        "user_id": current_user["id"],
         "company_id": company_id,
         "role": "superadmin"
     }
@@ -2239,6 +2529,32 @@ async def switch_company(company_id: str, current_user: dict = Depends(get_curre
         "refresh_token": refresh_token,
         "company": serialize_doc(company),
         "message": f"Cambiado a empresa: {company.get('name', company_id)}"
+    }
+
+
+@api_router.post("/auth/salir-de-empresa")
+async def salir_de_empresa(current_user: dict = Depends(get_current_user)):
+    """Devuelve al superadmin a su propia empresa.
+
+    Existe como endpoint propio y no como "haz switch a tu empresa" porque el
+    camino de vuelta tiene que estar siempre disponible: si la empresa en la
+    que se entro se borra o se rompe, buscarse a uno mismo en un listado que
+    quiza ya no carga no es un plan.
+    """
+    if current_user.get("role") != "superadmin":
+        raise HTTPException(status_code=403, detail="Solo superadmin")
+
+    propia = current_user.get("company_id_propio") or current_user["company_id"]
+    token_data = {
+        "user_id": current_user["id"],
+        "company_id": propia,
+        "role": "superadmin",
+    }
+    return {
+        "access_token": create_access_token(token_data),
+        "refresh_token": create_refresh_token(token_data),
+        "company_id": propia,
+        "message": "De vuelta en tu empresa",
     }
 
 # ============== USER ROUTES ==============
@@ -2406,7 +2722,20 @@ async def create_company(request: dict = Body(...), current_user: dict = Depends
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
-    
+
+    # Subdominio: el que pida quien crea la empresa, o uno derivado del nombre.
+    # Fuera de la transaccion de abajo a proposito: esa esta acotada a la
+    # empresa que se crea, y RLS le esconderia justo las demas empresas, que
+    # son contra las que hay que comprobar la colision.
+    if request.get("slug"):
+        company["slug"] = _slug_pedido(request["slug"])
+        if not await tenant_host.slug_esta_libre(company["slug"]):
+            raise HTTPException(status_code=409, detail="Esa direccion ya esta ocupada")
+    else:
+        company["slug"] = await tenant_host.slug_libre(
+            company["name"], company.get("ruc") or ""
+        )
+
     # El contexto se fija en la empresa que se esta creando: la politica RLS
     # exige id = empresa_actual para insertar en companies, asi que esto entra
     # sin necesidad de saltarse el aislamiento.
@@ -2442,6 +2771,17 @@ async def update_company(company_id: str, request: dict = Body(...), current_use
     else:
         raise HTTPException(status_code=403, detail="No autorizado")
     
+    # Cambiar de subdominio no es editar un campo: la direccion anterior se
+    # queda muerta y con ella los marcadores de los usuarios y la PWA que
+    # tengan instalada con ese origen grabado. Hace falta una tabla de alias y
+    # una redireccion (ver la nota al pie de la migracion 016), y hasta que
+    # existan es mejor no poder que poder a medias.
+    if "slug" in request:
+        raise HTTPException(
+            status_code=400,
+            detail="La direccion web de la empresa no se puede cambiar todavia",
+        )
+
     request.pop("id", None)
     request["updated_at"] = datetime.now(timezone.utc)
     request["id"] = company_id
@@ -7245,6 +7585,11 @@ async def bootstrap_superadmin(_: bool = Depends(require_install_token)):
         for key, value in company_doc.items():
             if isinstance(value, datetime):
                 company_doc[key] = value.isoformat()
+        # La empresa del sistema tambien necesita slug: la columna es NOT NULL
+        # y sin esto el bootstrap fallaria en la primera instalacion nueva. Que
+        # tenga direccion propia no la vuelve accesible: para entrar por ella
+        # siguen haciendo falta las credenciales del superadmin.
+        company_doc["slug"] = await tenant_host.slug_libre(system_company.name, SYSTEM_RUC)
         async with db_pg.tx({"company_id": system_company.id}) as conn:
             sql, values = db_pg.build_insert("companies", COMPANY_COLS, company_doc)
             await conn.execute(sql, *values)
@@ -7315,6 +7660,7 @@ async def seed_demo_data(_: bool = Depends(require_install_token)):
     for key, value in company_doc.items():
         if isinstance(value, datetime):
             company_doc[key] = value.isoformat()
+    company_doc["slug"] = await tenant_host.slug_libre(company.name, company.ruc)
     # El contexto se fija en la empresa que se crea: la politica RLS permite
     # insertar en companies cuando id coincide con la empresa actual.
     async with db_pg.tx({"company_id": company.id}) as conn:
@@ -9918,11 +10264,25 @@ else:
         "http://localhost:5173",
         "http://127.0.0.1:5173",
     ]
+# Cada inquilino es un origen distinto (<slug>.sisac.pe), y son tantos como
+# clientes haya: enumerarlos en CORS_ORIGINS significaria reiniciar el backend
+# en cada alta. La expresion cubre un solo nivel bajo el dominio base, que es
+# exactamente lo que cubre el certificado comodin.
+#
+# En la practica casi no se usa -el frontend se sirve del mismo origen que la
+# API-, pero el dia que algo pida desde fuera, esto es lo que decide.
+_tenant_regex = (
+    r"^https://[a-z0-9][a-z0-9-]*[a-z0-9]\." + re.escape(tenant_host.DOMINIO_BASE) + r"$"
+    if tenant_host.DOMINIO_BASE
+    else None
+)
+
 # Nunca allow_origins=["*"] junto con allow_credentials=True
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
     allow_origins=_cors_origins,
+    allow_origin_regex=_tenant_regex,
     allow_methods=["*"],
     allow_headers=["*"],
 )

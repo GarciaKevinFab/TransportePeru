@@ -446,6 +446,38 @@ const MainLayout = ({ children }) => {
         </header>
 
         {/* Page Content */}
+        {/* Un superadmin dentro de los datos de un cliente tiene que verlo en
+            todo momento. Sin este aviso, el riesgo no es tecnico sino humano:
+            se entra a mirar una incidencia, se deja la pestana abierta, y dos
+            horas despues se crea un viaje creyendo estar en la empresa propia.
+            Va arriba del contenido, fijo, y con la salida al lado - de nada
+            sirve avisar si volver cuesta buscar. */}
+        {user?.en_otra_empresa && (
+          <div className="flex items-center justify-between gap-3 px-4 py-2 bg-amber-500 text-amber-950 text-sm font-semibold">
+            <span className="truncate">
+              Estas dentro de <strong>{companyBrand.name}</strong> como superadmin.
+              Todo lo que hagas queda en los datos de esta empresa.
+            </span>
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  const res = await api.post('/auth/salir-de-empresa');
+                  localStorage.setItem('access_token', res.data.access_token);
+                  localStorage.setItem('refresh_token', res.data.refresh_token);
+                  window.location.href = '/dashboard';
+                } catch (e) {
+                  // Si la salida falla, cerrar sesion siempre devuelve a un
+                  // estado limpio: es preferible a quedarse dentro sin querer.
+                  logout();
+                }
+              }}
+              className="shrink-0 rounded-md bg-amber-950 px-3 py-1 text-amber-50 hover:bg-amber-900"
+            >
+              Salir de esta empresa
+            </button>
+          </div>
+        )}
         <main className="flex-1 p-3 sm:p-4 md:p-6 overflow-auto page-fade-in">
           {children}
         </main>

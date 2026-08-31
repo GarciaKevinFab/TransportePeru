@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useTenant } from '../context/TenantContext';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -13,6 +14,12 @@ import { toast } from 'sonner';
 
 const LoginPage = () => {
   const { login, error } = useAuth();
+  // En <empresa>.sisac.pe, la pantalla de acceso lleva el nombre de esa
+  // empresa; en el host de la marca y en local, el del producto. Estaba
+  // escrito a mano como "G&E Transporta" desde que el sistema tenia un solo
+  // cliente: a partir del segundo, eso es el nombre de otro en la puerta.
+  const { tenant } = useTenant();
+  const marca = tenant?.name || 'FletePro';
   const [loading, setLoading] = useState(false);
 
   // Admin form state
@@ -115,7 +122,7 @@ const LoginPage = () => {
               <Truck className="w-7 h-7 text-white" />
             </div>
             <span className="font-heading text-xl font-black tracking-tight uppercase">
-              G&amp;E Transporta
+              {marca}
             </span>
           </div>
         </div>
@@ -166,7 +173,7 @@ const LoginPage = () => {
               <Truck className="w-8 h-8 text-white" />
             </div>
             <h1 className="font-heading text-3xl font-black text-slate-900 tracking-tight uppercase">
-              G&amp;E Transporta
+              {marca}
             </h1>
             <p className="text-slate-500 text-sm mt-1">
               Sistema de Gestión de Flota

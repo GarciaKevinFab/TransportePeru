@@ -1,6 +1,6 @@
 {
-  "name": "G&E Transporta S.A.C",
-  "short_name": "G&E Transporta",
+  "name": "FletePro",
+  "short_name": "FletePro",
   "description": "Sistema de Gestion de Flota y Transporte",
   "start_url": "/",
   "display": "standalone",

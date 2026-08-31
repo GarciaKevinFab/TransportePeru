@@ -67,7 +67,9 @@ Ver `backend/.env.example`. Las principales:
 | `MONGO_URL` | Sí | Heredada. El backend ya no consulta Mongo, pero el cliente se sigue creando al arrancar y sin la variable no levanta |
 | `DB_NAME` | Sí | Idem: nombre de la base de Mongo, ya sin uso |
 | `JWT_SECRET` | Recomendada | Clave para firmar los JWT |
-| `CORS_ORIGINS` | No | Orígenes permitidos separados por comas (`*` en dev) |
+| `CORS_ORIGINS` | No | Orígenes permitidos separados por comas (`*` en dev). Los subdominios de inquilino se aceptan aparte, por expresión regular |
+| `TENANT_BASE_DOMAIN` | No | Dominio de los subdominios por empresa (`sisac.pe`). En local, `localhost` hace funcionar `http://gye.localhost:8001` |
+| `TENANT_RESERVED_SLUGS` | No | Subdominios extra que ninguna empresa puede tomar, además de los de `backend/tenant_host.py` |
 | `INSTALL_TOKEN` | Bootstrap | Token del bootstrap inicial (ver más abajo) |
 | `GOOGLE_API_KEY` | Opcional | OCR con Google Gemini |
 | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_REGION` / `S3_BUCKET_NAME` | Opcional | Almacenamiento en S3 |

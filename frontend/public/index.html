@@ -7,10 +7,10 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https: http: ws: wss:; object-src 'none'; base-uri 'self'; form-action 'self'" />
     <meta name="referrer" content="no-referrer" />
     <meta name="theme-color" content="#f97316" />
-    <meta name="description" content="G&E Transporta S.A.C - Sistema de Gestion de Flota y Transporte" />
+    <meta name="description" content="FletePro - Sistema de gestion de flota para empresas de transporte" />
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="G&E Transporta">
+    <meta name="apple-mobile-web-app-title" content="FletePro">
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -18,7 +18,10 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@600&family=DM+Sans:wght@400;500;600;700&display=swap"
         rel="stylesheet" />
-    <title>G&E Transporta S.A.C | Gestion de Flota</title>
+    <!-- Titulo por defecto: el del producto. En el subdominio de un cliente lo
+         sustituye TenantContext con el nombre de su empresa en cuanto responde
+         /api/tenant; esto es lo que se ve el instante anterior. -->
+    <title>FletePro | Gestion de Flota</title>
     <script>
         window.addEventListener(
             "error",
@@ -186,7 +189,7 @@
             <img src="%PUBLIC_URL%/logo.png" alt="Star Insights IT" />
         </span>
         <span style="display: flex; flex-direction: column; line-height: 1;">
-            <span id="brand-badge-title">G&amp;E Transporta</span>
+            <span id="brand-badge-title">FletePro</span>
             <span id="brand-badge-sub">by Star Insights IT</span>
         </span>
         <span id="brand-badge-dot"></span>

@@ -2,6 +2,7 @@ import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { TenantProvider, useTenant } from './context/TenantContext';
 import { Toaster } from './components/ui/sonner';
 import MainLayout from './layouts/MainLayout';
 import MobileLayout from './layouts/MobileLayout';
@@ -110,6 +111,28 @@ const SuspenseFallback = () => (
   </div>
 );
 
+// En la direccion de una empresa la raiz NO es la landing. Quien abre
+// gye.sisac.pe viene a trabajar, no a que le vendan el producto -y menos a que
+// le ofrezcan darse de alta en algo que su empresa ya tiene contratado-. La
+// pagina de venta solo tiene sentido en el host de la marca.
+//
+// Se espera a saber de que host se trata antes de pintar: renderizar la
+// landing y cambiarla medio segundo despues es peor que un momento de spinner.
+const RaizSegunElHost = () => {
+  const { tenant, loading } = useTenant();
+  if (loading) return <SuspenseFallback />;
+  return tenant ? <Navigate to="/login" replace /> : <LandingPage />;
+};
+
+// El alta crea una empresa NUEVA, y eso solo se hace desde el host de la
+// marca. Ofrecerla dentro del subdominio de un cliente invita a sus empleados
+// a abrir una empresa paralela por error.
+const AltaSoloEnLaMarca = () => {
+  const { tenant, loading } = useTenant();
+  if (loading) return <SuspenseFallback />;
+  return tenant ? <Navigate to="/login" replace /> : <SignupPage />;
+};
+
 function AppRoutes() {
   return (
     <Suspense fallback={<SuspenseFallback />}>
@@ -124,7 +147,7 @@ function AppRoutes() {
         path="/"
         element={
           <PublicRoute>
-            <LandingPage />
+            <RaizSegunElHost />
           </PublicRoute>
         }
       />
@@ -132,7 +155,7 @@ function AppRoutes() {
         path="/registro"
         element={
           <PublicRoute>
-            <SignupPage />
+            <AltaSoloEnLaMarca />
           </PublicRoute>
         }
       />
@@ -470,10 +493,16 @@ function App() {
     <ThemeProvider>
       <BrowserRouter>
         <AuthProvider>
-          <AppRoutes />
-          <PushRegistrar />
-          <Toaster />
-          <OfflineIndicator />
+          {/* Dentro de AuthProvider porque quien consulta /api/tenant es la
+              instancia de axios que este ya dejo configurada. Fuera de
+              BrowserRouter no serviria: el Navigate de RaizSegunElHost
+              necesita el router. */}
+          <TenantProvider>
+            <AppRoutes />
+            <PushRegistrar />
+            <Toaster />
+            <OfflineIndicator />
+          </TenantProvider>
         </AuthProvider>
       </BrowserRouter>
     </ThemeProvider>
