@@ -2715,6 +2715,81 @@ async def update_user(user_id: str, request: dict = Body(...), current_user: dic
 
     return {"message": "Usuario actualizado"}
 
+@api_router.post("/users/{user_id}/reset-password")
+async def reset_user_password(
+    user_id: str,
+    request: dict = Body(...),
+    current_user: dict = Depends(require_roles("owner", "admin")),
+):
+    """El dueno o un admin le pone una contrasena nueva a alguien de SU empresa.
+
+    Existe porque hasta ahora no habia ninguna forma de recuperar el acceso de
+    un admin o un dueno. Los choferes tenian reset-pin desde el principio; los
+    que entran con correo y contrasena, nada: si la olvidaban, hacia falta
+    tocar la base a mano.
+
+    Y el formulario de editar usuario NO servia para esto aunque lo pareciera:
+    mandaba un campo `password` que update_user descartaba en silencio -hace
+    pop de password_hash, y USER_COLS filtra lo que no reconoce-. O sea que
+    quien lo intentaba se quedaba convencido de haber cambiado una contrasena
+    que seguia siendo la vieja.
+
+    El filtro por company_id del UPDATE no es decorativo: sin el, un admin
+    podria reescribirle la contrasena a un usuario de otra empresa pasando su
+    id. RLS ya lo impediria, pero esto lo dice explicito y falla antes.
+    """
+    nueva = (request.get("password") or "").strip()
+    if len(nueva) < 8:
+        raise HTTPException(
+            status_code=400, detail="La contrasena necesita al menos 8 caracteres"
+        )
+
+    async with db_pg.tx(current_user) as conn:
+        fila = await conn.fetchrow(
+            "select id, role, email from users where id = $1 and company_id = $2",
+            db_pg.as_uuid(user_id), db_pg.as_uuid(current_user["company_id"]),
+        )
+        if not fila:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        objetivo = db_pg.to_api(fila)
+
+        # Un admin no puede reescribirle la contrasena al dueno de la empresa:
+        # seria quedarse con la cuenta de su jefe. El dueno si puede con
+        # cualquiera, incluido el mismo.
+        #
+        # El superadmin tambien pasa, y no es una excepcion comoda: si el dueno
+        # de una empresa pierde su clave, NO hay ningun otro camino de vuelta
+        # -no existe envio de correo en el sistema-. Dejarlo fuera aqui
+        # significaria que la unica forma de rescatarlo es entrar a la base de
+        # datos a mano. El rastro queda en el registro de auditoria de la
+        # empresa, que es lo que hace aceptable el permiso.
+        if objetivo["role"] == "owner" and current_user["role"] not in ("owner", "superadmin"):
+            raise HTTPException(
+                status_code=403,
+                detail="Solo el dueno de la empresa puede cambiar su propia contrasena",
+            )
+
+        await conn.execute(
+            "update users set password_hash = $1, force_password_change = true, "
+            "failed_attempts = 0, locked_until = null, updated_at = now() "
+            "where id = $2 and company_id = $3",
+            hash_password(nueva),
+            db_pg.as_uuid(user_id),
+            db_pg.as_uuid(current_user["company_id"]),
+        )
+
+    await create_audit_log(
+        company_id=current_user["company_id"],
+        user_id=current_user["id"],
+        user_name=current_user.get("name") or "",
+        action="reset_password",
+        entity_type="user",
+        entity_id=user_id,
+        details={"email": objetivo.get("email")},
+    )
+    return {"message": "Contrasena actualizada. Entregasela al usuario por un canal seguro."}
+
+
 @api_router.post("/users/{user_id}/reset-pin")
 async def reset_user_pin(user_id: str, request: dict = Body(...), current_user: dict = Depends(require_roles("owner", "admin"))):
     

@@ -148,6 +148,7 @@ export const usersApi = {
   create: (data) => api.post('/users', data),
   update: (id, data) => api.put(`/users/${id}`, data),
   resetPin: (id, pin) => api.post(`/users/${id}/reset-pin`, { pin }),
+  resetPassword: (id, password) => api.post(`/users/${id}/reset-password`, { password }),
 };
 
 // Vehicles API

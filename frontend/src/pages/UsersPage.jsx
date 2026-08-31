@@ -82,6 +82,8 @@ const UsersPage = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [saving, setSaving] = useState(false);
   const [newPin, setNewPin] = useState('');
+  const [showResetPasswordDialog, setShowResetPasswordDialog] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
   const [eppData, setEppData] = useState({
     casco: { assigned: false, date: '', condition: 'bueno', size: '' },
     chaleco: { assigned: false, date: '', condition: 'bueno', size: '' },
@@ -150,6 +152,22 @@ const UsersPage = () => {
       toast.error(error.response?.data?.detail || 'Error al crear usuario');
     }
     setSaving(false);
+  };
+
+  const handleResetPassword = async () => {
+    if (!selectedUser || newPassword.length < 8) return;
+    setSaving(true);
+    try {
+      await usersApi.resetPassword(selectedUser.id, newPassword);
+      toast.success('Contraseña actualizada');
+      setShowResetPasswordDialog(false);
+      setNewPassword('');
+      setSelectedUser(null);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Error al resetear la contraseña');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleResetPin = async () => {
@@ -422,6 +440,21 @@ const UsersPage = () => {
                               Resetear PIN
                             </DropdownMenuItem>
                           )}
+                          {/* Los choferes entran con DNI y PIN; los demas con
+                              correo y contrasena. Cada uno ve solo el reseteo
+                              que le sirve. */}
+                          {userItem.role !== 'chofer' && isAdmin && (
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setSelectedUser(userItem);
+                                setNewPassword('');
+                                setShowResetPasswordDialog(true);
+                              }}
+                            >
+                              <Key className="w-4 h-4 mr-2" />
+                              Resetear contraseña
+                            </DropdownMenuItem>
+                          )}
                           {userItem.role === 'chofer' && isAdmin && (
                             <DropdownMenuItem onClick={() => openEppDialog(userItem)}>
                               <HardHat className="w-4 h-4 mr-2" />
@@ -599,6 +632,52 @@ const UsersPage = () => {
             >
               {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Crear Usuario
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset password: la unica via de recuperacion que existe para quien
+          entra con correo. No hay envio de correo en el sistema, asi que la
+          contrasena la fija aqui el dueno o un admin y se la entrega a la
+          persona por fuera. */}
+      <Dialog open={showResetPasswordDialog} onOpenChange={setShowResetPasswordDialog}>
+        <DialogContent className="max-w-[95vw] sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Resetear contraseña</DialogTitle>
+            <DialogDescription>
+              Nueva contraseña para {selectedUser?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="input-label">Nueva contraseña (mínimo 8 caracteres)</Label>
+              <Input
+                type="text"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Escríbela o pega una generada"
+                className="rounded-sm font-mono"
+                data-testid="reset-password-input"
+              />
+            </div>
+            <p className="text-xs text-slate-500">
+              Se muestra en claro a propósito: tienes que poder copiarla para
+              entregársela. Hazlo por un canal privado y pídele que la cambie.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowResetPasswordDialog(false)}>
+              Cancelar
+            </Button>
+            <Button
+              className="btn-action"
+              onClick={handleResetPassword}
+              disabled={newPassword.length < 8 || saving}
+              data-testid="confirm-reset-password-btn"
+            >
+              {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Resetear contraseña
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -809,29 +888,18 @@ const UsersPage = () => {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="input-label">Nueva Contraseña</Label>
-                <Input
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  placeholder="Dejar vacío para no cambiar"
-                  className="rounded-sm"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="input-label">Nuevo PIN</Label>
-                <Input
-                  type="password"
-                  value={formData.pin}
-                  onChange={(e) => setFormData({ ...formData, pin: e.target.value.replace(/\D/g, '').slice(0, 6) })}
-                  placeholder="Dejar vacío para no cambiar"
-                  maxLength={6}
-                  className="rounded-sm font-mono"
-                />
-              </div>
-            </div>
+            {/* Aqui habia dos campos, "Nueva Contraseña" y "Nuevo PIN", que NO
+                hacian nada: update_user descarta password_hash y pin_hash, y
+                USER_COLS filtra password y pin. Quien los usaba se quedaba
+                convencido de haber cambiado una clave que seguia siendo la
+                vieja - y descubriendolo el dia que no podia entrar.
+                Las credenciales se cambian desde el menu de cada usuario, que
+                usa los endpoints que si las escriben. */}
+            <p className="rounded-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 px-3 py-2.5 text-xs text-slate-600 dark:text-slate-300">
+              Las credenciales no se cambian desde aquí. Usa el menú (⋯) de la
+              fila del usuario: <strong>Resetear contraseña</strong> para quienes
+              entran con correo, o <strong>Resetear PIN</strong> para los choferes.
+            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { resetForm(); setShowEditDialog(false); }}>
