@@ -478,7 +478,7 @@ const MainLayout = ({ children }) => {
             </button>
           </div>
         )}
-        <main className="flex-1 p-3 sm:p-4 md:p-6 overflow-auto page-fade-in">
+        <main className="flex-1 p-3 sm:p-4 md:p-6 pb-20 sm:pb-20 md:pb-24 overflow-auto page-fade-in">
           {children}
         </main>
       </div>

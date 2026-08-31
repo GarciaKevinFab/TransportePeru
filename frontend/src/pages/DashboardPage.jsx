@@ -375,7 +375,7 @@ const DashboardPage = () => {
               Hola, <span className="gradient-text">{user?.name?.split(' ')[0] || 'Equipo'}</span>
             </h1>
             <p className="text-slate-300 mt-2 max-w-xl text-sm sm:text-base">
-              {isAdmin ? 'Vista general del sistema y métricas clave en tiempo real.' :
+              {isAdmin ? 'Vista general de tu operación: flota, viajes, alertas y vencimientos.' :
                isOperaciones ? 'Gestiona las operaciones y viajes del día.' :
                isFlota ? 'Controla el estado de tu flota y documentación.' :
                isMantenimiento ? 'Coordina órdenes de trabajo y mantenimiento.' :

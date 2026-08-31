@@ -150,7 +150,7 @@ const PanelGraficas = ({ semanas = 12 }) => {
               content={<Etiqueta formato={(v) => `${v} ${v === 1 ? 'viaje' : 'viajes'}`} />}
               cursor={{ fill: 'rgba(148,163,184,0.12)' }}
             />
-            <Bar dataKey="viajes" fill={AZUL} radius={[4, 4, 0, 0]} maxBarSize={38} />
+            <Bar dataKey="viajes" fill={AZUL} radius={[4, 4, 0, 0]} maxBarSize={38} isAnimationActive={false} />
           </BarChart>
         </ResponsiveContainer>
       </Marco>
@@ -180,6 +180,7 @@ const PanelGraficas = ({ semanas = 12 }) => {
               stroke={NARANJA}
               strokeWidth={2}
               fill="url(#degradadoCombustible)"
+              isAnimationActive={false}
             />
           </AreaChart>
         </ResponsiveContainer>
