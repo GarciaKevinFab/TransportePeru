@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { maintenanceApi, vehiclesApi } from '../services/api';
 import api from '../services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -56,9 +57,11 @@ import {
 } from '../components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import { es } from 'date-fns/locale';
+import EstadoVacio from '../components/EstadoVacio';
 import { useAuth } from '../context/AuthContext';
 
 const MaintenancePage = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const isAdmin = user?.role === 'owner' || user?.role === 'admin' || user?.role === 'mantenimiento';
   
@@ -332,6 +335,51 @@ const MaintenancePage = () => {
   const openOrders = workOrders.filter(o => o.status === 'abierta').length;
   const inProgressOrders = workOrders.filter(o => o.status === 'en_proceso').length;
 
+  /* Un solo menu de acciones para la tabla (escritorio) y las tarjetas (movil), igual que AccionesViaje en TripsPage: una accion nueva aparece en ambas vistas o en ninguna. */
+  const AccionesOrden = ({ order }) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon">
+          <MoreVertical className="w-4 h-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {isAdmin && order.status !== 'completada' && (
+          <DropdownMenuItem onClick={() => handleEditOrder(order)}>
+            <Edit className="w-4 h-4 mr-2" />
+            Editar
+          </DropdownMenuItem>
+        )}
+        {order.status === 'abierta' && (
+          <DropdownMenuItem onClick={() => handleStartOrder(order.id)}>
+            <Play className="w-4 h-4 mr-2" />
+            Iniciar
+          </DropdownMenuItem>
+        )}
+        {order.status === 'en_proceso' && (
+          <DropdownMenuItem onClick={() => {
+            setSelectedOrder(order);
+            setParts([]);
+            setCompleteData({ labor_cost: '', parts_cost: '', odometer: '', notes: '' });
+            setShowCompleteDialog(true);
+          }}>
+            <CheckCircle className="w-4 h-4 mr-2" />
+            Completar
+          </DropdownMenuItem>
+        )}
+        {isAdmin && order.status === 'abierta' && (
+          <DropdownMenuItem
+            onClick={() => handleDeleteOrder(order.id)}
+            className="text-red-600"
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Eliminar
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
   return (
     <div className="space-y-6 page-fade-in" data-testid="maintenance-page">
       {/* Header */}
@@ -527,11 +575,61 @@ const MaintenancePage = () => {
               <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
             </div>
           ) : filteredOrders.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-              <Wrench className="w-12 h-12 mb-2" />
-              <p>No hay órdenes de trabajo</p>
-            </div>
+            /* Una orden de trabajo cuelga de un vehiculo: sin flota cargada,
+               el formulario abre con el selector vacio. La guia manda primero
+               a Vehiculos y solo despues ofrece crear la primera orden. */
+            workOrders.length > 0 ? (
+              <EstadoVacio
+                icono={Wrench}
+                titulo="Sin resultados"
+                texto="Ninguna orden de trabajo coincide con el filtro de estado."
+                filtrado
+              />
+            ) : vehicles.length === 0 ? (
+              <EstadoVacio
+                icono={Wrench}
+                titulo="Antes de abrir órdenes, registra tus vehículos"
+                texto="Cada orden de trabajo se abre sobre un vehículo. Carga primero tu flota y vuelve aquí."
+                enlace={{ texto: 'Ir a Vehículos', onClick: () => navigate('/vehicles') }}
+              />
+            ) : (
+              <EstadoVacio
+                icono={Wrench}
+                titulo="Abre tu primera orden de trabajo"
+                texto="Cada reparación o servicio queda con su costo, repuestos y garantía. El historial del vehículo se arma solo."
+                accion={{ texto: 'Nueva orden', onClick: () => setShowCreateDialog(true) }}
+              />
+            )
           ) : (
+            <>
+            {/* Movil: tarjetas. 8 columnas en 375px esconden estado y acciones tras un arrastre lateral que nadie descubre. */}
+            <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+              {filteredOrders.map((order) => (
+                <div key={order.id} className="flex items-start gap-3 px-4 py-3.5">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold truncate">{order.order_number}</span>
+                      {getStatusBadge(order.status)}
+                    </div>
+                    <p className="mt-0.5 truncate text-xs text-slate-500">
+                      {order.description}
+                    </p>
+                    <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                      <span className="font-mono font-bold text-slate-700 dark:text-slate-300">
+                        {getVehiclePlate(order.vehicle_id)}
+                      </span>
+                      <span>{order.order_type}</span>
+                      {getPriorityBadge(order.priority)}
+                      <span>S/ {order.total_cost?.toFixed(2) || '0.00'}</span>
+                    </p>
+                  </div>
+                  <AccionesOrden order={order} />
+                </div>
+              ))}
+            </div>
+
+            {/* Escritorio: la tabla de siempre */}
+            <div className="hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow className="table-dense">
@@ -558,52 +656,14 @@ const MaintenancePage = () => {
                     <TableCell>{getStatusBadge(order.status)}</TableCell>
                     <TableCell>S/ {order.total_cost?.toFixed(2) || '0.00'}</TableCell>
                     <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreVertical className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {isAdmin && order.status !== 'completada' && (
-                            <DropdownMenuItem onClick={() => handleEditOrder(order)}>
-                              <Edit className="w-4 h-4 mr-2" />
-                              Editar
-                            </DropdownMenuItem>
-                          )}
-                          {order.status === 'abierta' && (
-                            <DropdownMenuItem onClick={() => handleStartOrder(order.id)}>
-                              <Play className="w-4 h-4 mr-2" />
-                              Iniciar
-                            </DropdownMenuItem>
-                          )}
-                          {order.status === 'en_proceso' && (
-                            <DropdownMenuItem onClick={() => {
-                              setSelectedOrder(order);
-                              setParts([]);
-                              setCompleteData({ labor_cost: '', parts_cost: '', odometer: '', notes: '' });
-                              setShowCompleteDialog(true);
-                            }}>
-                              <CheckCircle className="w-4 h-4 mr-2" />
-                              Completar
-                            </DropdownMenuItem>
-                          )}
-                          {isAdmin && order.status === 'abierta' && (
-                            <DropdownMenuItem 
-                              onClick={() => handleDeleteOrder(order.id)}
-                              className="text-red-600"
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Eliminar
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <AccionesOrden order={order} />
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
+            </div>
+            </>
           )}
         </CardContent>
       </Card>

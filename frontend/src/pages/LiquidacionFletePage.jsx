@@ -26,6 +26,7 @@ import {
   FileSpreadsheet, Users, ImageIcon, CheckCircle2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import EstadoVacio from '../components/EstadoVacio';
 
 const soles = (value) =>
   `S/ ${(Number(value) || 0).toLocaleString('es-PE', {
@@ -183,6 +184,25 @@ const LiquidacionFletePage = () => {
     setSaving(false);
   };
 
+  /* Un solo menu de acciones para la tabla (escritorio) y las tarjetas (movil), igual que AccionesViaje en TripsPage: una accion nueva aparece en ambas vistas o en ninguna. */
+  const AccionesLiquidacion = ({ liq }) => (
+    <>
+      <Button size="sm" variant="ghost" title="Ver detalle" onClick={() => navigate(`/liquidacion-flete/${liq.id}`)}>
+        <Eye className="w-4 h-4" />
+      </Button>
+      {liq.status !== 'cerrada' && (
+        <Button size="sm" variant="ghost" title="Cerrar liquidación" onClick={() => { setSelectedLiq(liq); setShowCloseDialog(true); }}>
+          <Lock className="w-4 h-4" />
+        </Button>
+      )}
+      {liq.status === 'borrador' && (liq.lineas_count ?? 0) === 0 && (
+        <Button size="sm" variant="ghost" className="text-red-600" title="Eliminar" onClick={() => { setSelectedLiq(liq); setShowDeleteLiqDialog(true); }}>
+          <Trash2 className="w-4 h-4" />
+        </Button>
+      )}
+    </>
+  );
+
   const totalACobrar = liquidaciones.reduce((acc, l) => acc + (Number(l.total_a_cobrar) || 0), 0);
   const totalUtilidad = liquidaciones.reduce((acc, l) => acc + (Number(l.total_utilidad_neta) || 0), 0);
   const borradorCount = liquidaciones.filter((l) => l.status === 'borrador').length;
@@ -284,30 +304,82 @@ const LiquidacionFletePage = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0 overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="table-dense">
-                    <TableHead>N°</TableHead>
-                    <TableHead>Proveedor</TableHead>
-                    <TableHead>Periodo</TableHead>
-                    <TableHead>Tipo de carga</TableHead>
-                    <TableHead>Total a cobrar</TableHead>
-                    <TableHead>Utilidad neta</TableHead>
-                    <TableHead>Líneas</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    <TableRow><TableCell colSpan={9} className="text-center py-12 text-slate-400"><Loader2 className="w-6 h-6 mx-auto animate-spin" /></TableCell></TableRow>
-                  ) : liquidaciones.length === 0 ? (
-                    <TableRow><TableCell colSpan={9} className="text-center py-12 text-slate-400">
-                      <FileSpreadsheet className="w-10 h-10 mx-auto mb-3" />
-                      <p>No hay liquidaciones para los filtros seleccionados</p>
-                    </TableCell></TableRow>
-                  ) : (
-                    liquidaciones.map((l) => (
+              {loading ? (
+                <div className="flex items-center justify-center py-12 text-slate-400">
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                </div>
+              ) : liquidaciones.length === 0 ? (
+                /* El fetch ya filtra en el servidor: lista vacia con filtros
+                   activos es "sin resultados"; sin filtros, es el arranque y
+                   la guia sigue el orden real (sin proveedor no hay a quien
+                   liquidar). */
+                statusFilter !== 'all' || proveedorFilter !== 'all' ? (
+                  <EstadoVacio
+                    icono={FileSpreadsheet}
+                    titulo="Sin resultados"
+                    texto="Ninguna liquidación coincide con los filtros seleccionados."
+                    filtrado
+                  />
+                ) : proveedores.length === 0 ? (
+                  <EstadoVacio
+                    icono={FileSpreadsheet}
+                    titulo="Antes de liquidar, registra un proveedor"
+                    texto="Una liquidación agrupa los viajes de un proveedor en un periodo. Crea primero al proveedor y vuelve aquí."
+                    enlace={{ texto: 'Ir a Proveedores', onClick: () => setTab('proveedores') }}
+                  />
+                ) : (
+                  <EstadoVacio
+                    icono={FileSpreadsheet}
+                    titulo="Crea tu primera liquidación"
+                    texto="Agrupa las guías, tickets y vales de un proveedor en un periodo para cobrar el flete."
+                    accion={{ texto: 'Nueva liquidación', onClick: openCreateLiq }}
+                  />
+                )
+              ) : (
+                <>
+                {/* Movil: tarjetas. Nueve columnas en 375px esconden estado y acciones tras un arrastre lateral que nadie descubre. */}
+                <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+                  {liquidaciones.map((l) => (
+                    <div key={l.id} className="flex items-start gap-3 px-4 py-3.5">
+                      <div className="min-w-0 flex-1 cursor-pointer" onClick={() => navigate(`/liquidacion-flete/${l.id}`)}>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-medium truncate">{l.liquidacion_number || '-'}</span>
+                          {statusBadge(l.status)}
+                        </div>
+                        <p className="mt-0.5 truncate text-xs text-slate-500">
+                          {proveedorName(l.proveedor_id)} · {tipoCargaLabel(l.tipo_carga)}
+                        </p>
+                        <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                          <span>{localDate(l.periodo_inicio)} — {localDate(l.periodo_fin)}</span>
+                          <span className="font-bold text-green-600">{soles(l.total_utilidad_neta)}</span>
+                          <span>{l.lineas_count ?? 0} líneas</span>
+                        </p>
+                      </div>
+                      <div className="whitespace-nowrap">
+                        <AccionesLiquidacion liq={l} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Escritorio: la tabla de siempre */}
+                <div className="hidden md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="table-dense">
+                      <TableHead>N°</TableHead>
+                      <TableHead>Proveedor</TableHead>
+                      <TableHead>Periodo</TableHead>
+                      <TableHead>Tipo de carga</TableHead>
+                      <TableHead>Total a cobrar</TableHead>
+                      <TableHead>Utilidad neta</TableHead>
+                      <TableHead>Líneas</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {liquidaciones.map((l) => (
                       <TableRow key={l.id} className="table-dense cursor-pointer hover:bg-slate-50" data-testid={`liquidacion-row-${l.id}`} onClick={() => navigate(`/liquidacion-flete/${l.id}`)}>
                         <TableCell className="font-mono">{l.liquidacion_number || '-'}</TableCell>
                         <TableCell>{proveedorName(l.proveedor_id)}</TableCell>
@@ -318,25 +390,15 @@ const LiquidacionFletePage = () => {
                         <TableCell>{l.lineas_count ?? 0}</TableCell>
                         <TableCell>{statusBadge(l.status)}</TableCell>
                         <TableCell className="text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                          <Button size="sm" variant="ghost" title="Ver detalle" onClick={() => navigate(`/liquidacion-flete/${l.id}`)}>
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          {l.status !== 'cerrada' && (
-                            <Button size="sm" variant="ghost" title="Cerrar liquidación" onClick={() => { setSelectedLiq(l); setShowCloseDialog(true); }}>
-                              <Lock className="w-4 h-4" />
-                            </Button>
-                          )}
-                          {l.status === 'borrador' && (l.lineas_count ?? 0) === 0 && (
-                            <Button size="sm" variant="ghost" className="text-red-600" title="Eliminar" onClick={() => { setSelectedLiq(l); setShowDeleteLiqDialog(true); }}>
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          )}
+                          <AccionesLiquidacion liq={l} />
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+                    ))}
+                  </TableBody>
+                </Table>
+                </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -499,6 +561,18 @@ const ProveedoresTab = ({ proveedores, onChanged }) => {
     }
   };
 
+  /* Un solo menu de acciones para la tabla (escritorio) y las tarjetas (movil), igual que AccionesViaje en TripsPage: una accion nueva aparece en ambas vistas o en ninguna. */
+  const AccionesProveedor = ({ proveedor }) => (
+    <>
+      <Button size="sm" variant="ghost" title="Editar" onClick={() => openEdit(proveedor)}><Pencil className="w-4 h-4" /></Button>
+      {!proveedor.is_tenant_self && (
+        <Button size="sm" variant="ghost" className="text-red-600" title="Desactivar" onClick={() => handleDeactivate(proveedor)}>
+          <Trash2 className="w-4 h-4" />
+        </Button>
+      )}
+    </>
+  );
+
   return (
     <Card className="bg-white section-enter">
       <CardHeader className="flex flex-row items-center justify-between">
@@ -511,25 +585,56 @@ const ProveedoresTab = ({ proveedores, onChanged }) => {
         </Button>
       </CardHeader>
       <CardContent className="p-0 overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow className="table-dense">
-              <TableHead>Razón social</TableHead>
-              <TableHead>Tipo</TableHead>
-              <TableHead>RUC / DNI</TableHead>
-              <TableHead>Celular</TableHead>
-              <TableHead>Banco</TableHead>
-              <TableHead>Cuenta</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {proveedores.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="text-center py-12 text-slate-400">
-                <Users className="w-10 h-10 mx-auto mb-3" /><p>No hay proveedores registrados</p>
-              </TableCell></TableRow>
-            ) : (
-              proveedores.map((p) => (
+        {proveedores.length === 0 ? (
+          <EstadoVacio
+            icono={Users}
+            titulo="Registra tu primer proveedor"
+            texto="Cada liquidación de flete se cuelga de un proveedor: la empresa o persona que factura el transporte."
+            accion={{ texto: 'Nuevo proveedor', onClick: openCreate }}
+          />
+        ) : (
+          <>
+          {/* Movil: tarjetas. Siete columnas en 375px esconden banco, cuenta y acciones tras un arrastre lateral que nadie descubre. */}
+          <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+            {proveedores.map((p) => (
+              <div key={p.id} className="flex items-start gap-3 px-4 py-3.5">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium truncate">{p.razon_social}</span>
+                    {p.is_tenant_self && <Badge variant="outline" className="bg-slate-100 text-slate-600">Empresa propia</Badge>}
+                  </div>
+                  <p className="mt-0.5 truncate text-xs text-slate-500">
+                    {p.tipo === 'persona_natural' ? 'Persona natural' : 'Empresa'} · <span className="font-mono">{p.ruc || p.dni || '-'}</span>
+                  </p>
+                  <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                    <span>{p.celular || '-'}</span>
+                    <span>{p.banco || '-'}</span>
+                    <span className="font-mono truncate">{p.cuenta_corriente || p.cuenta_cci || '-'}</span>
+                  </p>
+                </div>
+                <div className="whitespace-nowrap">
+                  <AccionesProveedor proveedor={p} />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Escritorio: la tabla de siempre */}
+          <div className="hidden md:block">
+          <Table>
+            <TableHeader>
+              <TableRow className="table-dense">
+                <TableHead>Razón social</TableHead>
+                <TableHead>Tipo</TableHead>
+                <TableHead>RUC / DNI</TableHead>
+                <TableHead>Celular</TableHead>
+                <TableHead>Banco</TableHead>
+                <TableHead>Cuenta</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {proveedores.map((p) => (
                 <TableRow key={p.id} className="table-dense" data-testid={`proveedor-row-${p.id}`}>
                   <TableCell>
                     {p.razon_social}
@@ -541,18 +646,15 @@ const ProveedoresTab = ({ proveedores, onChanged }) => {
                   <TableCell>{p.banco || '-'}</TableCell>
                   <TableCell className="font-mono text-xs">{p.cuenta_corriente || p.cuenta_cci || '-'}</TableCell>
                   <TableCell className="text-right whitespace-nowrap">
-                    <Button size="sm" variant="ghost" title="Editar" onClick={() => openEdit(p)}><Pencil className="w-4 h-4" /></Button>
-                    {!p.is_tenant_self && (
-                      <Button size="sm" variant="ghost" className="text-red-600" title="Desactivar" onClick={() => handleDeactivate(p)}>
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    )}
+                    <AccionesProveedor proveedor={p} />
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ))}
+            </TableBody>
+          </Table>
+          </div>
+          </>
+        )}
       </CardContent>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>

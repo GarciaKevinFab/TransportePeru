@@ -39,6 +39,7 @@ import {
   Search,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import EstadoVacio from '../components/EstadoVacio';
 
 const InventoryPage = () => {
   const [loading, setLoading] = useState(true);
@@ -172,6 +173,36 @@ const InventoryPage = () => {
 
   const lowStockItems = items.filter(i => i.current_stock <= i.min_stock);
 
+  /* Un solo menu de acciones para la tabla (escritorio) y las tarjetas (movil), igual que AccionesViaje en TripsPage: una accion nueva aparece en ambas vistas o en ninguna. */
+  const AccionesItem = ({ item }) => (
+    <div className="flex flex-col md:flex-row justify-end gap-2">
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => {
+          setSelectedItem(item);
+          setMoveForm({ ...moveForm, move_type: 'entrada', unit_cost: item.unit_cost?.toString() || '' });
+          setShowMoveDialog(true);
+        }}
+      >
+        <ArrowUpCircle className="w-4 h-4 mr-1" />
+        Entrada
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => {
+          setSelectedItem(item);
+          setMoveForm({ ...moveForm, move_type: 'salida' });
+          setShowMoveDialog(true);
+        }}
+      >
+        <ArrowDownCircle className="w-4 h-4 mr-1" />
+        Salida
+      </Button>
+    </div>
+  );
+
   return (
     <div className="space-y-6 page-fade-in" data-testid="inventory-page">
       {/* Header */}
@@ -270,11 +301,56 @@ const InventoryPage = () => {
                   <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
                 </div>
               ) : filteredItems.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-                  <Package className="w-12 h-12 mb-2" />
-                  <p>No hay items en inventario</p>
-                </div>
+                /* Con datos pero sin coincidencias (busqueda o boton de stock
+                   bajo) no se ofrece crear nada; sin ningun item, la tabla
+                   vacia es el arranque y se guia hacia el primer registro. */
+                items.length > 0 || showLowStock || searchTerm ? (
+                  <EstadoVacio
+                    icono={Package}
+                    titulo="Sin resultados"
+                    texto="Ningún item coincide con la búsqueda o el filtro de stock bajo."
+                    filtrado
+                  />
+                ) : (
+                  <EstadoVacio
+                    icono={Package}
+                    titulo="Registra tu primer item"
+                    texto="Repuestos, filtros, lubricantes: con el inventario cargado, cada orden de taller descuenta stock y avisa cuando falta."
+                    accion={{ texto: 'Nuevo item', onClick: () => setShowItemDialog(true) }}
+                  />
+                )
               ) : (
+                <>
+                {/* Movil: tarjetas. 8 columnas en 375px esconden estado y acciones tras un arrastre lateral que nadie descubre. */}
+                <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+                  {filteredItems.map((item) => (
+                    <div key={item.id} className="flex items-start gap-3 px-4 py-3.5">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium truncate">{item.name}</span>
+                          <span className={`text-xs font-bold whitespace-nowrap ${item.current_stock <= item.min_stock ? 'text-red-600' : 'text-green-600'}`}>
+                            {item.current_stock} {item.unit}
+                          </span>
+                        </div>
+                        <p className="mt-0.5 truncate text-xs text-slate-500">
+                          <span className="font-mono font-bold text-slate-700 dark:text-slate-300">{item.code}</span>
+                          {item.location && <span> · Ubic: {item.location}</span>}
+                        </p>
+                        <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                          <span>Min/Max: {item.min_stock} / {item.max_stock || '∞'}</span>
+                          <span>Unit: S/ {item.unit_cost?.toFixed(2)}</span>
+                          <span className="font-bold text-slate-700 dark:text-slate-300">
+                            S/ {(item.current_stock * item.unit_cost).toFixed(2)}
+                          </span>
+                        </p>
+                      </div>
+                      <AccionesItem item={item} />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Escritorio: la tabla de siempre */}
+                <div className="hidden md:block">
                 <Table>
                   <TableHeader>
                     <TableRow className="table-dense">
@@ -316,37 +392,14 @@ const InventoryPage = () => {
                           S/ {(item.current_stock * item.unit_cost).toFixed(2)}
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setSelectedItem(item);
-                                setMoveForm({ ...moveForm, move_type: 'entrada', unit_cost: item.unit_cost?.toString() || '' });
-                                setShowMoveDialog(true);
-                              }}
-                            >
-                              <ArrowUpCircle className="w-4 h-4 mr-1" />
-                              Entrada
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setSelectedItem(item);
-                                setMoveForm({ ...moveForm, move_type: 'salida' });
-                                setShowMoveDialog(true);
-                              }}
-                            >
-                              <ArrowDownCircle className="w-4 h-4 mr-1" />
-                              Salida
-                            </Button>
-                          </div>
+                          <AccionesItem item={item} />
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
+                </div>
+                </>
               )}
             </CardContent>
           </Card>
@@ -356,11 +409,37 @@ const InventoryPage = () => {
           <Card className="bg-white section-enter">
             <CardContent className="p-0 overflow-x-auto">
               {suppliers.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-                  <Building className="w-12 h-12 mb-2" />
-                  <p>No hay proveedores registrados</p>
-                </div>
+                <EstadoVacio
+                  icono={Building}
+                  titulo="Registra tu primer proveedor"
+                  texto="Con los proveedores cargados sabrás a quién llamar cuando un repuesto se agote o el taller pida cotización."
+                  accion={{ texto: 'Nuevo proveedor', onClick: () => setShowSupplierDialog(true) }}
+                />
               ) : (
+                <>
+                {/* Movil: tarjetas. 5 columnas en 375px esconden email y categoria tras un arrastre lateral que nadie descubre. */}
+                <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+                  {suppliers.map((supplier) => (
+                    <div key={supplier.id} className="flex items-start gap-3 px-4 py-3.5">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium truncate">{supplier.name}</span>
+                          {supplier.category && <Badge variant="outline">{supplier.category}</Badge>}
+                        </div>
+                        <p className="mt-0.5 truncate text-xs text-slate-500 font-mono">
+                          {supplier.ruc || '-'}
+                        </p>
+                        <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                          <span>{supplier.phone || '-'}</span>
+                          <span className="truncate">{supplier.email || '-'}</span>
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Escritorio: la tabla de siempre */}
+                <div className="hidden md:block">
                 <Table>
                   <TableHeader>
                     <TableRow className="table-dense">
@@ -385,6 +464,8 @@ const InventoryPage = () => {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
+                </>
               )}
             </CardContent>
           </Card>

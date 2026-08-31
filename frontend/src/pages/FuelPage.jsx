@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { fuelApi, vehiclesApi, tripsApi, usersApi } from '../services/api';
 import api from '../services/api';
 import { Card, CardContent } from '../components/ui/card';
@@ -51,6 +52,7 @@ import {
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import EstadoVacio from '../components/EstadoVacio';
 import { useAuth } from '../context/AuthContext';
 
 const API_ORIGIN = process.env.REACT_APP_BACKEND_URL || '';
@@ -58,6 +60,7 @@ const API_ORIGIN = process.env.REACT_APP_BACKEND_URL || '';
 const resolvePhoto = (u) => (u && typeof u === 'string' && u.startsWith('/uploads') ? `${API_ORIGIN}${u}` : u);
 
 const FuelPage = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
@@ -492,6 +495,55 @@ const FuelPage = () => {
   const activeVouchers = vouchers.filter(v => !v.is_used).length;
   const avgPrice = totalLiters > 0 ? totalAmount / totalLiters : 0;
 
+  // Sin tractos no hay vale ni carga posible: los formularios piden vehiculo
+  const tractos = vehicles.filter((v) => v.vehicle_type === 'tracto');
+
+  /* Un solo menu de acciones para la tabla (escritorio) y las tarjetas (movil), igual que AccionesViaje en TripsPage: una accion nueva aparece en ambas vistas o en ninguna. */
+  const AccionesVale = ({ voucher }) => (
+    isAdmin ? (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon">
+            <MoreVertical className="w-4 h-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => handleEditVoucher(voucher)}>
+            <Pencil className="w-4 h-4 mr-2" />
+            Editar
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handleDeleteVoucher(voucher.id)} className="text-red-600">
+            <Trash2 className="w-4 h-4 mr-2" />
+            Eliminar
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    ) : null
+  );
+
+  /* Un solo menu de acciones para la tabla (escritorio) y las tarjetas (movil), igual que AccionesViaje en TripsPage: una accion nueva aparece en ambas vistas o en ninguna. */
+  const AccionesCarga = ({ load }) => (
+    isAdmin ? (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon">
+            <MoreVertical className="w-4 h-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => handleEditLoad(load)}>
+            <Pencil className="w-4 h-4 mr-2" />
+            Editar
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handleDeleteLoad(load.id)} className="text-red-600">
+            <Trash2 className="w-4 h-4 mr-2" />
+            Eliminar
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    ) : null
+  );
+
   return (
     <div className="space-y-6 page-fade-in" data-testid="fuel-page">
       {/* Hidden file inputs (legacy) */}
@@ -631,11 +683,75 @@ const FuelPage = () => {
                   <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
                 </div>
               ) : vouchers.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-                  <Ticket className="w-12 h-12 mb-2" />
-                  <p>No hay vales registrados</p>
-                </div>
+                /* El vale pide un tracto en el formulario: sin flota, la guia
+                   manda primero a Vehiculos en vez de abrir un selector vacio. */
+                tractos.length === 0 ? (
+                  <EstadoVacio
+                    icono={Ticket}
+                    titulo="Antes de emitir vales, registra tus vehículos"
+                    texto="Cada vale de combustible se asigna a un tracto. Carga primero tu flota y vuelve aquí."
+                    enlace={{ texto: 'Ir a Vehículos', onClick: () => navigate('/vehicles') }}
+                  />
+                ) : (
+                  <EstadoVacio
+                    icono={Ticket}
+                    titulo="Registra tu primer vale"
+                    texto="El vale fija el límite de litros o soles que el grifo puede despachar. Las cargas del chofer se descuentan de él."
+                    accion={{ texto: 'Nuevo vale', onClick: () => { resetVoucherForm(); setShowVoucherDialog(true); } }}
+                  />
+                )
               ) : (
+                <>
+                {/* Movil: tarjetas. Ocho columnas en 375px esconden estado y acciones tras un arrastre lateral que nadie descubre. */}
+                <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+                  {vouchers.map((voucher) => (
+                    <div key={voucher.id} className="flex items-start gap-3 px-4 py-3.5">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold truncate">{voucher.voucher_number}</span>
+                          <Badge className={voucher.is_used ? 'bg-slate-100 text-slate-700' : 'bg-green-100 text-green-700'}>
+                            {voucher.is_used ? 'Usado' : 'Disponible'}
+                          </Badge>
+                        </div>
+                        <p className="mt-0.5 truncate text-xs text-slate-500">
+                          {voucher.provider}
+                        </p>
+                        <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                          <span className="font-mono font-bold text-slate-700 dark:text-slate-300">
+                            {getVehiclePlate(voucher.vehicle_id)}
+                          </span>
+                          <span>
+                            {voucher.limit_liters ? `${voucher.limit_liters} L` :
+                             voucher.limit_amount ? `S/ ${voucher.limit_amount}` : '-'}
+                          </span>
+                          <span>
+                            {voucher.valid_from?.substring(0, 10)} - {voucher.valid_until?.substring(0, 10)}
+                          </span>
+                        </p>
+                        <div className="mt-2 flex items-center gap-1">
+                          {(voucher.voucher_photo_url || voucher.photo_url) ? (
+                            <button onClick={() => openPhoto(voucher.voucher_photo_url || voucher.photo_url, `Vale ${voucher.voucher_number}`)} className="border-2 border-blue-300 rounded p-0.5 hover:border-blue-500" title="Foto del vale">
+                              <img src={resolvePhoto(voucher.voucher_photo_url || voucher.photo_url)} alt="vale" className="w-8 h-8 object-cover rounded" />
+                            </button>
+                          ) : (
+                            <div className="w-9 h-9 border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-slate-300 text-[10px]">V</div>
+                          )}
+                          {voucher.invoice_photo_url ? (
+                            <button onClick={() => openPhoto(voucher.invoice_photo_url, `Factura ${voucher.invoice_number || ''}`)} className="border-2 border-orange-300 rounded p-0.5 hover:border-orange-500" title="Foto de factura">
+                              <img src={resolvePhoto(voucher.invoice_photo_url)} alt="factura" className="w-8 h-8 object-cover rounded" />
+                            </button>
+                          ) : (
+                            <div className="w-9 h-9 border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-slate-300 text-[10px]">F</div>
+                          )}
+                        </div>
+                      </div>
+                      <AccionesVale voucher={voucher} />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Escritorio: la tabla de siempre */}
+                <div className="hidden md:block">
                 <Table>
                   <TableHeader>
                     <TableRow className="table-dense">
@@ -686,30 +802,14 @@ const FuelPage = () => {
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
-                          {isAdmin && (
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon">
-                                  <MoreVertical className="w-4 h-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleEditVoucher(voucher)}>
-                                  <Pencil className="w-4 h-4 mr-2" />
-                                  Editar
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleDeleteVoucher(voucher.id)} className="text-red-600">
-                                  <Trash2 className="w-4 h-4 mr-2" />
-                                  Eliminar
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          )}
+                          <AccionesVale voucher={voucher} />
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
+                </div>
+                </>
               )}
             </CardContent>
           </Card>
@@ -724,11 +824,76 @@ const FuelPage = () => {
                   <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
                 </div>
               ) : loads.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-                  <Fuel className="w-12 h-12 mb-2" />
-                  <p>No hay cargas registradas</p>
-                </div>
+                /* La carga tambien exige tracto: misma guia que en vales. */
+                tractos.length === 0 ? (
+                  <EstadoVacio
+                    icono={Fuel}
+                    titulo="Antes de registrar cargas, registra tus vehículos"
+                    texto="Cada carga de combustible se registra sobre un tracto. Carga primero tu flota y vuelve aquí."
+                    enlace={{ texto: 'Ir a Vehículos', onClick: () => navigate('/vehicles') }}
+                  />
+                ) : (
+                  <EstadoVacio
+                    icono={Fuel}
+                    titulo="Registra tu primera carga"
+                    texto="Litros, precio y odómetro por despacho. De aquí salen el gasto total y el rendimiento de cada tracto."
+                    accion={{ texto: 'Registrar carga', onClick: () => { resetLoadForm(); setShowLoadDialog(true); } }}
+                  />
+                )
               ) : (
+                <>
+                {/* Movil: tarjetas. Once columnas en 375px esconden estado y acciones tras un arrastre lateral que nadie descubre. */}
+                <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+                  {loads.map((load) => {
+                    const voucherPhoto = load.voucher_photo_url || (load.voucher_id ? null : load.photo_url);
+                    const invoicePhoto = load.invoice_photo_url;
+                    return (
+                    <div key={load.id} className="flex items-start gap-3 px-4 py-3.5">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold">{load.liters?.toFixed(2)} L</span>
+                          <span className="font-bold text-green-600 text-sm">S/ {load.total_amount?.toFixed(2)}</span>
+                        </div>
+                        <p className="mt-0.5 truncate text-xs text-slate-500">
+                          {getDriverName(load.driver_id)}{getTripLabel(load.trip_id) ? ` · ${getTripLabel(load.trip_id)}` : ''}
+                        </p>
+                        <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                          <span>
+                            {format(new Date(load.load_date || load.created_at), 'dd/MM/yy HH:mm', { locale: es })}
+                          </span>
+                          <span className="font-mono font-bold text-slate-700 dark:text-slate-300">
+                            {getVehiclePlate(load.vehicle_id)}
+                          </span>
+                          <span>{load.odometer?.toLocaleString()} km</span>
+                          {load.voucher_number && (
+                            <span className="font-mono">Vale {load.voucher_number}</span>
+                          )}
+                        </p>
+                        <div className="mt-2 flex items-center gap-1">
+                          {voucherPhoto ? (
+                            <button onClick={() => openPhoto(voucherPhoto, `Vale ${load.voucher_number || ''}`)} className="border-2 border-blue-300 rounded p-0.5 hover:border-blue-500" title="Foto del vale">
+                              <img src={resolvePhoto(voucherPhoto)} alt="vale" className="w-8 h-8 object-cover rounded" />
+                            </button>
+                          ) : (
+                            <div className="w-9 h-9 border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-slate-300 text-[10px]">V</div>
+                          )}
+                          {invoicePhoto ? (
+                            <button onClick={() => openPhoto(invoicePhoto, `Factura ${load.invoice_number || ''}`)} className="border-2 border-orange-300 rounded p-0.5 hover:border-orange-500" title="Foto de factura">
+                              <img src={resolvePhoto(invoicePhoto)} alt="factura" className="w-8 h-8 object-cover rounded" />
+                            </button>
+                          ) : (
+                            <div className="w-9 h-9 border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-slate-300 text-[10px]">F</div>
+                          )}
+                        </div>
+                      </div>
+                      <AccionesCarga load={load} />
+                    </div>
+                    );
+                  })}
+                </div>
+
+                {/* Escritorio: la tabla de siempre */}
+                <div className="hidden md:block">
                 <Table>
                   <TableHeader>
                     <TableRow className="table-dense">
@@ -787,31 +952,15 @@ const FuelPage = () => {
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
-                          {isAdmin && (
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon">
-                                  <MoreVertical className="w-4 h-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleEditLoad(load)}>
-                                  <Pencil className="w-4 h-4 mr-2" />
-                                  Editar
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleDeleteLoad(load.id)} className="text-red-600">
-                                  <Trash2 className="w-4 h-4 mr-2" />
-                                  Eliminar
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          )}
+                          <AccionesCarga load={load} />
                         </TableCell>
                       </TableRow>
                       );
                     })}
                   </TableBody>
                 </Table>
+                </div>
+                </>
               )}
             </CardContent>
           </Card>

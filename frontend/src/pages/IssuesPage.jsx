@@ -49,6 +49,7 @@ import {
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import EstadoVacio from '../components/EstadoVacio';
 
 const IssuesPage = () => {
   const [loading, setLoading] = useState(true);
@@ -204,6 +205,41 @@ const IssuesPage = () => {
   const getSeverityInfo = (sev) => severities.find(s => s.value === sev) || severities[1];
   const getStatusInfo = (status) => statuses.find(s => s.value === status) || statuses[0];
 
+  /* Un solo menu de acciones para la tabla (escritorio) y las tarjetas (movil), igual que AccionesViaje en TripsPage: una accion nueva aparece en ambas vistas o en ninguna. */
+  const AccionesIncidente = ({ issue }) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon">
+          <MoreVertical className="w-4 h-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => {
+          setSelectedIssue(issue);
+          setShowDetailDialog(true);
+        }}>
+          <FileText className="w-4 h-4 mr-2" />
+          Ver Detalle
+        </DropdownMenuItem>
+        {issue.status === 'abierto' && (
+          <DropdownMenuItem onClick={() => handleUpdateStatus(issue.id, 'en_proceso')}>
+            <AlertCircle className="w-4 h-4 mr-2" />
+            Marcar En Proceso
+          </DropdownMenuItem>
+        )}
+        {issue.status !== 'cerrado' && (
+          <DropdownMenuItem onClick={() => {
+            setSelectedIssue(issue);
+            setShowDetailDialog(true);
+          }}>
+            <CheckCircle className="w-4 h-4 mr-2" />
+            Resolver
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
   const openIssues = issues.filter(i => i.status === 'abierto').length;
   const criticalIssues = issues.filter(i => i.severity === 'critica' && i.status !== 'cerrado').length;
   const totalCost = issues.reduce((a, b) => a + (b.cost || 0), 0);
@@ -338,11 +374,65 @@ const IssuesPage = () => {
               <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
             </div>
           ) : filteredIssues.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-              <AlertTriangle className="w-12 h-12 mb-2" />
-              <p>No hay incidentes registrados</p>
-            </div>
+            /* Vacio con guia: si hay incidentes pero el filtro no casa, no se
+               ofrece crear otro; si la lista total esta vacia, el vacio es la
+               invitacion a registrar el primero. */
+            issues.length > 0 ? (
+              <EstadoVacio
+                icono={AlertTriangle}
+                titulo="Sin resultados"
+                texto="Ningún incidente coincide con la búsqueda o los filtros."
+                filtrado
+              />
+            ) : (
+              <EstadoVacio
+                icono={AlertTriangle}
+                titulo="Registra tu primer incidente"
+                texto="Multas, siniestros y hallazgos críticos quedan aquí con su costo, para que nada se pierda en un cuaderno."
+                accion={{ texto: 'Nuevo incidente', onClick: () => setShowCreateDialog(true) }}
+              />
+            )
           ) : (
+            <>
+            {/* Movil: tarjetas. Diez columnas en 375px esconden estado y acciones tras un arrastre lateral que nadie descubre. */}
+            <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+              {filteredIssues.map((issue) => {
+                const typeInfo = getTypeInfo(issue.issue_type);
+                const TypeIcon = typeInfo.icon;
+                return (
+                  <div key={issue.id} className="flex items-start gap-3 px-4 py-3.5">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium truncate">{issue.title}</span>
+                        <Badge className={getStatusInfo(issue.status).color}>
+                          {getStatusInfo(issue.status).label}
+                        </Badge>
+                      </div>
+                      <p className="mt-0.5 truncate text-xs text-slate-500">
+                        <span className="font-mono font-bold">{issue.issue_number || '-'}</span>
+                        {' · '}
+                        {typeInfo.label}
+                      </p>
+                      <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                        <Badge className={getSeverityInfo(issue.severity).color}>
+                          {getSeverityInfo(issue.severity).label}
+                        </Badge>
+                        <span className="inline-flex items-center gap-1">
+                          <TypeIcon className={`h-3 w-3 ${typeInfo.color}`} />
+                          {getVehiclePlate(issue.vehicle_id)}
+                        </span>
+                        <span>S/ {issue.cost?.toFixed(2) || '0.00'}</span>
+                        <span>{format(new Date(issue.created_at), 'dd/MM/yy', { locale: es })}</span>
+                      </p>
+                    </div>
+                    <AccionesIncidente issue={issue} />
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Escritorio: la tabla de siempre */}
+            <div className="hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow className="table-dense">
@@ -391,43 +481,15 @@ const IssuesPage = () => {
                         {format(new Date(issue.created_at), 'dd/MM/yy', { locale: es })}
                       </TableCell>
                       <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreVertical className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => {
-                              setSelectedIssue(issue);
-                              setShowDetailDialog(true);
-                            }}>
-                              <FileText className="w-4 h-4 mr-2" />
-                              Ver Detalle
-                            </DropdownMenuItem>
-                            {issue.status === 'abierto' && (
-                              <DropdownMenuItem onClick={() => handleUpdateStatus(issue.id, 'en_proceso')}>
-                                <AlertCircle className="w-4 h-4 mr-2" />
-                                Marcar En Proceso
-                              </DropdownMenuItem>
-                            )}
-                            {issue.status !== 'cerrado' && (
-                              <DropdownMenuItem onClick={() => {
-                                setSelectedIssue(issue);
-                                setShowDetailDialog(true);
-                              }}>
-                                <CheckCircle className="w-4 h-4 mr-2" />
-                                Resolver
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <AccionesIncidente issue={issue} />
                       </TableCell>
                     </TableRow>
                   );
                 })}
               </TableBody>
             </Table>
+            </div>
+            </>
           )}
         </CardContent>
       </Card>

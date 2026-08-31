@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -50,6 +51,7 @@ import {
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { unitsApi, vehiclesApi, usersApi } from '../services/api';
+import EstadoVacio from '../components/EstadoVacio';
 
 // EPP de unidad por defecto (conos, botiquín, extintor, chalecos)
 const DEFAULT_EPP_ITEMS = [
@@ -86,6 +88,7 @@ const getUnitStatusBadge = (status) => {
 };
 
 const UnitsPage = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const isAdmin = user?.role === 'owner' || user?.role === 'admin' || user?.role === 'flota';
 
@@ -278,6 +281,31 @@ const UnitsPage = () => {
     }
   };
 
+  /* Un solo menu de acciones para la tabla (escritorio) y las tarjetas (movil), igual que AccionesViaje en TripsPage: una accion nueva aparece en ambas vistas o en ninguna. */
+  const AccionesUnidad = ({ unit }) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" data-testid={`unit-actions-${unit.id}`}>
+          <MoreVertical className="w-4 h-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {isAdmin && (
+          <DropdownMenuItem onClick={() => openEdit(unit)}>
+            <Edit className="w-4 h-4 mr-2" />
+            Editar
+          </DropdownMenuItem>
+        )}
+        {isAdmin && (
+          <DropdownMenuItem className="text-red-600" onClick={() => openDelete(unit)}>
+            <Trash2 className="w-4 h-4 mr-2" />
+            Eliminar
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
   return (
     <div className="space-y-6 page-fade-in" data-testid="units-page">
       {/* Header */}
@@ -310,17 +338,72 @@ const UnitsPage = () => {
               <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
             </div>
           ) : units.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-slate-400" data-testid="units-empty">
-              <Boxes className="w-12 h-12 mb-2" />
-              <p>No hay unidades registradas</p>
-              {isAdmin && (
-                <Button variant="outline" className="mt-4" onClick={openCreate}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Crear la primera unidad
-                </Button>
+            /* Vacio con guia: una unidad se arma sobre un tracto. Sin tractos
+               en el catalogo, el dialogo de creacion abre con un selector
+               vacio; mejor llevar a la persona a Vehiculos primero. */
+            <div data-testid="units-empty">
+              {tractos.length === 0 ? (
+                <EstadoVacio
+                  icono={Boxes}
+                  titulo="Antes de armar unidades, registra tus vehículos"
+                  texto="Una unidad acopla un tracto con su carreta y su chofer. Carga primero tu flota y vuelve aquí."
+                  enlace={{ texto: 'Ir a Vehículos', onClick: () => navigate('/vehicles') }}
+                />
+              ) : (
+                <EstadoVacio
+                  icono={Boxes}
+                  titulo="Arma tu primera unidad"
+                  texto="Acopla tracto, carreta y chofer, con su EPP al día. La unidad lista es la que sale a ruta sin observaciones."
+                  accion={isAdmin ? { texto: 'Nueva unidad', onClick: openCreate } : undefined}
+                />
               )}
             </div>
           ) : (
+            <>
+            {/* Movil: tarjetas. Seis columnas en 375px esconden estado y acciones tras un arrastre lateral que nadie descubre. */}
+            <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+              {units.map((unit) => {
+                const epp = getEppItems(unit);
+                const eppTotal = epp.length;
+                const eppOk = epp.filter((it) => it.condition === 'bueno').length;
+                const driverName = resolveDriverName(unit);
+                return (
+                  <div key={unit.id} className="flex items-start gap-3 px-4 py-3.5">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold truncate">{resolveTractoPlate(unit)}</span>
+                        {getUnitStatusBadge(unit.status || unit.estado)}
+                      </div>
+                      <p className="mt-0.5 truncate text-xs text-slate-500">
+                        Carreta: <span className="font-mono">{resolveCarretaPlate(unit)}</span>
+                      </p>
+                      <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                        {driverName ? (
+                          <span className="inline-flex items-center gap-1 truncate">
+                            <User className="h-3 w-3 text-green-600" />
+                            {driverName}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">Sin asignar</span>
+                        )}
+                        {eppTotal === 0 ? (
+                          <span className="text-slate-400">Sin EPP</span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1">
+                            <ShieldCheck className="h-3 w-3 text-green-600" />
+                            EPP {eppOk}/{eppTotal} OK
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <AccionesUnidad unit={unit} />
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Escritorio: la tabla de siempre */}
+            <div className="hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow className="table-dense">
@@ -376,33 +459,15 @@ const UnitsPage = () => {
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" data-testid={`unit-actions-${unit.id}`}>
-                              <MoreVertical className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            {isAdmin && (
-                              <DropdownMenuItem onClick={() => openEdit(unit)}>
-                                <Edit className="w-4 h-4 mr-2" />
-                                Editar
-                              </DropdownMenuItem>
-                            )}
-                            {isAdmin && (
-                              <DropdownMenuItem className="text-red-600" onClick={() => openDelete(unit)}>
-                                <Trash2 className="w-4 h-4 mr-2" />
-                                Eliminar
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <AccionesUnidad unit={unit} />
                       </TableCell>
                     </TableRow>
                   );
                 })}
               </TableBody>
             </Table>
+            </div>
+            </>
           )}
         </CardContent>
       </Card>

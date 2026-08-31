@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { tripsApi, usersApi, vehiclesApi } from '../services/api';
 import api from '../services/api';
 import { Card, CardContent } from '../components/ui/card';
@@ -48,6 +49,7 @@ import {
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import EstadoVacio from '../components/EstadoVacio';
 
 // Viáticos por viaje (regla de negocio): S/ 540 por viaje
 const VIATICO_POR_VIAJE = 540;
@@ -56,6 +58,7 @@ const API_ORIGIN = process.env.REACT_APP_BACKEND_URL || '';
 const resolvePhoto = (u) => (u && typeof u === 'string' && u.startsWith('/uploads') ? `${API_ORIGIN}${u}` : u);
 
 const SettlementsPage = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [trips, setTrips] = useState([]);
   const [drivers, setDrivers] = useState([]);
@@ -300,6 +303,18 @@ const SettlementsPage = () => {
   const totalPendingAdvances = trips.filter(t => t.settlement_status === 'pending' || !t.settlement_status)
     .reduce((sum, t) => sum + (t.total_advance || 0), 0);
 
+  /* Un solo menu de acciones para la tabla (escritorio) y las tarjetas (movil), igual que AccionesViaje en TripsPage: una accion nueva aparece en ambas vistas o en ninguna. */
+  const AccionesRendicion = ({ trip }) => (
+    <Button
+      size="sm"
+      variant="outline"
+      onClick={() => handleOpenDetail(trip)}
+    >
+      <Calculator className="w-4 h-4 mr-1" />
+      Liquidar
+    </Button>
+  );
+
   return (
     <div className="space-y-6 page-fade-in" data-testid="settlements-page">
       {/* Header */}
@@ -402,11 +417,62 @@ const SettlementsPage = () => {
               <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
             </div>
           ) : filteredTrips.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-              <Receipt className="w-12 h-12 mb-2" />
-              <p>No hay viajes registrados</p>
-            </div>
+            /* La liquidacion nace del viaje: sin viajes no hay nada que
+               rendir, y la guia lleva a programar el primero en vez de
+               dejar una tabla muda. */
+            trips.length > 0 ? (
+              <EstadoVacio
+                icono={Receipt}
+                titulo="Sin resultados"
+                texto="Ningún viaje coincide con la búsqueda o el filtro."
+                filtrado
+              />
+            ) : (
+              <EstadoVacio
+                icono={Receipt}
+                titulo="Las liquidaciones salen de los viajes"
+                texto="Cada viaje genera su rendición: anticipos, gastos y saldo. Programa el primero y aparecerá aquí para liquidar."
+                enlace={{ texto: 'Ir a Viajes', onClick: () => navigate('/trips') }}
+              />
+            )
           ) : (
+            <>
+            {/* Movil: tarjetas. Diez columnas en 375px esconden estado y acciones tras un arrastre lateral que nadie descubre. */}
+            <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+              {filteredTrips.map((trip) => {
+                const tripBalance = (trip.total_advance || 0) - (trip.total_expenses || 0);
+                return (
+                <div key={trip.id} className="flex items-start gap-3 px-4 py-3.5">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium truncate">{trip.client_name || 'Sin cliente'}</span>
+                      <Badge className={getStatusInfo(trip.settlement_status).color}>
+                        {getStatusInfo(trip.settlement_status).label}
+                      </Badge>
+                    </div>
+                    <p className="mt-0.5 truncate text-xs text-slate-500">
+                      {getDriverName(trip.driver_id)} · {trip.cargo_description || '-'}
+                    </p>
+                    <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                      <span>{format(new Date(trip.scheduled_date), 'dd/MM/yy', { locale: es })}</span>
+                      <span className="font-mono font-bold text-slate-700 dark:text-slate-300">
+                        {getVehiclePlate(trip.tracto_id)}
+                      </span>
+                      <span className="text-green-600">S/ {(trip.total_advance || 0).toFixed(2)}</span>
+                      <span className="text-red-600">S/ {(trip.total_expenses || 0).toFixed(2)}</span>
+                      <span className={tripBalance >= 0 ? 'font-bold text-green-600' : 'font-bold text-red-600'}>
+                        S/ {Math.abs(tripBalance).toFixed(2)} {tripBalance >= 0 ? '(a favor)' : '(a rendir)'}
+                      </span>
+                    </p>
+                  </div>
+                  <AccionesRendicion trip={trip} />
+                </div>
+                );
+              })}
+            </div>
+
+            {/* Escritorio: la tabla de siempre */}
+            <div className="hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow className="table-dense">
@@ -471,20 +537,15 @@ const SettlementsPage = () => {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleOpenDetail(trip)}
-                        >
-                          <Calculator className="w-4 h-4 mr-1" />
-                          Liquidar
-                        </Button>
+                        <AccionesRendicion trip={trip} />
                       </TableCell>
                     </TableRow>
                   );
                 })}
               </TableBody>
             </Table>
+            </div>
+            </>
           )}
         </CardContent>
       </Card>

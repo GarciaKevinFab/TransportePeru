@@ -53,6 +53,7 @@ import {
   BarChart3,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import EstadoVacio from '../components/EstadoVacio';
 
 const CATEGORIES = [
   { value: 'combustible', label: 'Combustible' },
@@ -309,6 +310,33 @@ const CashboxPage = () => {
       <Badge variant="outline" className="bg-green-100 text-green-700 border-green-200">Ingreso</Badge>
     );
 
+  /* Un solo menu de acciones para la tabla (escritorio) y las tarjetas (movil), igual que AccionesViaje en TripsPage: una accion nueva aparece en ambas vistas o en ninguna. */
+  const AccionesMovimiento = ({ movimiento }) => (
+    <div className="whitespace-nowrap">
+      <Button size="sm" variant="ghost" title="Editar" onClick={() => openEdit(movimiento)}>
+        <Pencil className="w-4 h-4" />
+      </Button>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="text-red-600"
+        title="Eliminar"
+        onClick={() => { setSelected(movimiento); setShowDeleteDialog(true); }}
+      >
+        <Trash2 className="w-4 h-4" />
+      </Button>
+    </div>
+  );
+
+  /* Los movimientos llegan ya filtrados por el servidor: sin filtros activos,
+     una lista vacia es una caja recien estrenada, no una busqueda fallida. */
+  const hayFiltrosCaja =
+    typeFilter !== 'all' ||
+    categoryFilter !== 'all' ||
+    methodFilter !== 'all' ||
+    !!fromDate ||
+    !!toDate;
+
   // --- Kardex derivado ---
   const kardexRows = kardex?.rows || kardex?.movements || kardex?.items || [];
   const openingBalance = kardex?.opening_balance ?? kardex?.saldo_inicial ?? 0;
@@ -525,36 +553,71 @@ const CashboxPage = () => {
               </Button>
             </CardHeader>
             <CardContent className="p-0 overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="table-dense">
-                    <TableHead>N°</TableHead>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Concepto</TableHead>
-                    <TableHead>Rubro</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Método</TableHead>
-                    <TableHead>Referencia</TableHead>
-                    <TableHead>Monto</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    <TableRow>
-                      <TableCell colSpan={9} className="text-center py-12 text-slate-400">
-                        <Loader2 className="w-6 h-6 mx-auto animate-spin" />
-                      </TableCell>
+              {loading ? (
+                <div className="flex items-center justify-center h-64">
+                  <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+                </div>
+              ) : movements.length === 0 ? (
+                hayFiltrosCaja ? (
+                  <EstadoVacio
+                    icono={PiggyBank}
+                    titulo="Sin resultados"
+                    texto="Ningún movimiento de caja coincide con los filtros seleccionados."
+                    filtrado
+                  />
+                ) : (
+                  <EstadoVacio
+                    icono={PiggyBank}
+                    titulo="Registra tu primer movimiento de caja"
+                    texto="Cada ingreso o egreso que anotes alimenta el kardex y el análisis por rubro."
+                    accion={{ texto: 'Nuevo ingreso', onClick: () => openCreate('ingreso') }}
+                  />
+                )
+              ) : (
+                <>
+                {/* Movil: tarjetas. Nueve columnas en 375px esconden estado y acciones tras un arrastre lateral que nadie descubre. */}
+                <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+                  {movements.map((m, i) => (
+                    <div key={m.id || i} className="flex items-start gap-3 px-4 py-3.5">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium truncate">{m.concept || '-'}</span>
+                          {typeBadge(m.type)}
+                        </div>
+                        <p className="mt-0.5 truncate text-xs text-slate-500">
+                          {categoryLabel(m.category)} · {methodLabel(m.payment_method)}
+                        </p>
+                        <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                          <span>{localDate(m.date)}</span>
+                          <span className={`font-bold ${m.type === 'egreso' ? 'text-red-600' : 'text-green-600'}`}>
+                            {m.type === 'egreso' ? '-' : '+'} {soles(m.amount)}
+                          </span>
+                          {m.reference && <span className="font-mono">{m.reference}</span>}
+                        </p>
+                      </div>
+                      <AccionesMovimiento movimiento={m} />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Escritorio: la tabla de siempre */}
+                <div className="hidden md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="table-dense">
+                      <TableHead>N°</TableHead>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Concepto</TableHead>
+                      <TableHead>Rubro</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Método</TableHead>
+                      <TableHead>Referencia</TableHead>
+                      <TableHead>Monto</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
-                  ) : movements.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={9} className="text-center py-12 text-slate-400">
-                        <PiggyBank className="w-10 h-10 mx-auto mb-3" />
-                        <p>No hay movimientos de caja para los filtros seleccionados</p>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    movements.map((m, i) => (
+                  </TableHeader>
+                  <TableBody>
+                    {movements.map((m, i) => (
                       <TableRow key={m.id || i} className="table-dense" data-testid={`movement-row-${m.id || i}`}>
                         <TableCell className="font-mono text-xs">{m.number ?? m.correlative ?? i + 1}</TableCell>
                         <TableCell>{localDate(m.date)}</TableCell>
@@ -566,25 +629,16 @@ const CashboxPage = () => {
                         <TableCell className={`font-bold ${m.type === 'egreso' ? 'text-red-600' : 'text-green-600'}`}>
                           {m.type === 'egreso' ? '-' : '+'} {soles(m.amount)}
                         </TableCell>
-                        <TableCell className="text-right whitespace-nowrap">
-                          <Button size="sm" variant="ghost" title="Editar" onClick={() => openEdit(m)}>
-                            <Pencil className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-red-600"
-                            title="Eliminar"
-                            onClick={() => { setSelected(m); setShowDeleteDialog(true); }}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                        <TableCell className="text-right">
+                          <AccionesMovimiento movimiento={m} />
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+                    ))}
+                  </TableBody>
+                </Table>
+                </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { vehiclesApi, usersApi } from '../services/api';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -39,8 +40,10 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
+import EstadoVacio from '../components/EstadoVacio';
 
 const EquipmentPage = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const isAdmin = user?.role === 'owner' || user?.role === 'admin';
 
@@ -176,6 +179,22 @@ const EquipmentPage = () => {
   const pendingEPP = totalVehicles - completeEPP;
   const assignedDrivers = vehicles.filter(v => v.assigned_driver_id).length;
 
+  /* Un solo menu de acciones para la tabla (escritorio) y las tarjetas (movil), igual que AccionesViaje en TripsPage: una accion nueva aparece en ambas vistas o en ninguna. */
+  const AccionesEquipo = ({ vehicle }) => (
+    <div className="flex flex-col items-end gap-2 md:flex-row md:justify-end">
+      {isAdmin && (
+        <Button size="sm" variant="outline" onClick={() => handleOpenAssign(vehicle)}>
+          <UserCheck className="w-4 h-4 mr-1" />
+          Chofer
+        </Button>
+      )}
+      <Button size="sm" className="btn-action" onClick={() => handleOpenEdit(vehicle)}>
+        <Shield className="w-4 h-4 mr-1" />
+        EPP
+      </Button>
+    </div>
+  );
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -262,6 +281,62 @@ const EquipmentPage = () => {
       {/* Table */}
       <Card className="bg-white section-enter section-stagger-1">
         <CardContent className="p-0 overflow-x-auto">
+          {filteredVehicles.length === 0 ? (
+            /* Vacio con guia: el EPP se cuelga de un vehiculo ya registrado.
+               Sin flota no hay nada que equipar; el alta vive en Vehiculos. */
+            vehicles.length > 0 ? (
+              <EstadoVacio
+                icono={Shield}
+                titulo="Sin resultados"
+                texto="Ningún vehículo coincide con la búsqueda."
+                filtrado
+              />
+            ) : (
+              <EstadoVacio
+                icono={Shield}
+                titulo="Antes de asignar EPP, registra tus vehículos"
+                texto="El equipamiento y el chofer se asignan sobre cada vehículo de tu flota. Carga primero tus tractos y carretas."
+                enlace={{ texto: 'Ir a Vehículos', onClick: () => navigate('/vehicles') }}
+              />
+            )
+          ) : (
+            <>
+            {/* Movil: tarjetas. Seis columnas en 375px esconden estado y acciones tras un arrastre lateral que nadie descubre. */}
+            <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+              {filteredVehicles.map((vehicle) => {
+                const eqStatus = getEquipmentStatus(equipmentMap[vehicle.id]);
+                const driverName = getDriverName(vehicle.assigned_driver_id);
+                return (
+                  <div key={vehicle.id} className="flex items-start gap-3 px-4 py-3.5">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold truncate">{vehicle.plate}</span>
+                        <Badge className={eqStatus.color}>{eqStatus.label}</Badge>
+                      </div>
+                      <p className="mt-0.5 truncate text-xs text-slate-500">
+                        {vehicle.vehicle_type === 'tracto' ? 'Tracto' : 'Carreta'}
+                        {' · '}
+                        {vehicle.brand || '-'} {vehicle.model || ''}
+                      </p>
+                      <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                        {driverName ? (
+                          <span className="inline-flex items-center gap-1 truncate text-green-700 font-medium">
+                            <UserCheck className="h-3 w-3" />
+                            {driverName}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">Sin chofer asignado</span>
+                        )}
+                      </p>
+                    </div>
+                    <AccionesEquipo vehicle={vehicle} />
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Escritorio: la tabla de siempre */}
+            <div className="hidden md:block">
           <Table>
             <TableHeader>
               <TableRow className="table-dense">
@@ -297,24 +372,16 @@ const EquipmentPage = () => {
                       <Badge className={eqStatus.color}>{eqStatus.label}</Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        {isAdmin && (
-                          <Button size="sm" variant="outline" onClick={() => handleOpenAssign(vehicle)}>
-                            <UserCheck className="w-4 h-4 mr-1" />
-                            Chofer
-                          </Button>
-                        )}
-                        <Button size="sm" className="btn-action" onClick={() => handleOpenEdit(vehicle)}>
-                          <Shield className="w-4 h-4 mr-1" />
-                          EPP
-                        </Button>
-                      </div>
+                      <AccionesEquipo vehicle={vehicle} />
                     </TableCell>
                   </TableRow>
                 );
               })}
             </TableBody>
           </Table>
+            </div>
+            </>
+          )}
         </CardContent>
       </Card>
 

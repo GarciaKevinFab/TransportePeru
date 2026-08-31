@@ -43,6 +43,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
+import EstadoVacio from '../components/EstadoVacio';
 
 const BillingPage = () => {
   const { user } = useAuth();
@@ -264,6 +265,31 @@ const BillingPage = () => {
     return <Badge className={info.color}>{info.label}</Badge>;
   };
 
+  /* Un solo menu de acciones para la tabla (escritorio) y las tarjetas (movil), igual que AccionesViaje en TripsPage: una accion nueva aparece en ambas vistas o en ninguna. */
+  const AccionesGuia = ({ guia }) => (
+    <div className="flex justify-end gap-1">
+      {guia.status === 'borrador' && (
+        <Button size="sm" className="h-7 text-xs bg-green-600 hover:bg-green-700" onClick={() => handleEmit('guias', guia.id)} disabled={saving}>
+          <Send className="w-3 h-3 mr-1" /> Emitir
+        </Button>
+      )}
+      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setSelectedItem(guia); setShowDetailDialog(true); }}>
+        <Eye className="w-3 h-3" />
+      </Button>
+    </div>
+  );
+
+  /* Un solo menu de acciones para la tabla (escritorio) y las tarjetas (movil), igual que AccionesViaje en TripsPage: una accion nueva aparece en ambas vistas o en ninguna. */
+  const AccionesFactura = ({ factura }) => (
+    <div className="flex justify-end gap-1">
+      {factura.status === 'borrador' && (
+        <Button size="sm" className="h-7 text-xs bg-green-600 hover:bg-green-700" onClick={() => handleEmit('facturas', factura.id)} disabled={saving}>
+          <Send className="w-3 h-3 mr-1" /> Emitir
+        </Button>
+      )}
+    </div>
+  );
+
   // Stats
   const guiasEmitidas = guias.filter(g => g.status === 'emitida').length;
   const facturasEmitidas = facturas.filter(f => f.status === 'emitida' || f.status === 'pagada').length;
@@ -359,53 +385,77 @@ const BillingPage = () => {
           </div>
           <Card className="bg-white section-enter">
             <CardContent className="p-0 overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="table-dense">
-                    <TableHead>N° Guía</TableHead>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Destinatario</TableHead>
-                    <TableHead>Ruta</TableHead>
-                    <TableHead>Carga</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {guias.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-slate-400">
-                        No hay guías registradas
-                      </TableCell>
-                    </TableRow>
-                  ) : guias.map((guia) => (
-                    <TableRow key={guia.id} className="table-dense">
-                      <TableCell className="font-mono font-bold text-sm">
-                        {guia.serie}-{String(guia.numero).padStart(8, '0')}
-                      </TableCell>
-                      <TableCell className="text-sm">{guia.fecha_emision || '-'}</TableCell>
-                      <TableCell className="max-w-[150px] truncate">{guia.destinatario_razon_social || '-'}</TableCell>
-                      <TableCell className="text-xs max-w-[150px] truncate">
-                        {guia.punto_partida} → {guia.punto_llegada}
-                      </TableCell>
-                      <TableCell className="text-xs">{guia.descripcion_carga || '-'}</TableCell>
-                      <TableCell>{getStatusBadge(guia.status)}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          {guia.status === 'borrador' && (
-                            <Button size="sm" className="h-7 text-xs bg-green-600 hover:bg-green-700" onClick={() => handleEmit('guias', guia.id)} disabled={saving}>
-                              <Send className="w-3 h-3 mr-1" /> Emitir
-                            </Button>
-                          )}
-                          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setSelectedItem(guia); setShowDetailDialog(true); }}>
-                            <Eye className="w-3 h-3" />
-                          </Button>
+              {guias.length === 0 ? (
+                <EstadoVacio
+                  icono={TruckIcon}
+                  titulo="Registra tu primera guía"
+                  texto="La guía de transportista respalda cada traslado ante SUNAT. Vincúlala a un viaje para autocompletar los datos."
+                  accion={{ texto: 'Nueva guía', onClick: () => setShowGuiaDialog(true) }}
+                />
+              ) : (
+                <>
+                {/* Movil: tarjetas. Siete columnas en 375px esconden estado y acciones tras un arrastre lateral que nadie descubre. */}
+                <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+                  {guias.map((guia) => (
+                    <div key={guia.id} className="flex items-start gap-3 px-4 py-3.5">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-sm truncate">
+                            {guia.serie}-{String(guia.numero).padStart(8, '0')}
+                          </span>
+                          {getStatusBadge(guia.status)}
                         </div>
-                      </TableCell>
-                    </TableRow>
+                        <p className="mt-0.5 truncate text-xs text-slate-500">
+                          {guia.destinatario_razon_social || '-'}
+                        </p>
+                        <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                          <span>{guia.fecha_emision || '-'}</span>
+                          <span className="truncate">{guia.punto_partida} → {guia.punto_llegada}</span>
+                          {guia.descripcion_carga && <span className="truncate">{guia.descripcion_carga}</span>}
+                        </p>
+                      </div>
+                      <AccionesGuia guia={guia} />
+                    </div>
                   ))}
-                </TableBody>
-              </Table>
+                </div>
+
+                {/* Escritorio: la tabla de siempre */}
+                <div className="hidden md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="table-dense">
+                      <TableHead>N° Guía</TableHead>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Destinatario</TableHead>
+                      <TableHead>Ruta</TableHead>
+                      <TableHead>Carga</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {guias.map((guia) => (
+                      <TableRow key={guia.id} className="table-dense">
+                        <TableCell className="font-mono font-bold text-sm">
+                          {guia.serie}-{String(guia.numero).padStart(8, '0')}
+                        </TableCell>
+                        <TableCell className="text-sm">{guia.fecha_emision || '-'}</TableCell>
+                        <TableCell className="max-w-[150px] truncate">{guia.destinatario_razon_social || '-'}</TableCell>
+                        <TableCell className="text-xs max-w-[150px] truncate">
+                          {guia.punto_partida} → {guia.punto_llegada}
+                        </TableCell>
+                        <TableCell className="text-xs">{guia.descripcion_carga || '-'}</TableCell>
+                        <TableCell>{getStatusBadge(guia.status)}</TableCell>
+                        <TableCell className="text-right">
+                          <AccionesGuia guia={guia} />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -419,52 +469,81 @@ const BillingPage = () => {
           </div>
           <Card className="bg-white section-enter">
             <CardContent className="p-0 overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="table-dense">
-                    <TableHead>N° Factura</TableHead>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>RUC</TableHead>
-                    <TableHead>Subtotal</TableHead>
-                    <TableHead>IGV</TableHead>
-                    <TableHead>Total</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {facturas.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8 text-slate-400">
-                        No hay facturas registradas
-                      </TableCell>
-                    </TableRow>
-                  ) : facturas.map((factura) => (
-                    <TableRow key={factura.id} className="table-dense">
-                      <TableCell className="font-mono font-bold text-sm">
-                        {factura.serie}-{String(factura.numero).padStart(8, '0')}
-                      </TableCell>
-                      <TableCell className="text-sm">{factura.fecha_emision || '-'}</TableCell>
-                      <TableCell className="max-w-[150px] truncate">{factura.cliente_razon_social || '-'}</TableCell>
-                      <TableCell className="font-mono text-sm">{factura.cliente_ruc || '-'}</TableCell>
-                      <TableCell>S/ {(factura.subtotal || 0).toFixed(2)}</TableCell>
-                      <TableCell>S/ {(factura.igv || 0).toFixed(2)}</TableCell>
-                      <TableCell className="font-bold">S/ {(factura.total || 0).toFixed(2)}</TableCell>
-                      <TableCell>{getStatusBadge(factura.status)}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          {factura.status === 'borrador' && (
-                            <Button size="sm" className="h-7 text-xs bg-green-600 hover:bg-green-700" onClick={() => handleEmit('facturas', factura.id)} disabled={saving}>
-                              <Send className="w-3 h-3 mr-1" /> Emitir
-                            </Button>
-                          )}
+              {facturas.length === 0 ? (
+                <EstadoVacio
+                  icono={Receipt}
+                  titulo="Registra tu primera factura"
+                  texto="La factura electrónica calcula el IGV sola. Vincúlala a un viaje para autocompletar cliente y servicio."
+                  accion={{ texto: 'Nueva factura', onClick: () => setShowFacturaDialog(true) }}
+                />
+              ) : (
+                <>
+                {/* Movil: tarjetas. Nueve columnas en 375px esconden estado y acciones tras un arrastre lateral que nadie descubre. */}
+                <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+                  {facturas.map((factura) => (
+                    <div key={factura.id} className="flex items-start gap-3 px-4 py-3.5">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-sm truncate">
+                            {factura.serie}-{String(factura.numero).padStart(8, '0')}
+                          </span>
+                          {getStatusBadge(factura.status)}
                         </div>
-                      </TableCell>
-                    </TableRow>
+                        <p className="mt-0.5 truncate text-xs text-slate-500">
+                          {factura.cliente_razon_social || '-'}
+                        </p>
+                        <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                          <span>{factura.fecha_emision || '-'}</span>
+                          <span className="font-mono">{factura.cliente_ruc || '-'}</span>
+                          <span className="font-bold text-slate-700 dark:text-slate-300">
+                            S/ {(factura.total || 0).toFixed(2)}
+                          </span>
+                        </p>
+                      </div>
+                      <AccionesFactura factura={factura} />
+                    </div>
                   ))}
-                </TableBody>
-              </Table>
+                </div>
+
+                {/* Escritorio: la tabla de siempre */}
+                <div className="hidden md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="table-dense">
+                      <TableHead>N° Factura</TableHead>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>RUC</TableHead>
+                      <TableHead>Subtotal</TableHead>
+                      <TableHead>IGV</TableHead>
+                      <TableHead>Total</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {facturas.map((factura) => (
+                      <TableRow key={factura.id} className="table-dense">
+                        <TableCell className="font-mono font-bold text-sm">
+                          {factura.serie}-{String(factura.numero).padStart(8, '0')}
+                        </TableCell>
+                        <TableCell className="text-sm">{factura.fecha_emision || '-'}</TableCell>
+                        <TableCell className="max-w-[150px] truncate">{factura.cliente_razon_social || '-'}</TableCell>
+                        <TableCell className="font-mono text-sm">{factura.cliente_ruc || '-'}</TableCell>
+                        <TableCell>S/ {(factura.subtotal || 0).toFixed(2)}</TableCell>
+                        <TableCell>S/ {(factura.igv || 0).toFixed(2)}</TableCell>
+                        <TableCell className="font-bold">S/ {(factura.total || 0).toFixed(2)}</TableCell>
+                        <TableCell>{getStatusBadge(factura.status)}</TableCell>
+                        <TableCell className="text-right">
+                          <AccionesFactura factura={factura} />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

@@ -42,6 +42,7 @@ import {
   Search,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import EstadoVacio from '../components/EstadoVacio';
 
 // Detracción SPOT (transporte de carga): 4% del importe de la operación
 // cuando supera S/ 400. El cliente deposita en el Banco de la Nación.
@@ -341,6 +342,40 @@ const DetraccionesPage = () => {
     return <Badge variant="outline" className="bg-yellow-100 text-yellow-700 border-yellow-200">Pendiente</Badge>;
   };
 
+  /* Un solo menu de acciones para la tabla (escritorio) y las tarjetas (movil), igual que AccionesViaje en TripsPage: una accion nueva aparece en ambas vistas o en ninguna. */
+  const AccionesDetraccion = ({ detraccion }) => (
+    <div className="whitespace-nowrap">
+      {detraccion.status === 'pendiente' && (
+        <Button
+          size="sm"
+          variant="ghost"
+          title="Registrar depósito"
+          onClick={() => openDeposit(detraccion)}
+          data-testid={`deposit-btn-${detraccion.id}`}
+        >
+          <Landmark className="w-4 h-4" />
+        </Button>
+      )}
+      <Button size="sm" variant="ghost" title="Editar" onClick={() => openEdit(detraccion)}>
+        <Pencil className="w-4 h-4" />
+      </Button>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="text-red-600"
+        title="Eliminar"
+        onClick={() => { setSelected(detraccion); setShowDeleteDialog(true); }}
+      >
+        <Trash2 className="w-4 h-4" />
+      </Button>
+    </div>
+  );
+
+  /* Las detracciones llegan ya filtradas por el servidor: sin filtros activos,
+     una lista vacia significa que aun no se registro ninguna. */
+  const hayFiltrosDetracciones =
+    statusFilter !== 'all' || !!rucFilter.trim() || !!fromDate || !!toDate;
+
   return (
     <div className="space-y-6 page-fade-in" data-testid="detracciones-page">
       {/* Header */}
@@ -459,37 +494,74 @@ const DetraccionesPage = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0 overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="table-dense">
-                <TableHead>Comprobante</TableHead>
-                <TableHead>F. Emisión</TableHead>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Base Imponible</TableHead>
-                <TableHead>Tasa</TableHead>
-                <TableHead>Monto Detracción</TableHead>
-                <TableHead>N° Constancia</TableHead>
-                <TableHead>F. Depósito</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={10} className="text-center py-12 text-slate-400">
-                    <Loader2 className="w-6 h-6 mx-auto animate-spin" />
-                  </TableCell>
+          {loading ? (
+            <div className="flex items-center justify-center h-64">
+              <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+            </div>
+          ) : detracciones.length === 0 ? (
+            hayFiltrosDetracciones ? (
+              <EstadoVacio
+                icono={Coins}
+                titulo="Sin resultados"
+                texto="Ninguna detracción coincide con los filtros seleccionados."
+                filtrado
+              />
+            ) : (
+              <EstadoVacio
+                icono={Coins}
+                titulo="Registra tu primera detracción"
+                texto="Anota cada detracción SPOT para saber qué depósitos del Banco de la Nación siguen pendientes."
+                accion={{ texto: 'Nueva detracción', onClick: openCreate }}
+              />
+            )
+          ) : (
+            <>
+            {/* Movil: tarjetas. Diez columnas en 375px esconden estado y acciones tras un arrastre lateral que nadie descubre. */}
+            <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+              {detracciones.map((d) => (
+                <div key={d.id} className="flex items-start gap-3 px-4 py-3.5">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-medium truncate">
+                        {d.comprobante_serie || '-'}-{d.comprobante_numero || '-'}
+                      </span>
+                      {statusBadge(d.status)}
+                    </div>
+                    <p className="mt-0.5 truncate text-xs text-slate-500">
+                      {d.client_name || d.client_ruc || '-'}
+                    </p>
+                    <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                      <span>{localDate(d.fecha_emision)}</span>
+                      <span className="font-bold text-orange-600">
+                        {soles(d.detraccion_amount ?? d.amount)}
+                      </span>
+                      {d.constancia_number && <span className="font-mono">{d.constancia_number}</span>}
+                    </p>
+                  </div>
+                  <AccionesDetraccion detraccion={d} />
+                </div>
+              ))}
+            </div>
+
+            {/* Escritorio: la tabla de siempre */}
+            <div className="hidden md:block">
+            <Table>
+              <TableHeader>
+                <TableRow className="table-dense">
+                  <TableHead>Comprobante</TableHead>
+                  <TableHead>F. Emisión</TableHead>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>Base Imponible</TableHead>
+                  <TableHead>Tasa</TableHead>
+                  <TableHead>Monto Detracción</TableHead>
+                  <TableHead>N° Constancia</TableHead>
+                  <TableHead>F. Depósito</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
-              ) : detracciones.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={10} className="text-center py-12 text-slate-400">
-                    <Coins className="w-10 h-10 mx-auto mb-3" />
-                    <p>No hay detracciones registradas para los filtros seleccionados</p>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                detracciones.map((d) => (
+              </TableHeader>
+              <TableBody>
+                {detracciones.map((d) => (
                   <TableRow key={d.id} className="table-dense" data-testid={`detraccion-row-${d.id}`}>
                     <TableCell className="font-mono">
                       {d.comprobante_serie || '-'}-{d.comprobante_numero || '-'}
@@ -507,36 +579,16 @@ const DetraccionesPage = () => {
                     <TableCell className="font-mono text-xs">{d.constancia_number || '-'}</TableCell>
                     <TableCell>{d.deposit_date ? localDate(d.deposit_date) : '-'}</TableCell>
                     <TableCell>{statusBadge(d.status)}</TableCell>
-                    <TableCell className="text-right whitespace-nowrap">
-                      {d.status === 'pendiente' && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          title="Registrar depósito"
-                          onClick={() => openDeposit(d)}
-                          data-testid={`deposit-btn-${d.id}`}
-                        >
-                          <Landmark className="w-4 h-4" />
-                        </Button>
-                      )}
-                      <Button size="sm" variant="ghost" title="Editar" onClick={() => openEdit(d)}>
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-red-600"
-                        title="Eliminar"
-                        onClick={() => { setSelected(d); setShowDeleteDialog(true); }}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                    <TableCell className="text-right">
+                      <AccionesDetraccion detraccion={d} />
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ))}
+              </TableBody>
+            </Table>
+            </div>
+            </>
+          )}
         </CardContent>
       </Card>
 

@@ -18,6 +18,7 @@ import {
 } from '../components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import EstadoVacio from '../components/EstadoVacio';
 import { useAuth } from '../context/AuthContext';
 
 const CompaniesPage = () => {
@@ -152,6 +153,40 @@ const CompaniesPage = () => {
     }
   };
 
+  /* Un solo menu de acciones para la tabla (escritorio) y las tarjetas (movil), igual que AccionesViaje en TripsPage: una accion nueva aparece en ambas vistas o en ninguna. */
+  const AccionesEmpresa = ({ company }) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon">
+          <MoreVertical className="w-4 h-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {isSuperAdmin && (
+          <DropdownMenuItem onClick={() => handleSwitchCompany(company)}>
+            <ArrowRightLeft className="w-4 h-4 mr-2" />
+            Entrar a esta empresa
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem onClick={() => handleViewStats(company)}>
+          <BarChart3 className="w-4 h-4 mr-2" />
+          Ver Estadísticas
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleEditCompany(company)}>
+          <Edit className="w-4 h-4 mr-2" />
+          Editar
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => handleDeleteCompany(company.id)}
+          className="text-red-600"
+        >
+          <Trash2 className="w-4 h-4 mr-2" />
+          Eliminar
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -212,13 +247,40 @@ const CompaniesPage = () => {
             Listado de Empresas
           </CardTitle>
         </CardHeader>
-        <CardContent className="overflow-x-auto">
+        <CardContent className="p-0 overflow-x-auto">
           {companies.length === 0 ? (
-            <div className="text-center py-12">
-              <Building2 className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-              <p className="text-slate-500">No hay empresas registradas</p>
-            </div>
+            <EstadoVacio
+              icono={Building2}
+              titulo="Registra tu primera empresa"
+              texto="Cada empresa es un tenant aislado con sus propios usuarios, vehículos y viajes. Al crearla defines también a su administrador."
+              accion={{ texto: 'Nueva empresa', onClick: () => setShowCreateDialog(true) }}
+            />
           ) : (
+            <>
+            {/* Movil: tarjetas. Cinco columnas en 375px esconden contacto y acciones tras un arrastre lateral que nadie descubre. */}
+            <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+              {companies.map((company) => (
+                <div key={company.id} className="flex items-start gap-3 px-4 py-3.5">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-slate-800 truncate">{company.name}</span>
+                    </div>
+                    <p className="mt-0.5 truncate text-xs text-slate-500">
+                      {company.address || company.email || '-'}
+                    </p>
+                    <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                      <span className="font-mono">{company.ruc || '-'}</span>
+                      {company.phone && <span>{company.phone}</span>}
+                      <span>{company.created_at ? format(new Date(company.created_at), 'dd/MM/yyyy') : '-'}</span>
+                    </p>
+                  </div>
+                  <AccionesEmpresa company={company} />
+                </div>
+              ))}
+            </div>
+
+            {/* Escritorio: la tabla de siempre */}
+            <div className="hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -258,41 +320,14 @@ const CompaniesPage = () => {
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreVertical className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {isSuperAdmin && (
-                            <DropdownMenuItem onClick={() => handleSwitchCompany(company)}>
-                              <ArrowRightLeft className="w-4 h-4 mr-2" />
-                              Entrar a esta empresa
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem onClick={() => handleViewStats(company)}>
-                            <BarChart3 className="w-4 h-4 mr-2" />
-                            Ver Estadísticas
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleEditCompany(company)}>
-                            <Edit className="w-4 h-4 mr-2" />
-                            Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleDeleteCompany(company.id)}
-                            className="text-red-600"
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Eliminar
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <AccionesEmpresa company={company} />
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
+            </div>
+            </>
           )}
         </CardContent>
       </Card>
