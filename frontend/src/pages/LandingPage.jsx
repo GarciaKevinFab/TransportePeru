@@ -274,7 +274,7 @@ const LandingPage = () => (
           En producción, no en demostración
         </p>
         <p className="font-heading mt-5 max-w-2xl text-2xl font-bold leading-snug tracking-tight md:text-3xl">
-          G&amp;E Transporta S.A.C. mueve su flota con FletePro desde marzo de 2026.
+          Una transportista peruana mueve su flota con FletePro desde marzo de 2026.
         </p>
         <dl className="mt-10 grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-4">
           {[
