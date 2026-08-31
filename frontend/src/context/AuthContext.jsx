@@ -47,11 +47,23 @@ export const AuthProvider = ({ children }) => {
     try {
       setError(null);
       const response = await authApi.login(credentials);
-      const { access_token, refresh_token, user: userData } = response.data;
+      const { access_token, refresh_token, user: userData, redirect_to } = response.data;
 
       localStorage.setItem('access_token', access_token);
       localStorage.setItem('refresh_token', refresh_token);
       setAuthToken(access_token);
+
+      // El backend manda a la casa del usuario cuando no es este origen: se
+      // entro por fletepro.sisac.pe y la empresa vive en su propio subdominio.
+      // Es un salto entre origenes de verdad, asi que no vale navigate() de
+      // React Router: hay que soltar la pagina. Los tokens que se acaban de
+      // guardar quedan en ESTE origen y no sirven alla - por eso el destino
+      // lleva un codigo de un solo uso que /entrar canjea por una sesion
+      // propia. Ver _destino_tras_entrar en el backend.
+      if (redirect_to) {
+        window.location.replace(redirect_to);
+        return { success: true, user: userData, redirigiendo: true };
+      }
 
       setUser(userData);
       return { success: true, user: userData };

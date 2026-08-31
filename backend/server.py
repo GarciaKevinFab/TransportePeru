@@ -68,6 +68,12 @@ COMPANY_COLS = {
     "created_at": "ts", "updated_at": "ts",
 }
 
+# La empresa de la plataforma: la que aloja al superadmin. No es un cliente y
+# no debe aparecer como tal en ningun listado. El RUC de relleno es el marcador
+# -ya lo era en bootstrap_superadmin- porque el nombre lo puede editar un admin
+# desde la interfaz y dejaria de identificarla.
+RUC_DE_LA_PLATAFORMA = "00000000000"
+
 # Dias de prueba de un alta nueva. La landing lo anuncia, asi que si cambia
 # aqui tiene que cambiar alli: es la misma promesa.
 DIAS_DE_PRUEBA = 14
@@ -862,6 +868,14 @@ class TokenResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     user: Dict[str, Any]
+    # A donde mandar al navegador despues de entrar, cuando la casa del usuario
+    # es OTRO origen (ver _destino_tras_entrar). None = quedarse donde esta,
+    # que es el caso de siempre.
+    redirect_to: Optional[str] = None
+
+class CanjeRequest(BaseModel):
+    codigo: str
+
 
 class RefreshRequest(BaseModel):
     refresh_token: str
@@ -1133,6 +1147,77 @@ async def _exigir_suscripcion_al_dia(request: Request, user: dict):
                    "registrando informacion; tus datos siguen disponibles "
                    "para consulta.",
         )
+
+# ---------------------------------------------------------------------------
+# TRASPASO DE SESION ENTRE ORIGENES
+# ---------------------------------------------------------------------------
+# Quien entra por fletepro.sisac.pe y pertenece a una empresa tiene que acabar
+# en <empresa>.sisac.pe. Y ahi hay un problema que un redirect no resuelve:
+# localStorage es POR ORIGEN. Los tokens que acaba de guardar el login viven en
+# fletepro.sisac.pe y no existen en el otro dominio, asi que el navegador
+# llegaria sin sesion y volveria al login. Es la misma pared que separa a los
+# inquilinos entre si; aqui hay que cruzarla una vez, a proposito y con cuidado.
+#
+# El token NO viaja en la URL. Va un codigo de un solo uso, que el origen de
+# destino canjea contra el backend. Diferencia practica: una URL queda en el
+# historial, en el Referer y en los logs de cualquier proxy; este codigo, aunque
+# se filtre entero, ya esta gastado.
+#
+# En memoria y no en una tabla porque el backend corre en UN proceso
+# (Dockerfile: uvicorn sin --workers) y estos codigos viven 60 segundos. Lo que
+# se pierde en un reinicio es un traspaso a medias: el usuario vuelve a entrar.
+# El dia que haya mas de un worker esto tiene que pasar a Postgres o a Redis, o
+# fallara de forma intermitente segun a que worker caiga el canje.
+_TRASPASOS: Dict[str, dict] = {}
+_VIDA_DEL_TRASPASO = 60.0  # segundos
+
+
+def _emitir_traspaso(user_id: str, company_id: str) -> str:
+    """Un codigo de un solo uso para llevar la sesion al dominio de la empresa."""
+    import time as _t
+    ahora = _t.monotonic()
+    # Barrido de caducados aprovechando el paso: sin esto el diccionario solo
+    # crece, y un login fallido a medias nunca lo limpiaria.
+    for viejo in [c for c, d in _TRASPASOS.items() if d["expira"] <= ahora]:
+        _TRASPASOS.pop(viejo, None)
+
+    codigo = secrets.token_urlsafe(32)
+    _TRASPASOS[codigo] = {
+        "user_id": str(user_id),
+        "company_id": str(company_id),
+        "expira": ahora + _VIDA_DEL_TRASPASO,
+    }
+    return codigo
+
+
+async def _destino_tras_entrar(request: Request, user: dict) -> Optional[str]:
+    """La URL a la que mandar al navegador tras un login, o None para quedarse.
+
+    Solo devuelve algo cuando se entro por un host que NO es de ninguna empresa
+    -la landing, fletepro.sisac.pe- y el usuario si tiene una. Entrando ya por
+    el subdominio propio no hay nada que hacer.
+
+    El superadmin nunca se mueve: su sitio es la consola, y mandarlo al
+    subdominio de un cliente seria justo lo contrario de lo que necesita.
+    """
+    if user.get("role") == "superadmin":
+        return None
+    if tenant_host.slug_desde_host(request.headers.get("host")):
+        return None  # ya esta en un subdominio de empresa
+
+    async with db_pg.tx_global("resolver la direccion propia del usuario tras entrar") as conn:
+        slug = await conn.fetchval(
+            "select slug from companies where id = $1",
+            db_pg.as_uuid(user["company_id"]),
+        )
+    # Un slug reservado no es un host de inquilino (la empresa de la plataforma
+    # usa 'fletepro'): ahi no hay a donde ir.
+    if not slug or slug in tenant_host.RESERVADOS or not tenant_host.DOMINIO_BASE:
+        return None
+
+    codigo = _emitir_traspaso(user["id"], user["company_id"])
+    return f"https://{slug}.{tenant_host.DOMINIO_BASE}/entrar?c={codigo}"
+
 
 def _slug_pedido(valor: str) -> str:
     """Valida un slug elegido a mano y traduce el motivo a un 400 legible.
@@ -2388,12 +2473,79 @@ async def login(request: Request, login_data: LoginRequest):
         "role": user["role"],
         "force_password_change": user.get("force_password_change", False)
     }
-    
+
     return TokenResponse(
         access_token=access_token,
         refresh_token=refresh_token,
-        user=user_response
+        user=user_response,
+        redirect_to=await _destino_tras_entrar(request, user),
     )
+
+
+@api_router.post("/auth/canjear", response_model=TokenResponse)
+@limiter.limit("20/minute")
+async def canjear_traspaso(request: Request, datos: CanjeRequest):
+    """Cambia un codigo de traspaso por la sesion, ya en el dominio correcto.
+
+    Lo llama /entrar del frontend, desde el origen de la empresa, con el codigo
+    que le llego en la URL. Publico y sin token: es justo lo que va a crear la
+    sesion en este origen.
+
+    Tres comprobaciones, y la tercera es la que importa:
+
+      - el codigo existe y no caduco (60 s),
+      - se gasta al usarlo -se saca del diccionario ANTES de comprobar nada
+        mas, para que dos peticiones simultaneas no puedan canjearlo las dos-.
+        Eso significa que un intento en el dominio equivocado tambien lo quema,
+        y es deliberado: un codigo llega al host correcto solo, por el redirect,
+        asi que un canje en otro sitio no es un despiste sino un intento. Ante
+        la duda se cierra la puerta y el usuario vuelve a entrar,
+      - EL HOST TIENE QUE SER EL DE LA EMPRESA DEL CODIGO. Sin esto, un codigo
+        emitido para una empresa podria canjearse desde el subdominio de otra:
+        no daria acceso a datos ajenos -el company_id sigue saliendo de la fila
+        del usuario- pero dejaria una sesion valida en un origen que no le
+        corresponde, que es exactamente lo que el resto de este trabajo evita.
+    """
+    datos_del_codigo = _TRASPASOS.pop(datos.codigo, None)
+    if not datos_del_codigo:
+        raise HTTPException(status_code=401, detail="Enlace caducado o ya usado. Vuelve a entrar.")
+
+    import time as _t
+    if datos_del_codigo["expira"] <= _t.monotonic():
+        raise HTTPException(status_code=401, detail="Enlace caducado. Vuelve a entrar.")
+
+    empresa_host = await tenant_host.empresa_desde_host(request.headers.get("host"))
+    if not empresa_host or str(empresa_host["id"]) != datos_del_codigo["company_id"]:
+        raise HTTPException(status_code=403, detail="Este enlace no es de esta direccion")
+
+    async with db_pg.tx_global("canje del traspaso: resolver la identidad") as conn:
+        fila = await conn.fetchrow(
+            "select * from users where id = $1",
+            db_pg.as_uuid(datos_del_codigo["user_id"]),
+        )
+    user = db_pg.to_api(fila)
+    if not user or not user.get("is_active"):
+        raise HTTPException(status_code=401, detail="Usuario no valido")
+
+    token_data = {
+        "user_id": user["id"],
+        "company_id": user["company_id"],
+        "role": user["role"],
+    }
+    return TokenResponse(
+        access_token=create_access_token(token_data),
+        refresh_token=create_refresh_token(token_data),
+        user={
+            "id": user["id"],
+            "company_id": user["company_id"],
+            "name": user["name"],
+            "email": user.get("email"),
+            "dni": user.get("dni"),
+            "role": user["role"],
+            "force_password_change": user.get("force_password_change", False),
+        },
+    )
+
 
 @api_router.post("/auth/refresh", response_model=TokenResponse)
 async def refresh_token(request: RefreshRequest):
@@ -2451,8 +2603,14 @@ async def get_me(current_user: dict = Depends(get_current_user)):
 async def get_companies(current_user: dict = Depends(require_roles("superadmin", "owner", "admin"))):
     # Superadmin sees ALL companies
     if current_user["role"] == "superadmin":
+        # La empresa de la plataforma queda fuera: es la casa del superadmin,
+        # no un cliente, y listarla junto a los clientes invita a operarla como
+        # si lo fuera. Para volver a ella esta /auth/salir-de-empresa.
         async with db_pg.tx_global("superadmin: listar todas las empresas") as conn:
-            filas = await conn.fetch("select * from companies order by name limit 100")
+            filas = await conn.fetch(
+                "select * from companies where ruc <> $1 order by name limit 100",
+                RUC_DE_LA_PLATAFORMA,
+            )
         return db_pg.rows_to_api(filas)
     # Others see only their own company
     company = await _empresa_pg(current_user["company_id"])
@@ -7562,7 +7720,7 @@ async def bootstrap_superadmin(_: bool = Depends(require_install_token)):
     # Se busca por RUC ademas de por nombre porque el nombre lo puede editar
     # un admin desde la UI, y el RUC 00000000000 es el marcador real de que
     # esta es la empresa interna y no la de un cliente.
-    SYSTEM_RUC = "00000000000"
+    SYSTEM_RUC = RUC_DE_LA_PLATAFORMA
     async with db_pg.tx_global("autenticacion: comprobaciones previas al login") as conn:
         existing_company = db_pg.to_api(await conn.fetchrow(
             "select * from companies where ruc = $1", SYSTEM_RUC
