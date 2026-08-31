@@ -26,6 +26,9 @@ guias_transportista
 detracciones
 cash_movements
 
+# --- 017: Recuperacion de contrasena ---
+password_reset_tokens
+
 # --- 003: Bot de WhatsApp ---
 whatsapp_events
 whatsapp_unrecognized

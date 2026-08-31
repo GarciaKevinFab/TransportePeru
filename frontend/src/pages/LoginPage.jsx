@@ -254,6 +254,16 @@ const LoginPage = () => {
                       )}
                       {loading ? 'Ingresando...' : 'Ingresar'}
                     </Button>
+                    {/* Solo en la pestana de admin: el chofer entra con DNI y PIN, y
+                        su reseteo lo hace su empresa desde Usuarios. */}
+                    <p className="pt-1 text-center text-sm">
+                      <a
+                        href="/olvide"
+                        className="text-slate-500 underline underline-offset-4 hover:text-orange-500"
+                      >
+                        ¿Olvidaste tu contraseña?
+                      </a>
+                    </p>
                   </form>
                 </TabsContent>
 

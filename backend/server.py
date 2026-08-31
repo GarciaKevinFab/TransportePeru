@@ -8,6 +8,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 # cruzaron y ya no queda ningun acceso a Mongo; ver db/tablas_en_postgres.txt.
 import db_pg
 import tenant_host
+import correo
 
 import os
 import logging
@@ -869,6 +870,20 @@ class TokenResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     user: Dict[str, Any]
+
+class OlvideRequest(BaseModel):
+    email: str
+
+
+class RestablecerRequest(BaseModel):
+    token: str
+    password: str
+
+
+class CambiarPasswordRequest(BaseModel):
+    password_actual: str
+    password_nueva: str
+
 
 class RefreshRequest(BaseModel):
     refresh_token: str
@@ -2449,6 +2464,165 @@ async def login(request: Request, login_data: LoginRequest):
         refresh_token=refresh_token,
         user=user_response,
     )
+
+
+VIDA_DEL_ENLACE = timedelta(minutes=30)
+
+
+def _huella(token: str) -> str:
+    """SHA-256 del codigo. En la base se guarda esto, nunca el codigo."""
+    import hashlib
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+@api_router.post("/auth/olvide")
+@limiter.limit("5/hour")
+async def olvide_mi_password(request: Request, datos: OlvideRequest):
+    """Manda un enlace para poner una contrasena nueva.
+
+    RESPONDE LO MISMO EXISTA O NO LA CUENTA, y no es una formalidad: si
+    contestara distinto, cualquiera podria averiguar quien esta registrado
+    probando correos uno a uno. Por eso tampoco se distingue "no existe" de
+    "fallo el envio": las dos cosas devuelven el mismo texto.
+
+    Solo sirve a quien entra con correo y contrasena. Un chofer entra con DNI y
+    PIN y normalmente no tiene correo; su reseteo lo hace su empresa desde
+    Usuarios.
+    """
+    generico = {
+        "message": "Si ese correo tiene una cuenta, te enviamos un enlace para "
+                   "crear una contrasena nueva. Revisa tambien la carpeta de spam."
+    }
+    email = (datos.email or "").strip().lower()
+    if "@" not in email:
+        return generico
+
+    async with db_pg.tx_global("recuperacion: encontrar la cuenta antes de tener sesion") as conn:
+        fila = await conn.fetchrow(
+            "select id, name, email, is_active, password_hash from users "
+            "where lower(email) = $1",
+            email,
+        )
+        usuario = db_pg.to_api(fila)
+        # Sin password_hash es una cuenta de chofer: no tiene contrasena que
+        # recuperar, y mandarle un enlace se la crearia sin que nadie lo pidiera.
+        if not usuario or not usuario.get("is_active") or not usuario.get("password_hash"):
+            return generico
+
+        token = secrets.token_urlsafe(32)
+        ahora = datetime.now(timezone.utc)
+        # Se limpian los caducados de paso, y se invalidan los enlaces
+        # anteriores de esta persona: pedir uno nuevo tiene que dejar sin valor
+        # al anterior, o un correo viejo reenviado seguiria abriendo la cuenta.
+        await conn.execute("delete from password_reset_tokens where expira_en < $1", ahora)
+        await conn.execute(
+            "update password_reset_tokens set usado_en = $1 "
+            "where user_id = $2 and usado_en is null",
+            ahora, db_pg.as_uuid(usuario["id"]),
+        )
+        await conn.execute(
+            "insert into password_reset_tokens (user_id, token_hash, expira_en, ip_solicitud) "
+            "values ($1, $2, $3, $4)",
+            db_pg.as_uuid(usuario["id"]), _huella(token),
+            ahora + VIDA_DEL_ENLACE,
+            (request.client.host if request.client else None),
+        )
+
+    base = os.environ.get("APP_BASE_URL", "").rstrip("/") or "https://fletepro.sisac.pe"
+    enlace = base + "/restablecer?t=" + token
+    minutos = int(VIDA_DEL_ENLACE.total_seconds() // 60)
+    nombre = (usuario.get("name") or "").split(" ")[0] or "Hola"
+
+    texto = (
+        nombre + ",\n\n"
+        "Pediste crear una contrasena nueva para tu cuenta de FletePro.\n\n"
+        "Abre este enlace y elige una:\n" + enlace + "\n\n"
+        "Caduca en " + str(minutos) + " minutos y solo se puede usar una vez.\n\n"
+        "Si no fuiste tu, ignora este correo: tu contrasena sigue igual.\n"
+    )
+    html = (
+        "<p>" + nombre + ",</p>"
+        "<p>Pediste crear una contrasena nueva para tu cuenta de FletePro.</p>"
+        "<p><a href=\"" + enlace + "\" style=\"display:inline-block;background:#f97316;"
+        "color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;"
+        "font-weight:600\">Crear contrasena nueva</a></p>"
+        "<p style=\"color:#64748b;font-size:13px\">O copia este enlace:<br>" + enlace + "</p>"
+        "<p style=\"color:#64748b;font-size:13px\">Caduca en " + str(minutos) + " minutos y "
+        "solo se puede usar una vez. Si no fuiste tu, ignora este correo: tu "
+        "contrasena sigue igual.</p>"
+    )
+    await correo.enviar(usuario["email"], "Recupera el acceso a FletePro", texto, html)
+    return generico
+
+
+@api_router.post("/auth/restablecer")
+@limiter.limit("10/hour")
+async def restablecer_password(request: Request, datos: RestablecerRequest):
+    """Canjea el enlace por una contrasena nueva."""
+    nueva = (datos.password or "").strip()
+    if len(nueva) < 8:
+        raise HTTPException(status_code=400, detail="La contrasena necesita al menos 8 caracteres")
+
+    ahora = datetime.now(timezone.utc)
+    async with db_pg.tx_global("recuperacion: canjear el enlace antes de tener sesion") as conn:
+        # El UPDATE ... returning marca el codigo como usado y comprueba que
+        # estuviera libre EN LA MISMA operacion. Separarlo en un select y un
+        # update dejaria una rendija por la que dos peticiones simultaneas
+        # canjearian el mismo enlace las dos.
+        fila = await conn.fetchrow(
+            "update password_reset_tokens set usado_en = $1 "
+            "where token_hash = $2 and usado_en is null and expira_en > $1 "
+            "returning user_id",
+            ahora, _huella((datos.token or "").strip()),
+        )
+        if not fila:
+            raise HTTPException(
+                status_code=400,
+                detail="Este enlace ya se uso o caduco. Pide uno nuevo.",
+            )
+        # force_password_change se apaga: la contrasena la acaba de elegir su
+        # dueno, obligarle a cambiarla otra vez seria absurdo.
+        await conn.execute(
+            "update users set password_hash = $1, force_password_change = false, "
+            "failed_attempts = 0, locked_until = null, updated_at = now() where id = $2",
+            hash_password(nueva), fila["user_id"],
+        )
+    return {"message": "Contrasena actualizada. Ya puedes entrar."}
+
+
+@api_router.post("/auth/cambiar-password")
+async def cambiar_mi_password(
+    datos: CambiarPasswordRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Cambio de contrasena por el propio usuario, con la actual por delante.
+
+    Es lo que hace util el cambio obligatorio: cuando alguien recibe una clave
+    puesta por un tercero -un reseteo desde Usuarios- queda marcado con
+    force_password_change, y la interfaz no le deja pasar de aqui hasta que
+    elija una que solo sepa el.
+
+    Se exige la actual aunque ya haya sesion: sin eso, una pestana abierta y
+    desatendida basta para que otra persona se apropie de la cuenta.
+    """
+    nueva = (datos.password_nueva or "").strip()
+    if len(nueva) < 8:
+        raise HTTPException(status_code=400, detail="La contrasena necesita al menos 8 caracteres")
+    if not current_user.get("password_hash") or not verify_password(
+        datos.password_actual or "", current_user["password_hash"]
+    ):
+        raise HTTPException(status_code=400, detail="La contrasena actual no es correcta")
+    if verify_password(nueva, current_user["password_hash"]):
+        raise HTTPException(status_code=400, detail="La nueva tiene que ser distinta de la actual")
+
+    async with db_pg.tx(current_user) as conn:
+        await conn.execute(
+            "update users set password_hash = $1, force_password_change = false, "
+            "updated_at = now() where id = $2 and company_id = $3",
+            hash_password(nueva), db_pg.as_uuid(current_user["id"]),
+            db_pg.as_uuid(current_user["company_id"]),
+        )
+    return {"message": "Contrasena actualizada"}
 
 
 @api_router.post("/auth/refresh", response_model=TokenResponse)

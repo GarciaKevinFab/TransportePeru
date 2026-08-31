@@ -147,6 +147,21 @@ create table users (
 -- DNI+PIN, no todos usan correo) - un único estricto sobre (company_id,email)
 -- rechazaría esos duplicados legítimos.
 create unique index companies_slug_idx on companies(slug);
+
+-- Codigos de un solo uso para recuperar la contrasena (ver migracion 017).
+-- Se guarda el SHA-256 del codigo, nunca el codigo: quien lea esta tabla no
+-- puede construir con ella ningun enlace valido.
+create table if not exists password_reset_tokens (
+  id           uuid primary key default gen_random_uuid(),
+  user_id      uuid not null references users(id) on delete cascade,
+  token_hash   text not null unique,
+  expira_en    timestamptz not null,
+  usado_en     timestamptz,
+  ip_solicitud text,
+  created_at   timestamptz not null default now()
+);
+create index if not exists prt_user_idx on password_reset_tokens (user_id);
+create index if not exists prt_expira_idx on password_reset_tokens (expira_en);
 create unique index users_company_email_idx on users(company_id, email) where email is not null and email <> '';
 create index users_dni_idx on users(dni);
 create unique index users_whatsapp_number_idx on users(whatsapp_number) where whatsapp_number is not null;

@@ -9,6 +9,8 @@ import MobileLayout from './layouts/MobileLayout';
 import LoginPage from './pages/LoginPage';
 import LandingPage from './pages/LandingPage';
 import SignupPage from './pages/SignupPage';
+import { OlvidePage, RestablecerPage } from './pages/RecuperarPage';
+import CambiarPasswordPage from './pages/CambiarPasswordPage';
 import DashboardPage from './pages/DashboardPage';
 import VehiclesPage from './pages/VehiclesPage';
 import UnitsPage from './pages/UnitsPage';
@@ -70,6 +72,15 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   // y esa asimetria se nota justo cuando el superadmin entra en una empresa
   // para atenderla: el backend le responde y la interfaz lo rebota al tablero,
   // asi que la mitad del sistema le parece rota sin que nada falle.
+  // Contrasena puesta por otra persona: no se entra a ningun sitio hasta
+  // cambiarla. Va ANTES del filtro de roles a proposito -da igual a que
+  // pantalla apuntara, la respuesta es la misma- y sustituye al sistema en
+  // vez de avisar encima: un aviso que se puede cerrar se cierra, y la clave
+  // que conocen dos personas se queda asi para siempre.
+  if (user?.force_password_change) {
+    return <CambiarPasswordPage />;
+  }
+
   if (allowedRoles && user?.role !== 'superadmin' && !allowedRoles.includes(user?.role)) {
     return <Navigate to="/dashboard" replace />;
   }
@@ -164,6 +175,11 @@ function AppRoutes() {
           </PublicRoute>
         }
       />
+      <Route path="/olvide" element={<OlvidePage />} />
+      {/* Fuera de PublicRoute: quien llega con el enlace puede tener una
+          sesion vieja abierta, y PublicRoute lo mandaria al tablero sin
+          dejarle cambiar la contrasena que vino a cambiar. */}
+      <Route path="/restablecer" element={<RestablecerPage />} />
       <Route
         path="/login"
         element={

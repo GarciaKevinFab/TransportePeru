@@ -139,6 +139,15 @@ export const authApi = {
   signup: (datos) => api.post('/auth/signup', datos),
   refresh: (refreshToken) => api.post('/auth/refresh', { refresh_token: refreshToken }),
   getMe: () => api.get('/auth/me'),
+  // Recuperacion. Las dos primeras son publicas: se usan justamente cuando no
+  // se puede entrar.
+  olvide: (email) => api.post('/auth/olvide', { email }),
+  restablecer: (token, password) => api.post('/auth/restablecer', { token, password }),
+  cambiarPassword: (passwordActual, passwordNueva) =>
+    api.post('/auth/cambiar-password', {
+      password_actual: passwordActual,
+      password_nueva: passwordNueva,
+    }),
 };
 
 // Users API

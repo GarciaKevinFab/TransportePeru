@@ -118,6 +118,19 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  // Vuelve a leer /auth/me. Lo usa la pantalla de cambio obligatorio: al
+  // guardar, force_password_change baja a false en la base, y esto es lo que
+  // hace que la puerta se abra sola sin recargar la pagina.
+  const refrescarUsuario = useCallback(async () => {
+    try {
+      const r = await authApi.getMe();
+      setUser(r.data);
+      return r.data;
+    } catch {
+      return null;
+    }
+  }, []);
+
   const logout = useCallback(() => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
@@ -150,6 +163,7 @@ export const AuthProvider = ({ children }) => {
     loginDriver,
     logout,
     isAuthenticated: !!user,
+    refrescarUsuario,
     isSuperAdmin: user?.role === 'superadmin',
     isAdmin: user?.role === 'admin' || user?.role === 'owner' || user?.role === 'superadmin',
     isDriver: user?.role === 'chofer',
