@@ -2509,8 +2509,25 @@ async def olvide_mi_password(request: Request, datos: OlvideRequest):
         if not usuario or not usuario.get("is_active") or not usuario.get("password_hash"):
             return generico
 
-        token = secrets.token_urlsafe(32)
+        # Limite POR CUENTA, ademas del limite por IP del decorador. El de IP
+        # solo no basta: sin este, cualquiera que conozca un correo puede
+        # llenarle la bandeja pidiendo enlaces desde direcciones distintas. Es
+        # la misma proteccion que ya tiene LicitaPro.
+        #
+        # Al pasarse NO se avisa, se devuelve el mismo mensaje de siempre:
+        # decir "has pedido demasiados" confirmaria que la cuenta existe, que es
+        # justo lo que todo este endpoint evita.
         ahora = datetime.now(timezone.utc)
+        recientes = await conn.fetchval(
+            "select count(*) from password_reset_tokens "
+            "where user_id = $1 and created_at > $2",
+            db_pg.as_uuid(usuario["id"]), ahora - timedelta(hours=1),
+        )
+        if recientes >= 5:
+            logger.warning("recuperacion: limite por hora alcanzado para un usuario")
+            return generico
+
+        token = secrets.token_urlsafe(32)
         # Se limpian los caducados de paso, y se invalidan los enlaces
         # anteriores de esta persona: pedir uno nuevo tiene que dejar sin valor
         # al anterior, o un correo viejo reenviado seguiria abriendo la cuenta.

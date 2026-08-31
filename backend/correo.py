@@ -37,16 +37,22 @@ TIEMPO_LIMITE = 10  # segundos
 def _clave():
     """La contrasena del buzon, preferentemente en base64.
 
-    SMTP_PASSWORD_B64 existe por un motivo concreto y comprobado: la clave de
-    soporte@sisac.pe contiene '#', '$' y '&', y el lector de env_file de Docker
-    Compose la CORTA -de 16 caracteres llegaban 10-, con comillas y sin ellas.
-    El sintoma era un 535 "Incorrect authentication data" que no apuntaba a
-    ningun sitio, porque la clave del fichero era correcta y la que recibia el
-    proceso no.
+    SMTP_PASSWORD_B64 existe por un motivo concreto y comprobado. La clave de
+    soporte@sisac.pe contiene un '$', y Docker Compose INTERPOLA las variables
+    dentro de los valores de env_file: leyo "$xxxxx" como una variable que no
+    existe y la sustituyo por nada. De 16 caracteres llegaban 10 -justo los 6
+    que ocupaba esa supuesta variable-.
 
-    En base64 el valor es [A-Za-z0-9+/=] y ningun lector de .env tiene nada que
-    interpretar. Se mantiene SMTP_PASSWORD como respaldo para entornos donde la
-    clave no tenga caracteres problematicos.
+    El sintoma era un 535 "Incorrect authentication data" que no apuntaba a
+    ningun sitio: la clave del fichero era correcta y la que recibia el proceso
+    no. Las comillas no arreglan nada, porque el problema no es el troceado
+    sino la sustitucion.
+
+    La forma nativa de escribirlo es duplicando el dolar ($$), que es lo que
+    hace LicitaPro en su .env. Aqui se usa base64 porque no depende de recordar
+    esa regla: el valor queda en [A-Za-z0-9+/=] y ningun lector de .env tiene
+    nada que interpretar, hoy ni cuando la clave cambie. Se mantiene
+    SMTP_PASSWORD como respaldo.
     """
     b64 = os.environ.get("SMTP_PASSWORD_B64", "").strip()
     if b64:
