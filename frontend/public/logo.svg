@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="FletePro">
+  <title>FletePro</title>
+  <!--
+    Fuente vectorial de la marca. De aqui salen todos los PNG y el .ico; si se
+    cambia algo, hay que regenerarlos para que no divergan.
+
+    Dos galones hacia la derecha: el de delante solido, el de atras tenue. Lo
+    que da sensacion de avance es el desfase entre los dos, no el detalle.
+
+    La regla que manda: tiene que reconocerse a 16 px en una pestana. Por eso un
+    galon grueso y nada mas -un camion dibujado a ese tamano es una mancha
+    naranja-. Los numeros coinciden con los del generador de iconos.
+  -->
+  <defs>
+    <linearGradient id="fp-degradado" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fb923c"/>
+      <stop offset="1" stop-color="#ea580c"/>
+    </linearGradient>
+  </defs>
+
+  <!-- rx = 22.6% del lado, la proporcion de los iconos de aplicacion actuales -->
+  <rect width="1024" height="1024" rx="231" fill="url(#fp-degradado)"/>
+
+  <g fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M268 380 L418 512 L268 644" stroke-width="74" opacity=".51"/>
+    <path d="M468 326 L676 512 L468 698" stroke-width="104"/>
+  </g>
+</svg>
