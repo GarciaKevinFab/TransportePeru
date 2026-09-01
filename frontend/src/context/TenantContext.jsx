@@ -11,7 +11,7 @@ import api from '../services/api';
  * coincidir, y el sintoma seria de los feos: la landing servida en la
  * direccion de un cliente, o al reves.
  *
- * null NO es un error: es lo que devuelven la landing, fletepro.sisac.pe y el
+ * null NO es un error: es lo que devuelven la landing, cargoxprez.sisac.pe y el
  * desarrollo en local. Significa "aquí no hay una empresa concreta", y la app
  * se comporta como siempre, resolviendo el inquilino solo por el token.
  */

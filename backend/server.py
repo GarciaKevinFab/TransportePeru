@@ -1104,7 +1104,7 @@ async def _exigir_host_de_la_empresa(request: Request, user: dict):
     """403 cuando la direccion es de una empresa y la sesion es de otra.
 
     Solo actua si el host resuelve a un inquilino. En la landing, en el acceso
-    de rescate (fletepro.sisac.pe) y en local no hay empresa en el host y no
+    de rescate (cargoxprez.sisac.pe) y en local no hay empresa en el host y no
     hay nada que comparar: se sigue como siempre.
 
     ESTO NO ES LO QUE IMPIDE VER DATOS AJENOS. De eso se encargan el company_id
@@ -1115,7 +1115,7 @@ async def _exigir_host_de_la_empresa(request: Request, user: dict):
 
     Sin excepcion para superadmin, a proposito. Su empresa es la del sistema,
     asi que un subdominio de cliente le responde 403 y su sitio es la consola
-    en fletepro.sisac.pe. Una excepcion aqui significaria que el superadmin ve
+    en cargoxprez.sisac.pe. Una excepcion aqui significaria que el superadmin ve
     en gye.sisac.pe los datos de la empresa del sistema, que es peor que el
     403: parece que la direccion funciona cuando no lo hace.
     """
@@ -2155,7 +2155,7 @@ async def tenant_del_host(request: Request):
     facturacion electronica.
 
     404 cuando el host no es de nadie, que es lo que responde en la landing, en
-    fletepro.sisac.pe y en local. El frontend lo lee como "aqui no hay empresa,
+    cargoxprez.sisac.pe y en local. El frontend lo lee como "aqui no hay empresa,
     pinta la marca del producto", no como un fallo.
 
     Si: esto permite averiguar si un subdominio existe. Es el mismo dato que ya
@@ -2622,7 +2622,7 @@ async def olvide_mi_password(request: Request, datos: OlvideRequest):
             ip_del_cliente(request),
         )
 
-    base = os.environ.get("APP_BASE_URL", "").rstrip("/") or "https://fletepro.sisac.pe"
+    base = os.environ.get("APP_BASE_URL", "").rstrip("/") or "https://cargoxprez.sisac.pe"
     enlace = base + "/restablecer?t=" + token
     minutos = int(VIDA_DEL_ENLACE.total_seconds() // 60)
     nombre = (usuario.get("name") or "").split(" ")[0] or "Hola"

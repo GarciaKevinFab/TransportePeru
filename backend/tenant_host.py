@@ -33,7 +33,7 @@ entiende cuando aparece en un log seis meses despues.
 HOSTS QUE NO SON DE NADIE
 -------------------------
 `localhost`, una IP, el dominio raiz y los subdominios de servicio
-(`fletepro`, `www`, `api`...) devuelven None: son la landing, el alta y el
+(`cargoxprez`, `www`, `api`...) devuelven None: son la landing, el alta y el
 acceso de rescate, y ahi el inquilino se sigue resolviendo solo por el token,
 exactamente igual que hasta ahora. Devolver None es el caso NORMAL, no un
 error.
@@ -48,7 +48,7 @@ import db_pg
 # El dominio bajo el que colgarian los inquilinos, si los hubiera.
 #
 # VACIO POR DEFECTO, Y ESO ES LA DECISION DE PRODUCTO: no hay subdominio por
-# empresa. Todo el mundo entra por fletepro.sisac.pe/login y cae en su empresa
+# empresa. Todo el mundo entra por cargoxprez.sisac.pe/login y cae en su empresa
 # por su usuario, que es mas simple de explicar a un cliente y de operar para
 # nosotros: una sola direccion que recordar, un solo certificado, ningun
 # hostname que crear en Cloudflare por cada alta.
