@@ -29,7 +29,20 @@ export const TenantProvider = ({ children }) => {
       // igual: sin empresa. Es el comportamiento que ya tenia la app antes de
       // que existieran los subdominios, asi que degradar hacia ahi no rompe
       // nada; quedarse cargando para siempre, si.
-      .then((r) => vivo && setTenant(r.data))
+      // Inquilino es SOLO un objeto con nombre. Todo lo demas es "no hay
+      // empresa aqui", y hacia falta decirlo explicitamente porque hay dos
+      // respuestas de 200 que no son un inquilino y colaban como tal:
+      //   - el index.html del dev-server, que axios entrega como cadena
+      //     (truthy) cuando la peticion no llega a la API;
+      //   - el {error:'offline'} que el service worker sirve, tambien con 200,
+      //     cuando no hay red.
+      // En ambos casos la landing quedaba inalcanzable y la raiz rebotaba a
+      // /login sin explicacion.
+      .then((r) => {
+        const d = r.data;
+        const esInquilino = d && typeof d === 'object' && !d.error && d.name;
+        return vivo && setTenant(esInquilino ? d : null);
+      })
       .catch(() => vivo && setTenant(null))
       .finally(() => vivo && setLoading(false));
     return () => {
