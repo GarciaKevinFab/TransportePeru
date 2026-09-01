@@ -10689,7 +10689,11 @@ async def delete_cash_movement(
 # El precio vive en el SERVIDOR. El navegador manda el plan y nada mas: un
 # monto que viajara hasta una pasarela de pago no puede venir editable en el
 # payload.
-PRECIOS_CHECKOUT = {"pro": ("Plan Pro (mensual)", 199.00)}
+#
+# Y ahora vive en planes.py, no aqui: lo leen este checkout y el del servidor
+# (checkout_sin_js.py). Dos copias funcionarian el primer dia y empezarian a
+# mentir el dia que alguien subiera el precio en una sola.
+from planes import PRECIOS_CHECKOUT  # noqa: E402
 
 
 class OrdenCheckoutRequest(BaseModel):
@@ -11143,6 +11147,15 @@ app.include_router(liquidacion_router)
 # Bot de WhatsApp (webhook + bandeja de documentos pendientes)
 from whatsapp_bot import router as whatsapp_router
 app.include_router(whatsapp_router)
+
+# Checkout renderizado en el servidor, para quien no ejecuta JavaScript.
+#
+# VA ANTES DEL CATCH-ALL, Y EL ORDEN ES TODO EL TRUCO: `serve_react` responde a
+# "/{full_path:path}", o sea a TODO. Registrado despues, /comprar seguiria
+# cayendo ahi y devolviendo el index.html vacio, que es justo el fallo que esto
+# viene a arreglar.
+from checkout_sin_js import router as checkout_sin_js_router
+app.include_router(checkout_sin_js_router)
 
 # Serve uploaded files
 from fastapi.staticfiles import StaticFiles
