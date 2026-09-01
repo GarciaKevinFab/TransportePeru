@@ -25,13 +25,13 @@ import LogoMarca from '../components/LogoMarca';
 const ACTUALIZADO = '31 de agosto de 2026';
 
 const Marco = ({ titulo, children }) => (
-  <div className="min-h-screen bg-slate-950 text-slate-100">
+  <div className="min-h-screen bg-grafito-950 text-grafito-100">
     <header className="border-b border-white/5">
       <div className="mx-auto flex w-full max-w-3xl items-center justify-between px-6 py-4">
         <Link to="/" className="flex items-center">
           <LogoMarca className="h-14 w-auto" />
         </Link>
-        <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-100">
+        <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-grafito-400 hover:text-grafito-100">
           <ArrowLeft className="h-4 w-4" />
           Volver
         </Link>
@@ -42,22 +42,22 @@ const Marco = ({ titulo, children }) => (
       <h1 className="font-heading text-3xl font-black uppercase tracking-tight sm:text-4xl">
         {titulo}
       </h1>
-      <p className="mt-3 text-sm text-slate-500">Última actualización: {ACTUALIZADO}</p>
+      <p className="mt-3 text-sm text-grafito-400">Última actualización: {ACTUALIZADO}</p>
 
       {/* Estilos de prosa a mano: el proyecto no trae @tailwindcss/typography, y
           sumar una dependencia entera por dos páginas de texto no se sostiene. */}
       <div
-        className="mt-10 text-[15px] leading-relaxed text-slate-300
-                   [&_h2]:font-heading [&_h2]:text-xl [&_h2]:font-bold [&_h2]:text-slate-100
+        className="mt-10 text-[15px] leading-relaxed text-grafito-300
+                   [&_h2]:font-heading [&_h2]:text-xl [&_h2]:font-bold [&_h2]:text-grafito-100
                    [&_h2]:mt-10 [&_h2]:mb-3 [&_h2]:tracking-tight
                    [&_p]:mb-4 [&_ul]:mb-4 [&_ul]:space-y-2 [&_ul]:pl-5 [&_li]:list-disc
-                   [&_strong]:text-slate-100 [&_strong]:font-semibold
+                   [&_strong]:text-grafito-100 [&_strong]:font-semibold
                    [&_a]:text-marca-400 [&_a]:underline [&_a]:underline-offset-4"
       >
         {children}
       </div>
 
-      <footer className="mt-16 border-t border-white/5 pt-6 text-sm text-slate-500">
+      <footer className="mt-16 border-t border-white/5 pt-6 text-sm text-grafito-400">
         ¿Dudas sobre esto? Escríbenos a{' '}
         <a href="mailto:soporte@sisac.pe" className="text-marca-400 underline underline-offset-4">
           soporte@sisac.pe
@@ -67,10 +67,10 @@ const Marco = ({ titulo, children }) => (
             a el desde cualquier punto de la web, y quien esta leyendo las
             condiciones es justo quien puede necesitarlo. */}
         <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2">
-          <Link to="/privacidad" className="hover:text-slate-300">Privacidad</Link>
-          <Link to="/terminos" className="hover:text-slate-300">Términos</Link>
-          <Link to="/reclamaciones" className="hover:text-slate-300">Libro de Reclamaciones</Link>
-          <Link to="/" className="hover:text-slate-300">Inicio</Link>
+          <Link to="/privacidad" className="hover:text-grafito-300">Privacidad</Link>
+          <Link to="/terminos" className="hover:text-grafito-300">Términos</Link>
+          <Link to="/reclamaciones" className="hover:text-grafito-300">Libro de Reclamaciones</Link>
+          <Link to="/" className="hover:text-grafito-300">Inicio</Link>
         </div>
       </footer>
     </main>

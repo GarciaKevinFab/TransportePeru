@@ -255,7 +255,7 @@ const BillingPage = () => {
 
   const getStatusBadge = (status) => {
     const map = {
-      borrador: { label: 'Borrador', color: 'bg-slate-100 text-slate-700' },
+      borrador: { label: 'Borrador', color: 'bg-grafito-100 text-grafito-700' },
       emitida: { label: 'Emitida', color: 'bg-green-100 text-green-700' },
       pagada: { label: 'Pagada', color: 'bg-blue-100 text-blue-700' },
       anulada: { label: 'Anulada', color: 'bg-red-100 text-red-700' },
@@ -308,10 +308,10 @@ const BillingPage = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-slate-900">
+          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
             Facturación y Guías
           </h1>
-          <p className="text-slate-500 mt-1">
+          <p className="text-grafito-500 mt-1">
             Guías de transportista y facturas electrónicas (SUNAT)
           </p>
         </div>
@@ -343,21 +343,21 @@ const BillingPage = () => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-white border-l-4 border-l-blue-500 card-enter card-stagger-1">
           <CardContent className="py-4">
-            <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Guías</p>
+            <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Guías</p>
             <p className="font-heading text-3xl font-bold text-blue-600 mt-1">{guias.length}</p>
-            <p className="text-xs text-slate-400">{guiasEmitidas} emitidas</p>
+            <p className="text-xs text-grafito-400">{guiasEmitidas} emitidas</p>
           </CardContent>
         </Card>
         <Card className="bg-white border-l-4 border-l-green-500 card-enter card-stagger-2">
           <CardContent className="py-4">
-            <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Facturas</p>
+            <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Facturas</p>
             <p className="font-heading text-3xl font-bold text-green-600 mt-1">{facturas.length}</p>
-            <p className="text-xs text-slate-400">{facturasEmitidas} emitidas</p>
+            <p className="text-xs text-grafito-400">{facturasEmitidas} emitidas</p>
           </CardContent>
         </Card>
         <Card className="bg-white border-l-4 border-l-marca-500 col-span-2 card-enter card-stagger-3">
           <CardContent className="py-4">
-            <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Total Facturado</p>
+            <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Total Facturado</p>
             <p className="font-heading text-3xl font-bold text-marca-600 mt-1">
               S/ {totalFacturado.toFixed(2)}
             </p>
@@ -395,7 +395,7 @@ const BillingPage = () => {
               ) : (
                 <>
                 {/* Movil: tarjetas. Siete columnas en 375px esconden estado y acciones tras un arrastre lateral que nadie descubre. */}
-                <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+                <div className="md:hidden divide-y divide-grafito-100 dark:divide-grafito-800">
                   {guias.map((guia) => (
                     <div key={guia.id} className="flex items-start gap-3 px-4 py-3.5">
                       <div className="min-w-0 flex-1">
@@ -405,10 +405,10 @@ const BillingPage = () => {
                           </span>
                           {getStatusBadge(guia.status)}
                         </div>
-                        <p className="mt-0.5 truncate text-xs text-slate-500">
+                        <p className="mt-0.5 truncate text-xs text-grafito-500">
                           {guia.destinatario_razon_social || '-'}
                         </p>
-                        <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                        <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-grafito-500">
                           <span>{guia.fecha_emision || '-'}</span>
                           <span className="truncate">{guia.punto_partida} → {guia.punto_llegada}</span>
                           {guia.descripcion_carga && <span className="truncate">{guia.descripcion_carga}</span>}
@@ -479,7 +479,7 @@ const BillingPage = () => {
               ) : (
                 <>
                 {/* Movil: tarjetas. Nueve columnas en 375px esconden estado y acciones tras un arrastre lateral que nadie descubre. */}
-                <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+                <div className="md:hidden divide-y divide-grafito-100 dark:divide-grafito-800">
                   {facturas.map((factura) => (
                     <div key={factura.id} className="flex items-start gap-3 px-4 py-3.5">
                       <div className="min-w-0 flex-1">
@@ -489,13 +489,13 @@ const BillingPage = () => {
                           </span>
                           {getStatusBadge(factura.status)}
                         </div>
-                        <p className="mt-0.5 truncate text-xs text-slate-500">
+                        <p className="mt-0.5 truncate text-xs text-grafito-500">
                           {factura.cliente_razon_social || '-'}
                         </p>
-                        <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                        <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-grafito-500">
                           <span>{factura.fecha_emision || '-'}</span>
                           <span className="font-mono">{factura.cliente_ruc || '-'}</span>
-                          <span className="font-bold text-slate-700 dark:text-slate-300">
+                          <span className="font-bold text-grafito-700 dark:text-grafito-300">
                             S/ {(factura.total || 0).toFixed(2)}
                           </span>
                         </p>
@@ -715,7 +715,7 @@ const BillingPage = () => {
             </div>
 
             {/* Totals */}
-            <div className="bg-slate-50 rounded-lg p-4 space-y-2">
+            <div className="bg-grafito-50 rounded-lg p-4 space-y-2">
               <div className="flex justify-between text-sm">
                 <span>Subtotal</span>
                 <span className="font-medium">S/ {facturaSubtotal.toFixed(2)}</span>

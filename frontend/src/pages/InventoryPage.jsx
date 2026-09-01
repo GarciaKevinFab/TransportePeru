@@ -211,10 +211,10 @@ const InventoryPage = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-slate-900">
+          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
             Inventario
           </h1>
-          <p className="text-slate-500 mt-1">
+          <p className="text-grafito-500 mt-1">
             Gestión de repuestos, stock y proveedores
           </p>
         </div>
@@ -234,19 +234,19 @@ const InventoryPage = () => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-white border-l-4 border-l-blue-500 card-enter card-stagger-1">
           <CardContent className="py-4">
-            <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Total Items</p>
+            <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Total Items</p>
             <p className="font-heading text-3xl font-bold text-blue-600 mt-1">{items.length}</p>
           </CardContent>
         </Card>
         <Card className="bg-white border-l-4 border-l-red-500 card-enter card-stagger-2">
           <CardContent className="py-4">
-            <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Stock Bajo</p>
+            <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Stock Bajo</p>
             <p className="font-heading text-3xl font-bold text-red-600 mt-1">{lowStockItems.length}</p>
           </CardContent>
         </Card>
         <Card className="bg-white border-l-4 border-l-green-500 card-enter card-stagger-3">
           <CardContent className="py-4">
-            <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Valor Total</p>
+            <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Valor Total</p>
             <p className="font-heading text-3xl font-bold text-green-600 mt-1">
               S/ {items.reduce((a, b) => a + (b.current_stock * b.unit_cost), 0).toLocaleString()}
             </p>
@@ -254,7 +254,7 @@ const InventoryPage = () => {
         </Card>
         <Card className="bg-white border-l-4 border-l-marca-500 card-enter card-stagger-4">
           <CardContent className="py-4">
-            <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Proveedores</p>
+            <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Proveedores</p>
             <p className="font-heading text-3xl font-bold text-marca-600 mt-1">{suppliers.length}</p>
           </CardContent>
         </Card>
@@ -262,11 +262,11 @@ const InventoryPage = () => {
 
       {/* Tabs */}
       <Tabs defaultValue="items">
-        <TabsList className="bg-slate-100 rounded-sm">
-          <TabsTrigger value="items" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
+        <TabsList className="bg-grafito-100 rounded-sm">
+          <TabsTrigger value="items" className="rounded-sm data-[state=active]:bg-grafito-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
             Inventario
           </TabsTrigger>
-          <TabsTrigger value="suppliers" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
+          <TabsTrigger value="suppliers" className="rounded-sm data-[state=active]:bg-grafito-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
             Proveedores
           </TabsTrigger>
         </TabsList>
@@ -277,7 +277,7 @@ const InventoryPage = () => {
             <CardContent className="py-4">
               <div className="flex flex-col md:flex-row gap-4">
                 <div className="flex-1 relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-grafito-400" />
                   <Input
                     placeholder="Buscar por código o nombre..."
                     value={searchTerm}
@@ -325,7 +325,7 @@ const InventoryPage = () => {
               ) : (
                 <>
                 {/* Movil: tarjetas. 8 columnas en 375px esconden estado y acciones tras un arrastre lateral que nadie descubre. */}
-                <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+                <div className="md:hidden divide-y divide-grafito-100 dark:divide-grafito-800">
                   {filteredItems.map((item) => (
                     <div key={item.id} className="flex items-start gap-3 px-4 py-3.5">
                       <div className="min-w-0 flex-1">
@@ -335,14 +335,14 @@ const InventoryPage = () => {
                             {item.current_stock} {item.unit}
                           </span>
                         </div>
-                        <p className="mt-0.5 truncate text-xs text-slate-500">
-                          <span className="font-mono font-bold text-slate-700 dark:text-slate-300">{item.code}</span>
+                        <p className="mt-0.5 truncate text-xs text-grafito-500">
+                          <span className="font-mono font-bold text-grafito-700 dark:text-grafito-300">{item.code}</span>
                           {item.location && <span> · Ubic: {item.location}</span>}
                         </p>
-                        <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                        <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-grafito-500">
                           <span>Min/Max: {item.min_stock} / {item.max_stock || '∞'}</span>
                           <span>Unit: S/ {item.unit_cost?.toFixed(2)}</span>
-                          <span className="font-bold text-slate-700 dark:text-slate-300">
+                          <span className="font-bold text-grafito-700 dark:text-grafito-300">
                             S/ {(item.current_stock * item.unit_cost).toFixed(2)}
                           </span>
                         </p>
@@ -375,7 +375,7 @@ const InventoryPage = () => {
                           <div>
                             <p className="font-medium">{item.name}</p>
                             {item.location && (
-                              <p className="text-xs text-slate-500">Ubic: {item.location}</p>
+                              <p className="text-xs text-grafito-500">Ubic: {item.location}</p>
                             )}
                           </div>
                         </TableCell>
@@ -387,7 +387,7 @@ const InventoryPage = () => {
                             {item.current_stock} {item.unit}
                           </span>
                         </TableCell>
-                        <TableCell className="text-sm text-slate-500">
+                        <TableCell className="text-sm text-grafito-500">
                           {item.min_stock} / {item.max_stock || '∞'}
                         </TableCell>
                         <TableCell>S/ {item.unit_cost?.toFixed(2)}</TableCell>
@@ -421,7 +421,7 @@ const InventoryPage = () => {
               ) : (
                 <>
                 {/* Movil: tarjetas. 5 columnas en 375px esconden email y categoria tras un arrastre lateral que nadie descubre. */}
-                <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+                <div className="md:hidden divide-y divide-grafito-100 dark:divide-grafito-800">
                   {suppliers.map((supplier) => (
                     <div key={supplier.id} className="flex items-start gap-3 px-4 py-3.5">
                       <div className="min-w-0 flex-1">
@@ -429,10 +429,10 @@ const InventoryPage = () => {
                           <span className="font-medium truncate">{supplier.name}</span>
                           {supplier.category && <Badge variant="outline">{supplier.category}</Badge>}
                         </div>
-                        <p className="mt-0.5 truncate text-xs text-slate-500 font-mono">
+                        <p className="mt-0.5 truncate text-xs text-grafito-500 font-mono">
                           {supplier.ruc || '-'}
                         </p>
-                        <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                        <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-grafito-500">
                           <span>{supplier.phone || '-'}</span>
                           <span className="truncate">{supplier.email || '-'}</span>
                         </p>
@@ -601,10 +601,10 @@ const InventoryPage = () => {
             </DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            <p className="text-sm text-slate-500 mb-4">
+            <p className="text-sm text-grafito-500 mb-4">
               Item: <strong>{selectedItem?.name}</strong> ({selectedItem?.code})
             </p>
-            <p className="text-sm text-slate-500 mb-4">
+            <p className="text-sm text-grafito-500 mb-4">
               Stock actual: <strong>{selectedItem?.current_stock} {selectedItem?.unit}</strong>
             </p>
             <div className="grid gap-4">

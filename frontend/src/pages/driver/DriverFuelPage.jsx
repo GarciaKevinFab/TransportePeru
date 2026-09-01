@@ -289,7 +289,7 @@ const DriverFuelPage = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-slate-900">Combustible</h1>
+        <h1 className="text-2xl font-bold text-grafito-900">Combustible</h1>
         <Button 
           className="bg-marca-500 hover:bg-marca-600"
           onClick={() => setShowAddDialog(true)}
@@ -308,7 +308,7 @@ const DriverFuelPage = () => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-wider text-slate-500 font-bold">
+                <p className="text-xs uppercase tracking-wider text-grafito-500 font-bold">
                   Saldo de Viáticos
                 </p>
                 <p className={`text-2xl font-bold ${viaticoAlert ? 'text-red-600' : 'text-emerald-700'}`}>
@@ -348,14 +348,14 @@ const DriverFuelPage = () => {
 
       {/* Recent Loads */}
       <div>
-        <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3">
+        <h2 className="text-sm font-bold text-grafito-500 uppercase tracking-wider mb-3">
           Mis Cargas Recientes
         </h2>
         {loads.length === 0 ? (
-          <Card className="bg-slate-50 border-dashed">
+          <Card className="bg-grafito-50 border-dashed">
             <CardContent className="p-6 text-center">
-              <Fuel className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500">No hay cargas registradas</p>
+              <Fuel className="w-12 h-12 text-grafito-300 mx-auto mb-3" />
+              <p className="text-grafito-500">No hay cargas registradas</p>
             </CardContent>
           </Card>
         ) : (
@@ -364,16 +364,16 @@ const DriverFuelPage = () => {
               <Card key={load.id} className="bg-white">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-bold text-slate-800">{load.vehicle_plate}</span>
+                    <span className="font-bold text-grafito-800">{load.vehicle_plate}</span>
                     <Badge className="bg-green-100 text-green-800">
                       {load.liters} L
                     </Badge>
                   </div>
-                  <div className="flex items-center justify-between text-sm text-slate-500">
+                  <div className="flex items-center justify-between text-sm text-grafito-500">
                     <span>{load.provider || 'Sin proveedor'}</span>
                     <span>S/ {((load.liters || 0) * (load.price_per_liter || 0)).toFixed(2)}</span>
                   </div>
-                  <p className="text-xs text-slate-400 mt-1">
+                  <p className="text-xs text-grafito-400 mt-1">
                     {format(new Date(load.created_at), "dd/MM/yyyy HH:mm")}
                   </p>
                 </CardContent>
@@ -507,7 +507,7 @@ const DriverFuelPage = () => {
             {/* Total */}
             {formData.liters && formData.price_per_liter && (
               <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-                <p className="text-sm text-slate-600">Total:</p>
+                <p className="text-sm text-grafito-600">Total:</p>
                 <p className="text-2xl font-bold text-green-700">
                   S/ {(parseFloat(formData.liters) * parseFloat(formData.price_per_liter)).toFixed(2)}
                 </p>

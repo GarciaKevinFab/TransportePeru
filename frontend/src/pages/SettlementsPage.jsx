@@ -112,7 +112,7 @@ const SettlementsPage = () => {
     { value: 'pending', label: 'Pendiente', color: 'bg-yellow-100 text-yellow-700' },
     { value: 'en_revision', label: 'En Revisión', color: 'bg-blue-100 text-blue-700' },
     { value: 'aprobado', label: 'Aprobado', color: 'bg-green-100 text-green-700' },
-    { value: 'cerrado', label: 'Cerrado', color: 'bg-slate-100 text-slate-700' },
+    { value: 'cerrado', label: 'Cerrado', color: 'bg-grafito-100 text-grafito-700' },
   ];
 
   const fetchData = async () => {
@@ -320,10 +320,10 @@ const SettlementsPage = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-slate-900">
+          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
             Viáticos y Liquidación
           </h1>
-          <p className="text-slate-500 mt-1">
+          <p className="text-grafito-500 mt-1">
             Gestión de anticipos, gastos y liquidación de viajes
           </p>
         </div>
@@ -335,7 +335,7 @@ const SettlementsPage = () => {
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Pendientes</p>
+                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Pendientes</p>
                 <p className="font-heading text-3xl font-bold text-yellow-600 mt-1">{pendingTrips}</p>
               </div>
               <Clock className="w-8 h-8 text-yellow-500" />
@@ -346,7 +346,7 @@ const SettlementsPage = () => {
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Por Rendir</p>
+                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Por Rendir</p>
                 <p className="font-heading text-2xl font-bold text-blue-600 mt-1">
                   S/ {totalPendingAdvances.toLocaleString()}
                 </p>
@@ -359,7 +359,7 @@ const SettlementsPage = () => {
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Cerrados</p>
+                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Cerrados</p>
                 <p className="font-heading text-3xl font-bold text-green-600 mt-1">
                   {trips.filter(t => t.settlement_status === 'cerrado').length}
                 </p>
@@ -372,7 +372,7 @@ const SettlementsPage = () => {
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Viajes Totales</p>
+                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Viajes Totales</p>
                 <p className="font-heading text-3xl font-bold text-marca-600 mt-1">{trips.length}</p>
               </div>
               <Truck className="w-8 h-8 text-marca-500" />
@@ -386,7 +386,7 @@ const SettlementsPage = () => {
         <CardContent className="py-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-grafito-400" />
               <Input
                 placeholder="Buscar por cliente o carga..."
                 value={searchTerm}
@@ -438,7 +438,7 @@ const SettlementsPage = () => {
           ) : (
             <>
             {/* Movil: tarjetas. Diez columnas en 375px esconden estado y acciones tras un arrastre lateral que nadie descubre. */}
-            <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+            <div className="md:hidden divide-y divide-grafito-100 dark:divide-grafito-800">
               {filteredTrips.map((trip) => {
                 const tripBalance = (trip.total_advance || 0) - (trip.total_expenses || 0);
                 return (
@@ -450,12 +450,12 @@ const SettlementsPage = () => {
                         {getStatusInfo(trip.settlement_status).label}
                       </Badge>
                     </div>
-                    <p className="mt-0.5 truncate text-xs text-slate-500">
+                    <p className="mt-0.5 truncate text-xs text-grafito-500">
                       {getDriverName(trip.driver_id)} · {trip.cargo_description || '-'}
                     </p>
-                    <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                    <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-grafito-500">
                       <span>{format(new Date(trip.scheduled_date), 'dd/MM/yy', { locale: es })}</span>
-                      <span className="font-mono font-bold text-slate-700 dark:text-slate-300">
+                      <span className="font-mono font-bold text-grafito-700 dark:text-grafito-300">
                         {getVehiclePlate(trip.tracto_id)}
                       </span>
                       <span className="text-green-600">S/ {(trip.total_advance || 0).toFixed(2)}</span>
@@ -500,13 +500,13 @@ const SettlementsPage = () => {
                       <TableCell>{getDriverName(trip.driver_id)}</TableCell>
                       <TableCell className="max-w-[200px]">
                         <p className="font-medium truncate">{trip.client_name || '-'}</p>
-                        <p className="text-xs text-slate-500 truncate">{trip.cargo_description || '-'}</p>
+                        <p className="text-xs text-grafito-500 truncate">{trip.cargo_description || '-'}</p>
                       </TableCell>
                       <TableCell>
                         {trip.viatico_daily ? (
                           <div>
                             <span className="font-bold text-indigo-600">S/ {trip.viatico_daily.toFixed(2)}</span>
-                            <p className="text-[10px] text-slate-400">{trip.viatico_days}d / S/{trip.viatico_budget?.toFixed(0)}</p>
+                            <p className="text-[10px] text-grafito-400">{trip.viatico_days}d / S/{trip.viatico_budget?.toFixed(0)}</p>
                           </div>
                         ) : (
                           <Button
@@ -561,19 +561,19 @@ const SettlementsPage = () => {
           {selectedTrip && (
             <div className="py-4">
               {/* Trip Info */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 p-4 bg-slate-50 rounded-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 p-4 bg-grafito-50 rounded-sm">
                 <div>
-                  <p className="text-xs uppercase text-slate-500 font-bold">Fecha</p>
+                  <p className="text-xs uppercase text-grafito-500 font-bold">Fecha</p>
                   <p className="font-medium">
                     {format(new Date(selectedTrip.scheduled_date), 'dd/MM/yyyy', { locale: es })}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase text-slate-500 font-bold">Vehículo</p>
+                  <p className="text-xs uppercase text-grafito-500 font-bold">Vehículo</p>
                   <p className="font-mono font-medium">{getVehiclePlate(selectedTrip.tracto_id)}</p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase text-slate-500 font-bold">Chofer</p>
+                  <p className="text-xs uppercase text-grafito-500 font-bold">Chofer</p>
                   <p className="font-medium">{getDriverName(selectedTrip.driver_id)}</p>
                 </div>
               </div>
@@ -677,11 +677,11 @@ const SettlementsPage = () => {
               {/* Tabs for Advances and Expenses */}
               <Tabs defaultValue="expenses">
                 <div className="flex items-center justify-between mb-2">
-                  <TabsList className="bg-slate-100 rounded-sm">
-                    <TabsTrigger value="expenses" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs">
+                  <TabsList className="bg-grafito-100 rounded-sm">
+                    <TabsTrigger value="expenses" className="rounded-sm data-[state=active]:bg-grafito-900 data-[state=active]:text-white font-bold uppercase text-xs">
                       Gastos ({tripExpenses.length})
                     </TabsTrigger>
-                    <TabsTrigger value="advances" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs">
+                    <TabsTrigger value="advances" className="rounded-sm data-[state=active]:bg-grafito-900 data-[state=active]:text-white font-bold uppercase text-xs">
                       Anticipos ({tripAdvances.length})
                     </TabsTrigger>
                   </TabsList>
@@ -699,7 +699,7 @@ const SettlementsPage = () => {
 
                 <TabsContent value="expenses">
                   {tripExpenses.length === 0 ? (
-                    <div className="text-center py-8 text-slate-400">
+                    <div className="text-center py-8 text-grafito-400">
                       <Receipt className="w-8 h-8 mx-auto mb-2" />
                       <p>No hay gastos registrados</p>
                     </div>
@@ -730,7 +730,7 @@ const SettlementsPage = () => {
                                 {expense.has_igv ? (
                                   <CheckCircle className="w-4 h-4 text-green-500" />
                                 ) : (
-                                  <span className="text-slate-400">-</span>
+                                  <span className="text-grafito-400">-</span>
                                 )}
                               </TableCell>
                               <TableCell className="text-center">
@@ -738,7 +738,7 @@ const SettlementsPage = () => {
                                   <button
                                     type="button"
                                     onClick={() => openPhoto(expense.receipt_url, `${catInfo.label} — ${expense.provider || 'Comprobante'}`)}
-                                    className="inline-block border-2 border-slate-200 rounded p-0.5 hover:border-marca-400"
+                                    className="inline-block border-2 border-grafito-200 rounded p-0.5 hover:border-marca-400"
                                     title="Ver comprobante"
                                   >
                                     <img
@@ -748,7 +748,7 @@ const SettlementsPage = () => {
                                     />
                                   </button>
                                 ) : (
-                                  <div className="w-9 h-9 mx-auto border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-slate-300">
+                                  <div className="w-9 h-9 mx-auto border-2 border-dashed border-grafito-200 rounded flex items-center justify-center text-grafito-300">
                                     <ImageIcon className="w-4 h-4" />
                                   </div>
                                 )}
@@ -766,7 +766,7 @@ const SettlementsPage = () => {
 
                 <TabsContent value="advances">
                   {tripAdvances.length === 0 ? (
-                    <div className="text-center py-8 text-slate-400">
+                    <div className="text-center py-8 text-grafito-400">
                       <DollarSign className="w-8 h-8 mx-auto mb-2" />
                       <p>No hay anticipos registrados</p>
                     </div>
@@ -1024,7 +1024,7 @@ const SettlementsPage = () => {
           <DialogHeader>
             <DialogTitle>{photoPreview.title || 'Comprobante'}</DialogTitle>
           </DialogHeader>
-          <div className="flex items-center justify-center bg-slate-100 rounded p-2">
+          <div className="flex items-center justify-center bg-grafito-100 rounded p-2">
             {photoPreview.url && (
               <img src={photoPreview.url} alt="comprobante" className="max-h-[70vh] max-w-full object-contain" />
             )}

@@ -93,7 +93,7 @@ const TiresPage = () => {
   const tireStatuses = [
     { value: 'nuevo', label: 'Nuevo', color: 'bg-green-100 text-green-700' },
     { value: 'en_uso', label: 'En Uso', color: 'bg-blue-100 text-blue-700' },
-    { value: 'almacen', label: 'En Almacén', color: 'bg-slate-100 text-slate-700' },
+    { value: 'almacen', label: 'En Almacén', color: 'bg-grafito-100 text-grafito-700' },
     { value: 'reencauche', label: 'Reencauche', color: 'bg-yellow-100 text-yellow-700' },
     { value: 'baja', label: 'Baja', color: 'bg-red-100 text-red-700' },
   ];
@@ -318,10 +318,10 @@ const TiresPage = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-slate-900">
+          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
             Gestión de Llantas
           </h1>
-          <p className="text-slate-500 mt-1">
+          <p className="text-grafito-500 mt-1">
             Inventario, montaje, inspecciones y reportes de llantas
           </p>
         </div>
@@ -355,21 +355,21 @@ const TiresPage = () => {
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">En Uso</p>
+                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">En Uso</p>
                 <p className="font-heading text-3xl font-bold text-blue-600 mt-1">{inUseTires}</p>
               </div>
               <Truck className="w-8 h-8 text-blue-500" />
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-slate-500 card-enter card-stagger-2">
+        <Card className="bg-white border-l-4 border-l-grafito-500 card-enter card-stagger-2">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">En Almacén</p>
-                <p className="font-heading text-3xl font-bold text-slate-600 mt-1">{storageTires}</p>
+                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">En Almacén</p>
+                <p className="font-heading text-3xl font-bold text-grafito-600 mt-1">{storageTires}</p>
               </div>
-              <CircleDot className="w-8 h-8 text-slate-500" />
+              <CircleDot className="w-8 h-8 text-grafito-500" />
             </div>
           </CardContent>
         </Card>
@@ -377,7 +377,7 @@ const TiresPage = () => {
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Críticas</p>
+                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Críticas</p>
                 <p className="font-heading text-3xl font-bold text-red-600 mt-1">{criticalTires}</p>
               </div>
               <AlertTriangle className="w-8 h-8 text-red-500" />
@@ -388,7 +388,7 @@ const TiresPage = () => {
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Inspección</p>
+                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Inspección</p>
                 <p className="font-heading text-3xl font-bold text-yellow-600 mt-1">{inspectionRequired}</p>
               </div>
               <Gauge className="w-8 h-8 text-yellow-500" />
@@ -399,11 +399,11 @@ const TiresPage = () => {
 
       {/* Tabs */}
       <Tabs defaultValue="inventory">
-        <TabsList className="bg-slate-100 rounded-sm">
-          <TabsTrigger value="inventory" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
+        <TabsList className="bg-grafito-100 rounded-sm">
+          <TabsTrigger value="inventory" className="rounded-sm data-[state=active]:bg-grafito-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
             Inventario
           </TabsTrigger>
-          <TabsTrigger value="vehicles" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
+          <TabsTrigger value="vehicles" className="rounded-sm data-[state=active]:bg-grafito-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
             Por Vehículo
           </TabsTrigger>
         </TabsList>
@@ -415,7 +415,7 @@ const TiresPage = () => {
             <CardContent className="py-4">
               <div className="flex flex-col md:flex-row gap-4">
                 <div className="flex-1 relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-grafito-400" />
                   <Input
                     placeholder="Buscar por serial o marca..."
                     value={searchTerm}
@@ -464,7 +464,7 @@ const TiresPage = () => {
                 <>
                 {/* Movil: tarjetas. Nueve columnas en 375px esconden estado y
                     acciones tras un arrastre lateral que nadie descubre. */}
-                <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+                <div className="md:hidden divide-y divide-grafito-100 dark:divide-grafito-800">
                   {filteredTires.map((tire) => (
                     <div key={tire.id} className="px-4 py-3.5">
                       <div className="flex flex-wrap items-center gap-2">
@@ -476,10 +476,10 @@ const TiresPage = () => {
                           {tire.life_number === 1 ? 'VN' : `R${tire.life_number - 1}`}
                         </Badge>
                       </div>
-                      <p className="mt-0.5 truncate text-xs text-slate-500">
+                      <p className="mt-0.5 truncate text-xs text-grafito-500">
                         {[tire.brand, tire.model, tire.dimension].filter(Boolean).join(' · ')}
                       </p>
-                      <p className="mt-1 flex flex-wrap items-center gap-x-3 text-xs text-slate-500">
+                      <p className="mt-1 flex flex-wrap items-center gap-x-3 text-xs text-grafito-500">
                         <span>{tire.total_km?.toLocaleString() || 0} km</span>
                         {tire.current_vehicle_id && (
                           <span className="font-mono">
@@ -518,7 +518,7 @@ const TiresPage = () => {
                         <TableCell>
                           <div>
                             <p className="font-medium">{tire.brand}</p>
-                            <p className="text-xs text-slate-500">{tire.model || '-'}</p>
+                            <p className="text-xs text-grafito-500">{tire.model || '-'}</p>
                           </div>
                         </TableCell>
                         <TableCell>{tire.dimension}</TableCell>
@@ -580,11 +580,11 @@ const TiresPage = () => {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex items-center gap-2 text-sm text-slate-500 mb-2">
+                    <div className="flex items-center gap-2 text-sm text-grafito-500 mb-2">
                       <Truck className="w-4 h-4" />
                       <span>{vehicle.brand} {vehicle.model}</span>
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-slate-500">
+                    <div className="flex items-center gap-2 text-sm text-grafito-500">
                       <Gauge className="w-4 h-4" />
                       <span>{vehicle.odometer?.toLocaleString() || 0} km</span>
                     </div>
@@ -796,10 +796,10 @@ const TiresPage = () => {
           </DialogHeader>
           <div className="py-4">
             {selectedTire && (
-              <div className="p-4 bg-slate-50 rounded-sm mb-4">
-                <p className="text-sm text-slate-500">Llanta seleccionada:</p>
+              <div className="p-4 bg-grafito-50 rounded-sm mb-4">
+                <p className="text-sm text-grafito-500">Llanta seleccionada:</p>
                 <p className="font-mono font-bold text-lg">{selectedTire.serial}</p>
-                <p className="text-sm text-slate-500">{selectedTire.brand} {selectedTire.dimension}</p>
+                <p className="text-sm text-grafito-500">{selectedTire.brand} {selectedTire.dimension}</p>
               </div>
             )}
             <div className="grid gap-4">

@@ -106,7 +106,7 @@ const DriverHomePage = () => {
         className="relative overflow-hidden rounded-2xl p-5 text-white smooth-appear card-3d"
         style={{
           backgroundImage:
-            'linear-gradient(135deg, #0f172a 0%, #1e293b 60%, color-mix(in srgb, var(--brand-color) 30%, #1e293b) 100%)',
+            'linear-gradient(135deg, #191614 0%, #2a2725 62%, color-mix(in srgb, var(--brand-color) 18%, #262321) 100%)',
         }}
       >
         <div aria-hidden className="absolute inset-0 pointer-events-none">
@@ -117,13 +117,13 @@ const DriverHomePage = () => {
           <div className="absolute top-3 right-4 w-12 h-12 rounded-xl border border-white/15 slow-spin" />
         </div>
         <div className="relative z-10">
-          <p className="text-[10px] uppercase font-semibold tracking-widest text-slate-300/80">
+          <p className="text-[10px] uppercase font-semibold tracking-widest text-grafito-300/80">
             {format(new Date(), "EEEE, d 'de' MMMM", { locale: es })}
           </p>
           <h1 className="font-heading text-2xl font-black uppercase tracking-tight mt-1">
             Hola, <span className="gradient-text">{user?.name?.split(' ')[0]}</span>
           </h1>
-          <p className="text-slate-300 text-sm mt-1">
+          <p className="text-grafito-300 text-sm mt-1">
             {activeTrip ? 'Tienes un viaje activo en curso.' : scheduledTrips.length > 0 ? `${scheduledTrips.length} viaje(s) programado(s).` : 'Sin viajes asignados hoy.'}
           </p>
         </div>
@@ -183,13 +183,13 @@ const DriverHomePage = () => {
           </CardContent>
         </Card>
       ) : (
-        <Card className="glass-light border-dashed border-slate-200 smooth-appear smooth-appear-1">
+        <Card className="glass-light border-dashed border-grafito-200 smooth-appear smooth-appear-1">
           <CardContent className="p-6 text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-3 icon-3d float-animation bg-slate-100">
-              <Truck className="w-8 h-8 text-slate-400" />
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-3 icon-3d float-animation bg-grafito-100">
+              <Truck className="w-8 h-8 text-grafito-400" />
             </div>
-            <h3 className="font-heading font-bold text-slate-700 uppercase tracking-tight">Sin Viaje Activo</h3>
-            <p className="text-sm text-slate-500 mt-1">
+            <h3 className="font-heading font-bold text-grafito-700 uppercase tracking-tight">Sin Viaje Activo</h3>
+            <p className="text-sm text-grafito-500 mt-1">
               {scheduledTrips.length > 0
                 ? `Tienes ${scheduledTrips.length} viaje(s) programado(s)`
                 : 'No tienes viajes asignados'}
@@ -200,7 +200,7 @@ const DriverHomePage = () => {
 
       {/* Quick Actions - large gradient grid 2x2 feel via 4 cols */}
       <div className="smooth-appear smooth-appear-2">
-        <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">
+        <h2 className="text-xs font-bold text-grafito-500 uppercase tracking-widest mb-3">
           Acciones Rápidas
         </h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -228,7 +228,7 @@ const DriverHomePage = () => {
       {/* Mantenimiento de tu unidad */}
       {myVehicle && (
         <div className="smooth-appear smooth-appear-2">
-          <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">
+          <h2 className="text-xs font-bold text-grafito-500 uppercase tracking-widest mb-3">
             Mantenimiento de tu Unidad
           </h2>
           {maintStatus && maintStatus.km_remaining != null ? (
@@ -238,7 +238,7 @@ const DriverHomePage = () => {
                   ? 'bg-red-50 border-red-200'
                   : maintStatus.due_soon
                   ? 'bg-marca-50 border-marca-200'
-                  : 'bg-white border-slate-200'
+                  : 'bg-white border-grafito-200'
               }`}
             >
               <CardContent className="p-4">
@@ -249,7 +249,7 @@ const DriverHomePage = () => {
                         ? 'bg-red-100 text-red-600'
                         : maintStatus.due_soon
                         ? 'bg-marca-100 text-marca-600'
-                        : 'bg-slate-100 text-slate-600'
+                        : 'bg-grafito-100 text-grafito-600'
                     }`}
                   >
                     <Gauge className="w-6 h-6" />
@@ -260,13 +260,13 @@ const DriverHomePage = () => {
                     ) : (
                       <p
                         className={`font-bold ${
-                          maintStatus.due_soon ? 'text-marca-700' : 'text-slate-800'
+                          maintStatus.due_soon ? 'text-marca-700' : 'text-grafito-800'
                         }`}
                       >
                         Faltan {Number(maintStatus.km_remaining).toLocaleString('es-PE')} km para el mantenimiento
                       </p>
                     )}
-                    <p className="text-xs text-slate-500 truncate">
+                    <p className="text-xs text-grafito-500 truncate">
                       {maintStatus.plan_name ? `Plan: ${maintStatus.plan_name}` : 'Plan preventivo'}
                       {maintStatus.next_service_km != null &&
                         ` · Próximo servicio a ${Number(maintStatus.next_service_km).toLocaleString('es-PE')} km`}
@@ -290,14 +290,14 @@ const DriverHomePage = () => {
               </CardContent>
             </Card>
           ) : (
-            <Card className="bg-white border-slate-200">
+            <Card className="bg-white border-grafito-200">
               <CardContent className="p-4 flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center flex-shrink-0">
+                <div className="w-12 h-12 rounded-xl bg-grafito-100 text-grafito-400 flex items-center justify-center flex-shrink-0">
                   <Wrench className="w-6 h-6" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold text-slate-700">Sin plan de mantenimiento asignado</p>
-                  <p className="text-xs text-slate-500">Reporta cualquier novedad de tu unidad</p>
+                  <p className="font-bold text-grafito-700">Sin plan de mantenimiento asignado</p>
+                  <p className="text-xs text-grafito-500">Reporta cualquier novedad de tu unidad</p>
                 </div>
                 <Button
                   variant="outline"
@@ -317,36 +317,36 @@ const DriverHomePage = () => {
       {/* Resumen de tu unidad */}
       {(myVehicle || activeTrip) && (
         <div className="smooth-appear smooth-appear-2">
-          <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">
+          <h2 className="text-xs font-bold text-grafito-500 uppercase tracking-widest mb-3">
             Resumen de tu Unidad
           </h2>
           <div className="grid grid-cols-2 gap-3">
-            <Card className="bg-white border-slate-200">
+            <Card className="bg-white border-grafito-200">
               <CardContent className="p-4">
-                <div className="flex items-center gap-2 text-slate-500 mb-1">
+                <div className="flex items-center gap-2 text-grafito-500 mb-1">
                   <Truck className="w-4 h-4" />
                   <span className="text-[10px] uppercase font-bold tracking-widest">Tracto</span>
                 </div>
-                <p className="font-mono font-black text-lg text-slate-900">
+                <p className="font-mono font-black text-lg text-grafito-900">
                   {myVehicle?.plate || activeTrip?.tracto_plate || '-'}
                 </p>
                 {myVehicle && (
-                  <p className="text-xs text-slate-500 truncate">
+                  <p className="text-xs text-grafito-500 truncate">
                     {myVehicle.brand} {myVehicle.model}
                   </p>
                 )}
               </CardContent>
             </Card>
-            <Card className="bg-white border-slate-200">
+            <Card className="bg-white border-grafito-200">
               <CardContent className="p-4">
-                <div className="flex items-center gap-2 text-slate-500 mb-1">
+                <div className="flex items-center gap-2 text-grafito-500 mb-1">
                   <Package className="w-4 h-4" />
                   <span className="text-[10px] uppercase font-bold tracking-widest">Carreta</span>
                 </div>
-                <p className="font-mono font-black text-lg text-slate-900">
+                <p className="font-mono font-black text-lg text-grafito-900">
                   {activeTrip?.carreta_plate || '-'}
                 </p>
-                <p className="text-xs text-slate-500 truncate">
+                <p className="text-xs text-grafito-500 truncate">
                   {activeTrip?.carreta_plate ? 'En viaje activo' : 'Sin carreta acoplada'}
                 </p>
               </CardContent>
@@ -358,7 +358,7 @@ const DriverHomePage = () => {
       {/* Scheduled Trips */}
       {scheduledTrips.length > 0 && (
         <div>
-          <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3">
+          <h2 className="text-sm font-bold text-grafito-500 uppercase tracking-wider mb-3">
             Próximos Viajes
           </h2>
           <div className="space-y-3">
@@ -375,18 +375,18 @@ const DriverHomePage = () => {
                     <Route className="w-6 h-6" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-bold text-slate-800 truncate">
+                    <h4 className="font-bold text-grafito-800 truncate">
                       {trip.client_name || 'Sin cliente'}
                     </h4>
-                    <p className="text-sm text-slate-500 truncate">
+                    <p className="text-sm text-grafito-500 truncate">
                       {trip.cargo_description}
                     </p>
-                    <div className="flex items-center gap-1 text-xs text-slate-400 mt-1">
+                    <div className="flex items-center gap-1 text-xs text-grafito-400 mt-1">
                       <Clock className="w-3 h-3" />
                       {format(new Date(trip.scheduled_date), "dd/MM HH:mm")}
                     </div>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-slate-400" />
+                  <ChevronRight className="w-5 h-5 text-grafito-400" />
                 </CardContent>
               </Card>
             ))}
@@ -397,7 +397,7 @@ const DriverHomePage = () => {
       {/* Alerts */}
       {alerts.length > 0 && (
         <div>
-          <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3">
+          <h2 className="text-sm font-bold text-grafito-500 uppercase tracking-wider mb-3">
             Alertas
           </h2>
           <div className="space-y-2">
@@ -414,7 +414,7 @@ const DriverHomePage = () => {
                   <AlertTriangle className={`w-5 h-5 ${
                     alert.severity === 'critical' ? 'text-red-500' : 'text-yellow-500'
                   }`} />
-                  <p className="text-sm text-slate-700 flex-1">{alert.message}</p>
+                  <p className="text-sm text-grafito-700 flex-1">{alert.message}</p>
                 </CardContent>
               </Card>
             ))}
@@ -426,7 +426,7 @@ const DriverHomePage = () => {
       <Card
         className="text-white border-0 overflow-hidden"
         style={{
-          backgroundImage: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+          backgroundImage: 'linear-gradient(135deg, #191614 0%, #2a2725 100%)',
         }}
       >
         <CardContent className="p-4 flex items-center justify-between relative">
@@ -437,7 +437,7 @@ const DriverHomePage = () => {
           />
           <div className="relative">
             <h3 className="font-bold">¿Necesitas ayuda?</h3>
-            <p className="text-sm text-slate-400">Contacta a tu supervisor</p>
+            <p className="text-sm text-grafito-400">Contacta a tu supervisor</p>
           </div>
           <Button variant="outline" className="relative bg-transparent border-white/25 text-white hover:bg-white/10 hover:text-white tap-scale btn-shine rounded-lg">
             Llamar

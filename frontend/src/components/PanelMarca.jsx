@@ -21,7 +21,7 @@ const PanelMarca = ({ marca = 'CargoXprez', titulo, descripcion, puntos = [] }) 
     className="hidden lg:flex relative flex-1 flex-col justify-between p-12 text-white overflow-hidden"
     style={{
       backgroundImage:
-        'linear-gradient(135deg, #0f172a 0%, #1e293b 55%, color-mix(in srgb, var(--brand-color) 35%, #1e293b) 100%)',
+        'linear-gradient(150deg, #0b0908 0%, #191614 48%, #2a2725 78%, color-mix(in srgb, var(--brand-color) 16%, #201d1b) 100%)',
     }}
   >
     {/* Trama de puntos */}
@@ -36,12 +36,12 @@ const PanelMarca = ({ marca = 'CargoXprez', titulo, descripcion, puntos = [] }) 
     {/* Resplandores */}
     <div
       aria-hidden
-      className="absolute -top-32 -right-32 w-[480px] h-[480px] rounded-full blur-3xl opacity-30 float-animation"
+      className="absolute -top-40 -right-44 w-[420px] h-[420px] rounded-full blur-3xl opacity-[0.14] float-animation"
       style={{ background: 'var(--brand-color)' }}
     />
     <div
       aria-hidden
-      className="absolute -bottom-40 -left-20 w-[420px] h-[420px] rounded-full blur-3xl opacity-20 float-rotate"
+      className="absolute -bottom-48 -left-24 w-[380px] h-[380px] rounded-full blur-3xl opacity-[0.10] float-rotate"
       style={{ background: 'var(--brand-color)' }}
     />
     {/* Formas y particulas */}
@@ -77,12 +77,12 @@ const PanelMarca = ({ marca = 'CargoXprez', titulo, descripcion, puntos = [] }) 
         {titulo}
       </h2>
       {descripcion && (
-        <p className="mt-6 text-slate-300 text-lg leading-relaxed">{descripcion}</p>
+        <p className="mt-6 text-grafito-300 text-lg leading-relaxed">{descripcion}</p>
       )}
       {puntos.length > 0 && (
         <ul className="mt-8 space-y-3">
           {puntos.map((punto) => (
-            <li key={punto} className="flex items-center gap-3 text-slate-200">
+            <li key={punto} className="flex items-center gap-3 text-grafito-200">
               <CheckCircle2 className="w-5 h-5 flex-shrink-0" style={{ color: 'var(--brand-color)' }} />
               <span className="text-sm">{punto}</span>
             </li>
@@ -92,11 +92,11 @@ const PanelMarca = ({ marca = 'CargoXprez', titulo, descripcion, puntos = [] }) 
     </div>
 
     {/* Pie legal */}
-    <div className="relative z-10 text-slate-400 text-xs">
+    <div className="relative z-10 text-grafito-400 text-xs">
       &copy; 2026 {marca} &mdash;{' '}
-      <a href="/privacidad" className="underline underline-offset-4 hover:text-marca-500">Privacidad</a>{' '}
+      <a href="/privacidad" className="underline underline-offset-4 hover:text-marca-300">Privacidad</a>{' '}
       &middot;{' '}
-      <a href="/terminos" className="underline underline-offset-4 hover:text-marca-500">T&eacute;rminos</a>
+      <a href="/terminos" className="underline underline-offset-4 hover:text-marca-300">T&eacute;rminos</a>
     </div>
   </div>
 );

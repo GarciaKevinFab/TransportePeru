@@ -104,7 +104,7 @@ const AxleConfigDialog = ({ open, onOpenChange, initialAxles, saving, onSave }) 
               return (
                 <div
                   key={globalIdx}
-                  className="rounded-md border border-slate-200 p-3 bg-slate-50"
+                  className="rounded-md border border-grafito-200 p-3 bg-grafito-50"
                   data-testid={`axle-config-row-${globalIdx}`}
                 >
                   <div className="flex flex-col md:flex-row md:items-end gap-3">
@@ -140,16 +140,16 @@ const AxleConfigDialog = ({ open, onOpenChange, initialAxles, saving, onSave }) 
                         {axle.dual ? (
                           <CircleDot className="w-4 h-4 text-emerald-600" />
                         ) : (
-                          <Circle className="w-4 h-4 text-slate-500" />
+                          <Circle className="w-4 h-4 text-grafito-500" />
                         )}
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-slate-500">Balón</span>
+                          <span className="text-xs text-grafito-500">Balón</span>
                           <Switch
                             checked={axle.dual}
                             onCheckedChange={(v) => updateAt(globalIdx, { dual: v })}
                             data-testid={`axle-dual-switch-${globalIdx}`}
                           />
-                          <span className="text-xs font-medium text-slate-700">Dual</span>
+                          <span className="text-xs font-medium text-grafito-700">Dual</span>
                         </div>
                       </div>
                       <Button
@@ -174,10 +174,10 @@ const AxleConfigDialog = ({ open, onOpenChange, initialAxles, saving, onSave }) 
           </div>
 
           {/* Spares */}
-          <div className="space-y-2 pt-2 border-t border-dashed border-slate-300">
+          <div className="space-y-2 pt-2 border-t border-dashed border-grafito-300">
             <Label className="input-label">Repuestos</Label>
             {spares.length === 0 && (
-              <p className="text-xs text-slate-400">Sin repuestos configurados.</p>
+              <p className="text-xs text-grafito-400">Sin repuestos configurados.</p>
             )}
             {spares.map((sp) => {
               const globalIdx = axles.indexOf(sp);

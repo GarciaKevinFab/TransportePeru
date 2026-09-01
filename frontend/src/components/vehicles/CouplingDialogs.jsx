@@ -76,7 +76,7 @@ export const CouplingDialog = ({
               </SelectContent>
             </Select>
             {availableCarretas.length === 0 && (
-              <p className="text-xs text-slate-500">No hay carretas disponibles para acoplar.</p>
+              <p className="text-xs text-grafito-500">No hay carretas disponibles para acoplar.</p>
             )}
           </div>
         </div>
@@ -124,26 +124,26 @@ export const CouplingInfoDialog = ({
           {(() => {
             if (!vehicle) return null;
             const coupling = getActiveCouplingForVehicle(vehicle.id);
-            if (!coupling) return <p className="text-slate-500">Sin tracto acoplado.</p>;
+            if (!coupling) return <p className="text-grafito-500">Sin tracto acoplado.</p>;
             const tracto = vehicles.find((v) => v.id === coupling.tracto_id);
-            if (!tracto) return <p className="text-slate-500">Tracto no encontrado.</p>;
+            if (!tracto) return <p className="text-grafito-500">Tracto no encontrado.</p>;
             return (
-              <div className="space-y-3 p-4 bg-slate-50 rounded-sm">
+              <div className="space-y-3 p-4 bg-grafito-50 rounded-sm">
                 <div>
-                  <p className="text-xs uppercase text-slate-500 font-bold">Placa</p>
+                  <p className="text-xs uppercase text-grafito-500 font-bold">Placa</p>
                   <p className="font-mono font-bold text-lg">{tracto.plate}</p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase text-slate-500 font-bold">Marca / Modelo</p>
+                  <p className="text-xs uppercase text-grafito-500 font-bold">Marca / Modelo</p>
                   <p>{tracto.brand || '-'} {tracto.model || ''}</p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase text-slate-500 font-bold">Chofer</p>
+                  <p className="text-xs uppercase text-grafito-500 font-bold">Chofer</p>
                   <p>{getDriverName(tracto.assigned_driver_id) || 'Sin asignar'}</p>
                 </div>
                 {coupling.start_date && (
                   <div>
-                    <p className="text-xs uppercase text-slate-500 font-bold">Acoplado desde</p>
+                    <p className="text-xs uppercase text-grafito-500 font-bold">Acoplado desde</p>
                     <p className="text-sm">{coupling.start_date.substring(0, 10)}</p>
                   </div>
                 )}

@@ -316,10 +316,10 @@ const SettingsPage = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-slate-900">
+          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
             Configuración
           </h1>
-          <p className="text-slate-500 mt-1">
+          <p className="text-grafito-500 mt-1">
             Configuración general del sistema
           </p>
         </div>
@@ -327,16 +327,16 @@ const SettingsPage = () => {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="bg-slate-100 rounded-sm">
-          <TabsTrigger value="company" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
+        <TabsList className="bg-grafito-100 rounded-sm">
+          <TabsTrigger value="company" className="rounded-sm data-[state=active]:bg-grafito-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
             <Building2 className="w-4 h-4 mr-2" />
             Empresa
           </TabsTrigger>
-          <TabsTrigger value="documents" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
+          <TabsTrigger value="documents" className="rounded-sm data-[state=active]:bg-grafito-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
             <FileText className="w-4 h-4 mr-2" />
             Documentos
           </TabsTrigger>
-          <TabsTrigger value="checklists" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
+          <TabsTrigger value="checklists" className="rounded-sm data-[state=active]:bg-grafito-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
             <ClipboardList className="w-4 h-4 mr-2" />
             Checklists
           </TabsTrigger>
@@ -354,7 +354,7 @@ const SettingsPage = () => {
                 <div className="space-y-3">
                   <Label className="input-label">Logo de la Empresa</Label>
                   <div className="flex items-center gap-4">
-                    <div className="w-24 h-24 rounded-lg border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden bg-slate-50 shrink-0">
+                    <div className="w-24 h-24 rounded-lg border-2 border-dashed border-grafito-300 flex items-center justify-center overflow-hidden bg-grafito-50 shrink-0">
                       {companyForm.logo_url ? (
                         <img
                           src={companyForm.logo_url}
@@ -364,8 +364,8 @@ const SettingsPage = () => {
                         />
                       ) : (
                         <div className="text-center">
-                          <Image className="w-8 h-8 text-slate-300 mx-auto" />
-                          <span className="text-xs text-slate-400 mt-1">Sin logo</span>
+                          <Image className="w-8 h-8 text-grafito-300 mx-auto" />
+                          <span className="text-xs text-grafito-400 mt-1">Sin logo</span>
                         </div>
                       )}
                     </div>
@@ -377,7 +377,7 @@ const SettingsPage = () => {
                           {uploadingLogo ? 'Subiendo...' : 'Subir Logo'}
                         </div>
                       </label>
-                      <p className="text-xs text-slate-500">PNG, JPG o SVG. Máx 2MB</p>
+                      <p className="text-xs text-grafito-500">PNG, JPG o SVG. Máx 2MB</p>
                       {companyForm.logo_url && (
                         <button
                           className="text-xs text-red-500 hover:text-red-700 underline"
@@ -396,7 +396,7 @@ const SettingsPage = () => {
                       type="color"
                       value={companyForm.brand_color || '#e00000'}
                       onChange={(e) => setCompanyForm({ ...companyForm, brand_color: e.target.value })}
-                      className="w-12 h-12 rounded-lg cursor-pointer border border-slate-300 p-1"
+                      className="w-12 h-12 rounded-lg cursor-pointer border border-grafito-300 p-1"
                     />
                     <div className="space-y-1">
                       <Input
@@ -405,14 +405,14 @@ const SettingsPage = () => {
                         className="rounded-sm w-28 font-mono text-sm"
                         maxLength={7}
                       />
-                      <p className="text-xs text-slate-500">Se usa en sidebar y botones</p>
+                      <p className="text-xs text-grafito-500">Se usa en sidebar y botones</p>
                     </div>
                   </div>
                   <div className="flex gap-2 mt-2">
                     {['#e00000', '#3b82f6', '#10b981', '#ef4444', '#8b5cf6', '#06b6d4'].map(color => (
                       <button
                         key={color}
-                        className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${companyForm.brand_color === color ? 'border-slate-900 scale-110' : 'border-transparent'}`}
+                        className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${companyForm.brand_color === color ? 'border-grafito-900 scale-110' : 'border-transparent'}`}
                         style={{ backgroundColor: color }}
                         onClick={() => setCompanyForm({ ...companyForm, brand_color: color })}
                       />
@@ -432,7 +432,7 @@ const SettingsPage = () => {
                 </div>
                 <div className="space-y-2">
                   <Label className="input-label">RUC</Label>
-                  <Input value={company?.ruc || ''} disabled className="rounded-sm bg-slate-50" />
+                  <Input value={company?.ruc || ''} disabled className="rounded-sm bg-grafito-50" />
                 </div>
               </div>
               <div className="space-y-2">
@@ -464,12 +464,12 @@ const SettingsPage = () => {
               </div>
               
               <div className="pt-4 border-t">
-                <h3 className="font-bold uppercase text-sm text-slate-500 mb-4">Configuración Operativa</h3>
+                <h3 className="font-bold uppercase text-sm text-grafito-500 mb-4">Configuración Operativa</h3>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-medium">Requerir checklist para iniciar viaje</p>
-                      <p className="text-sm text-slate-500">El chofer debe completar el checklist antes de iniciar</p>
+                      <p className="text-sm text-grafito-500">El chofer debe completar el checklist antes de iniciar</p>
                     </div>
                     <Switch
                       checked={companyForm.config?.require_checklist_for_start ?? true}
@@ -482,7 +482,7 @@ const SettingsPage = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-medium">Bloquear viaje con checklist crítico</p>
-                      <p className="text-sm text-slate-500">No permite iniciar si hay items críticos fallidos</p>
+                      <p className="text-sm text-grafito-500">No permite iniciar si hay items críticos fallidos</p>
                     </div>
                     <Switch
                       checked={companyForm.config?.block_trip_on_critical_checklist ?? true}
@@ -495,7 +495,7 @@ const SettingsPage = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-medium">Crear incidencia automática</p>
-                      <p className="text-sm text-slate-500">Crea incidente cuando hay checklist crítico</p>
+                      <p className="text-sm text-grafito-500">Crea incidente cuando hay checklist crítico</p>
                     </div>
                     <Switch
                       checked={companyForm.config?.auto_create_issue_on_critical ?? true}
@@ -560,21 +560,21 @@ const SettingsPage = () => {
                         {dt.is_critical ? (
                           <AlertTriangle className="w-4 h-4 text-red-500" />
                         ) : (
-                          <span className="text-slate-400">-</span>
+                          <span className="text-grafito-400">-</span>
                         )}
                       </TableCell>
                       <TableCell>
                         {dt.requires_expiry ? (
                           <CheckCircle className="w-4 h-4 text-green-500" />
                         ) : (
-                          <span className="text-slate-400">-</span>
+                          <span className="text-grafito-400">-</span>
                         )}
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className={
                           dt.block_rule === 'bloquea_inicio' ? 'bg-red-100 text-red-700' :
                           dt.block_rule === 'bloquea_asignacion' ? 'bg-marca-100 text-marca-700' :
-                          'bg-slate-100'
+                          'bg-grafito-100'
                         }>
                           {blockRules.find(r => r.value === dt.block_rule)?.label || dt.block_rule}
                         </Badge>
@@ -616,7 +616,7 @@ const SettingsPage = () => {
             </CardHeader>
             <CardContent className="p-0 overflow-x-auto">
               {checklistTemplates.length === 0 ? (
-                <div className="py-12 text-center text-slate-400">
+                <div className="py-12 text-center text-grafito-400">
                   <ClipboardList className="w-12 h-12 mx-auto mb-2" />
                   <p>No hay plantillas de checklist</p>
                   <p className="text-sm">Se usará la plantilla por defecto del sistema</p>
@@ -639,7 +639,7 @@ const SettingsPage = () => {
                         <TableCell className="capitalize">{t.vehicle_type || 'Todos'}</TableCell>
                         <TableCell>{t.items?.length || 0} items</TableCell>
                         <TableCell>
-                          <Badge className={t.is_active ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-700'}>
+                          <Badge className={t.is_active ? 'bg-green-100 text-green-700' : 'bg-grafito-100 text-grafito-700'}>
                             {t.is_active ? 'Activo' : 'Inactivo'}
                           </Badge>
                         </TableCell>
@@ -700,7 +700,7 @@ const SettingsPage = () => {
                     <SelectItem key={r.value} value={r.value}>
                       <div>
                         <p>{r.label}</p>
-                        <p className="text-xs text-slate-500">{r.description}</p>
+                        <p className="text-xs text-grafito-500">{r.description}</p>
                       </div>
                     </SelectItem>
                   ))}
@@ -775,10 +775,10 @@ const SettingsPage = () => {
             </div>
             
             <div className="border-t pt-4">
-              <h3 className="font-bold uppercase text-sm text-slate-500 mb-4">Items del Checklist</h3>
+              <h3 className="font-bold uppercase text-sm text-grafito-500 mb-4">Items del Checklist</h3>
               
               {/* Add Item Form */}
-              <div className="grid grid-cols-4 gap-2 mb-4 p-3 bg-slate-50 rounded-sm">
+              <div className="grid grid-cols-4 gap-2 mb-4 p-3 bg-grafito-50 rounded-sm">
                 <Input
                   placeholder="Categoría"
                   value={newChecklistItem.category}
@@ -816,7 +816,7 @@ const SettingsPage = () => {
               
               {/* Items List */}
               {templateForm.items.length === 0 ? (
-                <p className="text-center text-slate-400 py-4">No hay items. Agregue items usando el formulario de arriba.</p>
+                <p className="text-center text-grafito-400 py-4">No hay items. Agregue items usando el formulario de arriba.</p>
               ) : (
                 <div className="space-y-2 max-h-[300px] overflow-y-auto">
                   {templateForm.items.map((item, index) => (

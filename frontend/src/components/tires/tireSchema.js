@@ -18,7 +18,7 @@ export const AXLE_TYPES = ['direccional', 'traccion', 'muerto', 'levantable'];
 export const AXLE_TYPE_META = {
   direccional: { label: 'Direccional', bar: 'bg-amber-400', dot: 'bg-amber-400' },
   traccion: { label: 'Tracción', bar: 'bg-emerald-500', dot: 'bg-emerald-500' },
-  muerto: { label: 'Muerto', bar: 'bg-slate-400', dot: 'bg-slate-400' },
+  muerto: { label: 'Muerto', bar: 'bg-grafito-400', dot: 'bg-grafito-400' },
   levantable: { label: 'Levantable', bar: 'bg-blue-500', dot: 'bg-blue-500' },
 };
 

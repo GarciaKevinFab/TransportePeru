@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PROVEEDOR, AVISO_DE_MARCA } from '../config/proveedor';
+import LogoMarca from '../components/LogoMarca';
+import IconoCamion from '../components/IconoCamion';
 import { ComparativaPlanes, Preguntas } from '../components/landing/Comparativa';
 import Testimonio from '../components/landing/Testimonio';
 import { Revelado, Cifra, CapturaTilt } from '../components/landing/animaciones';
 import {
-  Truck, Route as RouteIcon, Fuel, Wrench, CircleDot, FileText,
+  Route as RouteIcon, Fuel, Wrench, CircleDot, FileText,
   ShieldCheck, Smartphone, MessageCircle, ScanLine, Building2,
   ArrowRight, Check, Menu, X, BookOpen,
 } from 'lucide-react';
@@ -160,31 +162,26 @@ const Cabecera = () => {
   const [abierto, setAbierto] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-white/5 bg-slate-950/80 backdrop-blur">
+    <header className="sticky top-0 z-50 border-b border-white/5 bg-grafito-950/80 backdrop-blur">
       <nav className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
         {/* El logo de la marca registrada, no un icono generico. Lleva el
             nombre dentro, asi que sustituye tambien al texto.
 
-            El drop-shadow claro NO es decoracion: el logotipo tiene contornos
-            y camion negros, y sobre este fondo casi negro se perderian. El
-            halo los separa del fondo sin retocar el archivo -que es la marca
-            registrada y se reivindica en sus colores-. */}
+            Va por LogoMarca y no como <img> suelto a proposito: el filete que
+            separa sus perfiles negros del fondo oscuro es una decision de
+            marca, y tenerla en dos sitios garantiza que un dia se cambie en
+            uno solo. */}
         <Link to="/" className="flex items-center" onClick={() => setAbierto(false)}>
-          <img
-            src="/cargoxprez.png"
-            alt={PRODUCTO}
-            className="h-14 w-auto sm:h-16"
-            style={{ filter: 'drop-shadow(0 0 1px rgba(255,255,255,.75)) drop-shadow(0 1px 3px rgba(255,255,255,.25))' }}
-          />
+          <LogoMarca className="h-14 w-auto sm:h-16" />
         </Link>
 
         <div className="hidden items-center gap-8 md:flex">
           {ENLACES_NAV.map(([href, texto]) => (
-            <a key={href} href={href} className="text-sm text-slate-300 transition hover:text-white">
+            <a key={href} href={href} className="text-sm text-grafito-300 transition hover:text-white">
               {texto}
             </a>
           ))}
-          <Link to="/login" className="text-sm text-slate-300 transition hover:text-white">Entrar</Link>
+          <Link to="/login" className="text-sm text-grafito-300 transition hover:text-white">Entrar</Link>
         </div>
 
         <div className="flex items-center gap-2">
@@ -200,7 +197,7 @@ const Cabecera = () => {
             aria-expanded={abierto}
             aria-controls="menu-movil"
             aria-label={abierto ? 'Cerrar menú' : 'Abrir menú'}
-            className="grid h-10 w-10 place-items-center rounded-lg border border-white/10 text-slate-300 transition hover:text-white md:hidden"
+            className="grid h-10 w-10 place-items-center rounded-lg border border-white/10 text-grafito-300 transition hover:text-white md:hidden"
           >
             {abierto ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
@@ -214,7 +211,7 @@ const Cabecera = () => {
               key={href}
               href={href}
               onClick={() => setAbierto(false)}
-              className="block border-b border-white/5 py-3.5 text-[15px] text-slate-200"
+              className="block border-b border-white/5 py-3.5 text-[15px] text-grafito-200"
             >
               {texto}
             </a>
@@ -233,7 +230,7 @@ const Cabecera = () => {
 };
 
 const LandingPage = () => (
-  <div className="min-h-screen bg-slate-950 text-slate-100 antialiased">
+  <div className="min-h-screen bg-grafito-950 text-grafito-100 antialiased">
     <Cabecera />
 
     <Seccion className="pt-20 md:pt-28">
@@ -241,11 +238,11 @@ const LandingPage = () => (
 
       <h1 className="font-heading max-w-4xl text-5xl font-black leading-[1.05] tracking-tight md:text-7xl">
         Tu flota ya genera los datos.
-        <span className="block text-slate-500">El problema es que viven</span>
+        <span className="block text-grafito-400">El problema es que viven</span>
         <span className="block">en seis cuadernos distintos.</span>
       </h1>
 
-      <p className="mt-8 max-w-2xl text-lg leading-relaxed text-slate-400">
+      <p className="mt-8 max-w-2xl text-lg leading-relaxed text-grafito-400">
         Viajes, combustible, llantas, mantenimiento y documentos en un solo
         sitio. El chofer carga desde el celular, la liquidación sale sola y el
         SOAT vencido te avisa antes de que lo pare la policía.
@@ -266,7 +263,7 @@ const LandingPage = () => (
         </a>
       </div>
 
-      <p className="mt-6 flex items-center gap-2 text-sm text-slate-500">
+      <p className="mt-6 flex items-center gap-2 text-sm text-grafito-400">
         <span className="h-1.5 w-1.5 rounded-full bg-marca-500" />
         14 días de prueba. Sin tarjeta.
       </p>
@@ -288,10 +285,10 @@ const LandingPage = () => (
         <div
           aria-hidden="true"
           className="pointer-events-none absolute -inset-x-8 -top-8 bottom-10 rounded-[2rem]
-                     bg-[radial-gradient(60%_60%_at_50%_0%,rgba(249,115,22,0.16),transparent_70%)] blur-2xl"
+                     bg-[radial-gradient(60%_60%_at_50%_0%,rgba(224,0,0,0.16),transparent_70%)] blur-2xl"
         />
         <CapturaTilt>
-        <div className="relative overflow-hidden rounded-xl border border-white/10 bg-slate-900/60 shadow-2xl shadow-black/60 ring-1 ring-white/5">
+        <div className="relative overflow-hidden rounded-xl border border-white/10 bg-grafito-900/60 shadow-2xl shadow-black/60 ring-1 ring-white/5">
           <img
             src="/capturas/panel.webp"
             alt="Panel de CargoXprez: vehículos disponibles, viajes activos, alertas y documentos por vencer"
@@ -303,7 +300,7 @@ const LandingPage = () => (
           />
         </div>
         </CapturaTilt>
-        <figcaption className="mt-4 text-center text-sm text-slate-500">
+        <figcaption className="mt-4 text-center text-sm text-grafito-400">
           El panel al abrir el sistema: qué está en ruta, qué vence y qué está parado.
         </figcaption>
       </figure>
@@ -327,7 +324,7 @@ const LandingPage = () => (
         ].map((c) => (
           <Revelado key={c.src} retraso={0}>
           <figure className="group">
-            <div className="overflow-hidden rounded-lg border border-white/10 bg-slate-900/60 transition group-hover:border-white/20">
+            <div className="overflow-hidden rounded-lg border border-white/10 bg-grafito-900/60 transition group-hover:border-white/20">
               <img
                 src={c.src}
                 alt={c.alt}
@@ -339,10 +336,10 @@ const LandingPage = () => (
               />
             </div>
             <figcaption className="mt-4">
-              <h3 className="font-heading text-lg font-bold tracking-tight text-slate-100">
+              <h3 className="font-heading text-lg font-bold tracking-tight text-grafito-100">
                 {c.titulo}
               </h3>
-              <p className="mt-1.5 text-sm leading-relaxed text-slate-400">{c.texto}</p>
+              <p className="mt-1.5 text-sm leading-relaxed text-grafito-400">{c.texto}</p>
             </figcaption>
           </figure>
           </Revelado>
@@ -369,7 +366,7 @@ const LandingPage = () => (
               <dt className="font-heading text-4xl font-black tracking-tight text-marca-400">
                 <Cifra valor={cifra} />
               </dt>
-              <dd className="mt-1.5 text-sm leading-snug text-slate-400">{texto}</dd>
+              <dd className="mt-1.5 text-sm leading-snug text-grafito-400">{texto}</dd>
             </div>
           ))}
         </dl>
@@ -383,7 +380,7 @@ const LandingPage = () => (
       <h2 className="font-heading max-w-3xl text-3xl font-black tracking-tight md:text-4xl">
         Operar, mantener, cumplir.
       </h2>
-      <p className="mt-5 max-w-2xl text-slate-400">
+      <p className="mt-5 max-w-2xl text-grafito-400">
         Las tres cosas que hacen que un camión salga hoy y siga saliendo el mes
         que viene.
       </p>
@@ -392,18 +389,21 @@ const LandingPage = () => (
         {PASOS.map(({ n, titulo, texto, icono: Icono }) => (
           <div key={n}>
             <div className="mb-5 flex items-center gap-3">
-              <span className="text-xs font-bold tracking-[0.2em] text-marca-500">{n}</span>
+              {/* El rojo de marca puro a 12 px sobre el grafito da 3,9:1 y estos
+                  numeros son informacion, no adorno: van en el tono claro de la
+                  escala, que es el mismo rojo con luz suficiente para leerse. */}
+              <span className="text-xs font-bold tracking-[0.2em] text-marca-400">{n}</span>
               <span className="h-px flex-1 bg-white/10" />
               <Icono className="h-5 w-5 text-marca-500" />
             </div>
             <h3 className="font-heading text-xl font-bold tracking-tight">{titulo}</h3>
-            <p className="mt-3 leading-relaxed text-slate-400">{texto}</p>
+            <p className="mt-3 leading-relaxed text-grafito-400">{texto}</p>
           </div>
         ))}
       </div>
     </Seccion>
 
-    <Seccion id="modulos" className="border-t border-white/5 bg-slate-900/40">
+    <Seccion id="modulos" className="border-t border-white/5 bg-grafito-900/40">
       <h2 className="font-heading max-w-3xl text-3xl font-black tracking-tight md:text-4xl">
         Todo lo que hoy está en un cuaderno.
       </h2>
@@ -414,7 +414,7 @@ const LandingPage = () => (
             <div className="border-t border-white/10 pt-5">
               <Icono className="h-5 w-5 text-marca-500" />
               <h3 className="mt-3 font-bold">{nombre}</h3>
-              <p className="mt-1.5 text-sm leading-relaxed text-slate-400">{texto}</p>
+              <p className="mt-1.5 text-sm leading-relaxed text-grafito-400">{texto}</p>
             </div>
           </Revelado>
         ))}
@@ -434,18 +434,18 @@ const LandingPage = () => (
             </span>
             <div>
               <h3 className="font-heading text-xl font-bold tracking-tight">{titulo}</h3>
-              <p className="mt-2 leading-relaxed text-slate-400">{texto}</p>
+              <p className="mt-2 leading-relaxed text-grafito-400">{texto}</p>
             </div>
           </div>
         ))}
       </div>
     </Seccion>
 
-    <Seccion id="planes" className="border-t border-white/5 bg-slate-900/40">
+    <Seccion id="planes" className="border-t border-white/5 bg-grafito-900/40">
       <h2 className="font-heading max-w-3xl text-3xl font-black tracking-tight md:text-4xl">
         Un viaje mal liquidado cuesta más.
       </h2>
-      <p className="mt-5 max-w-2xl text-slate-400">
+      <p className="mt-5 max-w-2xl text-grafito-400">
         Empiezas gratis y sin tarjeta. Si no te sirve, no pagas nada.
       </p>
 
@@ -465,17 +465,17 @@ const LandingPage = () => (
               </span>
             )}
             <h3 className="font-heading text-xl font-bold tracking-tight">{p.nombre}</h3>
-            <p className="mt-1 text-sm text-slate-400">{p.para}</p>
+            <p className="mt-1 text-sm text-grafito-400">{p.para}</p>
 
             <div className="mt-6 flex items-baseline gap-1">
               <span className="font-heading text-4xl font-black tracking-tight">{p.precio}</span>
-              {p.periodo && <span className="text-slate-400">{p.periodo}</span>}
+              {p.periodo && <span className="text-grafito-400">{p.periodo}</span>}
             </div>
             <p className="mt-2 text-sm font-semibold text-marca-400">{p.limite}</p>
 
             <ul className="mt-7 space-y-3">
               {p.incluye.map((i) => (
-                <li key={i} className="flex items-start gap-2.5 text-sm text-slate-300">
+                <li key={i} className="flex items-start gap-2.5 text-sm text-grafito-300">
                   <Check className="mt-0.5 h-4 w-4 shrink-0 text-marca-500" />
                   {i}
                 </li>
@@ -511,7 +511,7 @@ const LandingPage = () => (
         <h2 className="font-heading mx-auto max-w-2xl text-3xl font-black tracking-tight md:text-4xl">
           Tu próximo viaje puede estar acá dentro.
         </h2>
-        <p className="mx-auto mt-5 max-w-xl text-slate-400">
+        <p className="mx-auto mt-5 max-w-xl text-grafito-400">
           Se configura en una tarde: cargas tus unidades, tus choferes y tus
           rutas, y empiezas a operar.
         </p>
@@ -521,7 +521,7 @@ const LandingPage = () => (
         >
           Empezar gratis <ArrowRight className="h-4 w-4" />
         </Link>
-        <p className="mt-5 text-sm text-slate-500">14 días de prueba. Sin tarjeta.</p>
+        <p className="mt-5 text-sm text-grafito-400">14 días de prueba. Sin tarjeta.</p>
       </div>
     </Seccion>
 
@@ -535,13 +535,13 @@ const LandingPage = () => (
           <div>
             <div className="flex items-center gap-2.5">
               <span className="grid h-9 w-9 place-items-center rounded-lg bg-marca-500">
-                <Truck className="h-5 w-5 text-white" />
+                <IconoCamion className="h-5 w-5 text-white" />
               </span>
-              <span className="font-heading text-lg font-black uppercase tracking-tight text-slate-100">
+              <span className="font-heading text-lg font-black uppercase tracking-tight text-grafito-100">
                 {PRODUCTO}
               </span>
             </div>
-            <p className="mt-4 max-w-xs text-sm leading-relaxed text-slate-500">
+            <p className="mt-4 max-w-xs text-sm leading-relaxed text-grafito-400">
               Gestión de flota para transportistas del Perú. Viajes, llantas,
               mantenimiento y SUNAT en un solo sitio.
             </p>
@@ -567,18 +567,18 @@ const LandingPage = () => (
             ]],
           ].map(([titulo, enlaces]) => (
             <nav key={titulo} aria-label={titulo}>
-              <h3 className="font-heading text-sm font-bold uppercase tracking-wide text-slate-400">
+              <h3 className="font-heading text-sm font-bold uppercase tracking-wide text-grafito-400">
                 {titulo}
               </h3>
               <ul className="mt-4 space-y-2.5">
                 {enlaces.map(([href, texto]) => (
                   <li key={href}>
                     {href.startsWith('/') ? (
-                      <Link to={href} className="text-sm text-slate-500 transition hover:text-white">
+                      <Link to={href} className="text-sm text-grafito-400 transition hover:text-white">
                         {texto}
                       </Link>
                     ) : (
-                      <a href={href} className="text-sm text-slate-500 transition hover:text-white">
+                      <a href={href} className="text-sm text-grafito-400 transition hover:text-white">
                         {texto}
                       </a>
                     )}
@@ -597,7 +597,7 @@ const LandingPage = () => (
           {/* La razon social y el RUC en el pie: es lo que identifica a quien
               vende, y una web que cobra tiene que decirlo sin que haya que
               buscarlo dentro de los terminos. */}
-          <p className="text-sm leading-relaxed text-slate-600">
+          <p className="text-sm leading-relaxed text-grafito-600">
             &copy; {new Date().getFullYear()} {PROVEEDOR.razonSocial} — RUC {PROVEEDOR.ruc}
             <br />
             {PROVEEDOR.ciudad}, Perú.
@@ -612,10 +612,10 @@ const LandingPage = () => (
               <BookOpen className="h-4 w-4 text-marca-400" />
             </span>
             <span className="leading-tight">
-              <span className="block text-[11px] font-bold uppercase tracking-widest text-slate-500">
+              <span className="block text-[11px] font-bold uppercase tracking-widest text-grafito-400">
                 Libro de
               </span>
-              <span className="font-heading block text-sm font-bold text-slate-300 transition group-hover:text-white">
+              <span className="font-heading block text-sm font-bold text-grafito-300 transition group-hover:text-white">
                 Reclamaciones
               </span>
             </span>

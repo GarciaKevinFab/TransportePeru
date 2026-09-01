@@ -67,7 +67,7 @@ const cargarRecurso = (etiqueta, atributos) =>
 
 const Campo = ({ etiqueta, children }) => (
   <div>
-    <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-400">
+    <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-grafito-400">
       {etiqueta}
     </label>
     {children}
@@ -75,7 +75,7 @@ const Campo = ({ etiqueta, children }) => (
 );
 
 const inputCls =
-  'w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-slate-100 placeholder:text-slate-500 outline-none transition focus:border-marca-500/60 focus:bg-white/[0.07]';
+  'w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-grafito-100 placeholder:text-grafito-400 outline-none transition focus:border-marca-500/60 focus:bg-white/[0.07]';
 
 const CheckoutPage = () => {
   const [params] = useSearchParams();
@@ -187,14 +187,14 @@ const CheckoutPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 antialiased">
+    <div className="min-h-screen bg-grafito-950 text-grafito-100 antialiased">
       {/* Barra minima: logo de vuelta a la landing y el candado. En un
           checkout, cuanta menos navegacion, mejor. */}
       <header className="flex items-center justify-between px-6 py-5 md:px-10">
         <Link to="/" className="flex items-center">
           <LogoMarca className="h-14 w-auto" />
         </Link>
-        <span className="flex items-center gap-1.5 text-xs text-slate-400">
+        <span className="flex items-center gap-1.5 text-xs text-grafito-400">
           <Lock className="h-3.5 w-3.5" />
           Compra segura
         </span>
@@ -203,7 +203,7 @@ const CheckoutPage = () => {
       <main className="mx-auto w-full max-w-4xl px-6 pb-20 pt-4 md:pt-8">
         {!orden ? (
           <>
-            <Link to="/#planes" className="inline-flex items-center gap-1.5 text-sm text-slate-400 transition hover:text-slate-200">
+            <Link to="/#planes" className="inline-flex items-center gap-1.5 text-sm text-grafito-400 transition hover:text-grafito-200">
               <ArrowLeft className="h-4 w-4" />
               Volver a los planes
             </Link>
@@ -218,13 +218,13 @@ const CheckoutPage = () => {
                 className="h-fit rounded-2xl border border-white/10 bg-white/[0.03] p-7"
                 data-testid="resumen-pedido"
               >
-                <h2 className="font-heading text-sm font-bold uppercase tracking-widest text-slate-400">
+                <h2 className="font-heading text-sm font-bold uppercase tracking-widest text-grafito-400">
                   Tu pedido
                 </h2>
                 <div className="mt-5 flex items-start justify-between gap-4">
                   <div>
                     <p className="font-heading text-lg font-bold">{plan.nombre}</p>
-                    <p className="mt-1 text-sm leading-relaxed text-slate-400">{plan.detalle}</p>
+                    <p className="mt-1 text-sm leading-relaxed text-grafito-400">{plan.detalle}</p>
                   </div>
                   <p className="font-heading whitespace-nowrap text-lg font-bold">
                     S/ {plan.precio.toFixed(2)}
@@ -237,11 +237,11 @@ const CheckoutPage = () => {
                       S/ {plan.precio.toFixed(2)}
                     </span>
                   </div>
-                  <p className="mt-2 text-xs text-slate-500">
+                  <p className="mt-2 text-xs text-grafito-400">
                     Precio en soles. Incluye IGV. Se renueva cada mes y puedes cancelar cuando quieras.
                   </p>
                 </div>
-                <p className="mt-5 text-xs text-slate-500">
+                <p className="mt-5 text-xs text-grafito-400">
                   ¿Solo quieres probar? El{' '}
                   <Link to="/registro" className="text-marca-400 underline-offset-2 hover:underline">
                     plan Gratis
@@ -252,7 +252,7 @@ const CheckoutPage = () => {
 
               {/* Datos + boton de pago */}
               <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-7">
-                <h2 className="font-heading text-sm font-bold uppercase tracking-widest text-slate-400">
+                <h2 className="font-heading text-sm font-bold uppercase tracking-widest text-grafito-400">
                   Datos de facturación
                 </h2>
                 <form onSubmit={pagar} className="mt-5 space-y-4" noValidate>
@@ -310,8 +310,8 @@ const CheckoutPage = () => {
                     {enviando ? <Loader2 className="h-5 w-5 animate-spin" /> : <CreditCard className="h-5 w-5" />}
                     Pagar S/ {plan.precio.toFixed(2)}
                   </button>
-                  <p className="flex items-center justify-center gap-1.5 text-xs text-slate-500">
-                    <ShieldCheck className="h-4 w-4 text-slate-400" />
+                  <p className="flex items-center justify-center gap-1.5 text-xs text-grafito-400">
+                    <ShieldCheck className="h-4 w-4 text-grafito-400" />
                     Pago con tarjeta procesado por Izipay sobre conexión cifrada.
                   </p>
                   {/* A quien se le paga, en la misma pantalla del cobro. En el
@@ -319,13 +319,13 @@ const CheckoutPage = () => {
                       marca: verla antes evita el desconcierto -y la
                       reclamacion- de no reconocer el cobro en el estado de
                       cuenta. */}
-                  <p className="text-center text-[11px] leading-relaxed text-slate-600">
+                  <p className="text-center text-[11px] leading-relaxed text-grafito-600">
                     Contratas con {PROVEEDOR.razonSocial} — RUC {PROVEEDOR.ruc}.{' '}
-                    <Link to="/terminos" className="underline underline-offset-2 hover:text-slate-400">
+                    <Link to="/terminos" className="underline underline-offset-2 hover:text-grafito-400">
                       Términos
                     </Link>{' '}
                     y{' '}
-                    <Link to="/privacidad" className="underline underline-offset-2 hover:text-slate-400">
+                    <Link to="/privacidad" className="underline underline-offset-2 hover:text-grafito-400">
                       privacidad
                     </Link>.
                   </p>
@@ -357,15 +357,15 @@ const CheckoutPage = () => {
                   ? `¡Listo! Pedido N° ${orden.numero} pagado`
                   : `Pedido N° ${orden.numero} registrado`}
               </h1>
-              <p className="mt-3 leading-relaxed text-slate-400">
+              <p className="mt-3 leading-relaxed text-grafito-400">
                 {orden.descripcion} — S/ {Number(orden.monto).toFixed(2)} {orden.moneda}
               </p>
 
               {pasarela === 'pagado' && (
                 <>
-                  <p className="mt-4 leading-relaxed text-slate-400">
+                  <p className="mt-4 leading-relaxed text-grafito-400">
                     Tu plan quedó activo y te enviamos el comprobante a{' '}
-                    <strong className="text-slate-200">{datos.email.trim()}</strong>.
+                    <strong className="text-grafito-200">{datos.email.trim()}</strong>.
                   </p>
                   <Link
                     to="/login"
@@ -377,7 +377,7 @@ const CheckoutPage = () => {
               )}
 
               {pasarela === 'confirmando' && (
-                <p className="mt-4 leading-relaxed text-slate-400">
+                <p className="mt-4 leading-relaxed text-grafito-400">
                   Estamos confirmando el pago con el banco. Puede tardar unos segundos;
                   no cierres esta página.
                 </p>
@@ -394,11 +394,11 @@ const CheckoutPage = () => {
               )}
 
               {pasarela === 'pendiente' && (
-                <p className="mt-6 rounded-xl border border-dashed border-white/15 p-5 text-sm leading-relaxed text-slate-400">
+                <p className="mt-6 rounded-xl border border-dashed border-white/15 p-5 text-sm leading-relaxed text-grafito-400">
                   {avisoPasarela || 'El pago con tarjeta aún no está disponible.'}{' '}
-                  Te escribiremos a <strong className="text-slate-200">{datos.email.trim()}</strong>{' '}
+                  Te escribiremos a <strong className="text-grafito-200">{datos.email.trim()}</strong>{' '}
                   para completar el pago y activar tu plan.{' '}
-                  <strong className="text-slate-200">No se ha realizado ningún cargo.</strong>
+                  <strong className="text-grafito-200">No se ha realizado ningún cargo.</strong>
                 </p>
               )}
 
@@ -409,7 +409,7 @@ const CheckoutPage = () => {
               <div id="izipay-form" className={pasarela === 'tarjeta' ? 'mt-6 text-left' : 'hidden'} />
 
               {pasarela === null && (
-                <p className="mt-6 flex items-center justify-center gap-2 text-sm text-slate-400">
+                <p className="mt-6 flex items-center justify-center gap-2 text-sm text-grafito-400">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Preparando el pago…
                 </p>
@@ -425,7 +425,7 @@ const CheckoutPage = () => {
               )}
             </div>
 
-            <p className="mt-5 text-center text-xs text-slate-500">
+            <p className="mt-5 text-center text-xs text-grafito-400">
               ¿Algún problema con tu compra? Escríbenos o usa el{' '}
               <Link to="/reclamaciones" className="text-marca-400 underline-offset-2 hover:underline">
                 Libro de Reclamaciones

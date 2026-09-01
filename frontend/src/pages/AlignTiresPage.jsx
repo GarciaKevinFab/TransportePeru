@@ -131,14 +131,14 @@ const AlignTiresPage = () => {
           Volver
         </Button>
         <div className="flex-1">
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-slate-900">
+          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
             Alinear Ejes
           </h1>
           <div className="flex items-center gap-4 mt-1">
             <Badge variant="outline" className="font-mono text-lg">
               {vehicle?.plate}
             </Badge>
-            <span className="text-slate-500">
+            <span className="text-grafito-500">
               {vehicle?.brand} {vehicle?.model} -{' '}
               {vehicle?.vehicle_type === 'tracto' ? 'Tracto' : 'Carreta'}
             </span>
@@ -150,12 +150,12 @@ const AlignTiresPage = () => {
         {/* Truck schema */}
         <Card className="bg-white lg:col-span-2">
           <CardHeader>
-            <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest">
+            <CardTitle className="text-sm font-bold uppercase text-grafito-500 tracking-widest">
               Esquema de Llantas
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-slate-600 mb-2">
+            <p className="text-sm text-grafito-600 mb-2">
               Haz click sobre una llanta para seleccionar su eje, o usa el selector.
             </p>
             <TruckSchema
@@ -171,7 +171,7 @@ const AlignTiresPage = () => {
         {/* Alignment form */}
         <Card className="bg-white">
           <CardHeader>
-            <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest">
+            <CardTitle className="text-sm font-bold uppercase text-grafito-500 tracking-widest">
               Datos de la Alineación
             </CardTitle>
           </CardHeader>

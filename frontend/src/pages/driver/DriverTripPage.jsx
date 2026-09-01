@@ -146,7 +146,7 @@ const DriverTripPage = () => {
 
   return (
     <div className="space-y-6 page-fade-in">
-      <h1 className="font-heading text-2xl font-black uppercase tracking-tight text-slate-900">Mis Viajes</h1>
+      <h1 className="font-heading text-2xl font-black uppercase tracking-tight text-grafito-900">Mis Viajes</h1>
 
       {/* Active Trip */}
       {activeTrip && (
@@ -222,7 +222,7 @@ const DriverTripPage = () => {
       {/* Scheduled Trips */}
       {scheduledTrips.length > 0 && (
         <div>
-          <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3">
+          <h2 className="text-sm font-bold text-grafito-500 uppercase tracking-wider mb-3">
             Viajes Programados
           </h2>
           <div className="space-y-3">
@@ -231,17 +231,17 @@ const DriverTripPage = () => {
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-3">
                     <div>
-                      <h4 className="font-bold text-slate-800">
+                      <h4 className="font-bold text-grafito-800">
                         {trip.client_name || 'Sin cliente'}
                       </h4>
-                      <p className="text-sm text-slate-500">
+                      <p className="text-sm text-grafito-500">
                         {trip.cargo_description}
                       </p>
                     </div>
                     {getStatusBadge(trip.status)}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 text-sm text-slate-500 mb-3">
+                  <div className="grid grid-cols-2 gap-2 text-sm text-grafito-500 mb-3">
                     <div className="flex items-center gap-1">
                       <Truck className="w-4 h-4" />
                       {trip.tracto_plate}
@@ -271,11 +271,11 @@ const DriverTripPage = () => {
 
       {/* No trips message */}
       {!activeTrip && scheduledTrips.length === 0 && (
-        <Card className="bg-slate-50 border-dashed">
+        <Card className="bg-grafito-50 border-dashed">
           <CardContent className="p-8 text-center">
-            <Truck className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-            <h3 className="font-bold text-slate-700 mb-2">Sin Viajes Asignados</h3>
-            <p className="text-sm text-slate-500">
+            <Truck className="w-16 h-16 text-grafito-300 mx-auto mb-4" />
+            <h3 className="font-bold text-grafito-700 mb-2">Sin Viajes Asignados</h3>
+            <p className="text-sm text-grafito-500">
               No tienes viajes programados en este momento
             </p>
           </CardContent>
@@ -285,7 +285,7 @@ const DriverTripPage = () => {
       {/* Recent completed trips */}
       {completedTrips.length > 0 && (
         <div>
-          <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3">
+          <h2 className="text-sm font-bold text-grafito-500 uppercase tracking-wider mb-3">
             Viajes Completados
           </h2>
           <div className="space-y-2">
@@ -296,10 +296,10 @@ const DriverTripPage = () => {
                     <CheckCircle className="w-5 h-5 text-green-600" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-slate-800 text-sm truncate">
+                    <h4 className="font-medium text-grafito-800 text-sm truncate">
                       {trip.client_name || 'Sin cliente'}
                     </h4>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-grafito-500">
                       {format(new Date(trip.completed_at || trip.scheduled_date), "dd/MM/yyyy")}
                     </p>
                   </div>
@@ -318,8 +318,8 @@ const DriverTripPage = () => {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="p-4 bg-marca-50 rounded-lg">
-              <p className="font-bold text-slate-800">{selectedTrip?.client_name}</p>
-              <p className="text-sm text-slate-600">{selectedTrip?.cargo_description}</p>
+              <p className="font-bold text-grafito-800">{selectedTrip?.client_name}</p>
+              <p className="text-sm text-grafito-600">{selectedTrip?.cargo_description}</p>
             </div>
             <div className="space-y-2">
               <Label>Odómetro inicial (km) *</Label>
@@ -332,7 +332,7 @@ const DriverTripPage = () => {
                 data-testid="driver-km-start-input"
               />
             </div>
-            <div className="flex items-center gap-2 text-sm text-slate-500">
+            <div className="flex items-center gap-2 text-sm text-grafito-500">
               <AlertTriangle className="w-4 h-4 text-yellow-500" />
               <span>Asegúrate de haber completado el checklist de salida</span>
             </div>
@@ -360,10 +360,10 @@ const DriverTripPage = () => {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="p-4 bg-green-50 rounded-lg">
-              <p className="font-bold text-slate-800">{selectedTrip?.client_name}</p>
-              <p className="text-sm text-slate-600">{selectedTrip?.cargo_description}</p>
+              <p className="font-bold text-grafito-800">{selectedTrip?.client_name}</p>
+              <p className="text-sm text-grafito-600">{selectedTrip?.cargo_description}</p>
               {selectedTrip?.km_start != null && (
-                <p className="text-xs text-slate-500 mt-1">Odómetro inicial: {selectedTrip.km_start} km</p>
+                <p className="text-xs text-grafito-500 mt-1">Odómetro inicial: {selectedTrip.km_start} km</p>
               )}
             </div>
             <div className="space-y-2">

@@ -89,11 +89,11 @@ const IssuesPage = () => {
     { value: 'siniestro', label: 'Siniestro', icon: Car, color: 'text-red-600' },
     { value: 'checklist_critico', label: 'Checklist Crítico', icon: AlertCircle, color: 'text-yellow-500' },
     { value: 'llanta_critica', label: 'Llanta Crítica', icon: AlertCircle, color: 'text-marca-600' },
-    { value: 'otro', label: 'Otro', icon: AlertTriangle, color: 'text-slate-500' },
+    { value: 'otro', label: 'Otro', icon: AlertTriangle, color: 'text-grafito-500' },
   ];
 
   const severities = [
-    { value: 'baja', label: 'Baja', color: 'bg-slate-100 text-slate-700' },
+    { value: 'baja', label: 'Baja', color: 'bg-grafito-100 text-grafito-700' },
     { value: 'media', label: 'Media', color: 'bg-yellow-100 text-yellow-700' },
     { value: 'alta', label: 'Alta', color: 'bg-marca-100 text-marca-700' },
     { value: 'critica', label: 'Crítica', color: 'bg-red-100 text-red-700' },
@@ -249,10 +249,10 @@ const IssuesPage = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-slate-900">
+          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
             Incidentes
           </h1>
-          <p className="text-slate-500 mt-1">
+          <p className="text-grafito-500 mt-1">
             Gestión de incidentes, multas y siniestros
           </p>
         </div>
@@ -268,7 +268,7 @@ const IssuesPage = () => {
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Abiertos</p>
+                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Abiertos</p>
                 <p className="font-heading text-3xl font-bold text-yellow-600 mt-1">{openIssues}</p>
               </div>
               <AlertTriangle className="w-8 h-8 text-yellow-500" />
@@ -279,7 +279,7 @@ const IssuesPage = () => {
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Críticos</p>
+                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Críticos</p>
                 <p className="font-heading text-3xl font-bold text-red-600 mt-1">{criticalIssues}</p>
               </div>
               <AlertCircle className="w-8 h-8 text-red-500" />
@@ -290,7 +290,7 @@ const IssuesPage = () => {
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Resueltos</p>
+                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Resueltos</p>
                 <p className="font-heading text-3xl font-bold text-green-600 mt-1">
                   {issues.filter(i => i.status === 'cerrado').length}
                 </p>
@@ -303,7 +303,7 @@ const IssuesPage = () => {
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Costo Total</p>
+                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Costo Total</p>
                 <p className="font-heading text-2xl font-bold text-marca-600 mt-1">
                   S/ {totalCost.toLocaleString()}
                 </p>
@@ -318,7 +318,7 @@ const IssuesPage = () => {
         <CardContent className="py-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-grafito-400" />
               <Input
                 placeholder="Buscar por título, descripción o número..."
                 value={searchTerm}
@@ -395,7 +395,7 @@ const IssuesPage = () => {
           ) : (
             <>
             {/* Movil: tarjetas. Diez columnas en 375px esconden estado y acciones tras un arrastre lateral que nadie descubre. */}
-            <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+            <div className="md:hidden divide-y divide-grafito-100 dark:divide-grafito-800">
               {filteredIssues.map((issue) => {
                 const typeInfo = getTypeInfo(issue.issue_type);
                 const TypeIcon = typeInfo.icon;
@@ -408,12 +408,12 @@ const IssuesPage = () => {
                           {getStatusInfo(issue.status).label}
                         </Badge>
                       </div>
-                      <p className="mt-0.5 truncate text-xs text-slate-500">
+                      <p className="mt-0.5 truncate text-xs text-grafito-500">
                         <span className="font-mono font-bold">{issue.issue_number || '-'}</span>
                         {' · '}
                         {typeInfo.label}
                       </p>
-                      <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                      <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-grafito-500">
                         <Badge className={getSeverityInfo(issue.severity).color}>
                           {getSeverityInfo(issue.severity).label}
                         </Badge>
@@ -453,7 +453,7 @@ const IssuesPage = () => {
                   const typeInfo = getTypeInfo(issue.issue_type);
                   const TypeIcon = typeInfo.icon;
                   return (
-                    <TableRow key={issue.id} className="table-dense cursor-pointer hover:bg-slate-50">
+                    <TableRow key={issue.id} className="table-dense cursor-pointer hover:bg-grafito-50">
                       <TableCell className="font-mono font-bold">{issue.issue_number || '-'}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -477,7 +477,7 @@ const IssuesPage = () => {
                         </Badge>
                       </TableCell>
                       <TableCell>S/ {issue.cost?.toFixed(2) || '0.00'}</TableCell>
-                      <TableCell className="text-sm text-slate-500">
+                      <TableCell className="text-sm text-grafito-500">
                         {format(new Date(issue.created_at), 'dd/MM/yy', { locale: es })}
                       </TableCell>
                       <TableCell className="text-right">
@@ -634,41 +634,41 @@ const IssuesPage = () => {
           {selectedIssue && (
             <div className="py-4">
               <div className="grid grid-cols-2 gap-4 mb-4">
-                <div className="p-3 bg-slate-50 rounded-sm">
-                  <p className="text-xs uppercase text-slate-500 font-bold">Tipo</p>
+                <div className="p-3 bg-grafito-50 rounded-sm">
+                  <p className="text-xs uppercase text-grafito-500 font-bold">Tipo</p>
                   <p className="font-medium mt-1">{getTypeInfo(selectedIssue.issue_type).label}</p>
                 </div>
-                <div className="p-3 bg-slate-50 rounded-sm">
-                  <p className="text-xs uppercase text-slate-500 font-bold">Severidad</p>
+                <div className="p-3 bg-grafito-50 rounded-sm">
+                  <p className="text-xs uppercase text-grafito-500 font-bold">Severidad</p>
                   <Badge className={getSeverityInfo(selectedIssue.severity).color + ' mt-1'}>
                     {getSeverityInfo(selectedIssue.severity).label}
                   </Badge>
                 </div>
-                <div className="p-3 bg-slate-50 rounded-sm">
-                  <p className="text-xs uppercase text-slate-500 font-bold">Estado</p>
+                <div className="p-3 bg-grafito-50 rounded-sm">
+                  <p className="text-xs uppercase text-grafito-500 font-bold">Estado</p>
                   <Badge className={getStatusInfo(selectedIssue.status).color + ' mt-1'}>
                     {getStatusInfo(selectedIssue.status).label}
                   </Badge>
                 </div>
-                <div className="p-3 bg-slate-50 rounded-sm">
-                  <p className="text-xs uppercase text-slate-500 font-bold">Costo</p>
+                <div className="p-3 bg-grafito-50 rounded-sm">
+                  <p className="text-xs uppercase text-grafito-500 font-bold">Costo</p>
                   <p className="font-medium mt-1">S/ {selectedIssue.cost?.toFixed(2) || '0.00'}</p>
                 </div>
               </div>
               
-              <div className="p-3 bg-slate-50 rounded-sm mb-4">
-                <p className="text-xs uppercase text-slate-500 font-bold mb-2">Descripción</p>
-                <p className="text-sm text-slate-700">{selectedIssue.description}</p>
+              <div className="p-3 bg-grafito-50 rounded-sm mb-4">
+                <p className="text-xs uppercase text-grafito-500 font-bold mb-2">Descripción</p>
+                <p className="text-sm text-grafito-700">{selectedIssue.description}</p>
               </div>
 
               {selectedIssue.vehicle_id && (
-                <div className="flex items-center gap-2 text-sm text-slate-600 mb-2">
+                <div className="flex items-center gap-2 text-sm text-grafito-600 mb-2">
                   <Car className="w-4 h-4" />
                   <span>Vehículo: {getVehiclePlate(selectedIssue.vehicle_id)}</span>
                 </div>
               )}
               {selectedIssue.driver_id && (
-                <div className="flex items-center gap-2 text-sm text-slate-600 mb-4">
+                <div className="flex items-center gap-2 text-sm text-grafito-600 mb-4">
                   <User className="w-4 h-4" />
                   <span>Chofer: {getDriverName(selectedIssue.driver_id)}</span>
                 </div>

@@ -324,17 +324,17 @@ const MaintenancePage = () => {
       completada: 'Completada',
       cancelada: 'Cancelada',
     };
-    return <Badge className={styles[status] || 'bg-slate-100'}>{labels[status] || status}</Badge>;
+    return <Badge className={styles[status] || 'bg-grafito-100'}>{labels[status] || status}</Badge>;
   };
 
   const getPriorityBadge = (priority) => {
     const styles = {
-      baja: 'bg-slate-100 text-slate-700',
+      baja: 'bg-grafito-100 text-grafito-700',
       normal: 'bg-blue-100 text-blue-700',
       alta: 'bg-marca-100 text-marca-700',
       critica: 'bg-red-100 text-red-700',
     };
-    return <Badge className={styles[priority] || 'bg-slate-100'}>{priority.toUpperCase()}</Badge>;
+    return <Badge className={styles[priority] || 'bg-grafito-100'}>{priority.toUpperCase()}</Badge>;
   };
 
   const openOrders = workOrders.filter(o => o.status === 'abierta').length;
@@ -390,10 +390,10 @@ const MaintenancePage = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-slate-900">
+          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
             Mantenimiento
           </h1>
-          <p className="text-slate-500 mt-1">
+          <p className="text-grafito-500 mt-1">
             Órdenes de trabajo y planes preventivos por vehículo
           </p>
         </div>
@@ -406,12 +406,12 @@ const MaintenancePage = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="bg-slate-100 rounded-sm">
-          <TabsTrigger value="orders" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
+        <TabsList className="bg-grafito-100 rounded-sm">
+          <TabsTrigger value="orders" className="rounded-sm data-[state=active]:bg-grafito-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
             <ClipboardList className="w-4 h-4 mr-2" />
             Órdenes de Trabajo
           </TabsTrigger>
-          <TabsTrigger value="plans" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
+          <TabsTrigger value="plans" className="rounded-sm data-[state=active]:bg-grafito-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
             <FileSpreadsheet className="w-4 h-4 mr-2" />
             Planes Preventivos
           </TabsTrigger>
@@ -425,7 +425,7 @@ const MaintenancePage = () => {
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Abiertas</p>
+                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Abiertas</p>
                 <p className="font-heading text-3xl font-bold text-yellow-600 mt-1">{openOrders}</p>
               </div>
               <Clock className="w-8 h-8 text-yellow-500" />
@@ -436,7 +436,7 @@ const MaintenancePage = () => {
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">En Proceso</p>
+                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">En Proceso</p>
                 <p className="font-heading text-3xl font-bold text-blue-600 mt-1">{inProgressOrders}</p>
               </div>
               <Wrench className="w-8 h-8 text-blue-500" />
@@ -447,7 +447,7 @@ const MaintenancePage = () => {
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Completadas</p>
+                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Completadas</p>
                 <p className="font-heading text-3xl font-bold text-green-600 mt-1">
                   {workOrders.filter(o => o.status === 'completada').length}
                 </p>
@@ -460,7 +460,7 @@ const MaintenancePage = () => {
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Críticas</p>
+                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Críticas</p>
                 <p className="font-heading text-3xl font-bold text-red-600 mt-1">
                   {workOrders.filter(o => o.priority === 'critica' && o.status !== 'completada').length}
                 </p>
@@ -474,11 +474,11 @@ const MaintenancePage = () => {
       {/* Estado de Mantenimiento Preventivo por Unidad */}
       <Card className="bg-white section-enter" data-testid="maintenance-status-card">
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 font-heading text-lg font-bold uppercase tracking-tight text-slate-900">
-            <Gauge className="w-5 h-5 text-slate-500" />
+          <CardTitle className="flex items-center gap-2 font-heading text-lg font-bold uppercase tracking-tight text-grafito-900">
+            <Gauge className="w-5 h-5 text-grafito-500" />
             Estado de Mantenimiento por Unidad
           </CardTitle>
-          <p className="text-xs text-slate-500">Kilómetros restantes para el próximo servicio preventivo</p>
+          <p className="text-xs text-grafito-500">Kilómetros restantes para el próximo servicio preventivo</p>
         </CardHeader>
         <CardContent className="p-0 overflow-x-auto">
           {maintLoading ? (
@@ -486,7 +486,7 @@ const MaintenancePage = () => {
               <Loader2 className="w-6 h-6 animate-spin text-marca-500" />
             </div>
           ) : Object.keys(maintStatuses).length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+            <div className="flex flex-col items-center justify-center py-10 text-grafito-400">
               <Gauge className="w-10 h-10 mb-2" />
               <p className="text-sm">Sin planes preventivos asignados a vehículos</p>
               <p className="text-xs">Asigna un plan en la pestaña "Planes Preventivos"</p>
@@ -512,7 +512,7 @@ const MaintenancePage = () => {
                     return (
                       <TableRow key={v.id} className="table-dense">
                         <TableCell className="font-mono font-bold">{v.plate}</TableCell>
-                        <TableCell className="text-slate-600">{st.plan_name || '-'}</TableCell>
+                        <TableCell className="text-grafito-600">{st.plan_name || '-'}</TableCell>
                         <TableCell className="text-right font-mono">
                           {st.current_odometer != null ? `${Number(st.current_odometer).toLocaleString('es-PE')} km` : '-'}
                         </TableCell>
@@ -521,7 +521,7 @@ const MaintenancePage = () => {
                         </TableCell>
                         <TableCell className="text-right font-mono font-bold">
                           {kmRemaining != null ? (
-                            <span className={kmRemaining <= 0 ? 'text-red-600' : st.due_soon ? 'text-marca-600' : 'text-slate-900'}>
+                            <span className={kmRemaining <= 0 ? 'text-red-600' : st.due_soon ? 'text-marca-600' : 'text-grafito-900'}>
                               {Number(kmRemaining).toLocaleString('es-PE')} km
                             </span>
                           ) : '-'}
@@ -608,7 +608,7 @@ const MaintenancePage = () => {
           ) : (
             <>
             {/* Movil: tarjetas. 8 columnas en 375px esconden estado y acciones tras un arrastre lateral que nadie descubre. */}
-            <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+            <div className="md:hidden divide-y divide-grafito-100 dark:divide-grafito-800">
               {filteredOrders.map((order) => (
                 <div key={order.id} className="flex items-start gap-3 px-4 py-3.5">
                   <div className="min-w-0 flex-1">
@@ -616,11 +616,11 @@ const MaintenancePage = () => {
                       <span className="font-mono font-bold truncate">{order.order_number}</span>
                       {getStatusBadge(order.status)}
                     </div>
-                    <p className="mt-0.5 truncate text-xs text-slate-500">
+                    <p className="mt-0.5 truncate text-xs text-grafito-500">
                       {order.description}
                     </p>
-                    <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
-                      <span className="font-mono font-bold text-slate-700 dark:text-slate-300">
+                    <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-grafito-500">
+                      <span className="font-mono font-bold text-grafito-700 dark:text-grafito-300">
                         {getVehiclePlate(order.vehicle_id)}
                       </span>
                       <span>{order.order_type}</span>
@@ -793,7 +793,7 @@ const MaintenancePage = () => {
                   type="number"
                   value={partsTotal.toFixed(2)}
                   disabled
-                  className="rounded-sm bg-slate-50 font-bold"
+                  className="rounded-sm bg-grafito-50 font-bold"
                 />
               </div>
             </div>
@@ -817,7 +817,7 @@ const MaintenancePage = () => {
                 </Button>
               </div>
               {parts.length === 0 ? (
-                <p className="text-xs text-slate-400 italic p-3 bg-slate-50 rounded-sm">
+                <p className="text-xs text-grafito-400 italic p-3 bg-grafito-50 rounded-sm">
                   Sin repuestos. Agregue uno con el botón superior.
                 </p>
               ) : (
@@ -826,9 +826,9 @@ const MaintenancePage = () => {
                     const expires = computeWarrantyExpires(p.installation_date, p.warranty_months);
                     const lineTotal = (parseFloat(p.quantity) || 0) * (parseFloat(p.unit_cost) || 0);
                     return (
-                      <div key={index} className="p-3 bg-slate-50 rounded-sm border border-slate-200 space-y-2 card-enter">
+                      <div key={index} className="p-3 bg-grafito-50 rounded-sm border border-grafito-200 space-y-2 card-enter">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-slate-500 uppercase">
+                          <span className="text-xs font-bold text-grafito-500 uppercase">
                             Repuesto #{index + 1}
                           </span>
                           <Button
@@ -893,11 +893,11 @@ const MaintenancePage = () => {
                             />
                           </div>
                         </div>
-                        <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-200">
-                          <span className="text-slate-500">
+                        <div className="flex items-center justify-between text-xs pt-1 border-t border-grafito-200">
+                          <span className="text-grafito-500">
                             Garantía vence: <strong>{expires || '-'}</strong>
                           </span>
-                          <span className="font-bold text-slate-700">
+                          <span className="font-bold text-grafito-700">
                             S/ {lineTotal.toFixed(2)}
                           </span>
                         </div>
@@ -917,9 +917,9 @@ const MaintenancePage = () => {
                 rows={3}
               />
             </div>
-            <div className="p-4 bg-slate-50 rounded-sm">
-              <p className="text-sm text-slate-500">Total estimado:</p>
-              <p className="font-heading text-2xl font-bold text-slate-900">
+            <div className="p-4 bg-grafito-50 rounded-sm">
+              <p className="text-sm text-grafito-500">Total estimado:</p>
+              <p className="font-heading text-2xl font-bold text-grafito-900">
                 S/ {((parseFloat(completeData.labor_cost) || 0) + partsTotal).toFixed(2)}
               </p>
             </div>

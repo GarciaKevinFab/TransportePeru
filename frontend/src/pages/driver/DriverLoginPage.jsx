@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
+import IconoCamion from '../../components/IconoCamion';
+import { PROVEEDOR } from '../../config/proveedor';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Truck, Loader2, ArrowLeft } from 'lucide-react';
+import { Loader2, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
 const DriverLoginPage = () => {
@@ -34,7 +36,7 @@ const DriverLoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-b from-grafito-900 to-grafito-800 flex flex-col items-center justify-center p-4">
       {/* Back to admin login */}
       <Button
         variant="ghost"
@@ -48,23 +50,23 @@ const DriverLoginPage = () => {
       {/* Logo */}
       <div className="mb-8 text-center">
         <div className="w-20 h-20 bg-marca-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-          <Truck className="w-10 h-10 text-white" />
+          <IconoCamion className="w-10 h-10 text-white" />
         </div>
-        <h1 className="text-2xl font-bold text-white">TransportePeru</h1>
-        <p className="text-slate-400 text-sm">App del Chofer</p>
+        <h1 className="text-2xl font-bold text-white">{PROVEEDOR.producto}</h1>
+        <p className="text-grafito-400 text-sm">App del Chofer</p>
       </div>
 
       {/* Login Card */}
       <Card className="w-full max-w-sm bg-white/95 backdrop-blur shadow-2xl">
         <CardHeader className="text-center pb-2">
-          <CardTitle className="text-xl font-bold text-slate-900">
+          <CardTitle className="text-xl font-bold text-grafito-900">
             Iniciar Sesión
           </CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label className="text-slate-700">DNI</Label>
+              <Label className="text-grafito-700">DNI</Label>
               <Input
                 type="tel"
                 inputMode="numeric"
@@ -79,7 +81,7 @@ const DriverLoginPage = () => {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-slate-700">PIN</Label>
+              <Label className="text-grafito-700">PIN</Label>
               <Input
                 type="password"
                 inputMode="numeric"
@@ -107,14 +109,14 @@ const DriverLoginPage = () => {
             </Button>
           </form>
 
-          <p className="text-center text-xs text-slate-500 mt-4">
+          <p className="text-center text-xs text-grafito-500 mt-4">
             Contacte a su supervisor si olvidó su PIN
           </p>
         </CardContent>
       </Card>
 
       {/* Version */}
-      <p className="text-slate-500 text-xs mt-8">v1.5.0 • Chofer App</p>
+      <p className="text-grafito-500 text-xs mt-8">v1.5.0 • Chofer App</p>
     </div>
   );
 };

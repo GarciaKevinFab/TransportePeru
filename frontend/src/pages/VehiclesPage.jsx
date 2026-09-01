@@ -152,10 +152,10 @@ const VehiclesPage = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-slate-900">
+          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
             Vehículos
           </h1>
-          <p className="text-slate-500 mt-1">
+          <p className="text-grafito-500 mt-1">
             Gestión de tractos y carretas de la flota
           </p>
         </div>
@@ -170,7 +170,7 @@ const VehiclesPage = () => {
         <CardContent className="py-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-grafito-400" />
               <Input
                 placeholder="Buscar por placa, marca o modelo..."
                 value={filters.search}
@@ -233,7 +233,7 @@ const VehiclesPage = () => {
       <div className="bento-grid">
         {[
           { value: vehicles.filter((v) => v.vehicle_type === 'tracto').length, label: 'Tractos', icon: Truck, color: 'var(--brand-color)' },
-          { value: vehicles.filter((v) => v.vehicle_type === 'carreta').length, label: 'Carretas', icon: CircleDot, color: '#475569' },
+          { value: vehicles.filter((v) => v.vehicle_type === 'carreta').length, label: 'Carretas', icon: CircleDot, color: '#55514c' },
           { value: vehicles.filter((v) => v.status === 'disponible').length, label: 'Disponibles', icon: UserCheck, color: '#16a34a' },
           { value: vehicles.filter((v) => v.status === 'en_viaje').length, label: 'En Viaje', icon: Truck, color: '#2563eb' },
         ].map((stat, idx) => (

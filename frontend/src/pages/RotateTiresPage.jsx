@@ -202,14 +202,14 @@ const RotateTiresPage = () => {
           Volver
         </Button>
         <div className="flex-1">
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-slate-900">
+          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
             Rotar Llantas
           </h1>
           <div className="flex items-center gap-4 mt-1">
             <Badge variant="outline" className="font-mono text-lg">
               {vehicle?.plate}
             </Badge>
-            <span className="text-slate-500">
+            <span className="text-grafito-500">
               {vehicle?.brand} {vehicle?.model} -{' '}
               {vehicle?.vehicle_type === 'tracto' ? 'Tracto' : 'Carreta'}
             </span>
@@ -223,7 +223,7 @@ const RotateTiresPage = () => {
           {selectedOrigin ? (
             <div className="flex items-center gap-3 text-sm">
               <RotateCw className="w-5 h-5 text-marca-500 animate-spin" />
-              <span className="font-medium text-slate-800">
+              <span className="font-medium text-grafito-800">
                 Origen seleccionado:{' '}
                 <Badge variant="outline" className="font-mono">
                   {selectedOrigin.position.label}
@@ -241,7 +241,7 @@ const RotateTiresPage = () => {
               </Button>
             </div>
           ) : (
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-grafito-600">
               Haz click en una llanta montada (origen) y luego en la posición de destino
               para armar la rotación. Si el destino ya tiene llanta, se registrará un
               intercambio.
@@ -254,7 +254,7 @@ const RotateTiresPage = () => {
         {/* Truck schema */}
         <Card className="bg-white lg:col-span-2">
           <CardHeader>
-            <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest">
+            <CardTitle className="text-sm font-bold uppercase text-grafito-500 tracking-widest">
               Esquema de Llantas
             </CardTitle>
           </CardHeader>
@@ -273,13 +273,13 @@ const RotateTiresPage = () => {
         <div className="space-y-6">
           <Card className="bg-white">
             <CardHeader>
-              <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest">
+              <CardTitle className="text-sm font-bold uppercase text-grafito-500 tracking-widest">
                 Cambios Pendientes ({pendingOps.length})
               </CardTitle>
             </CardHeader>
             <CardContent>
               {pendingOps.length === 0 ? (
-                <div className="text-center py-6 text-slate-400">
+                <div className="text-center py-6 text-grafito-400">
                   <Repeat className="w-10 h-10 mx-auto mb-2" />
                   <p className="text-sm">Aún no hay cambios</p>
                 </div>
@@ -288,14 +288,14 @@ const RotateTiresPage = () => {
                   {pendingOps.map((op) => (
                     <li
                       key={op.id}
-                      className="flex items-center gap-2 p-2 rounded-sm border border-slate-200 bg-slate-50"
+                      className="flex items-center gap-2 p-2 rounded-sm border border-grafito-200 bg-grafito-50"
                     >
                       {op.type === 'swap' ? (
                         <Repeat className="w-4 h-4 text-marca-500 shrink-0" />
                       ) : (
                         <ArrowRight className="w-4 h-4 text-emerald-500 shrink-0" />
                       )}
-                      <span className="text-xs text-slate-700 flex-1">{op.desc}</span>
+                      <span className="text-xs text-grafito-700 flex-1">{op.desc}</span>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -314,7 +314,7 @@ const RotateTiresPage = () => {
 
           <Card className="bg-white">
             <CardHeader>
-              <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest">
+              <CardTitle className="text-sm font-bold uppercase text-grafito-500 tracking-widest">
                 Datos de la Rotación
               </CardTitle>
             </CardHeader>

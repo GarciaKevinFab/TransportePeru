@@ -29,7 +29,7 @@ export const getTypeBadge = (type) => {
       Tracto
     </Badge>
   ) : (
-    <Badge variant="outline" className="border-slate-300 text-slate-700 bg-slate-50">
+    <Badge variant="outline" className="border-grafito-300 text-grafito-700 bg-grafito-50">
       <CircleDot className="w-3 h-3 mr-1" />
       Carreta
     </Badge>

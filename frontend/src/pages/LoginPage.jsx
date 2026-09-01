@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTenant } from '../context/TenantContext';
 import PanelMarca from '../components/PanelMarca';
+import IconoCamion from '../components/IconoCamion';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -52,7 +53,7 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex bg-slate-950 smooth-appear">
+    <div className="min-h-screen flex bg-grafito-950 smooth-appear">
       {/* Panel de marca compartido con el registro: misma concha, distinto
           mensaje. Aqui se recibe a quien vuelve. */}
       <PanelMarca
@@ -79,22 +80,22 @@ const LoginPage = () => {
               className="inline-flex items-center justify-center w-14 h-14 rounded-xl mb-3 icon-3d glow-brand-soft"
               style={{ backgroundColor: 'var(--brand-color)' }}
             >
-              <Truck className="w-8 h-8 text-white" />
+              <IconoCamion className="w-8 h-8 text-white" />
             </div>
-            <h1 className="font-heading text-3xl font-black text-slate-100 tracking-tight uppercase">
+            <h1 className="font-heading text-3xl font-black text-grafito-100 tracking-tight uppercase">
               {marca}
             </h1>
-            <p className="text-slate-400 text-sm mt-1">
+            <p className="text-grafito-400 text-sm mt-1">
               Sistema de Gestión de Flota
             </p>
           </div>
 
-          <Card className="border border-white/10 bg-slate-900/70 shadow-2xl shadow-black/50 rounded-2xl login-card-enter">
+          <Card className="border border-white/10 bg-grafito-900/70 shadow-2xl shadow-black/50 rounded-2xl login-card-enter">
             <CardHeader className="pb-4 space-y-2">
-              <CardTitle className="font-heading text-2xl font-bold tracking-tight text-slate-100">
+              <CardTitle className="font-heading text-2xl font-bold tracking-tight text-grafito-100">
                 Bienvenido de nuevo
               </CardTitle>
-              <CardDescription className="text-slate-400">
+              <CardDescription className="text-grafito-400">
                 Selecciona tu tipo de usuario para continuar
               </CardDescription>
             </CardHeader>
@@ -103,14 +104,14 @@ const LoginPage = () => {
                 <TabsList className="grid w-full grid-cols-2 mb-6 bg-white/5 border border-white/10 rounded-lg p-1 h-11">
                   <TabsTrigger
                     value="admin"
-                    className="rounded-md data-[state=inactive]:text-slate-400 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm font-semibold text-sm transition-all"
+                    className="rounded-md data-[state=inactive]:text-grafito-400 data-[state=active]:bg-white data-[state=active]:text-grafito-900 data-[state=active]:shadow-sm font-semibold text-sm transition-all"
                   >
                     <User className="w-4 h-4 mr-2" />
                     Admin
                   </TabsTrigger>
                   <TabsTrigger
                     value="driver"
-                    className="rounded-md data-[state=inactive]:text-slate-400 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm font-semibold text-sm transition-all"
+                    className="rounded-md data-[state=inactive]:text-grafito-400 data-[state=active]:bg-white data-[state=active]:text-grafito-900 data-[state=active]:shadow-sm font-semibold text-sm transition-all"
                   >
                     <Truck className="w-4 h-4 mr-2" />
                     Chofer
@@ -121,7 +122,7 @@ const LoginPage = () => {
                 <TabsContent value="admin">
                   <form onSubmit={handleAdminLogin} className="space-y-4">
                     <div className="space-y-1.5">
-                      <Label htmlFor="admin-email" className="text-xs font-semibold text-slate-300">
+                      <Label htmlFor="admin-email" className="text-xs font-semibold text-grafito-300">
                         Correo Electrónico
                       </Label>
                       <Input
@@ -131,12 +132,12 @@ const LoginPage = () => {
                         value={adminEmail}
                         onChange={(e) => setAdminEmail(e.target.value)}
                         required
-                        className="rounded-md h-11 input-focus-ring transition-all duration-200 bg-slate-950/60 border-white/15 text-slate-100 placeholder:text-slate-500"
+                        className="rounded-md h-11 input-focus-ring transition-all duration-200 bg-grafito-950/60 border-white/15 text-grafito-100 placeholder:text-grafito-400"
                         data-testid="admin-email-input"
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="admin-password" className="text-xs font-semibold text-slate-300">
+                      <Label htmlFor="admin-password" className="text-xs font-semibold text-grafito-300">
                         Contraseña
                       </Label>
                       <Input
@@ -146,7 +147,7 @@ const LoginPage = () => {
                         value={adminPassword}
                         onChange={(e) => setAdminPassword(e.target.value)}
                         required
-                        className="rounded-md h-11 input-focus-ring transition-all duration-200 bg-slate-950/60 border-white/15 text-slate-100 placeholder:text-slate-500"
+                        className="rounded-md h-11 input-focus-ring transition-all duration-200 bg-grafito-950/60 border-white/15 text-grafito-100 placeholder:text-grafito-400"
                         data-testid="admin-password-input"
                       />
                     </div>
@@ -168,7 +169,7 @@ const LoginPage = () => {
                     <p className="pt-1 text-center text-sm">
                       <a
                         href="/olvide"
-                        className="text-slate-500 underline underline-offset-4 hover:text-marca-500"
+                        className="text-grafito-400 underline underline-offset-4 hover:text-marca-300"
                       >
                         ¿Olvidaste tu contraseña?
                       </a>
@@ -180,7 +181,7 @@ const LoginPage = () => {
                 <TabsContent value="driver">
                   <form onSubmit={handleDriverLogin} className="space-y-4">
                     <div className="space-y-1.5">
-                      <Label htmlFor="driver-dni" className="text-xs font-semibold text-slate-300">
+                      <Label htmlFor="driver-dni" className="text-xs font-semibold text-grafito-300">
                         DNI
                       </Label>
                       <Input
@@ -191,12 +192,12 @@ const LoginPage = () => {
                         onChange={(e) => setDriverDni(e.target.value.replace(/\D/g, '').slice(0, 8))}
                         required
                         maxLength={8}
-                        className="rounded-md h-11 input-focus-ring transition-all duration-200 font-mono text-lg tracking-wider bg-slate-950/60 border-white/15 text-slate-100 placeholder:text-slate-500"
+                        className="rounded-md h-11 input-focus-ring transition-all duration-200 font-mono text-lg tracking-wider bg-grafito-950/60 border-white/15 text-grafito-100 placeholder:text-grafito-400"
                         data-testid="driver-dni-input"
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="driver-pin" className="text-xs font-semibold text-slate-300">
+                      <Label htmlFor="driver-pin" className="text-xs font-semibold text-grafito-300">
                         PIN (6 dígitos)
                       </Label>
                       <Input
@@ -207,7 +208,7 @@ const LoginPage = () => {
                         onChange={(e) => setDriverPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
                         required
                         maxLength={6}
-                        className="rounded-md h-11 input-focus-ring transition-all duration-200 font-mono text-lg tracking-[0.4em] text-center bg-slate-950/60 border-white/15 text-slate-100 placeholder:text-slate-500"
+                        className="rounded-md h-11 input-focus-ring transition-all duration-200 font-mono text-lg tracking-[0.4em] text-center bg-grafito-950/60 border-white/15 text-grafito-100 placeholder:text-grafito-400"
                         data-testid="driver-pin-input"
                       />
                     </div>
@@ -237,27 +238,27 @@ const LoginPage = () => {
             </CardContent>
           </Card>
 
-          <p className="mt-6 text-center text-sm text-slate-400">
+          <p className="mt-6 text-center text-sm text-grafito-400">
             ¿Tu empresa aún no usa CargoXprez?{' '}
             <a
               href="/registro"
-              className="font-semibold text-marca-500 underline underline-offset-4 hover:text-marca-400"
+              className="font-semibold text-marca-400 underline underline-offset-4 hover:text-marca-300"
             >
               Crear cuenta gratis
             </a>
           </p>
           <p className="mt-2 text-center text-sm">
-            <a href="/" className="text-slate-500 underline underline-offset-4 hover:text-slate-300">
+            <a href="/" className="text-grafito-400 underline underline-offset-4 hover:text-grafito-300">
               Volver al inicio
             </a>
           </p>
 
           {/* Mobile footer */}
-          <p className="lg:hidden text-center text-slate-400 text-xs mt-6">
+          <p className="lg:hidden text-center text-grafito-400 text-xs mt-6">
             &copy; 2026 {marca} &mdash;{' '}
-            <a href="/privacidad" className="underline underline-offset-4 hover:text-marca-500">Privacidad</a>{' '}
+            <a href="/privacidad" className="underline underline-offset-4 hover:text-marca-300">Privacidad</a>{' '}
             &middot;{' '}
-            <a href="/terminos" className="underline underline-offset-4 hover:text-marca-500">Términos</a>
+            <a href="/terminos" className="underline underline-offset-4 hover:text-marca-300">Términos</a>
           </p>
         </div>
       </div>

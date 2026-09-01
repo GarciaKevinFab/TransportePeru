@@ -222,14 +222,14 @@ const TireGraphsPage = () => {
           Volver
         </Button>
         <div className="flex-1">
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-slate-900">
+          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
             Gráficas de Llantas
           </h1>
           <div className="flex items-center gap-4 mt-1">
             <Badge variant="outline" className="font-mono text-lg">
               {vehicle?.plate}
             </Badge>
-            <span className="text-slate-500">
+            <span className="text-grafito-500">
               {vehicle?.brand} {vehicle?.model} -{' '}
               {vehicle?.vehicle_type === 'tracto' ? 'Tracto' : 'Carreta'}
             </span>
@@ -240,13 +240,13 @@ const TireGraphsPage = () => {
       {/* Tire selector */}
       <Card className="bg-white">
         <CardHeader>
-          <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest">
+          <CardTitle className="text-sm font-bold uppercase text-grafito-500 tracking-widest">
             Seleccionar Llanta Montada
           </CardTitle>
         </CardHeader>
         <CardContent>
           {tires.length === 0 ? (
-            <div className="text-center py-8 text-slate-400">
+            <div className="text-center py-8 text-grafito-400">
               <CircleDot className="w-12 h-12 mx-auto mb-2" />
               <p>No hay llantas montadas en este vehículo</p>
             </div>
@@ -281,8 +281,8 @@ const TireGraphsPage = () => {
                     <Route className="w-5 h-5 text-blue-600" />
                   </div>
                   <div>
-                    <p className="text-xs text-slate-500 uppercase font-bold">Km Recorridos</p>
-                    <p className="font-heading text-2xl font-bold text-slate-900 font-mono">
+                    <p className="text-xs text-grafito-500 uppercase font-bold">Km Recorridos</p>
+                    <p className="font-heading text-2xl font-bold text-grafito-900 font-mono">
                       {(selectedTire.total_km || 0).toLocaleString()} km
                     </p>
                   </div>
@@ -296,8 +296,8 @@ const TireGraphsPage = () => {
                     <DollarSign className="w-5 h-5 text-green-600" />
                   </div>
                   <div>
-                    <p className="text-xs text-slate-500 uppercase font-bold">Costo / Km</p>
-                    <p className="font-heading text-2xl font-bold text-slate-900 font-mono">
+                    <p className="text-xs text-grafito-500 uppercase font-bold">Costo / Km</p>
+                    <p className="font-heading text-2xl font-bold text-grafito-900 font-mono">
                       {formatMoney(selectedTire.cost_per_km)}
                     </p>
                   </div>
@@ -311,8 +311,8 @@ const TireGraphsPage = () => {
                     <TrendingDown className="w-5 h-5 text-marca-600" />
                   </div>
                   <div>
-                    <p className="text-xs text-slate-500 uppercase font-bold">Costo / mm</p>
-                    <p className="font-heading text-2xl font-bold text-slate-900 font-mono">
+                    <p className="text-xs text-grafito-500 uppercase font-bold">Costo / mm</p>
+                    <p className="font-heading text-2xl font-bold text-grafito-900 font-mono">
                       {formatMoney(selectedTire.cost_per_mm)}
                     </p>
                   </div>
@@ -324,7 +324,7 @@ const TireGraphsPage = () => {
           {/* Projection */}
           <Card className="bg-white" data-testid="tire-projection">
             <CardHeader>
-              <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest flex items-center gap-2">
+              <CardTitle className="text-sm font-bold uppercase text-grafito-500 tracking-widest flex items-center gap-2">
                 <Activity className="w-4 h-4" />
                 Proyección de Vida de la Llanta
               </CardTitle>
@@ -336,7 +336,7 @@ const TireGraphsPage = () => {
                 </div>
               ) : !enoughForProjection || !projection ? (
                 <div
-                  className="text-center py-8 text-slate-400"
+                  className="text-center py-8 text-grafito-400"
                   data-testid="tire-projection-empty"
                 >
                   <Hourglass className="w-10 h-10 mx-auto mb-2" />
@@ -357,30 +357,30 @@ const TireGraphsPage = () => {
                     </div>
                   )}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="flex items-center gap-3 p-4 rounded-sm bg-slate-50">
+                    <div className="flex items-center gap-3 p-4 rounded-sm bg-grafito-50">
                       <div className="p-2 rounded-sm bg-marca-50">
                         <Hourglass className="w-5 h-5 text-marca-600" />
                       </div>
                       <div>
-                        <p className="text-xs text-slate-500 uppercase font-bold">Km Restantes</p>
+                        <p className="text-xs text-grafito-500 uppercase font-bold">Km Restantes</p>
                         <p
-                          className="font-heading text-2xl font-bold text-slate-900 font-mono"
+                          className="font-heading text-2xl font-bold text-grafito-900 font-mono"
                           data-testid="tire-projection-km"
                         >
                           {formatKm(projection.km_remaining)}
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 p-4 rounded-sm bg-slate-50">
+                    <div className="flex items-center gap-3 p-4 rounded-sm bg-grafito-50">
                       <div className="p-2 rounded-sm bg-blue-50">
                         <CalendarClock className="w-5 h-5 text-blue-600" />
                       </div>
                       <div>
-                        <p className="text-xs text-slate-500 uppercase font-bold">
+                        <p className="text-xs text-grafito-500 uppercase font-bold">
                           Fecha Estimada de Cambio
                         </p>
                         <p
-                          className="font-heading text-2xl font-bold text-slate-900 font-mono"
+                          className="font-heading text-2xl font-bold text-grafito-900 font-mono"
                           data-testid="tire-projection-date"
                         >
                           {projection.estimated_change_date
@@ -389,16 +389,16 @@ const TireGraphsPage = () => {
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 p-4 rounded-sm bg-slate-50">
+                    <div className="flex items-center gap-3 p-4 rounded-sm bg-grafito-50">
                       <div className="p-2 rounded-sm bg-red-50">
                         <TrendingDown className="w-5 h-5 text-red-600" />
                       </div>
                       <div>
-                        <p className="text-xs text-slate-500 uppercase font-bold">
+                        <p className="text-xs text-grafito-500 uppercase font-bold">
                           Tasa de Desgaste
                         </p>
                         <p
-                          className="font-heading text-2xl font-bold text-slate-900 font-mono"
+                          className="font-heading text-2xl font-bold text-grafito-900 font-mono"
                           data-testid="tire-projection-rate"
                         >
                           {wearRatePer1000 !== null
@@ -416,7 +416,7 @@ const TireGraphsPage = () => {
           {/* Depth chart */}
           <Card className="bg-white">
             <CardHeader>
-              <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest flex items-center gap-2">
+              <CardTitle className="text-sm font-bold uppercase text-grafito-500 tracking-widest flex items-center gap-2">
                 <TrendingDown className="w-4 h-4" />
                 Evolución de Profundidad (mm)
               </CardTitle>
@@ -427,7 +427,7 @@ const TireGraphsPage = () => {
                   <Loader2 className="w-6 h-6 animate-spin text-marca-500" />
                 </div>
               ) : !hasDepth ? (
-                <div className="text-center py-12 text-slate-400" data-testid="tire-graphs-depth-empty">
+                <div className="text-center py-12 text-grafito-400" data-testid="tire-graphs-depth-empty">
                   <CircleDot className="w-12 h-12 mx-auto mb-2" />
                   <p>Sin inspecciones registradas para esta llanta</p>
                 </div>
@@ -435,11 +435,11 @@ const TireGraphsPage = () => {
                 <div className="w-full h-72" data-testid="tire-graphs-depth-chart">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={depthChartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                      <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="#94a3b8" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e6e4e1" />
+                      <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="#a19d97" />
                       <YAxis
                         tick={{ fontSize: 12 }}
-                        stroke="#94a3b8"
+                        stroke="#a19d97"
                         domain={[0, 'auto']}
                         label={{ value: 'mm', angle: -90, position: 'insideLeft', fontSize: 12 }}
                       />
@@ -475,7 +475,7 @@ const TireGraphsPage = () => {
                           type="monotone"
                           dataKey="projected"
                           name="Proyección"
-                          stroke="#94a3b8"
+                          stroke="#a19d97"
                           strokeWidth={2}
                           strokeDasharray="6 4"
                           dot={{ r: 3 }}
@@ -493,7 +493,7 @@ const TireGraphsPage = () => {
           {hasPressure && (
             <Card className="bg-white">
               <CardHeader>
-                <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest flex items-center gap-2">
+                <CardTitle className="text-sm font-bold uppercase text-grafito-500 tracking-widest flex items-center gap-2">
                   <Gauge className="w-4 h-4" />
                   Evolución de Presión (PSI)
                 </CardTitle>
@@ -502,11 +502,11 @@ const TireGraphsPage = () => {
                 <div className="w-full h-72" data-testid="tire-graphs-pressure-chart">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                      <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="#94a3b8" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e6e4e1" />
+                      <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="#a19d97" />
                       <YAxis
                         tick={{ fontSize: 12 }}
-                        stroke="#94a3b8"
+                        stroke="#a19d97"
                         label={{ value: 'PSI', angle: -90, position: 'insideLeft', fontSize: 12 }}
                       />
                       <Tooltip formatter={(value) => [`${value} PSI`, 'Presión']} />

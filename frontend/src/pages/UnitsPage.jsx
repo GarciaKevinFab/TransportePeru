@@ -81,9 +81,9 @@ const getUnitStatusBadge = (status) => {
     activa: { label: 'Activa', className: 'border-green-300 text-green-700 bg-green-50' },
     disponible: { label: 'Disponible', className: 'border-green-300 text-green-700 bg-green-50' },
     en_viaje: { label: 'En Viaje', className: 'border-blue-300 text-blue-700 bg-blue-50' },
-    inactiva: { label: 'Inactiva', className: 'border-slate-300 text-slate-600 bg-slate-50' },
+    inactiva: { label: 'Inactiva', className: 'border-grafito-300 text-grafito-600 bg-grafito-50' },
   };
-  const cfg = map[status] || { label: status || 'Sin estado', className: 'border-slate-300 text-slate-600 bg-slate-50' };
+  const cfg = map[status] || { label: status || 'Sin estado', className: 'border-grafito-300 text-grafito-600 bg-grafito-50' };
   return <Badge variant="outline" className={cfg.className}>{cfg.label}</Badge>;
 };
 
@@ -311,10 +311,10 @@ const UnitsPage = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-slate-900">
+          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
             Unidades
           </h1>
-          <p className="text-slate-500 mt-1">
+          <p className="text-grafito-500 mt-1">
             Tracto + carreta + chofer + EPP de unidad
           </p>
         </div>
@@ -361,7 +361,7 @@ const UnitsPage = () => {
           ) : (
             <>
             {/* Movil: tarjetas. Seis columnas en 375px esconden estado y acciones tras un arrastre lateral que nadie descubre. */}
-            <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+            <div className="md:hidden divide-y divide-grafito-100 dark:divide-grafito-800">
               {units.map((unit) => {
                 const epp = getEppItems(unit);
                 const eppTotal = epp.length;
@@ -374,20 +374,20 @@ const UnitsPage = () => {
                         <span className="font-mono font-bold truncate">{resolveTractoPlate(unit)}</span>
                         {getUnitStatusBadge(unit.status || unit.estado)}
                       </div>
-                      <p className="mt-0.5 truncate text-xs text-slate-500">
+                      <p className="mt-0.5 truncate text-xs text-grafito-500">
                         Carreta: <span className="font-mono">{resolveCarretaPlate(unit)}</span>
                       </p>
-                      <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                      <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-grafito-500">
                         {driverName ? (
                           <span className="inline-flex items-center gap-1 truncate">
                             <User className="h-3 w-3 text-green-600" />
                             {driverName}
                           </span>
                         ) : (
-                          <span className="text-slate-400">Sin asignar</span>
+                          <span className="text-grafito-400">Sin asignar</span>
                         )}
                         {eppTotal === 0 ? (
-                          <span className="text-slate-400">Sin EPP</span>
+                          <span className="text-grafito-400">Sin EPP</span>
                         ) : (
                           <span className="inline-flex items-center gap-1">
                             <ShieldCheck className="h-3 w-3 text-green-600" />
@@ -426,14 +426,14 @@ const UnitsPage = () => {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Truck className="w-4 h-4 text-marca-500" />
-                          <span className="font-mono font-bold text-slate-900">
+                          <span className="font-mono font-bold text-grafito-900">
                             {resolveTractoPlate(unit)}
                           </span>
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <CircleDot className="w-4 h-4 text-slate-400" />
+                          <CircleDot className="w-4 h-4 text-grafito-400" />
                           <span className="font-mono">{resolveCarretaPlate(unit)}</span>
                         </div>
                       </TableCell>
@@ -444,15 +444,15 @@ const UnitsPage = () => {
                             <span className="text-sm">{driverName}</span>
                           </div>
                         ) : (
-                          <span className="text-xs text-slate-400">Sin asignar</span>
+                          <span className="text-xs text-grafito-400">Sin asignar</span>
                         )}
                       </TableCell>
                       <TableCell>{getUnitStatusBadge(unit.status || unit.estado)}</TableCell>
                       <TableCell>
                         {eppTotal === 0 ? (
-                          <span className="text-xs text-slate-400">Sin EPP</span>
+                          <span className="text-xs text-grafito-400">Sin EPP</span>
                         ) : (
-                          <Badge variant="outline" className="border-slate-300 text-slate-700 bg-slate-50">
+                          <Badge variant="outline" className="border-grafito-300 text-grafito-700 bg-grafito-50">
                             <ShieldCheck className="w-3 h-3 mr-1 text-green-600" />
                             {eppOk}/{eppTotal} OK
                           </Badge>
@@ -549,10 +549,10 @@ const UnitsPage = () => {
             </div>
 
             {/* EPP de unidad */}
-            <div className="space-y-2 pt-2 border-t border-slate-100">
+            <div className="space-y-2 pt-2 border-t border-grafito-100">
               <div className="flex items-center justify-between">
                 <Label className="flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-slate-500" />
+                  <Shield className="w-4 h-4 text-grafito-500" />
                   EPP de la unidad
                 </Label>
                 <Button type="button" variant="outline" size="sm" onClick={addEppItem} data-testid="add-epp-item-btn">
@@ -562,7 +562,7 @@ const UnitsPage = () => {
               </div>
 
               {form.epp_items.length === 0 ? (
-                <p className="text-sm text-slate-400 py-2">No hay ítems de EPP. Añada conos, botiquín, extintor o chalecos.</p>
+                <p className="text-sm text-grafito-400 py-2">No hay ítems de EPP. Añada conos, botiquín, extintor o chalecos.</p>
               ) : (
                 <div className="overflow-x-auto">
                   <Table>

@@ -187,7 +187,7 @@ const DocumentsPage = () => {
         href={resolveFileUrl(doc.file_url)}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-slate-400 hover:text-marca-500"
+        className="text-grafito-400 hover:text-marca-500"
         title="Ver / descargar archivo"
         onClick={(e) => e.stopPropagation()}
         data-testid="doc-file-link"
@@ -201,7 +201,7 @@ const DocumentsPage = () => {
     if (revisionTecnicaNoAplica(docType, entity)) {
       return (
         <div
-          className="doc-cell flex items-center justify-center gap-1 bg-slate-100 text-slate-400 border border-slate-200 rounded"
+          className="doc-cell flex items-center justify-center gap-1 bg-grafito-100 text-grafito-400 border border-grafito-200 rounded"
           data-testid="doc-cell-no-aplica"
         >
           <Ban className="w-3 h-3" />
@@ -262,10 +262,10 @@ const DocumentsPage = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-slate-900">
+          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
             Documentos
           </h1>
-          <p className="text-slate-500 mt-1">
+          <p className="text-grafito-500 mt-1">
             Matriz de documentos y vencimientos
           </p>
         </div>
@@ -284,16 +284,16 @@ const DocumentsPage = () => {
 
       {/* Tabs */}
       <Tabs value={entityType} onValueChange={setEntityType}>
-        <TabsList className="bg-slate-100 rounded-sm">
+        <TabsList className="bg-grafito-100 rounded-sm">
           <TabsTrigger
             value="vehicle"
-            className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide"
+            className="rounded-sm data-[state=active]:bg-grafito-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide"
           >
             Vehículos
           </TabsTrigger>
           <TabsTrigger
             value="user"
-            className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide"
+            className="rounded-sm data-[state=active]:bg-grafito-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide"
           >
             Choferes
           </TabsTrigger>
@@ -303,21 +303,21 @@ const DocumentsPage = () => {
           <Card className="bg-white">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest">
+                <CardTitle className="text-sm font-bold uppercase text-grafito-500 tracking-widest">
                   Matriz de Documentos - {entityType === 'vehicle' ? 'Vehículos' : 'Choferes'}
                 </CardTitle>
                 <div className="flex gap-3">
                   <div className="flex items-center gap-1">
                     <div className="w-3 h-3 rounded bg-green-100 border border-green-500" />
-                    <span className="text-xs text-slate-500">Vigente</span>
+                    <span className="text-xs text-grafito-500">Vigente</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <div className="w-3 h-3 rounded bg-yellow-100 border border-yellow-500" />
-                    <span className="text-xs text-slate-500">Por vencer</span>
+                    <span className="text-xs text-grafito-500">Por vencer</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <div className="w-3 h-3 rounded bg-red-100 border border-red-500" />
-                    <span className="text-xs text-slate-500">Vencido</span>
+                    <span className="text-xs text-grafito-500">Vencido</span>
                   </div>
                 </div>
               </div>
@@ -352,7 +352,7 @@ const DocumentsPage = () => {
                 {/* Movil: tarjetas por entidad. La matriz entera no cabe en
                     375px, y el scroll lateral esconde justo los vencimientos
                     que la pagina existe para mostrar. */}
-                <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+                <div className="md:hidden divide-y divide-grafito-100 dark:divide-grafito-800">
                   {matrix.matrix.map((row) => (
                     <div key={row.entity.id} className="px-4 py-3.5">
                       <p className="font-medium">
@@ -365,7 +365,7 @@ const DocumentsPage = () => {
                       <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2">
                         {matrix.document_types.map((dt) => (
                           <div key={dt.id} className="min-w-0">
-                            <p className="truncate text-[11px] uppercase tracking-wide text-slate-500">
+                            <p className="truncate text-[11px] uppercase tracking-wide text-grafito-500">
                               {dt.name}
                             </p>
                             <div className="mt-0.5 flex items-center gap-1">
@@ -384,7 +384,7 @@ const DocumentsPage = () => {
                 <Table>
                   <TableHeader>
                     <TableRow className="table-dense">
-                      <TableHead className="sticky left-0 bg-slate-100 z-10">
+                      <TableHead className="sticky left-0 bg-grafito-100 z-10">
                         {entityType === 'vehicle' ? 'Placa' : 'Nombre'}
                       </TableHead>
                       {matrix.document_types.map((dt) => (
@@ -437,7 +437,7 @@ const DocumentsPage = () => {
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Vigentes</p>
+                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Vigentes</p>
                 <p className="font-heading text-3xl font-bold text-green-600 mt-1">
                   {matrix?.matrix?.reduce((acc, row) => 
                     acc + Object.values(row.documents).filter(d => {
@@ -454,7 +454,7 @@ const DocumentsPage = () => {
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Por Vencer</p>
+                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Por Vencer</p>
                 <p className="font-heading text-3xl font-bold text-yellow-600 mt-1">
                   {matrix?.matrix?.reduce((acc, row) => 
                     acc + Object.values(row.documents).filter(d => {
@@ -472,7 +472,7 @@ const DocumentsPage = () => {
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Vencidos</p>
+                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Vencidos</p>
                 <p className="font-heading text-3xl font-bold text-red-600 mt-1">
                   {matrix?.matrix?.reduce((acc, row) => 
                     acc + Object.values(row.documents).filter(d => {
@@ -485,17 +485,17 @@ const DocumentsPage = () => {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-slate-500 card-enter card-stagger-4">
+        <Card className="bg-white border-l-4 border-l-grafito-500 card-enter card-stagger-4">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Pendientes</p>
-                <p className="font-heading text-3xl font-bold text-slate-600 mt-1">
+                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Pendientes</p>
+                <p className="font-heading text-3xl font-bold text-grafito-600 mt-1">
                   {matrix?.matrix?.reduce((acc, row) => 
                     acc + Object.values(row.documents).filter(d => !d).length, 0) || 0}
                 </p>
               </div>
-              <XCircle className="w-8 h-8 text-slate-500" />
+              <XCircle className="w-8 h-8 text-grafito-500" />
             </div>
           </CardContent>
         </Card>
@@ -602,14 +602,14 @@ const DocumentsPage = () => {
                 {selectedFile ? 'Cambiar archivo' : 'Subir archivo (PDF o imagen)'}
               </Button>
               {selectedFile && (
-                <div className="flex items-center justify-between gap-2 text-xs text-slate-600 bg-slate-50 rounded-sm px-2 py-1">
+                <div className="flex items-center justify-between gap-2 text-xs text-grafito-600 bg-grafito-50 rounded-sm px-2 py-1">
                   <span className="flex items-center gap-1 truncate">
                     <Paperclip className="w-3 h-3 shrink-0" />
                     <span className="truncate">{selectedFile.name}</span>
                   </span>
                   <button
                     type="button"
-                    className="text-slate-400 hover:text-red-500 shrink-0"
+                    className="text-grafito-400 hover:text-red-500 shrink-0"
                     onClick={() => {
                       setSelectedFile(null);
                       if (fileInputRef.current) fileInputRef.current.value = '';

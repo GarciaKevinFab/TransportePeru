@@ -62,7 +62,7 @@ const ROLES = [
   { value: 'mantenimiento', label: 'Mantenimiento', icon: User, color: 'bg-yellow-100 text-yellow-800' },
   { value: 'almacen', label: 'Almacén', icon: User, color: 'bg-marca-100 text-marca-800' },
   { value: 'contabilidad', label: 'Contabilidad', icon: User, color: 'bg-teal-100 text-teal-800' },
-  { value: 'chofer', label: 'Chofer', icon: Truck, color: 'bg-slate-100 text-slate-800' },
+  { value: 'chofer', label: 'Chofer', icon: Truck, color: 'bg-grafito-100 text-grafito-800' },
 ];
 
 const UsersPage = () => {
@@ -361,10 +361,10 @@ const UsersPage = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-slate-900">
+          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
             Usuarios
           </h1>
-          <p className="text-slate-500 mt-1">
+          <p className="text-grafito-500 mt-1">
             Gestión de usuarios y permisos del sistema
           </p>
         </div>
@@ -379,7 +379,7 @@ const UsersPage = () => {
         <CardContent className="py-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-grafito-400" />
               <Input
                 placeholder="Buscar por nombre, email o DNI..."
                 value={searchTerm}
@@ -432,10 +432,10 @@ const UsersPage = () => {
             <>
             {/* Movil: tarjetas. Seis columnas en 375px esconden el estado y
                 las acciones tras un arrastre lateral que nadie descubre. */}
-            <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+            <div className="md:hidden divide-y divide-grafito-100 dark:divide-grafito-800">
               {filteredUsers.map((userItem) => (
                 <div key={userItem.id} className="flex items-start gap-3 px-4 py-3.5">
-                  <div className="w-10 h-10 shrink-0 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 font-bold">
+                  <div className="w-10 h-10 shrink-0 bg-grafito-100 rounded-full flex items-center justify-center text-grafito-600 font-bold">
                     {userItem.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -446,12 +446,12 @@ const UsersPage = () => {
                         <Badge className="bg-red-100 text-red-800">Inactivo</Badge>
                       )}
                     </div>
-                    <p className="mt-0.5 truncate text-xs text-slate-500">
+                    <p className="mt-0.5 truncate text-xs text-grafito-500">
                       {userItem.email || (userItem.dni ? `DNI: ${userItem.dni}` : '-')}
                       {userItem.phone ? ` · ${userItem.phone}` : ''}
                     </p>
                     {userItem.license_number && (
-                      <p className="mt-0.5 font-mono text-xs text-slate-500">
+                      <p className="mt-0.5 font-mono text-xs text-grafito-500">
                         Lic. {userItem.license_number}
                       </p>
                     )}
@@ -479,13 +479,13 @@ const UsersPage = () => {
                   <TableRow key={userItem.id} className="table-dense hover:bg-marca-50">
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 font-bold">
+                        <div className="w-10 h-10 bg-grafito-100 rounded-full flex items-center justify-center text-grafito-600 font-bold">
                           {userItem.name.charAt(0).toUpperCase()}
                         </div>
                         <div>
                           <p className="font-medium">{userItem.name}</p>
                           {userItem.dni && (
-                            <p className="text-xs text-slate-500 font-mono">DNI: {userItem.dni}</p>
+                            <p className="text-xs text-grafito-500 font-mono">DNI: {userItem.dni}</p>
                           )}
                         </div>
                       </div>
@@ -493,7 +493,7 @@ const UsersPage = () => {
                     <TableCell>
                       <div>
                         {userItem.email && <p className="text-sm">{userItem.email}</p>}
-                        {userItem.phone && <p className="text-xs text-slate-500">{userItem.phone}</p>}
+                        {userItem.phone && <p className="text-xs text-grafito-500">{userItem.phone}</p>}
                       </div>
                     </TableCell>
                     <TableCell>{getRoleBadge(userItem.role)}</TableCell>
@@ -501,7 +501,7 @@ const UsersPage = () => {
                       {userItem.license_number ? (
                         <span className="font-mono text-sm">{userItem.license_number}</span>
                       ) : (
-                        <span className="text-slate-400">-</span>
+                        <span className="text-grafito-400">-</span>
                       )}
                       {userItem.role === 'chofer' && userItem.epp && (
                         <div className="flex flex-wrap gap-0.5 mt-1">
@@ -509,7 +509,7 @@ const UsersPage = () => {
                             <span
                               key={k}
                               title={k}
-                              className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${userItem.epp?.[k]?.assigned ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'}`}
+                              className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${userItem.epp?.[k]?.assigned ? 'bg-green-100 text-green-700' : 'bg-grafito-100 text-grafito-400'}`}
                             >
                               {k.substring(0, 3)}
                             </span>
@@ -540,10 +540,10 @@ const UsersPage = () => {
         {ROLES.slice(0, 4).map((role, idx) => (
           <Card key={role.value} className={`bg-white card-enter card-stagger-${idx + 1} card-3d shadow-card-hover`}>
             <CardContent className="py-4 text-center">
-              <p className="font-heading text-3xl font-bold text-slate-900">
+              <p className="font-heading text-3xl font-bold text-grafito-900">
                 {users.filter((u) => u.role === role.value).length}
               </p>
-              <p className="text-xs uppercase tracking-widest text-slate-500 mt-1">{role.label}</p>
+              <p className="text-xs uppercase tracking-widest text-grafito-500 mt-1">{role.label}</p>
             </CardContent>
           </Card>
         ))}
@@ -715,7 +715,7 @@ const UsersPage = () => {
                 data-testid="reset-password-input"
               />
             </div>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-grafito-500">
               Se muestra en claro a propósito: tienes que poder copiarla para
               entregársela. Hazlo por un canal privado y pídele que la cambie.
             </p>
@@ -759,7 +759,7 @@ const UsersPage = () => {
                 data-testid="reset-pin-input"
               />
             </div>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-grafito-500">
               El usuario deberá cambiar su PIN en el próximo inicio de sesión.
             </p>
           </div>
@@ -803,7 +803,7 @@ const UsersPage = () => {
             ].map(({ key, label }) => {
               const item = eppData[key] || { assigned: false };
               return (
-                <div key={key} className={`p-3 rounded-lg border-2 transition-all ${item.assigned ? 'bg-green-50 border-green-300' : 'bg-slate-50 border-slate-200'}`}>
+                <div key={key} className={`p-3 rounded-lg border-2 transition-all ${item.assigned ? 'bg-green-50 border-green-300' : 'bg-grafito-50 border-grafito-200'}`}>
                   <div className="flex items-center justify-between mb-2">
                     <label className="flex items-center gap-2 cursor-pointer flex-1">
                       <input
@@ -813,7 +813,7 @@ const UsersPage = () => {
                         className="w-5 h-5"
                       />
                       <span className="font-semibold">{label}</span>
-                      {item.assigned ? <CheckCircle className="w-4 h-4 text-green-600" /> : <XCircle className="w-4 h-4 text-slate-300" />}
+                      {item.assigned ? <CheckCircle className="w-4 h-4 text-green-600" /> : <XCircle className="w-4 h-4 text-grafito-300" />}
                     </label>
                   </div>
                   {item.assigned && (
@@ -949,7 +949,7 @@ const UsersPage = () => {
                 vieja - y descubriendolo el dia que no podia entrar.
                 Las credenciales se cambian desde el menu de cada usuario, que
                 usa los endpoints que si las escriben. */}
-            <p className="rounded-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 px-3 py-2.5 text-xs text-slate-600 dark:text-slate-300">
+            <p className="rounded-sm border border-grafito-200 dark:border-grafito-700 bg-grafito-50 dark:bg-grafito-800/50 px-3 py-2.5 text-xs text-grafito-600 dark:text-grafito-300">
               Las credenciales no se cambian desde aquí. Usa el menú (⋯) de la
               fila del usuario: <strong>Resetear contraseña</strong> para quienes
               entran con correo, o <strong>Resetear PIN</strong> para los choferes.

@@ -35,7 +35,7 @@ export const ComparativaPlanes = () => (
       <caption className="sr-only">Comparación de lo que incluye cada plan</caption>
       <thead>
         <tr className="border-b border-white/10">
-          <th scope="col" className="w-2/5 py-4 text-left font-normal text-slate-400">
+          <th scope="col" className="w-2/5 py-4 text-left font-normal text-grafito-400">
             Qué incluye
           </th>
           {['Gratis', 'Pro', 'Empresa'].map((plan) => (
@@ -43,7 +43,7 @@ export const ComparativaPlanes = () => (
               key={plan}
               scope="col"
               className={`px-3 py-4 text-center font-heading text-base font-bold tracking-tight ${
-                plan === 'Pro' ? 'text-marca-400' : 'text-slate-200'
+                plan === 'Pro' ? 'text-marca-400' : 'text-grafito-200'
               }`}
             >
               {plan}
@@ -54,7 +54,7 @@ export const ComparativaPlanes = () => (
       <tbody>
         {FILAS.map(([fila, ...celdas]) => (
           <tr key={fila} className="border-b border-white/5">
-            <th scope="row" className="py-3.5 pr-4 text-left font-normal text-slate-300">
+            <th scope="row" className="py-3.5 pr-4 text-left font-normal text-grafito-300">
               {fila}
             </th>
             {celdas.map((c, i) => (
@@ -64,11 +64,11 @@ export const ComparativaPlanes = () => (
                 ) : c === false ? (
                   // Un guion y no una cruz: una cruz roja se lee como error, y
                   // esto no es un fallo, es que ese plan no lo trae.
-                  <span className="text-slate-600" aria-label="No incluido">
+                  <span className="text-grafito-600" aria-label="No incluido">
                     —
                   </span>
                 ) : (
-                  <span className="text-slate-200">{c}</span>
+                  <span className="text-grafito-200">{c}</span>
                 )}
               </td>
             ))}
@@ -118,15 +118,15 @@ export const Preguntas = () => (
       // añadiría formas de romperlo.
       <details key={p} className="group py-5">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-left">
-          <span className="font-heading text-lg font-bold tracking-tight text-slate-100">{p}</span>
+          <span className="font-heading text-lg font-bold tracking-tight text-grafito-100">{p}</span>
           <span
             aria-hidden="true"
-            className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-white/10 text-slate-400 transition group-open:rotate-45 group-open:border-marca-500/40 group-open:text-marca-400"
+            className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-white/10 text-grafito-400 transition group-open:rotate-45 group-open:border-marca-500/40 group-open:text-marca-400"
           >
             +
           </span>
         </summary>
-        <p className="mt-3 max-w-2xl pr-11 text-[15px] leading-relaxed text-slate-400">{r}</p>
+        <p className="mt-3 max-w-2xl pr-11 text-[15px] leading-relaxed text-grafito-400">{r}</p>
       </details>
     ))}
   </div>

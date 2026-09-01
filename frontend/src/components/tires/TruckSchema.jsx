@@ -12,7 +12,7 @@ const STATUS_RING = {
   good: '#10b981',
   warning: '#f59e0b',
   critical: '#ef4444',
-  empty: '#cbd5e1',
+  empty: '#d0cdc8',
 };
 
 // Realistic truck-tire drawn as an SVG (tread face view): rubber body with
@@ -39,7 +39,7 @@ const RealTire = ({ w, h, ring, dashed }) => {
         width={w - 5}
         height={h - 5}
         rx={Math.min(12, (w - 5) / 2)}
-        fill={dashed ? '#f1f5f9' : 'url(#tireRubber)'}
+        fill={dashed ? '#f3f2f0' : 'url(#tireRubber)'}
         stroke={ring}
         strokeWidth="3"
         strokeDasharray={dashed ? '5 4' : undefined}
@@ -82,11 +82,11 @@ const TireGlyph = ({ position, tire, status, wide, onClick }) => {
             <RealTire w={w} h={h} ring={ring} dashed={!mounted} />
             <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
               {mounted ? (
-                <span className="rounded bg-slate-900/75 px-1 py-0.5 text-[9px] font-bold leading-none text-white shadow-sm">
+                <span className="rounded bg-grafito-900/75 px-1 py-0.5 text-[9px] font-bold leading-none text-white shadow-sm">
                   {position.label}
                 </span>
               ) : (
-                <span className="flex flex-col items-center text-slate-400">
+                <span className="flex flex-col items-center text-grafito-400">
                   <Plus className="w-3.5 h-3.5" />
                   <span className="mt-0.5 text-[8px] font-semibold leading-none">{position.label}</span>
                 </span>
@@ -161,8 +161,8 @@ const AxleRow = ({ axle, getTireByPosition, getTireStatus, onPositionClick }) =>
       </div>
       <div className="mt-1 flex items-center justify-center gap-2">
         <span className={`w-2 h-2 rounded-full ${meta.dot}`} />
-        <span className="text-[11px] font-semibold text-slate-600">{axle.name}</span>
-        <span className="text-[10px] uppercase tracking-wide text-slate-400">
+        <span className="text-[11px] font-semibold text-grafito-600">{axle.name}</span>
+        <span className="text-[10px] uppercase tracking-wide text-grafito-400">
           {meta.label} · {axle.dual ? 'Dual' : 'Balón'}
         </span>
       </div>
@@ -175,12 +175,12 @@ const TruckSchema = ({ config, isTracto, getTireByPosition, getTireStatus, onPos
     <div className="flex flex-col items-center py-6">
       <div className="relative w-full max-w-md">
         {/* central vertical chassis */}
-        <div className="absolute top-6 bottom-6 left-1/2 -translate-x-1/2 w-3 rounded-full bg-slate-300" />
+        <div className="absolute top-6 bottom-6 left-1/2 -translate-x-1/2 w-3 rounded-full bg-grafito-300" />
 
         {/* cab (only for tracto) */}
         {isTracto && (
           <div className="relative z-10 flex justify-center mb-2">
-            <div className="w-24 h-10 rounded-lg bg-slate-700 text-white flex items-center justify-center shadow">
+            <div className="w-24 h-10 rounded-lg bg-grafito-700 text-white flex items-center justify-center shadow">
               <Truck className="w-5 h-5" />
             </div>
           </div>
@@ -201,8 +201,8 @@ const TruckSchema = ({ config, isTracto, getTireByPosition, getTireStatus, onPos
 
       {/* Spares */}
       {config.spare && config.spare.length > 0 && (
-        <div className="mt-6 pt-4 border-t-2 border-dashed border-slate-300 w-full max-w-md">
-          <span className="text-xs font-bold text-slate-500 mb-2 block text-center uppercase tracking-wide">
+        <div className="mt-6 pt-4 border-t-2 border-dashed border-grafito-300 w-full max-w-md">
+          <span className="text-xs font-bold text-grafito-500 mb-2 block text-center uppercase tracking-wide">
             Repuesto(s)
           </span>
           <div className="flex justify-center gap-4">
@@ -223,25 +223,25 @@ const TruckSchema = ({ config, isTracto, getTireByPosition, getTireStatus, onPos
       {/* Legend */}
       <div className="mt-8 w-full max-w-2xl space-y-3">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-grafito-400 mb-2">
             Estado de la llanta
           </p>
           <div className="flex flex-wrap gap-4">
             <LegendItem className="border-emerald-500 bg-emerald-50" label="Buena condición" />
             <LegendItem className="border-amber-500 bg-amber-50" label="Requiere atención" />
             <LegendItem className="border-red-500 bg-red-50" label="Crítico" />
-            <LegendItem className="border-slate-300 border-dashed bg-slate-100" label="Sin llanta" />
+            <LegendItem className="border-grafito-300 border-dashed bg-grafito-100" label="Sin llanta" />
           </div>
         </div>
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-grafito-400 mb-2">
             Tipo de eje
           </p>
           <div className="flex flex-wrap gap-4">
             {Object.entries(AXLE_TYPE_META).map(([key, meta]) => (
               <div key={key} className="flex items-center gap-2">
                 <span className={`w-5 h-2 rounded-full ${meta.bar}`} />
-                <span className="text-xs text-slate-600">{meta.label}</span>
+                <span className="text-xs text-grafito-600">{meta.label}</span>
               </div>
             ))}
           </div>
@@ -254,7 +254,7 @@ const TruckSchema = ({ config, isTracto, getTireByPosition, getTireStatus, onPos
 const LegendItem = ({ className, label }) => (
   <div className="flex items-center gap-2">
     <span className={`w-4 h-4 rounded border-2 ${className}`} />
-    <span className="text-xs text-slate-600">{label}</span>
+    <span className="text-xs text-grafito-600">{label}</span>
   </div>
 );
 

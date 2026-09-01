@@ -375,10 +375,10 @@ const CashboxPage = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-slate-900">
+          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
             Caja
           </h1>
-          <p className="text-slate-500 mt-1">
+          <p className="text-grafito-500 mt-1">
             Control de ingresos y egresos, kardex de caja y análisis por rubro
           </p>
         </div>
@@ -409,7 +409,7 @@ const CashboxPage = () => {
         <Card className="bg-white border-l-4 border-l-green-500" data-testid="stat-income">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
-              <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Total Ingresos</p>
+              <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Total Ingresos</p>
               <ArrowDownCircle className="w-4 h-4 text-green-600" />
             </div>
             <p className="font-heading text-2xl font-bold text-green-600 mt-1">{soles(totalIncome)}</p>
@@ -418,7 +418,7 @@ const CashboxPage = () => {
         <Card className="bg-white border-l-4 border-l-red-500" data-testid="stat-expense">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
-              <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Total Egresos</p>
+              <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Total Egresos</p>
               <ArrowUpCircle className="w-4 h-4 text-red-600" />
             </div>
             <p className="font-heading text-2xl font-bold text-red-600 mt-1">{soles(totalExpense)}</p>
@@ -427,7 +427,7 @@ const CashboxPage = () => {
         <Card className="bg-white border-l-4 border-l-marca-500" data-testid="stat-balance">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
-              <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Saldo</p>
+              <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Saldo</p>
               <Wallet className="w-4 h-4 text-marca-600" />
             </div>
             <p className={`font-heading text-2xl font-bold mt-1 ${(Number(currentBalance) || 0) >= 0 ? 'text-marca-600' : 'text-red-600'}`}>
@@ -438,16 +438,16 @@ const CashboxPage = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <TabsList className="bg-slate-100 rounded-sm">
-          <TabsTrigger value="movements" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide" data-testid="tab-movements">
+        <TabsList className="bg-grafito-100 rounded-sm">
+          <TabsTrigger value="movements" className="rounded-sm data-[state=active]:bg-grafito-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide" data-testid="tab-movements">
             <PiggyBank className="w-4 h-4 mr-2" />
             Movimientos
           </TabsTrigger>
-          <TabsTrigger value="kardex" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide" data-testid="tab-kardex">
+          <TabsTrigger value="kardex" className="rounded-sm data-[state=active]:bg-grafito-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide" data-testid="tab-kardex">
             <BookOpen className="w-4 h-4 mr-2" />
             Kardex
           </TabsTrigger>
-          <TabsTrigger value="by_category" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide" data-testid="tab-by-category">
+          <TabsTrigger value="by_category" className="rounded-sm data-[state=active]:bg-grafito-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide" data-testid="tab-by-category">
             <BarChart3 className="w-4 h-4 mr-2" />
             Por Rubro
           </TabsTrigger>
@@ -524,7 +524,7 @@ const CashboxPage = () => {
         <TabsContent value="movements" className="mt-4">
           <Card className="bg-white section-enter">
             <CardHeader className="flex-row items-center justify-between">
-              <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest">
+              <CardTitle className="text-sm font-bold uppercase text-grafito-500 tracking-widest">
                 Movimientos de Caja
               </CardTitle>
               <Button
@@ -555,7 +555,7 @@ const CashboxPage = () => {
             <CardContent className="p-0 overflow-x-auto">
               {loading ? (
                 <div className="flex items-center justify-center h-64">
-                  <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+                  <Loader2 className="w-6 h-6 animate-spin text-grafito-400" />
                 </div>
               ) : movements.length === 0 ? (
                 hayFiltrosCaja ? (
@@ -576,7 +576,7 @@ const CashboxPage = () => {
               ) : (
                 <>
                 {/* Movil: tarjetas. Nueve columnas en 375px esconden estado y acciones tras un arrastre lateral que nadie descubre. */}
-                <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+                <div className="md:hidden divide-y divide-grafito-100 dark:divide-grafito-800">
                   {movements.map((m, i) => (
                     <div key={m.id || i} className="flex items-start gap-3 px-4 py-3.5">
                       <div className="min-w-0 flex-1">
@@ -584,10 +584,10 @@ const CashboxPage = () => {
                           <span className="font-medium truncate">{m.concept || '-'}</span>
                           {typeBadge(m.type)}
                         </div>
-                        <p className="mt-0.5 truncate text-xs text-slate-500">
+                        <p className="mt-0.5 truncate text-xs text-grafito-500">
                           {categoryLabel(m.category)} · {methodLabel(m.payment_method)}
                         </p>
-                        <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                        <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-grafito-500">
                           <span>{localDate(m.date)}</span>
                           <span className={`font-bold ${m.type === 'egreso' ? 'text-red-600' : 'text-green-600'}`}>
                             {m.type === 'egreso' ? '-' : '+'} {soles(m.amount)}
@@ -646,15 +646,15 @@ const CashboxPage = () => {
         {/* --- Kardex --- */}
         <TabsContent value="kardex" className="mt-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-            <Card className="bg-white border-l-4 border-l-slate-500" data-testid="stat-opening-balance">
+            <Card className="bg-white border-l-4 border-l-grafito-500" data-testid="stat-opening-balance">
               <CardContent className="py-4">
-                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Saldo Inicial</p>
-                <p className="font-heading text-2xl font-bold text-slate-700 mt-1">{soles(openingBalance)}</p>
+                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Saldo Inicial</p>
+                <p className="font-heading text-2xl font-bold text-grafito-700 mt-1">{soles(openingBalance)}</p>
               </CardContent>
             </Card>
             <Card className="bg-white border-l-4 border-l-marca-500" data-testid="stat-closing-balance">
               <CardContent className="py-4">
-                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Saldo Final</p>
+                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Saldo Final</p>
                 <p className={`font-heading text-2xl font-bold mt-1 ${(Number(closingBalance) || 0) >= 0 ? 'text-marca-600' : 'text-red-600'}`}>
                   {soles(closingBalance)}
                 </p>
@@ -664,7 +664,7 @@ const CashboxPage = () => {
 
           <Card className="bg-white section-enter">
             <CardHeader className="flex-row items-center justify-between">
-              <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest">
+              <CardTitle className="text-sm font-bold uppercase text-grafito-500 tracking-widest">
                 Kardex de Caja
               </CardTitle>
               <Button
@@ -707,13 +707,13 @@ const CashboxPage = () => {
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-12 text-slate-400">
+                      <TableCell colSpan={7} className="text-center py-12 text-grafito-400">
                         <Loader2 className="w-6 h-6 mx-auto animate-spin" />
                       </TableCell>
                     </TableRow>
                   ) : kardexRows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-12 text-slate-400">
+                      <TableCell colSpan={7} className="text-center py-12 text-grafito-400">
                         <BookOpen className="w-10 h-10 mx-auto mb-3" />
                         <p>No hay movimientos en el periodo seleccionado</p>
                       </TableCell>
@@ -731,7 +731,7 @@ const CashboxPage = () => {
                           <TableCell>{categoryLabel(r.category)}</TableCell>
                           <TableCell className="text-green-600">{income ? soles(income) : '-'}</TableCell>
                           <TableCell className="text-red-600">{expense ? soles(expense) : '-'}</TableCell>
-                          <TableCell className={`font-bold ${running >= 0 ? 'text-slate-900' : 'text-red-600'}`}>
+                          <TableCell className={`font-bold ${running >= 0 ? 'text-grafito-900' : 'text-red-600'}`}>
                             {soles(running)}
                           </TableCell>
                         </TableRow>
@@ -749,7 +749,7 @@ const CashboxPage = () => {
           {categoryRows.length > 0 && (
             <Card className="bg-white section-enter mb-4">
               <CardHeader>
-                <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest">
+                <CardTitle className="text-sm font-bold uppercase text-grafito-500 tracking-widest">
                   Ingresos vs Egresos por Rubro
                 </CardTitle>
               </CardHeader>
@@ -757,7 +757,7 @@ const CashboxPage = () => {
                 <div style={{ width: '100%', height: 300 }}>
                   <ResponsiveContainer>
                     <BarChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e6e4e1" />
                       <XAxis dataKey="category" tick={{ fontSize: 12 }} />
                       <YAxis tick={{ fontSize: 12 }} />
                       <RechartsTooltip formatter={(v) => soles(v)} />
@@ -773,7 +773,7 @@ const CashboxPage = () => {
 
           <Card className="bg-white section-enter">
             <CardHeader className="flex-row items-center justify-between">
-              <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest">
+              <CardTitle className="text-sm font-bold uppercase text-grafito-500 tracking-widest">
                 Consolidado por Rubro
               </CardTitle>
               <Button
@@ -816,13 +816,13 @@ const CashboxPage = () => {
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-12 text-slate-400">
+                      <TableCell colSpan={5} className="text-center py-12 text-grafito-400">
                         <Loader2 className="w-6 h-6 mx-auto animate-spin" />
                       </TableCell>
                     </TableRow>
                   ) : categoryRows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-12 text-slate-400">
+                      <TableCell colSpan={5} className="text-center py-12 text-grafito-400">
                         <BarChart3 className="w-10 h-10 mx-auto mb-3" />
                         <p>No hay datos por rubro para el periodo seleccionado</p>
                       </TableCell>

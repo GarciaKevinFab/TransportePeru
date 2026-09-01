@@ -93,7 +93,7 @@ const TireLifecyclePage = () => {
   const tireStatuses = [
     { value: 'nuevo', label: 'Nuevo', color: 'bg-green-100 text-green-700' },
     { value: 'en_uso', label: 'En Uso', color: 'bg-blue-100 text-blue-700' },
-    { value: 'almacen', label: 'En Almacén', color: 'bg-slate-100 text-slate-700' },
+    { value: 'almacen', label: 'En Almacén', color: 'bg-grafito-100 text-grafito-700' },
     { value: 'reencauche', label: 'Reencauche', color: 'bg-yellow-100 text-yellow-700' },
     { value: 'reparacion', label: 'En Reparación', color: 'bg-marca-100 text-marca-700' },
     { value: 'baja', label: 'Baja', color: 'bg-red-100 text-red-700' },
@@ -278,10 +278,10 @@ const TireLifecyclePage = () => {
             Volver
           </Button>
           <div>
-            <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-slate-900">
+            <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
               Ciclo de Vida de Llantas
             </h1>
-            <p className="text-slate-500 mt-1">
+            <p className="text-grafito-500 mt-1">
               Reencauche, regrabado, baja y análisis de la pila de descarte
             </p>
           </div>
@@ -298,17 +298,17 @@ const TireLifecyclePage = () => {
       </div>
 
       <Tabs defaultValue="overview">
-        <TabsList className="bg-slate-100 rounded-sm">
+        <TabsList className="bg-grafito-100 rounded-sm">
           <TabsTrigger
             value="overview"
-            className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide"
+            className="rounded-sm data-[state=active]:bg-grafito-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide"
             data-testid="overview-tab"
           >
             Vista General
           </TabsTrigger>
           <TabsTrigger
             value="scrap-pile"
-            className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide"
+            className="rounded-sm data-[state=active]:bg-grafito-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide"
             data-testid="scrap-pile-tab"
           >
             Pila de Descarte
@@ -387,7 +387,7 @@ const TireLifecyclePage = () => {
                         <TableCell>
                           <div>
                             <p className="font-medium">{tire.brand}</p>
-                            <p className="text-xs text-slate-500">{tire.model || '-'}</p>
+                            <p className="text-xs text-grafito-500">{tire.model || '-'}</p>
                           </div>
                         </TableCell>
                         <TableCell>{tire.dimension}</TableCell>
@@ -402,7 +402,7 @@ const TireLifecyclePage = () => {
                         <TableCell>{tire.total_km?.toLocaleString() || 0} km</TableCell>
                         <TableCell className="text-right">
                           {isScrapped(tire) ? (
-                            <span className="text-xs text-slate-400">Fin de vida</span>
+                            <span className="text-xs text-grafito-400">Fin de vida</span>
                           ) : (
                             <div className="flex justify-end gap-2 flex-wrap">
                               <Button
@@ -456,7 +456,7 @@ const TireLifecyclePage = () => {
               <CardContent className="py-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">
+                    <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">
                       Total Descartadas
                     </p>
                     <p className="font-heading text-3xl font-bold text-red-600 mt-1">
@@ -467,20 +467,20 @@ const TireLifecyclePage = () => {
                 </div>
               </CardContent>
             </Card>
-            <Card className="bg-white border-l-4 border-l-slate-500">
+            <Card className="bg-white border-l-4 border-l-grafito-500">
               <CardContent className="py-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">
+                    <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">
                       Km Promedio
                     </p>
-                    <p className="font-heading text-3xl font-bold text-slate-700 mt-1">
+                    <p className="font-heading text-3xl font-bold text-grafito-700 mt-1">
                       {scrapAvgKm != null
                         ? Number(scrapAvgKm).toLocaleString()
                         : '-'}
                     </p>
                   </div>
-                  <Gauge className="w-8 h-8 text-slate-500" />
+                  <Gauge className="w-8 h-8 text-grafito-500" />
                 </div>
               </CardContent>
             </Card>
@@ -488,7 +488,7 @@ const TireLifecyclePage = () => {
               <CardContent className="py-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">
+                    <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">
                       Motivos Distintos
                     </p>
                     <p className="font-heading text-3xl font-bold text-marca-600 mt-1">
@@ -557,7 +557,7 @@ const TireLifecyclePage = () => {
                   <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
                 </div>
               ) : scrapItems.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-48 text-slate-400">
+                <div className="flex flex-col items-center justify-center h-48 text-grafito-400">
                   <Layers className="w-12 h-12 mb-2" />
                   <p>No hay llantas en la pila de descarte</p>
                 </div>
@@ -583,7 +583,7 @@ const TireLifecyclePage = () => {
                         <TableCell>
                           <div>
                             <p className="font-medium">{tire.brand}</p>
-                            <p className="text-xs text-slate-500">{tire.model || '-'}</p>
+                            <p className="text-xs text-grafito-500">{tire.model || '-'}</p>
                           </div>
                         </TableCell>
                         <TableCell>{tire.dimension || '-'}</TableCell>
@@ -618,10 +618,10 @@ const TireLifecyclePage = () => {
             </DialogTitle>
           </DialogHeader>
           {selectedTire && (
-            <div className="p-3 bg-slate-50 rounded-sm text-sm">
-              <p className="text-slate-500">Llanta:</p>
+            <div className="p-3 bg-grafito-50 rounded-sm text-sm">
+              <p className="text-grafito-500">Llanta:</p>
               <p className="font-mono font-bold">{selectedTire.serial}</p>
-              <p className="text-slate-500">
+              <p className="text-grafito-500">
                 {selectedTire.brand} {selectedTire.dimension} · {getLifeCode(selectedTire)}
               </p>
             </div>
@@ -715,10 +715,10 @@ const TireLifecyclePage = () => {
             </DialogTitle>
           </DialogHeader>
           {selectedTire && (
-            <div className="p-3 bg-slate-50 rounded-sm text-sm">
-              <p className="text-slate-500">Llanta:</p>
+            <div className="p-3 bg-grafito-50 rounded-sm text-sm">
+              <p className="text-grafito-500">Llanta:</p>
               <p className="font-mono font-bold">{selectedTire.serial}</p>
-              <p className="text-slate-500">
+              <p className="text-grafito-500">
                 {selectedTire.brand} {selectedTire.dimension} · {getLifeCode(selectedTire)}
               </p>
             </div>

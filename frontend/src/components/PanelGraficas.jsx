@@ -37,12 +37,12 @@ const diaMes = (iso) => {
 };
 
 const Marco = ({ titulo, subtitulo, children }) => (
-  <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800/50">
-    <h3 className="font-heading text-sm font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+  <div className="rounded-xl border border-grafito-200 bg-white p-5 dark:border-grafito-700 dark:bg-grafito-800/50">
+    <h3 className="font-heading text-sm font-bold uppercase tracking-wide text-grafito-500 dark:text-grafito-400">
       {titulo}
     </h3>
     {subtitulo && (
-      <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">{subtitulo}</p>
+      <p className="mt-0.5 text-xs text-grafito-400 dark:text-grafito-500">{subtitulo}</p>
     )}
     <div className="mt-4 h-56">{children}</div>
   </div>
@@ -51,11 +51,11 @@ const Marco = ({ titulo, subtitulo, children }) => (
 const Etiqueta = ({ active, payload, label, formato }) => {
   if (!active || !payload || !payload.length) return null;
   return (
-    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg dark:border-slate-700 dark:bg-slate-900">
-      <p className="font-semibold text-slate-500 dark:text-slate-400">
+    <div className="rounded-lg border border-grafito-200 bg-white px-3 py-2 text-xs shadow-lg dark:border-grafito-700 dark:bg-grafito-900">
+      <p className="font-semibold text-grafito-500 dark:text-grafito-400">
         Semana del {diaMes(label)}
       </p>
-      <p className="mt-1 font-bold text-slate-900 dark:text-slate-100">
+      <p className="mt-1 font-bold text-grafito-900 dark:text-grafito-100">
         {formato(payload[0].value)}
       </p>
     </div>
@@ -84,7 +84,7 @@ const PanelGraficas = ({ semanas = 12 }) => {
         {[0, 1].map((i) => (
           <div
             key={i}
-            className="h-[19rem] animate-pulse rounded-xl border border-slate-200 bg-slate-100 dark:border-slate-700 dark:bg-slate-800/50"
+            className="h-[19rem] animate-pulse rounded-xl border border-grafito-200 bg-grafito-100 dark:border-grafito-700 dark:bg-grafito-800/50"
           />
         ))}
       </div>
@@ -98,11 +98,11 @@ const PanelGraficas = ({ semanas = 12 }) => {
   // sugieren que algo esta roto.
   if (totalViajes === 0 && totalCombustible === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center dark:border-slate-700">
-        <p className="text-sm text-slate-500 dark:text-slate-400">
+      <div className="rounded-xl border border-dashed border-grafito-300 p-8 text-center dark:border-grafito-700">
+        <p className="text-sm text-grafito-500 dark:text-grafito-400">
           Todavía no hay historial suficiente para las gráficas.
         </p>
-        <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+        <p className="mt-1 text-xs text-grafito-400 dark:text-grafito-500">
           Aparecerán solas en cuanto se registren viajes y cargas de combustible.
         </p>
       </div>
@@ -113,7 +113,7 @@ const PanelGraficas = ({ semanas = 12 }) => {
     <CartesianGrid
       strokeDasharray="3 3"
       stroke="currentColor"
-      className="text-slate-200 dark:text-slate-700"
+      className="text-grafito-200 dark:text-grafito-700"
       vertical={false}
     />
   );
@@ -124,7 +124,7 @@ const PanelGraficas = ({ semanas = 12 }) => {
       tickLine={false}
       axisLine={false}
       tick={{ fontSize: 11, fill: 'currentColor' }}
-      className="text-slate-400"
+      className="text-grafito-400"
       interval="preserveStartEnd"
     />
   );
@@ -144,11 +144,11 @@ const PanelGraficas = ({ semanas = 12 }) => {
               tickLine={false}
               axisLine={false}
               tick={{ fontSize: 11, fill: 'currentColor' }}
-              className="text-slate-400"
+              className="text-grafito-400"
             />
             <Tooltip
               content={<Etiqueta formato={(v) => `${v} ${v === 1 ? 'viaje' : 'viajes'}`} />}
-              cursor={{ fill: 'rgba(148,163,184,0.12)' }}
+              cursor={{ fill: 'rgba(161,157,151,0.12)' }}
             />
             <Bar dataKey="viajes" fill={AZUL} radius={[4, 4, 0, 0]} maxBarSize={38} isAnimationActive={false} />
           </BarChart>
@@ -171,7 +171,7 @@ const PanelGraficas = ({ semanas = 12 }) => {
               tickLine={false}
               axisLine={false}
               tick={{ fontSize: 11, fill: 'currentColor' }}
-              className="text-slate-400"
+              className="text-grafito-400"
             />
             <Tooltip content={<Etiqueta formato={soles} />} cursor={{ stroke: NARANJA, strokeWidth: 1 }} />
             <Area

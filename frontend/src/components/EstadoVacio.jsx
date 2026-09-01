@@ -28,11 +28,11 @@ const EstadoVacio = ({ icono: Icono, titulo, texto, accion, enlace, filtrado = f
         <Icono className="h-7 w-7 text-marca-500" />
       </div>
     )}
-    <h3 className="font-heading text-lg font-bold tracking-tight text-slate-900 dark:text-slate-100">
+    <h3 className="font-heading text-lg font-bold tracking-tight text-grafito-900 dark:text-grafito-100">
       {titulo}
     </h3>
     {texto && (
-      <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+      <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-grafito-500 dark:text-grafito-400">
         {texto}
       </p>
     )}

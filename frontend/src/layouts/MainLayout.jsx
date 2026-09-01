@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import IconoCamion from '../components/IconoCamion';
 import { useTheme } from '../context/ThemeContext';
 import api from '../services/api';
 import {
@@ -156,7 +157,13 @@ const MainLayout = ({ children }) => {
       className={({ isActive }) =>
         `sidebar-item sidebar-item-animated tap-scale ${isActive ? 'active' : ''}`
       }
-      style={({ isActive }) => isActive ? { color: companyBrand.brand_color, borderLeftColor: companyBrand.brand_color } : {}}
+      // Mismo criterio que .sidebar-item.active en index.css: el filete lleva
+      // el color del cliente tal cual; la etiqueta, ese color aclarado, porque
+      // sobre el grafito del menu un rojo oscuro no se lee.
+      style={({ isActive }) => isActive ? {
+        color: `color-mix(in srgb, ${companyBrand.brand_color} 42%, #ffffff)`,
+        borderLeftColor: companyBrand.brand_color,
+      } : {}}
       data-testid={`nav-${item.path.replace('/', '')}`}
       title={item.label}
     >
@@ -183,11 +190,11 @@ const MainLayout = ({ children }) => {
         {filteredGroups.map((group) => (
           <div key={group.section} className="pt-2 first:pt-0">
             {expanded ? (
-              <p className="sidebar-section-label px-5 pb-1 pt-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+              <p className="sidebar-section-label px-5 pb-1 pt-2 text-[10px] font-bold uppercase tracking-widest text-grafito-400">
                 {group.section}
               </p>
             ) : (
-              <div className="mx-3 my-2 border-t border-slate-700/60" aria-hidden="true" />
+              <div className="mx-3 my-2 border-t border-grafito-700/60" aria-hidden="true" />
             )}
             <div className="space-y-0.5">
               {group.items.map((item) => (
@@ -202,22 +209,22 @@ const MainLayout = ({ children }) => {
 
   // Sidebar gradient background (subtle inner glow with brand color hint)
   const sidebarBg = {
-    backgroundImage: `linear-gradient(180deg, #0b1220 0%, #0f172a 55%, color-mix(in srgb, ${companyBrand.brand_color} 12%, #0f172a) 100%)`,
+    backgroundImage: `linear-gradient(180deg, #121010 0%, #191614 55%, color-mix(in srgb, ${companyBrand.brand_color} 12%, #191614) 100%)`,
   };
 
   // Header bottom gradient (claro/oscuro según el tema activo)
   const isDark = theme === 'dark';
   const headerStyle = {
     background: isDark
-      ? 'linear-gradient(180deg, rgba(15,23,42,0.94) 0%, rgba(15,23,42,0.88) 100%)'
+      ? 'linear-gradient(180deg, rgba(25,22,20,0.94) 0%, rgba(25,22,20,0.88) 100%)'
       : 'linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.85) 100%)',
     boxShadow:
       `0 1px 0 color-mix(in srgb, ${companyBrand.brand_color} 22%, transparent),` +
-      ` 0 1px 12px ${isDark ? 'rgba(0, 0, 0, 0.35)' : 'rgba(15, 23, 42, 0.04)'}`,
+      ` 0 1px 12px ${isDark ? 'rgba(0, 0, 0, 0.35)' : 'rgba(25, 22, 20, 0.04)'}`,
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="min-h-screen bg-grafito-50 flex">
       {/* Desktop Sidebar */}
       <aside
         className={`hidden md:flex flex-col text-white sidebar-transition relative overflow-hidden ${
@@ -226,7 +233,7 @@ const MainLayout = ({ children }) => {
         style={sidebarBg}
       >
         {/* Logo */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800">
+        <div className="h-16 flex items-center justify-between px-4 border-b border-grafito-800">
           {companyBrand.logo_url && !logoError ? (
             sidebarOpen ? (
               <img
@@ -242,13 +249,13 @@ const MainLayout = ({ children }) => {
             )
           ) : (
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm ${sidebarOpen ? '' : 'mx-auto'}`} style={{ backgroundColor: companyBrand.brand_color }}>
-              <Truck className="w-6 h-6 text-white" />
+              <IconoCamion className="w-6 h-6 text-white" />
             </div>
           )}
           <Button
             variant="ghost"
             size="icon"
-            className="text-slate-400 hover:text-white hover:bg-slate-800"
+            className="text-grafito-400 hover:text-white hover:bg-grafito-800"
             onClick={() => setSidebarOpen(!sidebarOpen)}
             data-testid="toggle-sidebar-btn"
           >
@@ -262,13 +269,12 @@ const MainLayout = ({ children }) => {
         </ScrollArea>
 
         {/* User Section */}
-        <div className="p-3 border-t border-slate-800/80 bg-slate-900/60">
-          <div className={`flex items-center rounded-lg p-2 transition-colors hover:bg-slate-800/60 ${sidebarOpen ? 'gap-3' : 'justify-center'}`}>
+        <div className="p-3 border-t border-grafito-800/80 bg-grafito-900/60">
+          <div className={`flex items-center rounded-lg p-2 transition-colors hover:bg-grafito-800/60 ${sidebarOpen ? 'gap-3' : 'justify-center'}`}>
             <div
-              className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ring-2 ring-slate-800"
+              className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ring-2 ring-grafito-800 text-marca-300"
               style={{
-                backgroundColor: `color-mix(in srgb, ${companyBrand.brand_color} 18%, #1e293b)`,
-                color: companyBrand.brand_color,
+                backgroundColor: `color-mix(in srgb, ${companyBrand.brand_color} 26%, #2a2725)`,
               }}
             >
               {user?.name?.charAt(0).toUpperCase()}
@@ -276,7 +282,7 @@ const MainLayout = ({ children }) => {
             {sidebarOpen && (
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-white truncate leading-tight">{user?.name}</p>
-                <p className="text-[11px] text-slate-400 uppercase tracking-wider mt-0.5">{user?.role}</p>
+                <p className="text-[11px] text-grafito-400 uppercase tracking-wider mt-0.5">{user?.role}</p>
               </div>
             )}
           </div>
@@ -290,7 +296,7 @@ const MainLayout = ({ children }) => {
         }`}
       >
         <div
-          className={`absolute inset-0 bg-slate-950/60 backdrop-blur-sm transition-opacity duration-300 ${
+          className={`absolute inset-0 bg-grafito-950/60 backdrop-blur-sm transition-opacity duration-300 ${
             mobileSidebarOpen ? 'opacity-100' : 'opacity-0'
           }`}
           onClick={() => setMobileSidebarOpen(false)}
@@ -301,7 +307,7 @@ const MainLayout = ({ children }) => {
           }`}
           style={{ ...sidebarBg, transition: 'transform 0.28s cubic-bezier(0.22, 1, 0.36, 1)' }}
         >
-          <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800/80">
+          <div className="h-16 flex items-center justify-between px-4 border-b border-grafito-800/80">
             <div className="flex items-center gap-3">
               <div
                 className="w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden shadow-md"
@@ -310,7 +316,7 @@ const MainLayout = ({ children }) => {
                 {companyBrand.logo_url && !logoError ? (
                   <img src={companyBrand.logo_url} alt="Logo" className="w-full h-full object-contain" onError={() => setLogoError(true)} />
                 ) : (
-                  <Truck className="w-6 h-6 text-white" />
+                  <IconoCamion className="w-6 h-6 text-white" />
                 )}
               </div>
               <span className="font-heading font-bold text-lg tracking-tight uppercase truncate max-w-[160px]">
@@ -320,7 +326,7 @@ const MainLayout = ({ children }) => {
             <Button
               variant="ghost"
               size="icon"
-              className="text-slate-400 hover:text-white hover:bg-slate-800 touch-target"
+              className="text-grafito-400 hover:text-white hover:bg-grafito-800 touch-target"
               onClick={() => setMobileSidebarOpen(false)}
             >
               <X className="w-5 h-5" />
@@ -330,20 +336,19 @@ const MainLayout = ({ children }) => {
             <SidebarNav expanded onItemClick={() => setMobileSidebarOpen(false)} />
           </ScrollArea>
           {/* Mobile sidebar user info */}
-          <div className="p-3 border-t border-slate-800/80 bg-slate-900/60">
+          <div className="p-3 border-t border-grafito-800/80 bg-grafito-900/60">
             <div className="flex items-center gap-3 rounded-lg p-2">
               <div
-                className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ring-2 ring-slate-800"
+                className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ring-2 ring-grafito-800 text-marca-300"
                 style={{
-                  backgroundColor: `color-mix(in srgb, ${companyBrand.brand_color} 18%, #1e293b)`,
-                  color: companyBrand.brand_color,
+                  backgroundColor: `color-mix(in srgb, ${companyBrand.brand_color} 26%, #2a2725)`,
                 }}
               >
                 {user?.name?.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-white truncate leading-tight">{user?.name}</p>
-                <p className="text-[11px] text-slate-400 uppercase tracking-wider mt-0.5">{user?.role}</p>
+                <p className="text-[11px] text-grafito-400 uppercase tracking-wider mt-0.5">{user?.role}</p>
               </div>
             </div>
           </div>
@@ -372,15 +377,15 @@ const MainLayout = ({ children }) => {
                 {companyBrand.logo_url && !logoError ? (
                   <img src={companyBrand.logo_url} alt="Logo" className="w-full h-full object-contain" onError={() => setLogoError(true)} />
                 ) : (
-                  <Truck className="w-5 h-5 text-white" />
+                  <IconoCamion className="w-5 h-5 text-white" />
                 )}
               </div>
-              <span className="font-heading font-bold text-sm tracking-tight uppercase text-slate-900">
+              <span className="font-heading font-bold text-sm tracking-tight uppercase text-grafito-900">
                 {companyBrand.name}
               </span>
             </div>
             {/* Configured company name in the desktop header/navbar */}
-            <span className="hidden md:inline font-heading font-bold text-lg tracking-tight uppercase text-slate-900">
+            <span className="hidden md:inline font-heading font-bold text-lg tracking-tight uppercase text-grafito-900">
               {companyBrand.name}
             </span>
           </div>
@@ -394,7 +399,7 @@ const MainLayout = ({ children }) => {
               data-testid="theme-toggle"
               aria-label={isDark ? 'Activar modo claro' : 'Activar modo oscuro'}
               title={isDark ? 'Modo claro' : 'Modo oscuro'}
-              className="rounded-full text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+              className="rounded-full text-grafito-600 hover:bg-grafito-100 hover:text-grafito-900"
             >
               {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </Button>
@@ -409,26 +414,26 @@ const MainLayout = ({ children }) => {
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
-                  className="flex items-center gap-2 h-10 px-2 sm:px-3 rounded-full hover:bg-slate-100 transition-colors"
+                  className="flex items-center gap-2 h-10 px-2 sm:px-3 rounded-full hover:bg-grafito-100 transition-colors"
                   data-testid="user-menu-btn"
                 >
                   <div
                     className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm ring-2 ring-white avatar-ring"
                     style={{
-                      backgroundImage: `linear-gradient(135deg, color-mix(in srgb, ${companyBrand.brand_color} 22%, #ffffff) 0%, color-mix(in srgb, ${companyBrand.brand_color} 8%, #f1f5f9) 100%)`,
+                      backgroundImage: `linear-gradient(135deg, color-mix(in srgb, ${companyBrand.brand_color} 22%, #ffffff) 0%, color-mix(in srgb, ${companyBrand.brand_color} 8%, #f3f2f0) 100%)`,
                       color: companyBrand.brand_color,
                     }}
                   >
                     {user?.name?.charAt(0).toUpperCase()}
                   </div>
-                  <span className="hidden sm:inline font-medium text-sm text-slate-700">{user?.name}</span>
-                  <ChevronDown className="w-4 h-4 text-slate-500" />
+                  <span className="hidden sm:inline font-medium text-sm text-grafito-700">{user?.name}</span>
+                  <ChevronDown className="w-4 h-4 text-grafito-500" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <div className="px-2 py-1.5">
                   <p className="font-medium">{user?.name}</p>
-                  <p className="text-xs text-slate-500">{user?.email || user?.dni}</p>
+                  <p className="text-xs text-grafito-500">{user?.email || user?.dni}</p>
                 </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => navigate('/settings')}>

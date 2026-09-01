@@ -217,8 +217,8 @@ const DriverIssuesPage = () => {
           <AlertTriangle className="w-6 h-6 text-red-600" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Reportar Incidente</h1>
-          <p className="text-sm text-slate-500">Comunica cualquier problema</p>
+          <h1 className="text-2xl font-bold text-grafito-900">Reportar Incidente</h1>
+          <p className="text-sm text-grafito-500">Comunica cualquier problema</p>
         </div>
       </div>
 
@@ -253,11 +253,11 @@ const DriverIssuesPage = () => {
                   className={`p-3 rounded-lg border text-left transition-all ${
                     formData.issue_type === type.value
                       ? 'border-marca-500 bg-marca-50 ring-2 ring-marca-200'
-                      : 'border-slate-200 hover:border-slate-300'
+                      : 'border-grafito-200 hover:border-grafito-300'
                   }`}
                 >
                   <span className="text-xl mr-2">{type.icon}</span>
-                  <span className="text-sm font-medium text-slate-700">{type.label}</span>
+                  <span className="text-sm font-medium text-grafito-700">{type.label}</span>
                 </button>
               ))}
             </div>
@@ -353,7 +353,7 @@ const DriverIssuesPage = () => {
               {location ? 'Ubicación Obtenida ✓' : 'Obtener Ubicación'}
             </Button>
             {location && (
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-grafito-500">
                 Lat: {location.lat.toFixed(6)}, Lng: {location.lng.toFixed(6)}
               </p>
             )}
@@ -378,9 +378,9 @@ const DriverIssuesPage = () => {
       </Button>
 
       {/* Emergency Contact */}
-      <Card className="bg-slate-900 text-white">
+      <Card className="bg-grafito-900 text-white">
         <CardContent className="p-4 text-center">
-          <p className="text-sm text-slate-400 mb-2">En caso de emergencia grave</p>
+          <p className="text-sm text-grafito-400 mb-2">En caso de emergencia grave</p>
           <Button
             variant="outline"
             className="border-red-500 text-red-400 hover:bg-red-500/20"

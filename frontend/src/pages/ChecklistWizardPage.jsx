@@ -312,10 +312,10 @@ const ChecklistWizardPage = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-bold uppercase tracking-tight text-slate-900">
+          <h1 className="font-heading text-2xl font-bold uppercase tracking-tight text-grafito-900">
             Checklist Pre-Viaje
           </h1>
-          <p className="text-slate-500 mt-1">
+          <p className="text-grafito-500 mt-1">
             {tracto?.plate} {carreta ? `+ ${carreta.plate}` : ''}
           </p>
         </div>
@@ -329,7 +329,7 @@ const ChecklistWizardPage = () => {
       <Card className="bg-white">
         <CardContent className="py-4">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-bold uppercase text-slate-500">Progreso</span>
+            <span className="text-sm font-bold uppercase text-grafito-500">Progreso</span>
             <span className="text-sm font-bold">{progress}%</span>
           </div>
           <Progress value={progress} className="h-2" />
@@ -343,11 +343,11 @@ const ChecklistWizardPage = () => {
                   key={step.id}
                   onClick={() => setCurrentStep(idx)}
                   className={`flex flex-col items-center gap-1 transition-colors ${
-                    isActive ? 'text-marca-600' : isCompleted ? 'text-green-600' : 'text-slate-400'
+                    isActive ? 'text-marca-600' : isCompleted ? 'text-green-600' : 'text-grafito-400'
                   }`}
                 >
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${
-                    isActive ? 'border-marca-600 bg-marca-50' : isCompleted ? 'border-green-600 bg-green-50' : 'border-slate-300'
+                    isActive ? 'border-marca-600 bg-marca-50' : isCompleted ? 'border-green-600 bg-green-50' : 'border-grafito-300'
                   }`}>
                     <Icon className="w-5 h-5" />
                   </div>
@@ -368,16 +368,16 @@ const ChecklistWizardPage = () => {
               <h2 className="font-heading text-xl font-bold uppercase">Información del Viaje</h2>
               
               <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 bg-slate-50 rounded-sm">
-                  <p className="text-xs uppercase text-slate-500 font-bold">Tracto</p>
+                <div className="p-4 bg-grafito-50 rounded-sm">
+                  <p className="text-xs uppercase text-grafito-500 font-bold">Tracto</p>
                   <p className="font-mono text-xl font-bold mt-1">{tracto?.plate}</p>
-                  <p className="text-sm text-slate-500">{tracto?.brand} {tracto?.model}</p>
+                  <p className="text-sm text-grafito-500">{tracto?.brand} {tracto?.model}</p>
                 </div>
                 {carreta && (
-                  <div className="p-4 bg-slate-50 rounded-sm">
-                    <p className="text-xs uppercase text-slate-500 font-bold">Carreta</p>
+                  <div className="p-4 bg-grafito-50 rounded-sm">
+                    <p className="text-xs uppercase text-grafito-500 font-bold">Carreta</p>
                     <p className="font-mono text-xl font-bold mt-1">{carreta?.plate}</p>
-                    <p className="text-sm text-slate-500">{carreta?.brand}</p>
+                    <p className="text-sm text-grafito-500">{carreta?.brand}</p>
                   </div>
                 )}
               </div>
@@ -433,7 +433,7 @@ const ChecklistWizardPage = () => {
               
               {Object.entries(groupedResponses).map(([category, items]) => (
                 <div key={category} className="space-y-2">
-                  <h3 className="font-bold text-sm uppercase text-slate-500 border-b pb-1">
+                  <h3 className="font-bold text-sm uppercase text-grafito-500 border-b pb-1">
                     {category}
                   </h3>
                   {items.map((resp) => (
@@ -443,7 +443,7 @@ const ChecklistWizardPage = () => {
                         resp.status === 'ok' ? 'bg-green-50 border-green-500' :
                         resp.status === 'observado' ? 'bg-yellow-50 border-yellow-500' :
                         resp.status === 'critico' ? 'bg-red-50 border-red-500' :
-                        'bg-slate-50 border-slate-300'
+                        'bg-grafito-50 border-grafito-300'
                       }`}
                     >
                       <div className="flex items-center justify-between">
@@ -565,7 +565,7 @@ const ChecklistWizardPage = () => {
           {currentStep === 3 && (
             <div className="space-y-4">
               <h2 className="font-heading text-xl font-bold uppercase">Fotografías</h2>
-              <p className="text-slate-500">
+              <p className="text-grafito-500">
                 Tome fotos del vehículo antes de iniciar el viaje. Mínimo: frente, lateral y trasera.
               </p>
               
@@ -573,16 +573,16 @@ const ChecklistWizardPage = () => {
                 {['Frente', 'Lateral Izq.', 'Lateral Der.', 'Trasera', 'Motor', 'Carga', 'Documentos', 'Otros'].map((label, idx) => (
                   <div 
                     key={idx}
-                    className="aspect-square border-2 border-dashed border-slate-300 rounded-sm flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 transition-colors"
+                    className="aspect-square border-2 border-dashed border-grafito-300 rounded-sm flex flex-col items-center justify-center cursor-pointer hover:bg-grafito-50 transition-colors"
                   >
-                    <Camera className="w-8 h-8 text-slate-400" />
-                    <span className="text-sm text-slate-500 mt-2">{label}</span>
-                    <span className="text-xs text-slate-400">Tomar foto</span>
+                    <Camera className="w-8 h-8 text-grafito-400" />
+                    <span className="text-sm text-grafito-500 mt-2">{label}</span>
+                    <span className="text-xs text-grafito-400">Tomar foto</span>
                   </div>
                 ))}
               </div>
               
-              <p className="text-sm text-slate-400 text-center">
+              <p className="text-sm text-grafito-400 text-center">
                 * La funcionalidad de cámara requiere dispositivo móvil con PWA instalada
               </p>
             </div>
@@ -592,11 +592,11 @@ const ChecklistWizardPage = () => {
           {currentStep === 4 && (
             <div className="space-y-4">
               <h2 className="font-heading text-xl font-bold uppercase">Firma del Chofer</h2>
-              <p className="text-slate-500">
+              <p className="text-grafito-500">
                 Firme en el recuadro para confirmar que ha realizado la inspección.
               </p>
               
-              <div className="border-2 border-slate-300 rounded-sm bg-white">
+              <div className="border-2 border-grafito-300 rounded-sm bg-white">
                 <SignatureCanvas
                   ref={signatureRef}
                   canvasProps={{
@@ -627,26 +627,26 @@ const ChecklistWizardPage = () => {
               )}
 
               {/* Summary */}
-              <div className="mt-6 p-4 bg-slate-50 rounded-sm">
-                <h3 className="font-bold uppercase text-sm text-slate-500 mb-2">Resumen</h3>
+              <div className="mt-6 p-4 bg-grafito-50 rounded-sm">
+                <h3 className="font-bold uppercase text-sm text-grafito-500 mb-2">Resumen</h3>
                 <div className="grid grid-cols-3 gap-4 text-center">
                   <div>
                     <p className="text-2xl font-bold text-green-600">
                       {responses.filter(r => r.status === 'ok').length}
                     </p>
-                    <p className="text-xs uppercase text-slate-500">OK</p>
+                    <p className="text-xs uppercase text-grafito-500">OK</p>
                   </div>
                   <div>
                     <p className="text-2xl font-bold text-yellow-600">
                       {responses.filter(r => r.status === 'observado').length}
                     </p>
-                    <p className="text-xs uppercase text-slate-500">Observados</p>
+                    <p className="text-xs uppercase text-grafito-500">Observados</p>
                   </div>
                   <div>
                     <p className="text-2xl font-bold text-red-600">
                       {responses.filter(r => r.status === 'critico').length}
                     </p>
-                    <p className="text-xs uppercase text-slate-500">Críticos</p>
+                    <p className="text-xs uppercase text-grafito-500">Críticos</p>
                   </div>
                 </div>
                 

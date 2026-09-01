@@ -242,9 +242,9 @@ const DriverExpensesPage = () => {
   if (!activeTrip) {
     return (
       <div className="flex flex-col items-center justify-center h-96 px-4 text-center">
-        <Receipt className="w-16 h-16 text-slate-300 mb-4" />
-        <h2 className="text-xl font-bold text-slate-600">Sin viaje activo</h2>
-        <p className="text-slate-400 mt-2">
+        <Receipt className="w-16 h-16 text-grafito-300 mb-4" />
+        <h2 className="text-xl font-bold text-grafito-600">Sin viaje activo</h2>
+        <p className="text-grafito-400 mt-2">
           No tienes ningún viaje en curso o programado para registrar gastos.
         </p>
       </div>
@@ -254,16 +254,16 @@ const DriverExpensesPage = () => {
   return (
     <div className="space-y-4 pb-24">
       {/* Trip Info */}
-      <Card className="bg-gradient-to-r from-slate-800 to-slate-900 text-white border-0">
+      <Card className="bg-gradient-to-r from-grafito-800 to-grafito-900 text-white border-0">
         <CardContent className="py-4">
-          <p className="text-xs uppercase tracking-widest text-slate-400">Viaje Activo</p>
+          <p className="text-xs uppercase tracking-widest text-grafito-400">Viaje Activo</p>
           <p className="font-bold text-lg mt-1">{activeTrip.client_name || 'Sin cliente'}</p>
-          <p className="text-sm text-slate-300">{activeTrip.cargo_description || ''}</p>
+          <p className="text-sm text-grafito-300">{activeTrip.cargo_description || ''}</p>
           <div className="flex gap-4 mt-3 text-sm">
             <Badge variant="outline" className="border-marca-500 text-marca-400">
               {activeTrip.status === 'en_curso' ? 'En Curso' : 'Programado'}
             </Badge>
-            <span className="text-slate-400">
+            <span className="text-grafito-400">
               {format(new Date(activeTrip.scheduled_date), 'dd MMM yyyy', { locale: es })}
             </span>
           </div>
@@ -278,7 +278,7 @@ const DriverExpensesPage = () => {
         >
           <CardContent className="py-3 flex items-center justify-between">
             <div>
-              <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Saldo de Viáticos</p>
+              <p className="text-[10px] uppercase tracking-widest text-grafito-500 font-bold">Saldo de Viáticos</p>
               <p className={`text-xl font-bold ${viaticoAlert ? 'text-red-600' : 'text-emerald-700'}`}>
                 S/ {viaticoRemaining.toFixed(2)}
               </p>
@@ -300,29 +300,29 @@ const DriverExpensesPage = () => {
         <div className="grid grid-cols-2 gap-3">
           <Card className="border-l-4 border-l-green-500">
             <CardContent className="py-3">
-              <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Viático/Día</p>
+              <p className="text-[10px] uppercase tracking-widest text-grafito-500 font-bold">Viático/Día</p>
               <p className="text-xl font-bold text-green-600">S/ {dailyBudget.toFixed(2)}</p>
-              <p className="text-[10px] text-slate-400">{totalDays} días / S/ {totalBudget.toFixed(0)} total</p>
+              <p className="text-[10px] text-grafito-400">{totalDays} días / S/ {totalBudget.toFixed(0)} total</p>
             </CardContent>
           </Card>
           <Card className={`border-l-4 ${todayRemaining >= 0 ? 'border-l-blue-500' : 'border-l-red-500'}`}>
             <CardContent className="py-3">
-              <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Saldo Hoy</p>
+              <p className="text-[10px] uppercase tracking-widest text-grafito-500 font-bold">Saldo Hoy</p>
               <p className={`text-xl font-bold ${todayRemaining >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
                 S/ {todayRemaining.toFixed(2)}
               </p>
-              <p className="text-[10px] text-slate-400">Gastado hoy: S/ {todayExpenses.toFixed(2)}</p>
+              <p className="text-[10px] text-grafito-400">Gastado hoy: S/ {todayExpenses.toFixed(2)}</p>
             </CardContent>
           </Card>
           <Card className="border-l-4 border-l-indigo-500">
             <CardContent className="py-3">
-              <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Total Gastado</p>
+              <p className="text-[10px] uppercase tracking-widest text-grafito-500 font-bold">Total Gastado</p>
               <p className="text-xl font-bold text-indigo-600">S/ {totalExpenses.toFixed(2)}</p>
             </CardContent>
           </Card>
           <Card className={`border-l-4 ${remaining >= 0 ? 'border-l-emerald-500' : 'border-l-red-500'}`}>
             <CardContent className="py-3">
-              <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Saldo Total</p>
+              <p className="text-[10px] uppercase tracking-widest text-grafito-500 font-bold">Saldo Total</p>
               <p className={`text-xl font-bold ${remaining >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                 S/ {remaining.toFixed(2)}
               </p>
@@ -336,10 +336,10 @@ const DriverExpensesPage = () => {
         <Card>
           <CardContent className="py-3">
             <div className="flex justify-between text-xs mb-2">
-              <span className="text-slate-500">Presupuesto usado</span>
+              <span className="text-grafito-500">Presupuesto usado</span>
               <span className="font-bold">{Math.min(100, Math.round((totalExpenses / totalBudget) * 100))}%</span>
             </div>
-            <div className="w-full bg-slate-100 rounded-full h-3">
+            <div className="w-full bg-grafito-100 rounded-full h-3">
               <div
                 className={`h-3 rounded-full transition-all ${
                   (totalExpenses / totalBudget) > 0.9 ? 'bg-red-500' :
@@ -361,7 +361,7 @@ const DriverExpensesPage = () => {
         </CardHeader>
         <CardContent className="p-0">
           {expenses.length === 0 ? (
-            <div className="py-8 text-center text-slate-400">
+            <div className="py-8 text-center text-grafito-400">
               <Receipt className="w-10 h-10 mx-auto mb-2 opacity-50" />
               <p>No hay gastos registrados</p>
             </div>
@@ -374,10 +374,10 @@ const DriverExpensesPage = () => {
                     <span className="text-2xl">{cat.icon}</span>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm">{cat.label}</p>
-                      <p className="text-xs text-slate-500 truncate">
+                      <p className="text-xs text-grafito-500 truncate">
                         {expense.description || expense.provider || '-'}
                       </p>
-                      <p className="text-[10px] text-slate-400">
+                      <p className="text-[10px] text-grafito-400">
                         {format(new Date(expense.expense_date || expense.created_at), 'dd/MM HH:mm', { locale: es })}
                       </p>
                     </div>
@@ -387,7 +387,7 @@ const DriverExpensesPage = () => {
                         <button
                           type="button"
                           onClick={() => openReceipt(expense.receipt_url)}
-                          className="mt-1 border-2 border-slate-200 rounded p-0.5 hover:border-marca-400"
+                          className="mt-1 border-2 border-grafito-200 rounded p-0.5 hover:border-marca-400"
                           title="Ver comprobante"
                         >
                           <img
@@ -540,7 +540,7 @@ const DriverExpensesPage = () => {
                 placeholder="0.00"
               />
               {form.amount && dailyBudget > 0 && (
-                <p className={`text-xs ${(todayRemaining - parseFloat(form.amount || 0)) < 0 ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
+                <p className={`text-xs ${(todayRemaining - parseFloat(form.amount || 0)) < 0 ? 'text-red-500 font-bold' : 'text-grafito-500'}`}>
                   {(todayRemaining - parseFloat(form.amount || 0)) < 0
                     ? `⚠️ Excede el viático diario por S/ ${Math.abs(todayRemaining - parseFloat(form.amount || 0)).toFixed(2)}`
                     : `Quedará S/ ${(todayRemaining - parseFloat(form.amount || 0)).toFixed(2)} del día`
@@ -610,7 +610,7 @@ const DriverExpensesPage = () => {
           <DialogHeader>
             <DialogTitle>Comprobante</DialogTitle>
           </DialogHeader>
-          <div className="flex items-center justify-center bg-slate-100 rounded p-2">
+          <div className="flex items-center justify-center bg-grafito-100 rounded p-2">
             {photoViewer.url && (
               <img src={photoViewer.url} alt="Comprobante" className="max-h-[70vh] max-w-full object-contain" />
             )}

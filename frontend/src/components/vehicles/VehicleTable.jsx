@@ -145,12 +145,12 @@ const VehicleTable = ({
           <>
           {/* Movil: tarjetas. Ocho columnas en 375px esconden estado y
               acciones tras un arrastre lateral que nadie descubre. */}
-          <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+          <div className="md:hidden divide-y divide-grafito-100 dark:divide-grafito-800">
             {vehicles.map((vehicle) => (
               <div key={vehicle.id} className="flex items-start gap-3 px-4 py-3.5">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-mono font-bold text-slate-900 dark:text-slate-100">
+                    <span className="font-mono font-bold text-grafito-900 dark:text-grafito-100">
                       {vehicle.plate}
                     </span>
                     {getStatusBadge(vehicle.status)}
@@ -161,10 +161,10 @@ const VehicleTable = ({
                       </Badge>
                     )}
                   </div>
-                  <p className="mt-0.5 truncate text-xs text-slate-500">
+                  <p className="mt-0.5 truncate text-xs text-grafito-500">
                     {[vehicle.brand, vehicle.model, vehicle.year].filter(Boolean).join(' · ') || '-'}
                   </p>
-                  <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                  <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-grafito-500">
                     {getTypeBadge(vehicle.vehicle_type)}
                     <span className="font-mono">{vehicle.odometer?.toLocaleString() || 0} km</span>
                     {getDriverName(vehicle.assigned_driver_id) ? (
@@ -173,7 +173,7 @@ const VehicleTable = ({
                         {getDriverName(vehicle.assigned_driver_id)}
                       </span>
                     ) : (
-                      <span className="text-slate-400">Sin chofer</span>
+                      <span className="text-grafito-400">Sin chofer</span>
                     )}
                   </p>
                 </div>
@@ -202,7 +202,7 @@ const VehicleTable = ({
                 <TableRow key={vehicle.id} className="table-dense table-row-lift">
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-slate-900">
+                      <span className="font-mono font-bold text-grafito-900">
                         {vehicle.plate}
                       </span>
                       {isVehicleCoupled(vehicle.id) && (
@@ -217,7 +217,7 @@ const VehicleTable = ({
                   <TableCell>
                     <div>
                       <p className="font-medium">{vehicle.brand || '-'}</p>
-                      <p className="text-xs text-slate-500">{vehicle.model || '-'}</p>
+                      <p className="text-xs text-grafito-500">{vehicle.model || '-'}</p>
                     </div>
                   </TableCell>
                   <TableCell>{vehicle.year || '-'}</TableCell>
@@ -228,7 +228,7 @@ const VehicleTable = ({
                         <span className="text-sm">{getDriverName(vehicle.assigned_driver_id)}</span>
                       </div>
                     ) : (
-                      <span className="text-xs text-slate-400">Sin asignar</span>
+                      <span className="text-xs text-grafito-400">Sin asignar</span>
                     )}
                   </TableCell>
                   <TableCell>

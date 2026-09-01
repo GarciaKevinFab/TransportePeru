@@ -337,7 +337,7 @@ const DetraccionesPage = () => {
       return <Badge variant="outline" className="bg-green-100 text-green-700 border-green-200">Depositada</Badge>;
     }
     if (status === 'anulada') {
-      return <Badge variant="outline" className="bg-slate-100 text-slate-600">Anulada</Badge>;
+      return <Badge variant="outline" className="bg-grafito-100 text-grafito-600">Anulada</Badge>;
     }
     return <Badge variant="outline" className="bg-yellow-100 text-yellow-700 border-yellow-200">Pendiente</Badge>;
   };
@@ -381,10 +381,10 @@ const DetraccionesPage = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-slate-900">
+          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
             Detracciones
           </h1>
-          <p className="text-slate-500 mt-1">
+          <p className="text-grafito-500 mt-1">
             SPOT — Transporte de carga: {DEFAULT_RATE}% del importe cuando supera S/ {MIN_AMOUNT}.
             El cliente deposita en el Banco de la Nación.
           </p>
@@ -410,31 +410,31 @@ const DetraccionesPage = () => {
         <Card className="bg-white border-l-4 border-l-yellow-500" data-testid="stat-pendientes">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
-              <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Pendientes</p>
+              <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Pendientes</p>
               <Clock className="w-4 h-4 text-yellow-600" />
             </div>
             <p className="font-heading text-3xl font-bold text-yellow-600 mt-1">{pendingCount}</p>
-            <p className="text-sm text-slate-500">{soles(pendingAmount)}</p>
+            <p className="text-sm text-grafito-500">{soles(pendingAmount)}</p>
           </CardContent>
         </Card>
         <Card className="bg-white border-l-4 border-l-green-500" data-testid="stat-depositadas">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
-              <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Depositadas</p>
+              <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Depositadas</p>
               <CheckCircle2 className="w-4 h-4 text-green-600" />
             </div>
             <p className="font-heading text-3xl font-bold text-green-600 mt-1">{depositedCount}</p>
-            <p className="text-sm text-slate-500">{soles(depositedAmount)}</p>
+            <p className="text-sm text-grafito-500">{soles(depositedAmount)}</p>
           </CardContent>
         </Card>
         <Card className="bg-white border-l-4 border-l-marca-500" data-testid="stat-total">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
-              <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Total del periodo</p>
+              <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Total del periodo</p>
               <Coins className="w-4 h-4 text-marca-600" />
             </div>
             <p className="font-heading text-2xl font-bold text-marca-600 mt-1">{soles(totalAmount)}</p>
-            <p className="text-sm text-slate-500">{totalCount} detracciones</p>
+            <p className="text-sm text-grafito-500">{totalCount} detracciones</p>
           </CardContent>
         </Card>
       </div>
@@ -489,14 +489,14 @@ const DetraccionesPage = () => {
       {/* Tabla */}
       <Card className="bg-white section-enter">
         <CardHeader>
-          <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest">
+          <CardTitle className="text-sm font-bold uppercase text-grafito-500 tracking-widest">
             Detracciones registradas
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0 overflow-x-auto">
           {loading ? (
             <div className="flex items-center justify-center h-64">
-              <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+              <Loader2 className="w-6 h-6 animate-spin text-grafito-400" />
             </div>
           ) : detracciones.length === 0 ? (
             hayFiltrosDetracciones ? (
@@ -517,7 +517,7 @@ const DetraccionesPage = () => {
           ) : (
             <>
             {/* Movil: tarjetas. Diez columnas en 375px esconden estado y acciones tras un arrastre lateral que nadie descubre. */}
-            <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+            <div className="md:hidden divide-y divide-grafito-100 dark:divide-grafito-800">
               {detracciones.map((d) => (
                 <div key={d.id} className="flex items-start gap-3 px-4 py-3.5">
                   <div className="min-w-0 flex-1">
@@ -527,10 +527,10 @@ const DetraccionesPage = () => {
                       </span>
                       {statusBadge(d.status)}
                     </div>
-                    <p className="mt-0.5 truncate text-xs text-slate-500">
+                    <p className="mt-0.5 truncate text-xs text-grafito-500">
                       {d.client_name || d.client_ruc || '-'}
                     </p>
-                    <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                    <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-grafito-500">
                       <span>{localDate(d.fecha_emision)}</span>
                       <span className="font-bold text-marca-600">
                         {soles(d.detraccion_amount ?? d.amount)}
@@ -568,7 +568,7 @@ const DetraccionesPage = () => {
                     </TableCell>
                     <TableCell>{localDate(d.fecha_emision)}</TableCell>
                     <TableCell>
-                      <span className="font-mono text-xs text-slate-500 block">{d.client_ruc || '-'}</span>
+                      <span className="font-mono text-xs text-grafito-500 block">{d.client_ruc || '-'}</span>
                       <span className="truncate block max-w-[180px]">{d.client_name || '-'}</span>
                     </TableCell>
                     <TableCell>{soles(d.base_amount)}</TableCell>
@@ -708,7 +708,7 @@ const DetraccionesPage = () => {
             </div>
 
             {/* Monto calculado en vivo */}
-            <div className="bg-slate-50 rounded-lg p-4 space-y-2">
+            <div className="bg-grafito-50 rounded-lg p-4 space-y-2">
               <div className="flex justify-between text-sm">
                 <span>Base imponible</span>
                 <span className="font-medium">{soles(formData.base_amount)}</span>
@@ -770,7 +770,7 @@ const DetraccionesPage = () => {
               />
             </div>
             {selected && (
-              <div className="bg-slate-50 rounded-lg p-3 text-sm flex justify-between">
+              <div className="bg-grafito-50 rounded-lg p-3 text-sm flex justify-between">
                 <span>Monto a depositar</span>
                 <span className="font-bold text-marca-600">
                   {soles(selected.detraccion_amount ?? selected.amount)}
@@ -815,7 +815,7 @@ const DetraccionesPage = () => {
                 </SelectContent>
               </Select>
               {facturas.length === 0 && (
-                <p className="text-xs text-slate-400">No hay facturas disponibles.</p>
+                <p className="text-xs text-grafito-400">No hay facturas disponibles.</p>
               )}
             </div>
           </div>

@@ -127,10 +127,10 @@ const MaintenancePlansPanel = ({ vehicles = [] }) => {
       <Card className="bg-white">
         <CardContent className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <BookOpen className="w-5 h-5 text-slate-500" />
+            <BookOpen className="w-5 h-5 text-grafito-500" />
             <div>
               <p className="text-sm font-bold">Planes preventivos por modelo de vehículo</p>
-              <p className="text-xs text-slate-500">Importa un Excel (estilo E MAX 540) o crea uno desde cero</p>
+              <p className="text-xs text-grafito-500">Importa un Excel (estilo E MAX 540) o crea uno desde cero</p>
             </div>
           </div>
           <div>
@@ -147,7 +147,7 @@ const MaintenancePlansPanel = ({ vehicles = [] }) => {
       <Card className="bg-white">
         <CardContent className="py-3">
           <div className="flex flex-wrap gap-2 items-center">
-            <span className="text-xs font-bold uppercase text-slate-500 mr-2">Leyenda:</span>
+            <span className="text-xs font-bold uppercase text-grafito-500 mr-2">Leyenda:</span>
             {Object.entries(ACTION_LEGEND).map(([code, info]) => (
               <Badge key={code} className={`${info.color} text-xs`}>
                 <span className="font-mono font-bold mr-1">{code}</span>
@@ -162,9 +162,9 @@ const MaintenancePlansPanel = ({ vehicles = [] }) => {
       {plans.length === 0 ? (
         <Card className="bg-white border-dashed">
           <CardContent className="py-12 text-center">
-            <FileSpreadsheet className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-            <p className="text-slate-500 mb-2">No hay planes de mantenimiento</p>
-            <p className="text-sm text-slate-400">Importa el primero desde un archivo Excel</p>
+            <FileSpreadsheet className="w-16 h-16 text-grafito-300 mx-auto mb-4" />
+            <p className="text-grafito-500 mb-2">No hay planes de mantenimiento</p>
+            <p className="text-sm text-grafito-400">Importa el primero desde un archivo Excel</p>
           </CardContent>
         </Card>
       ) : (
@@ -180,7 +180,7 @@ const MaintenancePlansPanel = ({ vehicles = [] }) => {
                   <FileSpreadsheet className="w-10 h-10" style={{ color: 'var(--brand-color)' }} />
                   <button
                     onClick={() => handleDelete(plan)}
-                    className="text-slate-400 hover:text-red-600"
+                    className="text-grafito-400 hover:text-red-600"
                     title="Eliminar"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -189,7 +189,7 @@ const MaintenancePlansPanel = ({ vehicles = [] }) => {
                 <h3 className="font-heading text-lg font-bold uppercase tracking-tight mb-2">
                   {plan.name}
                 </h3>
-                <div className="space-y-1 text-sm text-slate-600 mb-3">
+                <div className="space-y-1 text-sm text-grafito-600 mb-3">
                   <div className="flex items-center gap-2">
                     <Clock className="w-3 h-3" />
                     <span>{plan.intervals?.length || 0} intervalos</span>
@@ -242,11 +242,11 @@ const MaintenancePlansPanel = ({ vehicles = [] }) => {
             </DialogTitle>
           </DialogHeader>
           <div className="py-4 space-y-3 max-h-[60vh] overflow-y-auto">
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-grafito-600">
               Selecciona los vehículos a los que aplica el plan <strong>{selectedPlan?.name}</strong>
             </p>
             {vehicles.length === 0 ? (
-              <p className="text-sm text-slate-500">No hay vehículos disponibles</p>
+              <p className="text-sm text-grafito-500">No hay vehículos disponibles</p>
             ) : (
               <div className="space-y-2">
                 {/* Group by type — 'otros' captura cualquier vehículo sin tipo tracto/carreta */}
@@ -263,22 +263,22 @@ const MaintenancePlansPanel = ({ vehicles = [] }) => {
                   return (
                     <div key={key}>
                       <div className="flex items-center justify-between mt-3 mb-1">
-                        <div className="text-xs font-bold uppercase text-slate-500">{label}</div>
+                        <div className="text-xs font-bold uppercase text-grafito-500">{label}</div>
                         {selectedInGroup > 0 && (
                           <Badge variant="outline" className="text-[10px]">{selectedInGroup} seleccionado(s)</Badge>
                         )}
                       </div>
                       {list.map(v => (
-                        <label key={v.id} className="flex items-center gap-2 p-2 hover:bg-slate-50 rounded cursor-pointer">
+                        <label key={v.id} className="flex items-center gap-2 p-2 hover:bg-grafito-50 rounded cursor-pointer">
                           <input
                             type="checkbox"
                             checked={assignVehicleIds.includes(v.id)}
                             onChange={() => toggleVehicle(v.id)}
                             className="w-4 h-4"
                           />
-                          <Truck className="w-4 h-4 text-slate-400" />
+                          <Truck className="w-4 h-4 text-grafito-400" />
                           <span className="font-mono font-bold">{v.plate}</span>
-                          <span className="text-sm text-slate-500">{v.brand} {v.model}</span>
+                          <span className="text-sm text-grafito-500">{v.brand} {v.model}</span>
                         </label>
                       ))}
                     </div>
@@ -307,27 +307,27 @@ const MaintenancePlansPanel = ({ vehicles = [] }) => {
           {selectedPlan && (
             <div className="flex-1 overflow-auto">
               <div className="mb-4">
-                <div className="text-xs font-bold uppercase text-slate-500 mb-2">Intervalos</div>
+                <div className="text-xs font-bold uppercase text-grafito-500 mb-2">Intervalos</div>
                 <div className="flex flex-wrap gap-2">
                   {selectedPlan.intervals?.map((iv, i) => (
-                    <div key={i} className="px-3 py-2 bg-slate-100 rounded border text-xs">
+                    <div key={i} className="px-3 py-2 bg-grafito-100 rounded border text-xs">
                       <div className="font-bold font-mono">{iv.code}</div>
-                      <div className="text-slate-600">{iv.hours}h</div>
-                      {iv.km && <div className="text-slate-500">{(iv.km / 1000).toFixed(0)}k km</div>}
+                      <div className="text-grafito-600">{iv.hours}h</div>
+                      {iv.km && <div className="text-grafito-500">{(iv.km / 1000).toFixed(0)}k km</div>}
                     </div>
                   ))}
                 </div>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs border-collapse">
-                  <thead className="sticky top-0 bg-slate-900 text-white z-10">
+                  <thead className="sticky top-0 bg-grafito-900 text-white z-10">
                     <tr>
-                      <th className="text-left p-2 border border-slate-700 min-w-[50px]">#</th>
-                      <th className="text-left p-2 border border-slate-700 min-w-[200px]">Descripción</th>
-                      <th className="text-left p-2 border border-slate-700">Tipo</th>
-                      <th className="text-center p-2 border border-slate-700">Qty</th>
+                      <th className="text-left p-2 border border-grafito-700 min-w-[50px]">#</th>
+                      <th className="text-left p-2 border border-grafito-700 min-w-[200px]">Descripción</th>
+                      <th className="text-left p-2 border border-grafito-700">Tipo</th>
+                      <th className="text-center p-2 border border-grafito-700">Qty</th>
                       {selectedPlan.intervals?.map((iv, i) => (
-                        <th key={i} className="text-center p-2 border border-slate-700 min-w-[40px]">
+                        <th key={i} className="text-center p-2 border border-grafito-700 min-w-[40px]">
                           <div className="font-bold">{iv.code}</div>
                           <div className="text-[10px] opacity-70">{iv.hours}h</div>
                         </th>
@@ -338,7 +338,7 @@ const MaintenancePlansPanel = ({ vehicles = [] }) => {
                     {selectedPlan.sections?.map((section, si) => (
                       <React.Fragment key={si}>
                         <tr className="bg-marca-50">
-                          <td colSpan={4 + (selectedPlan.intervals?.length || 0)} className="p-2 border border-slate-300 font-bold uppercase tracking-wide">
+                          <td colSpan={4 + (selectedPlan.intervals?.length || 0)} className="p-2 border border-grafito-300 font-bold uppercase tracking-wide">
                             <span style={{ color: 'var(--brand-color)' }} className="font-mono mr-2">{section.code}</span>
                             {section.name}
                           </td>
@@ -346,33 +346,33 @@ const MaintenancePlansPanel = ({ vehicles = [] }) => {
                         {section.tasks?.map((task, ti) => {
                           const Icon = COMPONENT_ICON[task.component_type] || AlertTriangle;
                           return (
-                            <tr key={`${si}-${ti}`} className="hover:bg-slate-50">
-                              <td className="p-2 border border-slate-200 font-mono">{task.n}</td>
-                              <td className="p-2 border border-slate-200">{task.description}</td>
-                              <td className="p-2 border border-slate-200">
+                            <tr key={`${si}-${ti}`} className="hover:bg-grafito-50">
+                              <td className="p-2 border border-grafito-200 font-mono">{task.n}</td>
+                              <td className="p-2 border border-grafito-200">{task.description}</td>
+                              <td className="p-2 border border-grafito-200">
                                 {task.component_type && (
-                                  <span className="inline-flex items-center gap-1 text-slate-600">
+                                  <span className="inline-flex items-center gap-1 text-grafito-600">
                                     <Icon className="w-3 h-3" />
                                     <span className="text-[10px]">{task.component_type}</span>
                                   </span>
                                 )}
                               </td>
-                              <td className="p-2 border border-slate-200 text-center">{task.quantity || '-'}</td>
+                              <td className="p-2 border border-grafito-200 text-center">{task.quantity || '-'}</td>
                               {selectedPlan.intervals?.map((iv, ivi) => {
                                 const actionKey = iv.code + '_' + ivi;
                                 const action = task.actions?.[actionKey];
                                 const info = action ? ACTION_LEGEND[action] : null;
                                 return (
-                                  <td key={ivi} className="p-1 border border-slate-200 text-center">
+                                  <td key={ivi} className="p-1 border border-grafito-200 text-center">
                                     {action ? (
                                       <span
-                                        className={`inline-block w-6 h-6 rounded text-xs font-bold leading-6 ${info?.color || 'bg-slate-200'}`}
+                                        className={`inline-block w-6 h-6 rounded text-xs font-bold leading-6 ${info?.color || 'bg-grafito-200'}`}
                                         title={info?.label || action}
                                       >
                                         {action}
                                       </span>
                                     ) : (
-                                      <span className="text-slate-300">·</span>
+                                      <span className="text-grafito-300">·</span>
                                     )}
                                   </td>
                                 );

@@ -33,7 +33,7 @@ code {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--brand-color) 35%, #cbd5e1);
+  background: color-mix(in srgb, var(--brand-color) 35%, #d0cdc8);
   border-radius: 999px;
   transition: background 0.2s ease;
 }
@@ -45,13 +45,13 @@ code {
 /* Firefox */
 * {
   scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--brand-color) 35%, #cbd5e1) transparent;
+  scrollbar-color: color-mix(in srgb, var(--brand-color) 35%, #d0cdc8) transparent;
 }
 
 /* Selection color uses brand */
 ::selection {
   background-color: color-mix(in srgb, var(--brand-color) 30%, transparent);
-  color: #0f172a;
+  color: #191614;
 }
 
 /* Global focus rings using brand color */
@@ -83,24 +83,24 @@ code {
 
 @layer base {
   :root {
-    --background: 210 40% 98%;
-    --foreground: 222 47% 11%;
+    --background: 30 20% 98%;
+    --foreground: 24 12% 9%;
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 24 12% 9%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --primary: 222 47% 11%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
+    --popover-foreground: 24 12% 9%;
+    --primary: 24 12% 9%;
+    --primary-foreground: 30 20% 98%;
+    --secondary: 30 14% 96%;
+    --secondary-foreground: 24 12% 9%;
+    --muted: 30 14% 96%;
+    --muted-foreground: 24 6% 45%;
     --accent: 0 100% 44%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
+    --destructive-foreground: 30 20% 98%;
+    --border: 30 10% 89%;
+    --input: 30 10% 89%;
     --ring: 0 100% 44%;
     --chart-1: 0 100% 44%;
     --chart-2: 173 58% 39%;
@@ -118,29 +118,29 @@ code {
     --info: 217 91% 60%;
 
     /* Superficies de página (gris muy sutil) y offset del anillo de foco */
-    --page-bg: #f6f8fb;
+    --page-bg: #f7f6f4;
     --ring-offset-bg: #ffffff;
   }
 
   .dark {
-    --background: 222 47% 3%;
-    --foreground: 210 40% 98%;
-    --card: 222 47% 6%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 47% 6%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222 47% 11%;
-    --secondary: 217 33% 17%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
+    --background: 24 10% 4%;
+    --foreground: 30 20% 98%;
+    --card: 24 9% 7%;
+    --card-foreground: 30 20% 98%;
+    --popover: 24 9% 7%;
+    --popover-foreground: 30 20% 98%;
+    --primary: 30 20% 98%;
+    --primary-foreground: 24 12% 9%;
+    --secondary: 24 8% 16%;
+    --secondary-foreground: 30 20% 98%;
+    --muted: 24 8% 16%;
+    --muted-foreground: 26 7% 64%;
     --accent: 0 100% 44%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 62% 30%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
+    --destructive-foreground: 30 20% 98%;
+    --border: 24 8% 17%;
+    --input: 24 8% 17%;
     --ring: 0 100% 44%;
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
@@ -148,8 +148,8 @@ code {
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
 
-    --page-bg: #0b1220;
-    --ring-offset-bg: #0f172a;
+    --page-bg: #121010;
+    --ring-offset-bg: #191614;
   }
 }
 
@@ -164,11 +164,11 @@ code {
 
 /* Table styles — header sutil, filas limpias, hover de marca */
 .table-dense th {
-  @apply bg-slate-50 text-slate-500 uppercase text-[11px] font-bold tracking-wider border-b border-slate-200 py-3 px-4;
+  @apply bg-grafito-50 text-grafito-500 uppercase text-[11px] font-bold tracking-wider border-b border-grafito-200 py-3 px-4;
 }
 
 .table-dense td {
-  @apply py-3 px-4 text-sm text-slate-700 border-b border-slate-100;
+  @apply py-3 px-4 text-sm text-grafito-700 border-b border-grafito-100;
 }
 
 .table-dense tbody tr {
@@ -198,28 +198,28 @@ code {
 
 /* KPI Card styles — tarjeta con esquina redondeada, sombra suave y hover-lift */
 .kpi-card {
-  @apply bg-white border border-slate-200 p-6 flex flex-col justify-between;
+  @apply bg-white border border-grafito-200 p-6 flex flex-col justify-between;
   border-left: 4px solid var(--brand-color);
   border-radius: 0.875rem;
   box-shadow:
-    0 1px 3px rgba(2, 6, 23, 0.06),
-    0 1px 2px rgba(2, 6, 23, 0.04);
+    0 1px 3px rgba(11, 9, 8, 0.06),
+    0 1px 2px rgba(11, 9, 8, 0.04);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .kpi-card:hover {
   transform: translateY(-2px);
   box-shadow:
-    0 12px 28px -10px rgba(2, 6, 23, 0.14),
-    0 4px 10px -4px rgba(2, 6, 23, 0.06);
+    0 12px 28px -10px rgba(11, 9, 8, 0.14),
+    0 4px 10px -4px rgba(11, 9, 8, 0.06);
 }
 
 .kpi-value {
-  @apply font-heading text-4xl font-bold text-slate-900 tracking-tight;
+  @apply font-heading text-4xl font-bold text-grafito-900 tracking-tight;
 }
 
 .kpi-label {
-  @apply text-xs font-bold uppercase text-slate-500 tracking-widest mt-2;
+  @apply text-xs font-bold uppercase text-grafito-500 tracking-widest mt-2;
 }
 
 /* Icono tintado en círculo para KPIs / stat cards (por categoría de acento) */
@@ -239,12 +239,12 @@ code {
 .stat-icon-green   { background-color: rgba(34, 197, 94, 0.14);   color: #16a34a; }
 .stat-icon-amber   { background-color: rgba(234, 179, 8, 0.16);   color: #b45309; }
 .stat-icon-red     { background-color: rgba(239, 68, 68, 0.14);   color: #dc2626; }
-.stat-icon-slate   { background-color: rgba(100, 116, 139, 0.14); color: #475569; }
+.stat-icon-slate   { background-color: rgba(115, 111, 105, 0.14); color: #55514c; }
 
 /* Button styles */
 .btn-primary {
-  @apply bg-slate-900 text-white hover:bg-slate-800 rounded-lg uppercase font-bold tracking-wide text-sm h-10 px-6 transition-all;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  @apply bg-grafito-900 text-white hover:bg-grafito-800 rounded-lg uppercase font-bold tracking-wide text-sm h-10 px-6 transition-all;
+  box-shadow: 0 1px 2px rgba(25, 22, 20, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 /* Botón de marca (usado por el variant default de shadcn Button) */
@@ -273,7 +273,7 @@ code {
   transform: translateY(0.5px);
 }
 .btn-primary:hover {
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  box-shadow: 0 4px 12px rgba(25, 22, 20, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   transform: translateY(-1px);
 }
 
@@ -306,25 +306,31 @@ code {
 
 /* Input styles */
 .input-label {
-  @apply text-xs font-bold uppercase text-slate-500 mb-1 block tracking-widest;
+  @apply text-xs font-bold uppercase text-grafito-500 mb-1 block tracking-widest;
 }
 
 /* Sidebar styles */
 .sidebar-item {
-  @apply relative flex items-center gap-3 mx-2 my-0.5 px-3 py-2.5 rounded-lg text-slate-300 cursor-pointer;
+  @apply relative flex items-center gap-3 mx-2 my-0.5 px-3 py-2.5 rounded-lg text-grafito-300 cursor-pointer;
   min-height: 42px;
   border-left: 3px solid transparent;
   transition: background-color 0.2s ease, color 0.2s ease, border-left-color 0.2s ease, padding-left 0.15s ease;
 }
 
 .sidebar-item:hover {
-  background-color: rgba(30, 41, 59, 0.6); /* slate-800/60 */
+  background-color: rgba(42, 39, 37, 0.6); /* grafito-800/60 */
   color: #ffffff;
 }
 
 .sidebar-item.active {
-  background-color: color-mix(in srgb, var(--brand-color) 14%, transparent);
-  color: var(--brand-color);
+  background-color: color-mix(in srgb, var(--brand-color) 16%, transparent);
+  /* La ETIQUETA no va en el color de marca puro. El menu lateral es grafito
+     casi negro y el rojo #e00000 encima da 3,4:1: por debajo del minimo
+     legible, y con un cliente de color aun mas oscuro seria peor. El color de
+     marca sigue mandando -es el mismo tono, aclarado-, pero quien identifica
+     el item de un vistazo son el filete izquierdo y el fondo, que si lo
+     llevan puro. */
+  color: color-mix(in srgb, var(--brand-color) 42%, #ffffff);
   border-left-color: var(--brand-color);
   font-weight: 600;
 }
@@ -351,7 +357,7 @@ code {
 }
 
 .tire-position.empty {
-  @apply bg-slate-100 border-slate-300 text-slate-400 border-dashed;
+  @apply bg-grafito-100 border-grafito-300 text-grafito-400 border-dashed;
 }
 
 /* Document matrix cell styles */
@@ -372,7 +378,7 @@ code {
 }
 
 .doc-cell.pendiente {
-  @apply bg-slate-100 text-slate-600;
+  @apply bg-grafito-100 text-grafito-600;
 }
 
 /* Animation classes */
@@ -393,10 +399,10 @@ code {
 
 @keyframes pulse-orange {
   0%, 100% {
-    box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.4);
+    box-shadow: 0 0 0 0 rgba(224, 0, 0, 0.4);
   }
   50% {
-    box-shadow: 0 0 0 8px rgba(249, 115, 22, 0);
+    box-shadow: 0 0 0 8px rgba(224, 0, 0, 0);
   }
 }
 
@@ -413,8 +419,8 @@ code {
 [data-card],
 .shadow-card {
   box-shadow:
-    0 1px 3px rgba(15, 23, 42, 0.06),
-    0 1px 2px rgba(15, 23, 42, 0.04);
+    0 1px 3px rgba(25, 22, 20, 0.06),
+    0 1px 2px rgba(25, 22, 20, 0.04);
   transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 
@@ -422,15 +428,15 @@ code {
    Sombra suave de marca + hover-lift muy sutil, coherente con el look SaaS. */
 .card-surface {
   box-shadow:
-    0 1px 3px rgba(2, 6, 23, 0.06),
-    0 1px 2px rgba(2, 6, 23, 0.04);
+    0 1px 3px rgba(11, 9, 8, 0.06),
+    0 1px 2px rgba(11, 9, 8, 0.04);
   transition: box-shadow 0.22s ease, transform 0.22s ease, border-color 0.22s ease;
 }
 .card-surface:hover {
   transform: translateY(-1px);
   box-shadow:
-    0 10px 25px -8px rgba(2, 6, 23, 0.12),
-    0 4px 10px -4px rgba(2, 6, 23, 0.06);
+    0 10px 25px -8px rgba(11, 9, 8, 0.12),
+    0 4px 10px -4px rgba(11, 9, 8, 0.06);
 }
 .dark .card-surface {
   box-shadow:
@@ -446,8 +452,8 @@ code {
 .shadow-card-hover:hover,
 .card-hover:hover {
   box-shadow:
-    0 10px 25px -8px rgba(15, 23, 42, 0.12),
-    0 4px 10px -4px rgba(15, 23, 42, 0.06);
+    0 10px 25px -8px rgba(25, 22, 20, 0.12),
+    0 4px 10px -4px rgba(25, 22, 20, 0.06);
 }
 
 /* Glass card utility - frosted, ideal for hero/feature blocks */
@@ -457,13 +463,13 @@ code {
   backdrop-filter: saturate(160%) blur(14px);
   border: 1px solid rgba(255, 255, 255, 0.6);
   box-shadow:
-    0 1px 2px rgba(15, 23, 42, 0.06),
-    0 8px 24px -8px rgba(15, 23, 42, 0.10);
+    0 1px 2px rgba(25, 22, 20, 0.06),
+    0 8px 24px -8px rgba(25, 22, 20, 0.10);
   border-radius: 0.75rem;
 }
 
 .glass-card-dark {
-  background-color: rgba(15, 23, 42, 0.55);
+  background-color: rgba(25, 22, 20, 0.55);
   -webkit-backdrop-filter: saturate(160%) blur(14px);
   backdrop-filter: saturate(160%) blur(14px);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -474,22 +480,22 @@ code {
 .metric-tile {
   position: relative;
   background: #ffffff;
-  border: 1px solid rgb(226, 232, 240);
+  border: 1px solid rgb(230, 228, 225);
   border-left: 4px solid var(--brand-color);
   border-radius: 0.75rem;
   padding: 1.25rem;
   overflow: hidden;
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
   box-shadow:
-    0 1px 3px rgba(15, 23, 42, 0.05),
-    0 1px 2px rgba(15, 23, 42, 0.03);
+    0 1px 3px rgba(25, 22, 20, 0.05),
+    0 1px 2px rgba(25, 22, 20, 0.03);
 }
 
 .metric-tile:hover {
   transform: translateY(-2px);
   box-shadow:
-    0 12px 28px -10px rgba(15, 23, 42, 0.14),
-    0 4px 10px -4px rgba(15, 23, 42, 0.06);
+    0 12px 28px -10px rgba(25, 22, 20, 0.14),
+    0 4px 10px -4px rgba(25, 22, 20, 0.06);
 }
 
 .metric-tile .metric-watermark {
@@ -507,17 +513,17 @@ code {
 }
 
 .metric-tile .metric-value {
-  @apply font-heading font-bold text-slate-900 tracking-tight;
+  @apply font-heading font-bold text-grafito-900 tracking-tight;
   font-size: clamp(1.875rem, 2vw + 1rem, 2.5rem);
   line-height: 1.05;
 }
 
 .metric-tile .metric-label {
-  @apply text-[11px] font-bold uppercase text-slate-500 tracking-widest;
+  @apply text-[11px] font-bold uppercase text-grafito-500 tracking-widest;
 }
 
 .metric-tile .metric-sub {
-  @apply text-xs text-slate-500 mt-1;
+  @apply text-xs text-grafito-500 mt-1;
 }
 
 /* Trend chip */
@@ -546,49 +552,49 @@ code {
    ============================================ */
 
 /* Paleta oscura de referencia:
-   superficie base   #0f172a (slate-900)
-   superficie tarjeta#1e293b (slate-800)
-   superficie elevada#334155 (slate-700)
-   borde             #334155 / #475569
-   texto fuerte      #f1f5f9  texto medio #cbd5e1  texto tenue #94a3b8 */
+   superficie base   #191614 (grafito-900)
+   superficie tarjeta#2a2725 (grafito-800)
+   superficie elevada#423e3a (grafito-700)
+   borde             #423e3a / #55514c
+   texto fuerte      #f3f2f0  texto medio #d0cdc8  texto tenue #a19d97 */
 
 /* Fondos claros -> superficies oscuras */
-.dark .bg-white { background-color: #1e293b !important; }
-.dark .bg-slate-50 { background-color: #0f172a !important; }
-.dark .bg-slate-100 { background-color: #334155 !important; }
-.dark .bg-slate-200 { background-color: #475569 !important; }
+.dark .bg-white { background-color: #2a2725 !important; }
+.dark .bg-grafito-50 { background-color: #191614 !important; }
+.dark .bg-grafito-100 { background-color: #423e3a !important; }
+.dark .bg-grafito-200 { background-color: #55514c !important; }
 
 /* Textos oscuros -> textos claros */
-.dark .text-slate-900 { color: #f1f5f9 !important; }
-.dark .text-slate-800 { color: #e2e8f0 !important; }
-.dark .text-slate-700 { color: #cbd5e1 !important; }
-.dark .text-slate-600 { color: #cbd5e1 !important; }
-.dark .text-slate-500 { color: #94a3b8 !important; }
-.dark .text-slate-400 { color: #94a3b8 !important; }
+.dark .text-grafito-900 { color: #f3f2f0 !important; }
+.dark .text-grafito-800 { color: #e6e4e1 !important; }
+.dark .text-grafito-700 { color: #d0cdc8 !important; }
+.dark .text-grafito-600 { color: #d0cdc8 !important; }
+.dark .text-grafito-500 { color: #a19d97 !important; }
+.dark .text-grafito-400 { color: #a19d97 !important; }
 
 /* Bordes claros -> bordes oscuros */
-.dark .border-slate-100 { border-color: #334155 !important; }
-.dark .border-slate-200 { border-color: #334155 !important; }
-.dark .border-slate-300 { border-color: #475569 !important; }
+.dark .border-grafito-100 { border-color: #423e3a !important; }
+.dark .border-grafito-200 { border-color: #423e3a !important; }
+.dark .border-grafito-300 { border-color: #55514c !important; }
 
 /* Divisores */
-.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: #334155 !important; }
-.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) { border-color: #334155 !important; }
+.dark .divide-grafito-100 > :not([hidden]) ~ :not([hidden]) { border-color: #423e3a !important; }
+.dark .divide-grafito-200 > :not([hidden]) ~ :not([hidden]) { border-color: #423e3a !important; }
 
 /* Hovers de fondo claro -> hovers oscuros */
-.dark .hover\:bg-slate-50:hover { background-color: #334155 !important; }
-.dark .hover\:bg-slate-100:hover { background-color: #475569 !important; }
-.dark .hover\:bg-white:hover { background-color: #1e293b !important; }
+.dark .hover\:bg-grafito-50:hover { background-color: #423e3a !important; }
+.dark .hover\:bg-grafito-100:hover { background-color: #55514c !important; }
+.dark .hover\:bg-white:hover { background-color: #2a2725 !important; }
 
 /* Selección de texto en oscuro */
 .dark ::selection {
   background-color: color-mix(in srgb, var(--brand-color) 40%, transparent);
-  color: #f1f5f9;
+  color: #f3f2f0;
 }
 
 /* Scrollbar en oscuro */
 .dark ::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--brand-color) 40%, #475569);
+  background: color-mix(in srgb, var(--brand-color) 40%, #55514c);
 }
 
 /* ---- Componentes personalizados definidos con @apply (no cubiertos por
@@ -596,33 +602,33 @@ code {
 
 /* Tablas densas */
 .dark .table-dense th {
-  background-color: #1e293b !important;
-  color: #94a3b8 !important;
-  border-bottom-color: #334155 !important;
+  background-color: #2a2725 !important;
+  color: #a19d97 !important;
+  border-bottom-color: #423e3a !important;
 }
 .dark .table-dense td {
-  color: #cbd5e1 !important;
+  color: #d0cdc8 !important;
   border-bottom-color: #263449 !important;
 }
 .dark .table-dense tr:hover {
-  background-color: rgba(249, 115, 22, 0.12) !important;
+  background-color: rgba(224, 0, 0, 0.12) !important;
 }
 
 /* KPI / métricas */
-.dark .kpi-card { background-color: #1e293b !important; border-color: #334155 !important; }
-.dark .kpi-value { color: #f1f5f9 !important; }
-.dark .kpi-label { color: #94a3b8 !important; }
+.dark .kpi-card { background-color: #2a2725 !important; border-color: #423e3a !important; }
+.dark .kpi-value { color: #f3f2f0 !important; }
+.dark .kpi-label { color: #a19d97 !important; }
 
 .dark .metric-tile {
-  background: #1e293b !important;
-  border-color: #334155 !important;
+  background: #2a2725 !important;
+  border-color: #423e3a !important;
 }
-.dark .metric-tile .metric-value { color: #f1f5f9 !important; }
+.dark .metric-tile .metric-value { color: #f3f2f0 !important; }
 .dark .metric-tile .metric-label,
-.dark .metric-tile .metric-sub { color: #94a3b8 !important; }
+.dark .metric-tile .metric-sub { color: #a19d97 !important; }
 
 /* Etiquetas de inputs */
-.dark .input-label { color: #94a3b8 !important; }
+.dark .input-label { color: #a19d97 !important; }
 
 /* Tarjetas glass
  *
@@ -639,13 +645,13 @@ code {
  */
 .dark .glass-card,
 .dark .glass-strong {
-  background-color: rgba(30, 41, 59, 0.72) !important;
-  border-color: rgba(148, 163, 184, 0.12) !important;
+  background-color: rgba(42, 39, 37, 0.72) !important;
+  border-color: rgba(161, 157, 151, 0.12) !important;
 }
 
 .dark .glass-light {
-  background-color: rgba(30, 41, 59, 0.6) !important;
-  border-color: rgba(148, 163, 184, 0.12) !important;
+  background-color: rgba(42, 39, 37, 0.6) !important;
+  border-color: rgba(161, 157, 151, 0.12) !important;
 }
 
 /* Badges de estado — se mantienen semánticos, con fondos tenues legibles */
@@ -658,20 +664,20 @@ code {
 .dark .doc-cell.vigente   { background-color: rgba(34, 197, 94, 0.16) !important; color: #86efac !important; }
 .dark .doc-cell.por-vencer{ background-color: rgba(234, 179, 8, 0.16) !important; color: #fde047 !important; }
 .dark .doc-cell.vencido   { background-color: rgba(239, 68, 68, 0.16) !important; color: #fca5a5 !important; }
-.dark .doc-cell.pendiente { background-color: #334155 !important; color: #cbd5e1 !important; }
+.dark .doc-cell.pendiente { background-color: #423e3a !important; color: #d0cdc8 !important; }
 
 /* Esquema de llantas */
 .dark .tire-position.good     { background-color: rgba(34, 197, 94, 0.18) !important; border-color: #22c55e !important; color: #86efac !important; }
 .dark .tire-position.warning  { background-color: rgba(234, 179, 8, 0.18) !important; border-color: #eab308 !important; color: #fde047 !important; }
 .dark .tire-position.critical { background-color: rgba(239, 68, 68, 0.18) !important; border-color: #ef4444 !important; color: #fca5a5 !important; }
-.dark .tire-position.empty    { background-color: #1e293b !important; border-color: #475569 !important; color: #64748b !important; }
+.dark .tire-position.empty    { background-color: #2a2725 !important; border-color: #55514c !important; color: #736f69 !important; }
 
 /* Chips de tendencia (fondos claros -> tenues) */
 .dark .trend-up   { background-color: rgba(34, 197, 94, 0.16) !important; color: #86efac !important; }
 .dark .trend-down { background-color: rgba(239, 68, 68, 0.16) !important; color: #fca5a5 !important; }
 
 /* Fondos de acento suaves que quedan brillantes en oscuro */
-.dark .bg-marca-50 { background-color: rgba(249, 115, 22, 0.12) !important; }
+.dark .bg-marca-50 { background-color: rgba(224, 0, 0, 0.12) !important; }
 .dark .bg-green-50  { background-color: rgba(34, 197, 94, 0.12) !important; }
 .dark .bg-red-50    { background-color: rgba(239, 68, 68, 0.12) !important; }
 .dark .bg-yellow-50 { background-color: rgba(234, 179, 8, 0.12) !important; }

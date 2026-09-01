@@ -329,7 +329,7 @@ const TireSchemaPage = () => {
     critical: 'bg-red-100 text-red-700',
     warning: 'bg-yellow-100 text-yellow-700',
     good: 'bg-green-100 text-green-700',
-    empty: 'bg-slate-100 text-slate-500',
+    empty: 'bg-grafito-100 text-grafito-500',
   };
   const statusLabels = {
     critical: 'Crítica',
@@ -348,7 +348,7 @@ const TireSchemaPage = () => {
     baja: 'bg-blue-100 text-blue-700 border-blue-200',
     low: 'bg-blue-100 text-blue-700 border-blue-200',
   };
-  const severityClass = (sev) => severityStyles[String(sev || '').toLowerCase()] || 'bg-slate-100 text-slate-600 border-slate-200';
+  const severityClass = (sev) => severityStyles[String(sev || '').toLowerCase()] || 'bg-grafito-100 text-grafito-600 border-grafito-200';
 
   const suggestions = diagnostics?.suggestions || [];
   const axleIssues = diagnostics?.axle_issues || [];
@@ -372,14 +372,14 @@ const TireSchemaPage = () => {
           Volver
         </Button>
         <div className="flex-1">
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-slate-900">
+          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
             Llantas del Vehículo
           </h1>
           <div className="flex items-center gap-4 mt-1">
             <Badge variant="outline" className="font-mono text-lg">
               {vehicle?.plate}
             </Badge>
-            <span className="text-slate-500">
+            <span className="text-grafito-500">
               {vehicle?.brand} {vehicle?.model} - {vehicle?.vehicle_type === 'tracto' ? 'Tracto' : 'Carreta'}
             </span>
           </div>
@@ -423,7 +423,7 @@ const TireSchemaPage = () => {
       {/* Tire Schema */}
       <Card className="bg-white">
         <CardHeader>
-          <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest">
+          <CardTitle className="text-sm font-bold uppercase text-grafito-500 tracking-widest">
             Esquema de Llantas
           </CardTitle>
         </CardHeader>
@@ -442,7 +442,7 @@ const TireSchemaPage = () => {
       {hasDiagnostics && (
         <Card className="bg-white" data-testid="tire-diagnostics-panel">
           <CardHeader>
-            <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest flex items-center gap-2">
+            <CardTitle className="text-sm font-bold uppercase text-grafito-500 tracking-widest flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-marca-500" />
               Diagnósticos
             </CardTitle>
@@ -475,7 +475,7 @@ const TireSchemaPage = () => {
             )}
             {axleIssues.length > 0 && (
               <div className="space-y-2">
-                <p className="text-xs font-bold uppercase text-slate-400 tracking-widest">
+                <p className="text-xs font-bold uppercase text-grafito-400 tracking-widest">
                   Problemas por eje
                 </p>
                 {axleIssues.map((ai, idx) => (
@@ -510,25 +510,25 @@ const TireSchemaPage = () => {
           <Card className="bg-white">
             <CollapsibleTrigger className="w-full text-left" data-testid="axle-history-trigger">
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest flex items-center gap-2">
+                <CardTitle className="text-sm font-bold uppercase text-grafito-500 tracking-widest flex items-center gap-2">
                   <History className="w-4 h-4" />
                   Histórico de esquema ({axleHistory.length})
                 </CardTitle>
-                <ChevronDown className="w-4 h-4 text-slate-400" />
+                <ChevronDown className="w-4 h-4 text-grafito-400" />
               </CardHeader>
             </CollapsibleTrigger>
             <CollapsibleContent>
               <CardContent>
                 <ul className="space-y-2">
                   {axleHistory.map((h, idx) => (
-                    <li key={idx} className="flex items-center gap-3 text-sm border-b border-slate-100 pb-2 last:border-0">
-                      <span className="font-mono text-xs text-slate-500 w-24 shrink-0">
+                    <li key={idx} className="flex items-center gap-3 text-sm border-b border-grafito-100 pb-2 last:border-0">
+                      <span className="font-mono text-xs text-grafito-500 w-24 shrink-0">
                         {fmtDate(h.date || h.changed_at || h.created_at)}
                       </span>
-                      <span className="text-slate-700">
+                      <span className="text-grafito-700">
                         {h.changed_by_name || h.changed_by || h.user || 'Usuario'}
                       </span>
-                      {h.note && <span className="text-slate-400 text-xs">— {h.note}</span>}
+                      {h.note && <span className="text-grafito-400 text-xs">— {h.note}</span>}
                     </li>
                   ))}
                 </ul>
@@ -541,13 +541,13 @@ const TireSchemaPage = () => {
       {/* Tires List */}
       <Card className="bg-white">
         <CardHeader>
-          <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest">
+          <CardTitle className="text-sm font-bold uppercase text-grafito-500 tracking-widest">
             Llantas Montadas ({tires.length})
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0 overflow-x-auto">
           {tires.length === 0 ? (
-            <div className="text-center py-8 text-slate-400">
+            <div className="text-center py-8 text-grafito-400">
               <CircleDot className="w-12 h-12 mx-auto mb-2" />
               <p>No hay llantas montadas</p>
             </div>
@@ -577,7 +577,7 @@ const TireSchemaPage = () => {
                       className={`table-dense cursor-pointer ${
                         tire.needs_review
                           ? 'bg-amber-50 hover:bg-amber-100'
-                          : 'hover:bg-slate-50'
+                          : 'hover:bg-grafito-50'
                       }`}
                       data-testid={tire.needs_review ? 'tire-row-review' : undefined}
                       onClick={() => {
@@ -594,7 +594,7 @@ const TireSchemaPage = () => {
                       <TableCell>
                         <div>
                           <p className="font-medium">{tire.brand} {tire.model}</p>
-                          <p className="text-xs text-slate-500">{dash(tire.dimension)}</p>
+                          <p className="text-xs text-grafito-500">{dash(tire.dimension)}</p>
                         </div>
                       </TableCell>
                       <TableCell className="font-mono text-xs">{dash(tire.cod_vida)}</TableCell>
@@ -698,25 +698,25 @@ const TireSchemaPage = () => {
           <div className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-xs text-slate-500 uppercase font-bold">Marca</p>
+                <p className="text-xs text-grafito-500 uppercase font-bold">Marca</p>
                 <p className="font-medium">{selectedTire?.brand}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-500 uppercase font-bold">Modelo</p>
+                <p className="text-xs text-grafito-500 uppercase font-bold">Modelo</p>
                 <p className="font-medium">{selectedTire?.model || '-'}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-500 uppercase font-bold">Dimensión</p>
+                <p className="text-xs text-grafito-500 uppercase font-bold">Dimensión</p>
                 <p className="font-medium">{selectedTire?.dimension}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-500 uppercase font-bold">Vida</p>
+                <p className="text-xs text-grafito-500 uppercase font-bold">Vida</p>
                 <p className="font-medium">
                   {selectedTire?.life_number === 1 ? 'Nueva' : `R${selectedTire?.life_number - 1}`}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-slate-500 uppercase font-bold">Km Totales</p>
+                <p className="text-xs text-grafito-500 uppercase font-bold">Km Totales</p>
                 <p className="font-medium font-mono">
                   {selectedTire?.total_km?.toLocaleString() || 0} km
                 </p>
@@ -724,17 +724,17 @@ const TireSchemaPage = () => {
             </div>
             
             {selectedTire?.last_inspection && (
-              <div className="p-4 bg-slate-50 rounded-sm">
-                <p className="text-xs text-slate-500 uppercase font-bold mb-2">Última Inspección</p>
+              <div className="p-4 bg-grafito-50 rounded-sm">
+                <p className="text-xs text-grafito-500 uppercase font-bold mb-2">Última Inspección</p>
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <div>
-                    <span className="text-slate-500">Profundidad:</span>{' '}
+                    <span className="text-grafito-500">Profundidad:</span>{' '}
                     <span className="font-medium">
                       {Math.min(...selectedTire.last_inspection.depths).toFixed(1)}mm
                     </span>
                   </div>
                   <div>
-                    <span className="text-slate-500">Presión:</span>{' '}
+                    <span className="text-grafito-500">Presión:</span>{' '}
                     <span className="font-medium">{selectedTire.last_inspection.pressure} PSI</span>
                   </div>
                 </div>

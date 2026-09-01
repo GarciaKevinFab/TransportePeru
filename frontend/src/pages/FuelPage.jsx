@@ -597,10 +597,10 @@ const FuelPage = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-slate-900">
+          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
             Combustible
           </h1>
-          <p className="text-slate-500 mt-1">
+          <p className="text-grafito-500 mt-1">
             Gestión de vales y cargas de combustible
           </p>
         </div>
@@ -622,7 +622,7 @@ const FuelPage = () => {
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Vales Activos</p>
+                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Vales Activos</p>
                 <p className="font-heading text-3xl font-bold text-blue-600 mt-1">{activeVouchers}</p>
               </div>
               <Ticket className="w-8 h-8 text-blue-500" />
@@ -633,7 +633,7 @@ const FuelPage = () => {
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Total Litros</p>
+                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Total Litros</p>
                 <p className="font-heading text-2xl font-bold text-green-600 mt-1">{totalLiters.toLocaleString()}</p>
               </div>
               <Fuel className="w-8 h-8 text-green-500" />
@@ -644,19 +644,19 @@ const FuelPage = () => {
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Total Gastado</p>
+                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Total Gastado</p>
                 <p className="font-heading text-xl font-bold text-marca-600 mt-1">S/ {totalAmount.toLocaleString()}</p>
               </div>
               <TrendingUp className="w-8 h-8 text-marca-500" />
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-slate-500 card-enter card-stagger-4">
+        <Card className="bg-white border-l-4 border-l-grafito-500 card-enter card-stagger-4">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Precio Promedio</p>
-                <p className="font-heading text-xl font-bold text-slate-600 mt-1">S/ {avgPrice.toFixed(2)}/L</p>
+                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Precio Promedio</p>
+                <p className="font-heading text-xl font-bold text-grafito-600 mt-1">S/ {avgPrice.toFixed(2)}/L</p>
               </div>
             </div>
           </CardContent>
@@ -665,11 +665,11 @@ const FuelPage = () => {
 
       {/* Tabs */}
       <Tabs defaultValue="vouchers">
-        <TabsList className="bg-slate-100 rounded-sm">
-          <TabsTrigger value="vouchers" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
+        <TabsList className="bg-grafito-100 rounded-sm">
+          <TabsTrigger value="vouchers" className="rounded-sm data-[state=active]:bg-grafito-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
             Vales ({vouchers.length})
           </TabsTrigger>
-          <TabsTrigger value="loads" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
+          <TabsTrigger value="loads" className="rounded-sm data-[state=active]:bg-grafito-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
             Cargas ({loads.length})
           </TabsTrigger>
         </TabsList>
@@ -703,21 +703,21 @@ const FuelPage = () => {
               ) : (
                 <>
                 {/* Movil: tarjetas. Ocho columnas en 375px esconden estado y acciones tras un arrastre lateral que nadie descubre. */}
-                <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+                <div className="md:hidden divide-y divide-grafito-100 dark:divide-grafito-800">
                   {vouchers.map((voucher) => (
                     <div key={voucher.id} className="flex items-start gap-3 px-4 py-3.5">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <span className="font-mono font-bold truncate">{voucher.voucher_number}</span>
-                          <Badge className={voucher.is_used ? 'bg-slate-100 text-slate-700' : 'bg-green-100 text-green-700'}>
+                          <Badge className={voucher.is_used ? 'bg-grafito-100 text-grafito-700' : 'bg-green-100 text-green-700'}>
                             {voucher.is_used ? 'Usado' : 'Disponible'}
                           </Badge>
                         </div>
-                        <p className="mt-0.5 truncate text-xs text-slate-500">
+                        <p className="mt-0.5 truncate text-xs text-grafito-500">
                           {voucher.provider}
                         </p>
-                        <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
-                          <span className="font-mono font-bold text-slate-700 dark:text-slate-300">
+                        <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-grafito-500">
+                          <span className="font-mono font-bold text-grafito-700 dark:text-grafito-300">
                             {getVehiclePlate(voucher.vehicle_id)}
                           </span>
                           <span>
@@ -734,14 +734,14 @@ const FuelPage = () => {
                               <img src={resolvePhoto(voucher.voucher_photo_url || voucher.photo_url)} alt="vale" className="w-8 h-8 object-cover rounded" />
                             </button>
                           ) : (
-                            <div className="w-9 h-9 border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-slate-300 text-[10px]">V</div>
+                            <div className="w-9 h-9 border-2 border-dashed border-grafito-200 rounded flex items-center justify-center text-grafito-300 text-[10px]">V</div>
                           )}
                           {voucher.invoice_photo_url ? (
                             <button onClick={() => openPhoto(voucher.invoice_photo_url, `Factura ${voucher.invoice_number || ''}`)} className="border-2 border-marca-300 rounded p-0.5 hover:border-marca-500" title="Foto de factura">
                               <img src={resolvePhoto(voucher.invoice_photo_url)} alt="factura" className="w-8 h-8 object-cover rounded" />
                             </button>
                           ) : (
-                            <div className="w-9 h-9 border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-slate-300 text-[10px]">F</div>
+                            <div className="w-9 h-9 border-2 border-dashed border-grafito-200 rounded flex items-center justify-center text-grafito-300 text-[10px]">F</div>
                           )}
                         </div>
                       </div>
@@ -779,7 +779,7 @@ const FuelPage = () => {
                           {voucher.valid_from?.substring(0, 10)} - {voucher.valid_until?.substring(0, 10)}
                         </TableCell>
                         <TableCell>
-                          <Badge className={voucher.is_used ? 'bg-slate-100 text-slate-700' : 'bg-green-100 text-green-700'}>
+                          <Badge className={voucher.is_used ? 'bg-grafito-100 text-grafito-700' : 'bg-green-100 text-green-700'}>
                             {voucher.is_used ? 'Usado' : 'Disponible'}
                           </Badge>
                         </TableCell>
@@ -790,14 +790,14 @@ const FuelPage = () => {
                                 <img src={resolvePhoto(voucher.voucher_photo_url || voucher.photo_url)} alt="vale" className="w-8 h-8 object-cover rounded" />
                               </button>
                             ) : (
-                              <div className="w-9 h-9 border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-slate-300 text-[10px]">V</div>
+                              <div className="w-9 h-9 border-2 border-dashed border-grafito-200 rounded flex items-center justify-center text-grafito-300 text-[10px]">V</div>
                             )}
                             {voucher.invoice_photo_url ? (
                               <button onClick={() => openPhoto(voucher.invoice_photo_url, `Factura ${voucher.invoice_number || ''}`)} className="border-2 border-marca-300 rounded p-0.5 hover:border-marca-500" title="Foto de factura">
                                 <img src={resolvePhoto(voucher.invoice_photo_url)} alt="factura" className="w-8 h-8 object-cover rounded" />
                               </button>
                             ) : (
-                              <div className="w-9 h-9 border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-slate-300 text-[10px]">F</div>
+                              <div className="w-9 h-9 border-2 border-dashed border-grafito-200 rounded flex items-center justify-center text-grafito-300 text-[10px]">F</div>
                             )}
                           </div>
                         </TableCell>
@@ -843,7 +843,7 @@ const FuelPage = () => {
               ) : (
                 <>
                 {/* Movil: tarjetas. Once columnas en 375px esconden estado y acciones tras un arrastre lateral que nadie descubre. */}
-                <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+                <div className="md:hidden divide-y divide-grafito-100 dark:divide-grafito-800">
                   {loads.map((load) => {
                     const voucherPhoto = load.voucher_photo_url || (load.voucher_id ? null : load.photo_url);
                     const invoicePhoto = load.invoice_photo_url;
@@ -854,14 +854,14 @@ const FuelPage = () => {
                           <span className="font-bold">{load.liters?.toFixed(2)} L</span>
                           <span className="font-bold text-green-600 text-sm">S/ {load.total_amount?.toFixed(2)}</span>
                         </div>
-                        <p className="mt-0.5 truncate text-xs text-slate-500">
+                        <p className="mt-0.5 truncate text-xs text-grafito-500">
                           {getDriverName(load.driver_id)}{getTripLabel(load.trip_id) ? ` · ${getTripLabel(load.trip_id)}` : ''}
                         </p>
-                        <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                        <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-grafito-500">
                           <span>
                             {format(new Date(load.load_date || load.created_at), 'dd/MM/yy HH:mm', { locale: es })}
                           </span>
-                          <span className="font-mono font-bold text-slate-700 dark:text-slate-300">
+                          <span className="font-mono font-bold text-grafito-700 dark:text-grafito-300">
                             {getVehiclePlate(load.vehicle_id)}
                           </span>
                           <span>{load.odometer?.toLocaleString()} km</span>
@@ -875,14 +875,14 @@ const FuelPage = () => {
                               <img src={resolvePhoto(voucherPhoto)} alt="vale" className="w-8 h-8 object-cover rounded" />
                             </button>
                           ) : (
-                            <div className="w-9 h-9 border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-slate-300 text-[10px]">V</div>
+                            <div className="w-9 h-9 border-2 border-dashed border-grafito-200 rounded flex items-center justify-center text-grafito-300 text-[10px]">V</div>
                           )}
                           {invoicePhoto ? (
                             <button onClick={() => openPhoto(invoicePhoto, `Factura ${load.invoice_number || ''}`)} className="border-2 border-marca-300 rounded p-0.5 hover:border-marca-500" title="Foto de factura">
                               <img src={resolvePhoto(invoicePhoto)} alt="factura" className="w-8 h-8 object-cover rounded" />
                             </button>
                           ) : (
-                            <div className="w-9 h-9 border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-slate-300 text-[10px]">F</div>
+                            <div className="w-9 h-9 border-2 border-dashed border-grafito-200 rounded flex items-center justify-center text-grafito-300 text-[10px]">F</div>
                           )}
                         </div>
                       </div>
@@ -923,9 +923,9 @@ const FuelPage = () => {
                         <TableCell className="font-mono">{getVehiclePlate(load.vehicle_id)}</TableCell>
                         <TableCell className="text-xs">
                           {getTripLabel(load.trip_id) ? (
-                            <span className="text-slate-700">{getTripLabel(load.trip_id)}</span>
+                            <span className="text-grafito-700">{getTripLabel(load.trip_id)}</span>
                           ) : (
-                            <span className="text-slate-300">-</span>
+                            <span className="text-grafito-300">-</span>
                           )}
                         </TableCell>
                         <TableCell className="font-mono text-xs">{load.voucher_number || '-'}</TableCell>
@@ -940,14 +940,14 @@ const FuelPage = () => {
                                 <img src={resolvePhoto(voucherPhoto)} alt="vale" className="w-8 h-8 object-cover rounded" />
                               </button>
                             ) : (
-                              <div className="w-9 h-9 border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-slate-300 text-[10px]">V</div>
+                              <div className="w-9 h-9 border-2 border-dashed border-grafito-200 rounded flex items-center justify-center text-grafito-300 text-[10px]">V</div>
                             )}
                             {invoicePhoto ? (
                               <button onClick={() => openPhoto(invoicePhoto, `Factura ${load.invoice_number || ''}`)} className="border-2 border-marca-300 rounded p-0.5 hover:border-marca-500" title="Foto de factura">
                                 <img src={resolvePhoto(invoicePhoto)} alt="factura" className="w-8 h-8 object-cover rounded" />
                               </button>
                             ) : (
-                              <div className="w-9 h-9 border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-slate-300 text-[10px]">F</div>
+                              <div className="w-9 h-9 border-2 border-dashed border-grafito-200 rounded flex items-center justify-center text-grafito-300 text-[10px]">F</div>
                             )}
                           </div>
                         </TableCell>
@@ -973,7 +973,7 @@ const FuelPage = () => {
           <DialogHeader>
             <DialogTitle>{photoPreview.title || 'Foto'}</DialogTitle>
           </DialogHeader>
-          <div className="flex items-center justify-center bg-slate-100 rounded p-2">
+          <div className="flex items-center justify-center bg-grafito-100 rounded p-2">
             {photoPreview.url && (
               <img src={photoPreview.url} alt="preview" className="max-h-[70vh] max-w-full object-contain" />
             )}
@@ -1261,7 +1261,7 @@ const FuelPage = () => {
                 <Input
                   value={`S/ ${((parseFloat(loadForm.liters) || 0) * (parseFloat(loadForm.price_per_liter) || 0)).toFixed(2)}`}
                   disabled
-                  className="rounded-sm bg-slate-50 font-bold"
+                  className="rounded-sm bg-grafito-50 font-bold"
                 />
               </div>
             </div>

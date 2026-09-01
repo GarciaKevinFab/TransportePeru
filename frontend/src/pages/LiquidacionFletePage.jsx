@@ -43,7 +43,7 @@ const localDate = (value) => {
 };
 
 const STATUS_LABEL = {
-  borrador: { label: 'Borrador', className: 'bg-slate-100 text-slate-600' },
+  borrador: { label: 'Borrador', className: 'bg-grafito-100 text-grafito-600' },
   en_revision: { label: 'En revisión', className: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
   aprobada: { label: 'Aprobada', className: 'bg-blue-100 text-blue-700 border-blue-200' },
   cerrada: { label: 'Cerrada', className: 'bg-green-100 text-green-700 border-green-200' },
@@ -211,10 +211,10 @@ const LiquidacionFletePage = () => {
     <div className="space-y-6 page-fade-in" data-testid="liquidacion-flete-page">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-slate-900">
+          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
             Liquidación de Flete
           </h1>
-          <p className="text-slate-500 mt-1">
+          <p className="text-grafito-500 mt-1">
             Guía remitente, ticket UNACEM, vale y factura de combustible por viaje — agrupados por proveedor y periodo.
           </p>
         </div>
@@ -239,21 +239,21 @@ const LiquidacionFletePage = () => {
         {/* ================= LIQUIDACIONES ================= */}
         <TabsContent value="liquidaciones" className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Card className="bg-white border-l-4 border-l-slate-400">
+            <Card className="bg-white border-l-4 border-l-grafito-400">
               <CardContent className="py-4">
-                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Borradores</p>
-                <p className="font-heading text-3xl font-bold text-slate-700 mt-1">{borradorCount}</p>
+                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Borradores</p>
+                <p className="font-heading text-3xl font-bold text-grafito-700 mt-1">{borradorCount}</p>
               </CardContent>
             </Card>
             <Card className="bg-white border-l-4 border-l-marca-500">
               <CardContent className="py-4">
-                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Total a cobrar</p>
+                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Total a cobrar</p>
                 <p className="font-heading text-2xl font-bold text-marca-600 mt-1">{soles(totalACobrar)}</p>
               </CardContent>
             </Card>
             <Card className="bg-white border-l-4 border-l-green-500">
               <CardContent className="py-4">
-                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Utilidad neta</p>
+                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Utilidad neta</p>
                 <p className="font-heading text-2xl font-bold text-green-600 mt-1">{soles(totalUtilidad)}</p>
               </CardContent>
             </Card>
@@ -299,13 +299,13 @@ const LiquidacionFletePage = () => {
 
           <Card className="bg-white section-enter">
             <CardHeader>
-              <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest">
+              <CardTitle className="text-sm font-bold uppercase text-grafito-500 tracking-widest">
                 Liquidaciones registradas
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0 overflow-x-auto">
               {loading ? (
-                <div className="flex items-center justify-center py-12 text-slate-400">
+                <div className="flex items-center justify-center py-12 text-grafito-400">
                   <Loader2 className="w-6 h-6 animate-spin" />
                 </div>
               ) : liquidaciones.length === 0 ? (
@@ -338,7 +338,7 @@ const LiquidacionFletePage = () => {
               ) : (
                 <>
                 {/* Movil: tarjetas. Nueve columnas en 375px esconden estado y acciones tras un arrastre lateral que nadie descubre. */}
-                <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+                <div className="md:hidden divide-y divide-grafito-100 dark:divide-grafito-800">
                   {liquidaciones.map((l) => (
                     <div key={l.id} className="flex items-start gap-3 px-4 py-3.5">
                       <div className="min-w-0 flex-1 cursor-pointer" onClick={() => navigate(`/liquidacion-flete/${l.id}`)}>
@@ -346,10 +346,10 @@ const LiquidacionFletePage = () => {
                           <span className="font-mono font-medium truncate">{l.liquidacion_number || '-'}</span>
                           {statusBadge(l.status)}
                         </div>
-                        <p className="mt-0.5 truncate text-xs text-slate-500">
+                        <p className="mt-0.5 truncate text-xs text-grafito-500">
                           {proveedorName(l.proveedor_id)} · {tipoCargaLabel(l.tipo_carga)}
                         </p>
-                        <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                        <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-grafito-500">
                           <span>{localDate(l.periodo_inicio)} — {localDate(l.periodo_fin)}</span>
                           <span className="font-bold text-green-600">{soles(l.total_utilidad_neta)}</span>
                           <span>{l.lineas_count ?? 0} líneas</span>
@@ -380,7 +380,7 @@ const LiquidacionFletePage = () => {
                   </TableHeader>
                   <TableBody>
                     {liquidaciones.map((l) => (
-                      <TableRow key={l.id} className="table-dense cursor-pointer hover:bg-slate-50" data-testid={`liquidacion-row-${l.id}`} onClick={() => navigate(`/liquidacion-flete/${l.id}`)}>
+                      <TableRow key={l.id} className="table-dense cursor-pointer hover:bg-grafito-50" data-testid={`liquidacion-row-${l.id}`} onClick={() => navigate(`/liquidacion-flete/${l.id}`)}>
                         <TableCell className="font-mono">{l.liquidacion_number || '-'}</TableCell>
                         <TableCell>{proveedorName(l.proveedor_id)}</TableCell>
                         <TableCell>{localDate(l.periodo_inicio)} — {localDate(l.periodo_fin)}</TableCell>
@@ -576,7 +576,7 @@ const ProveedoresTab = ({ proveedores, onChanged }) => {
   return (
     <Card className="bg-white section-enter">
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest">
+        <CardTitle className="text-sm font-bold uppercase text-grafito-500 tracking-widest">
           Proveedores de transporte
         </CardTitle>
         <Button className="btn-action btn-press" onClick={openCreate} data-testid="proveedor-new-btn">
@@ -595,18 +595,18 @@ const ProveedoresTab = ({ proveedores, onChanged }) => {
         ) : (
           <>
           {/* Movil: tarjetas. Siete columnas en 375px esconden banco, cuenta y acciones tras un arrastre lateral que nadie descubre. */}
-          <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+          <div className="md:hidden divide-y divide-grafito-100 dark:divide-grafito-800">
             {proveedores.map((p) => (
               <div key={p.id} className="flex items-start gap-3 px-4 py-3.5">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="font-medium truncate">{p.razon_social}</span>
-                    {p.is_tenant_self && <Badge variant="outline" className="bg-slate-100 text-slate-600">Empresa propia</Badge>}
+                    {p.is_tenant_self && <Badge variant="outline" className="bg-grafito-100 text-grafito-600">Empresa propia</Badge>}
                   </div>
-                  <p className="mt-0.5 truncate text-xs text-slate-500">
+                  <p className="mt-0.5 truncate text-xs text-grafito-500">
                     {p.tipo === 'persona_natural' ? 'Persona natural' : 'Empresa'} · <span className="font-mono">{p.ruc || p.dni || '-'}</span>
                   </p>
-                  <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                  <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-grafito-500">
                     <span>{p.celular || '-'}</span>
                     <span>{p.banco || '-'}</span>
                     <span className="font-mono truncate">{p.cuenta_corriente || p.cuenta_cci || '-'}</span>
@@ -638,7 +638,7 @@ const ProveedoresTab = ({ proveedores, onChanged }) => {
                 <TableRow key={p.id} className="table-dense" data-testid={`proveedor-row-${p.id}`}>
                   <TableCell>
                     {p.razon_social}
-                    {p.is_tenant_self && <Badge variant="outline" className="ml-2 bg-slate-100 text-slate-600">Empresa propia</Badge>}
+                    {p.is_tenant_self && <Badge variant="outline" className="ml-2 bg-grafito-100 text-grafito-600">Empresa propia</Badge>}
                   </TableCell>
                   <TableCell className="capitalize">{p.tipo === 'persona_natural' ? 'Persona natural' : 'Empresa'}</TableCell>
                   <TableCell className="font-mono text-xs">{p.ruc || p.dni || '-'}</TableCell>
@@ -741,7 +741,7 @@ const KIND_LABEL = {
 const confidenceBadge = (confidence) => {
   if (confidence === 'alta') return <Badge variant="outline" className="bg-green-100 text-green-700 border-green-200">Alta</Badge>;
   if (confidence === 'media') return <Badge variant="outline" className="bg-yellow-100 text-yellow-700 border-yellow-200">Media</Badge>;
-  return <Badge variant="outline" className="bg-slate-100 text-slate-600">Baja</Badge>;
+  return <Badge variant="outline" className="bg-grafito-100 text-grafito-600">Baja</Badge>;
 };
 
 const WhatsappPendientesTab = ({ liquidaciones, proveedorName }) => {
@@ -792,7 +792,7 @@ const WhatsappPendientesTab = ({ liquidaciones, proveedorName }) => {
   return (
     <Card className="bg-white section-enter">
       <CardHeader>
-        <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest">
+        <CardTitle className="text-sm font-bold uppercase text-grafito-500 tracking-widest">
           Documentos recibidos por WhatsApp, pendientes de asignar
         </CardTitle>
       </CardHeader>
@@ -810,9 +810,9 @@ const WhatsappPendientesTab = ({ liquidaciones, proveedorName }) => {
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={6} className="text-center py-12 text-slate-400"><Loader2 className="w-6 h-6 mx-auto animate-spin" /></TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} className="text-center py-12 text-grafito-400"><Loader2 className="w-6 h-6 mx-auto animate-spin" /></TableCell></TableRow>
             ) : pendientes.length === 0 ? (
-              <TableRow><TableCell colSpan={6} className="text-center py-12 text-slate-400">
+              <TableRow><TableCell colSpan={6} className="text-center py-12 text-grafito-400">
                 <MessageSquareText className="w-10 h-10 mx-auto mb-3" />
                 <p>No hay documentos pendientes del bot de WhatsApp</p>
               </TableCell></TableRow>
@@ -863,7 +863,7 @@ const WhatsappPendientesTab = ({ liquidaciones, proveedorName }) => {
                 </SelectContent>
               </Select>
               {borradores.length === 0 && (
-                <p className="text-xs text-slate-400">No hay liquidaciones en borrador. Crea una primero en la pestaña Liquidaciones.</p>
+                <p className="text-xs text-grafito-400">No hay liquidaciones en borrador. Crea una primero en la pestaña Liquidaciones.</p>
               )}
             </div>
           </div>

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
+import IconoCamion from '../components/IconoCamion';
 import { Link, useNavigate } from 'react-router-dom';
 import PanelMarca from '../components/PanelMarca';
-import { Truck, ArrowRight, Loader2 } from 'lucide-react';
+import { ArrowRight, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 /**
@@ -21,7 +22,7 @@ import { useAuth } from '../context/AuthContext';
 // en cada render y remontaria los inputs, que pierden el foco a cada tecla.
 const Campo = ({ etiqueta, campo, valor, onChange, tipo = 'text', placeholder, ...resto }) => (
   <div>
-    <label htmlFor={campo} className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-400">
+    <label htmlFor={campo} className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-grafito-400">
       {etiqueta}
     </label>
     <input
@@ -30,7 +31,7 @@ const Campo = ({ etiqueta, campo, valor, onChange, tipo = 'text', placeholder, .
       value={valor}
       onChange={onChange}
       placeholder={placeholder}
-      className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-slate-100 placeholder:text-slate-500 outline-none transition focus:border-marca-500/60 focus:bg-white/[0.07]"
+      className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-grafito-100 placeholder:text-grafito-400 outline-none transition focus:border-marca-500/60 focus:bg-white/[0.07]"
       {...resto}
     />
   </div>
@@ -76,7 +77,7 @@ const SignupPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex bg-slate-950 text-slate-100 antialiased smooth-appear">
+    <div className="min-h-screen flex bg-grafito-950 text-grafito-100 antialiased smooth-appear">
       {/* La misma concha que el login: panel de marca a la izquierda, tarjeta a
           la derecha. Antes el registro tenia OTRA estructura -cabecera fina y
           columna de texto- y las dos puertas del producto parecian de productos
@@ -106,18 +107,18 @@ const SignupPage = () => {
                 className="inline-flex items-center justify-center w-14 h-14 rounded-xl mb-3 icon-3d glow-brand-soft"
                 style={{ backgroundColor: 'var(--brand-color)' }}
               >
-                <Truck className="w-8 h-8 text-white" />
+                <IconoCamion className="w-8 h-8 text-white" />
               </span>
-              <span className="font-heading text-3xl font-black text-slate-100 tracking-tight uppercase">
+              <span className="font-heading text-3xl font-black text-grafito-100 tracking-tight uppercase">
                 CargoXprez
               </span>
             </Link>
-            <p className="text-slate-400 text-sm mt-1">Sistema de Gestión de Flota</p>
+            <p className="text-grafito-400 text-sm mt-1">Sistema de Gestión de Flota</p>
           </div>
 
-        <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-8 shadow-2xl shadow-black/50 login-card-enter">
+        <div className="rounded-2xl border border-white/10 bg-grafito-900/70 p-8 shadow-2xl shadow-black/50 login-card-enter">
           <h2 className="font-heading text-2xl font-black tracking-tight">Crea tu cuenta</h2>
-          <p className="mt-1 text-sm text-slate-400">Empiezas con 14 días de prueba.</p>
+          <p className="mt-1 text-sm text-grafito-400">Empiezas con 14 días de prueba.</p>
 
           <form onSubmit={enviar} className="mt-7 space-y-5" noValidate>
             <Campo etiqueta="Empresa" campo="company_name" valor={datos.company_name}
@@ -152,14 +153,14 @@ const SignupPage = () => {
               {!enviando && <ArrowRight className="h-4 w-4" />}
             </button>
 
-            <p className="text-center text-xs text-slate-500">
+            <p className="text-center text-xs text-grafito-400">
               Sin tarjeta. Puedes dejarlo cuando quieras. Al crear la cuenta
               aceptas los{' '}
-              <Link to="/terminos" className="text-slate-400 underline underline-offset-4 hover:text-marca-400">
+              <Link to="/terminos" className="text-grafito-400 underline underline-offset-4 hover:text-marca-400">
                 términos
               </Link>{' '}
               y la{' '}
-              <Link to="/privacidad" className="text-slate-400 underline underline-offset-4 hover:text-marca-400">
+              <Link to="/privacidad" className="text-grafito-400 underline underline-offset-4 hover:text-marca-400">
                 política de privacidad
               </Link>
               .
@@ -167,23 +168,23 @@ const SignupPage = () => {
           </form>
         </div>
 
-          <p className="mt-6 text-center text-sm text-slate-400">
+          <p className="mt-6 text-center text-sm text-grafito-400">
             ¿Ya tienes cuenta?{' '}
-            <Link to="/login" className="font-semibold text-marca-500 underline underline-offset-4 hover:text-marca-400">
+            <Link to="/login" className="font-semibold text-marca-400 underline underline-offset-4 hover:text-marca-300">
               Entrar
             </Link>
           </p>
           <p className="mt-2 text-center text-sm">
-            <Link to="/" className="text-slate-500 underline underline-offset-4 hover:text-slate-300">
+            <Link to="/" className="text-grafito-400 underline underline-offset-4 hover:text-grafito-300">
               Volver al inicio
             </Link>
           </p>
 
-          <p className="lg:hidden text-center text-slate-400 text-xs mt-6">
+          <p className="lg:hidden text-center text-grafito-400 text-xs mt-6">
             &copy; 2026 CargoXprez &mdash;{' '}
-            <Link to="/privacidad" className="underline underline-offset-4 hover:text-marca-500">Privacidad</Link>{' '}
+            <Link to="/privacidad" className="underline underline-offset-4 hover:text-marca-300">Privacidad</Link>{' '}
             &middot;{' '}
-            <Link to="/terminos" className="underline underline-offset-4 hover:text-marca-500">Términos</Link>
+            <Link to="/terminos" className="underline underline-offset-4 hover:text-marca-300">Términos</Link>
           </p>
         </div>
       </div>

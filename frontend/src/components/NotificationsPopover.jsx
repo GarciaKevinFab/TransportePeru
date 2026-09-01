@@ -111,10 +111,10 @@ const NotificationsPopover = () => {
         <ScrollArea className="h-80">
           {loading && notifications.length === 0 ? (
             <div className="flex items-center justify-center h-40">
-              <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+              <Loader2 className="w-6 h-6 animate-spin text-grafito-400" />
             </div>
           ) : notifications.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-40 text-slate-400">
+            <div className="flex flex-col items-center justify-center h-40 text-grafito-400">
               <Bell className="w-8 h-8 mb-2" />
               <p className="text-sm">No hay notificaciones</p>
             </div>
@@ -123,7 +123,7 @@ const NotificationsPopover = () => {
               {notifications.map((notification) => (
                 <div 
                   key={notification.id}
-                  className={`p-3 cursor-pointer hover:bg-slate-50 transition-colors ${
+                  className={`p-3 cursor-pointer hover:bg-grafito-50 transition-colors ${
                     !notification.is_read ? 'bg-blue-50/50' : ''
                   }`}
                   onClick={() => !notification.is_read && handleMarkAsRead(notification.id)}
@@ -136,10 +136,10 @@ const NotificationsPopover = () => {
                       <p className={`text-sm ${!notification.is_read ? 'font-medium' : ''}`}>
                         {notification.title}
                       </p>
-                      <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">
+                      <p className="text-xs text-grafito-500 mt-0.5 line-clamp-2">
                         {notification.message}
                       </p>
-                      <p className="text-xs text-slate-400 mt-1">
+                      <p className="text-xs text-grafito-400 mt-1">
                         {formatDistanceToNow(new Date(notification.created_at), { 
                           addSuffix: true,
                           locale: es 

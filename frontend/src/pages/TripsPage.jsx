@@ -305,7 +305,7 @@ const TripsPage = () => {
       cancelado: 'Cancelado',
     };
     return (
-      <Badge className={styles[status] || 'bg-slate-100 text-slate-800'}>
+      <Badge className={styles[status] || 'bg-grafito-100 text-grafito-800'}>
         {labels[status] || status}
       </Badge>
     );
@@ -381,10 +381,10 @@ const TripsPage = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-slate-900">
+          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
             Viajes
           </h1>
-          <p className="text-slate-500 mt-1">
+          <p className="text-grafito-500 mt-1">
             Gestión y seguimiento de viajes
           </p>
         </div>
@@ -399,7 +399,7 @@ const TripsPage = () => {
         <CardContent className="py-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-grafito-400" />
               <Input
                 placeholder="Buscar por cliente o carga..."
                 value={searchTerm}
@@ -470,7 +470,7 @@ const TripsPage = () => {
             {/* Movil: tarjetas. Una fila de 7 columnas en 375px esconde el
                 estado y las acciones tras un arrastre lateral que nadie
                 descubre. */}
-            <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+            <div className="md:hidden divide-y divide-grafito-100 dark:divide-grafito-800">
               {filteredTrips.map((trip) => (
                 <div key={trip.id} className="flex items-start gap-3 px-4 py-3.5">
                   <div className="min-w-0 flex-1">
@@ -478,15 +478,15 @@ const TripsPage = () => {
                       <span className="font-medium truncate">{trip.client_name || 'Sin cliente'}</span>
                       {getStatusBadge(trip.status)}
                     </div>
-                    <p className="mt-0.5 truncate text-xs text-slate-500">
+                    <p className="mt-0.5 truncate text-xs text-grafito-500">
                       {trip.cargo_description || '-'}
                     </p>
-                    <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                    <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-grafito-500">
                       <span className="inline-flex items-center gap-1">
                         <Calendar className="h-3 w-3" />
                         {format(new Date(trip.scheduled_date), 'dd/MM/yyyy', { locale: es })}
                       </span>
-                      <span className="font-mono font-bold text-slate-700 dark:text-slate-300">
+                      <span className="font-mono font-bold text-grafito-700 dark:text-grafito-300">
                         {getVehiclePlate(trip.tracto_id)}
                       </span>
                       <span className="inline-flex items-center gap-1 truncate">
@@ -519,19 +519,19 @@ const TripsPage = () => {
                   <TableRow key={trip.id} className="table-dense hover:bg-marca-50">
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-slate-400" />
+                        <Calendar className="w-4 h-4 text-grafito-400" />
                         {format(new Date(trip.scheduled_date), 'dd/MM/yyyy', { locale: es })}
                       </div>
                     </TableCell>
                     <TableCell>
                       <p className="font-medium">{trip.client_name || 'Sin cliente'}</p>
-                      <p className="text-xs text-slate-500 truncate max-w-[150px]">
+                      <p className="text-xs text-grafito-500 truncate max-w-[150px]">
                         {trip.cargo_description || '-'}
                       </p>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        <MapPin className="w-3 h-3 text-slate-400" />
+                        <MapPin className="w-3 h-3 text-grafito-400" />
                         <span className="text-sm">{getRouteName(trip.route_id)}</span>
                       </div>
                     </TableCell>
@@ -540,7 +540,7 @@ const TripsPage = () => {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <User className="w-4 h-4 text-slate-400" />
+                        <User className="w-4 h-4 text-grafito-400" />
                         {getDriverName(trip.driver_id)}
                       </div>
                     </TableCell>
@@ -919,8 +919,8 @@ const TripsPage = () => {
           <div className="grid gap-4 py-4">
             {actionTrip && (
               <div className="p-3 bg-marca-50 rounded-sm">
-                <p className="font-medium text-slate-800">{actionTrip.client_name || 'Sin cliente'}</p>
-                <p className="text-xs text-slate-500 font-mono">{getVehiclePlate(actionTrip.tracto_id)}</p>
+                <p className="font-medium text-grafito-800">{actionTrip.client_name || 'Sin cliente'}</p>
+                <p className="text-xs text-grafito-500 font-mono">{getVehiclePlate(actionTrip.tracto_id)}</p>
               </div>
             )}
             <div className="space-y-2">
@@ -966,8 +966,8 @@ const TripsPage = () => {
           <div className="grid gap-4 py-4">
             {actionTrip && (
               <div className="p-3 bg-green-50 rounded-sm">
-                <p className="font-medium text-slate-800">{actionTrip.client_name || 'Sin cliente'}</p>
-                <p className="text-xs text-slate-500">
+                <p className="font-medium text-grafito-800">{actionTrip.client_name || 'Sin cliente'}</p>
+                <p className="text-xs text-grafito-500">
                   Odómetro inicial: {actionTrip.km_start != null ? `${actionTrip.km_start} km` : '-'}
                 </p>
               </div>

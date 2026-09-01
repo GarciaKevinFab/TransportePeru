@@ -24,6 +24,38 @@ module.exports = {
   			// critica, eliminar-, y mezclar las dos escalas en un mismo nombre
   			// era garantizar que un dia una alarma se pintara con el color de un
   			// boton.
+  			// El gris del sistema, sacado del logotipo igual que el rojo.
+  			//
+  			// POR QUE NO SE USA slate. El logotipo es rojo #e00000 sobre negro y
+  			// blanco: tres colores y NINGUN azul. La escala slate de tailwind es
+  			// gris AZULADO (matiz 215), y toda la interfaz estaba pintada con
+  			// ella. Al superponer el rojo de la marca sobre esos azules -y hay
+  			// media docena de degradados que lo hacen- el resultado no es rojo
+  			// ni azul: es un granate sucio. Se veia en el fondo del login, en el
+  			// pie del menu lateral y en las cabeceras del panel.
+  			//
+  			// 'grafito' es la misma escala de CLARIDAD que slate -cada peldano
+  			// conserva su luminosidad, asi que los contrastes de texto no
+  			// cambian- pero neutra y con una pizca de calidez en los tonos
+  			// oscuros, que es el color del asfalto y del caucho. Sobre ella el
+  			// rojo se lee rojo.
+  			//
+  			// Se anade como escala propia y NO redefiniendo slate, por la misma
+  			// razon que 'marca' no se llama 'red': un nombre de tailwind que
+  			// significa otra cosa es una trampa para el que venga despues.
+  			grafito: {
+  				50:  '#fafaf9',
+  				100: '#f3f2f0',
+  				200: '#e6e4e1',
+  				300: '#d0cdc8',
+  				400: '#a19d97',
+  				500: '#736f69',
+  				600: '#55514c',
+  				700: '#423e3a',
+  				800: '#2a2725',
+  				900: '#191614',
+  				950: '#0b0908'
+  			},
   			marca: {
   				50:  '#fff1f1',
   				100: '#ffe0e0',
@@ -86,8 +118,8 @@ module.exports = {
   			}
   		},
   		boxShadow: {
-  			card: '0 1px 3px rgba(2, 6, 23, 0.06), 0 1px 2px rgba(2, 6, 23, 0.04)',
-  			'card-hover': '0 10px 25px -8px rgba(2, 6, 23, 0.12), 0 4px 10px -4px rgba(2, 6, 23, 0.06)',
+  			card: '0 1px 3px rgba(11, 9, 8, 0.06), 0 1px 2px rgba(11, 9, 8, 0.04)',
+  			'card-hover': '0 10px 25px -8px rgba(11, 9, 8, 0.12), 0 4px 10px -4px rgba(11, 9, 8, 0.06)',
   			'brand-glow': '0 8px 20px -6px color-mix(in srgb, var(--brand-color) 45%, transparent)'
   		},
   		keyframes: {

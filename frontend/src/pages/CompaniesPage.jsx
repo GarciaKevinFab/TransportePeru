@@ -200,10 +200,10 @@ const CompaniesPage = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-slate-900">
+          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
             Gestión de Empresas
           </h1>
-          <p className="text-slate-500 mt-1">Administración multi-tenant</p>
+          <p className="text-grafito-500 mt-1">Administración multi-tenant</p>
         </div>
         <Button className="btn-action btn-press" onClick={() => setShowCreateDialog(true)}>
           <Plus className="w-4 h-4 mr-2" />
@@ -243,7 +243,7 @@ const CompaniesPage = () => {
       {/* Companies Table */}
       <Card className="bg-white section-enter section-stagger-1">
         <CardHeader>
-          <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest">
+          <CardTitle className="text-sm font-bold uppercase text-grafito-500 tracking-widest">
             Listado de Empresas
           </CardTitle>
         </CardHeader>
@@ -258,17 +258,17 @@ const CompaniesPage = () => {
           ) : (
             <>
             {/* Movil: tarjetas. Cinco columnas en 375px esconden contacto y acciones tras un arrastre lateral que nadie descubre. */}
-            <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+            <div className="md:hidden divide-y divide-grafito-100 dark:divide-grafito-800">
               {companies.map((company) => (
                 <div key={company.id} className="flex items-start gap-3 px-4 py-3.5">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-800 truncate">{company.name}</span>
+                      <span className="font-bold text-grafito-800 truncate">{company.name}</span>
                     </div>
-                    <p className="mt-0.5 truncate text-xs text-slate-500">
+                    <p className="mt-0.5 truncate text-xs text-grafito-500">
                       {company.address || company.email || '-'}
                     </p>
-                    <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                    <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-grafito-500">
                       <span className="font-mono">{company.ruc || '-'}</span>
                       {company.phone && <span>{company.phone}</span>}
                       <span>{company.created_at ? format(new Date(company.created_at), 'dd/MM/yyyy') : '-'}</span>
@@ -300,8 +300,8 @@ const CompaniesPage = () => {
                           <Building2 className="w-5 h-5 text-blue-600" />
                         </div>
                         <div>
-                          <p className="font-bold text-slate-800">{company.name}</p>
-                          <p className="text-xs text-slate-500">{company.address || '-'}</p>
+                          <p className="font-bold text-grafito-800">{company.name}</p>
+                          <p className="text-xs text-grafito-500">{company.address || '-'}</p>
                         </div>
                       </div>
                     </TableCell>
@@ -311,11 +311,11 @@ const CompaniesPage = () => {
                     <TableCell>
                       <div className="text-sm">
                         {company.email && <p>{company.email}</p>}
-                        {company.phone && <p className="text-slate-500">{company.phone}</p>}
+                        {company.phone && <p className="text-grafito-500">{company.phone}</p>}
                       </div>
                     </TableCell>
                     <TableCell>
-                      <span className="text-sm text-slate-500">
+                      <span className="text-sm text-grafito-500">
                         {company.created_at ? format(new Date(company.created_at), 'dd/MM/yyyy') : '-'}
                       </span>
                     </TableCell>
@@ -393,7 +393,7 @@ const CompaniesPage = () => {
             </div>
             
             <div className="border-t pt-4 mt-2">
-              <h4 className="font-bold text-slate-700 mb-3">Administrador de la Empresa</h4>
+              <h4 className="font-bold text-grafito-700 mb-3">Administrador de la Empresa</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Nombre del Admin</Label>

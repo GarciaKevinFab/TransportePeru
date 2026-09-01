@@ -31,7 +31,7 @@ const TIPOS_DOCUMENTO = ['DNI', 'CE', 'RUC', 'Pasaporte'];
 
 const Campo = ({ etiqueta, children }) => (
   <div>
-    <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-400">
+    <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-grafito-400">
       {etiqueta}
     </label>
     {children}
@@ -39,7 +39,7 @@ const Campo = ({ etiqueta, children }) => (
 );
 
 const inputCls =
-  'w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-slate-100 placeholder:text-slate-500 outline-none transition focus:border-marca-500/60 focus:bg-white/[0.07]';
+  'w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-grafito-100 placeholder:text-grafito-400 outline-none transition focus:border-marca-500/60 focus:bg-white/[0.07]';
 
 // La fecha llega del servidor en ISO ("2026-08-31T23:04:12.285074+00:00"), que
 // es lo correcto para viajar y lo peor posible para leer. Aqui se pinta en la
@@ -128,13 +128,13 @@ const ReclamacionesPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 antialiased">
+    <div className="min-h-screen bg-grafito-950 text-grafito-100 antialiased">
       {/* Barra minima, como en el checkout: logo de vuelta y nada mas. */}
       <header className="flex items-center justify-between px-6 py-5 md:px-10">
         <Link to="/" className="flex items-center">
           <LogoMarca className="h-14 w-auto" />
         </Link>
-        <span className="flex items-center gap-1.5 text-xs text-slate-400">
+        <span className="flex items-center gap-1.5 text-xs text-grafito-400">
           <BookOpen className="h-3.5 w-3.5" />
           Libro de Reclamaciones
         </span>
@@ -145,7 +145,7 @@ const ReclamacionesPage = () => {
           <>
             <Link
               to="/"
-              className="inline-flex items-center gap-1.5 text-sm text-slate-400 transition hover:text-slate-200"
+              className="inline-flex items-center gap-1.5 text-sm text-grafito-400 transition hover:text-grafito-200"
             >
               <ArrowLeft className="h-4 w-4" />
               Volver al inicio
@@ -153,10 +153,10 @@ const ReclamacionesPage = () => {
             <h1 className="font-heading mt-4 text-3xl font-black tracking-tight md:text-4xl">
               Libro de Reclamaciones
             </h1>
-            <p className="mt-3 max-w-2xl leading-relaxed text-slate-400">
+            <p className="mt-3 max-w-2xl leading-relaxed text-grafito-400">
               Conforme a la Ley 29571, Código de Protección y Defensa del
               Consumidor. Aquí registras por escrito un reclamo o una queja
-              sobre <strong className="text-slate-200">{PROVEEDOR.producto}</strong>.
+              sobre <strong className="text-grafito-200">{PROVEEDOR.producto}</strong>.
               Al enviarlo recibes un código de hoja: guárdalo.
             </p>
 
@@ -164,14 +164,14 @@ const ReclamacionesPage = () => {
                 es formalismo: sin razon social, RUC y domicilio, quien reclama
                 no sabe a quien esta reclamando ni puede llevarlo a INDECOPI. */}
             <section
-              className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-sm leading-relaxed text-slate-400"
+              className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-sm leading-relaxed text-grafito-400"
               aria-label="Datos del proveedor"
             >
-              <h2 className="font-heading text-xs font-bold uppercase tracking-widest text-slate-500">
+              <h2 className="font-heading text-xs font-bold uppercase tracking-widest text-grafito-400">
                 Datos del proveedor
               </h2>
               <p className="mt-3">
-                <strong className="text-slate-200">{PROVEEDOR.razonSocial}</strong>
+                <strong className="text-grafito-200">{PROVEEDOR.razonSocial}</strong>
                 <br />
                 RUC {PROVEEDOR.ruc}
                 <br />
@@ -189,7 +189,7 @@ const ReclamacionesPage = () => {
                   le explique la diferencia: un reclamo obliga a responder sobre
                   el servicio, una queja es sobre el trato recibido. */}
               <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-7">
-                <h2 className="font-heading text-sm font-bold uppercase tracking-widest text-slate-400">
+                <h2 className="font-heading text-sm font-bold uppercase tracking-widest text-grafito-400">
                   1. Tipo de hoja
                 </h2>
                 <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -216,7 +216,7 @@ const ReclamacionesPage = () => {
                         />
                         <span className="font-heading font-bold">{titulo}</span>
                       </span>
-                      <span className="mt-1.5 block pl-7 text-sm text-slate-400">
+                      <span className="mt-1.5 block pl-7 text-sm text-grafito-400">
                         {explicacion}
                       </span>
                     </label>
@@ -226,7 +226,7 @@ const ReclamacionesPage = () => {
 
               {/* 2. Identificacion del consumidor. */}
               <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-7">
-                <h2 className="font-heading text-sm font-bold uppercase tracking-widest text-slate-400">
+                <h2 className="font-heading text-sm font-bold uppercase tracking-widest text-grafito-400">
                   2. Quién reclama
                 </h2>
                 <div className="mt-5 space-y-4">
@@ -247,7 +247,7 @@ const ReclamacionesPage = () => {
                         onChange={set('documento_tipo')}
                       >
                         {TIPOS_DOCUMENTO.map((t) => (
-                          <option key={t} value={t} className="bg-slate-900">
+                          <option key={t} value={t} className="bg-grafito-900">
                             {t}
                           </option>
                         ))}
@@ -301,9 +301,9 @@ const ReclamacionesPage = () => {
                       }
                       className="mt-0.5 h-4 w-4 accent-marca-500"
                     />
-                    <span className="text-sm text-slate-300">
+                    <span className="text-sm text-grafito-300">
                       Soy menor de edad
-                      <span className="mt-0.5 block text-slate-500">
+                      <span className="mt-0.5 block text-grafito-400">
                         La hoja debe ir firmada por tu padre, madre o apoderado.
                       </span>
                     </span>
@@ -325,7 +325,7 @@ const ReclamacionesPage = () => {
               {/* 3. Identificacion del bien contratado. La ley lo pide para que
                   la hoja no quede en una queja abstracta sin objeto. */}
               <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-7">
-                <h2 className="font-heading text-sm font-bold uppercase tracking-widest text-slate-400">
+                <h2 className="font-heading text-sm font-bold uppercase tracking-widest text-grafito-400">
                   3. Sobre qué reclamas
                 </h2>
                 <div className="mt-5 space-y-4">
@@ -336,8 +336,8 @@ const ReclamacionesPage = () => {
                         value={datos.bien_contratado}
                         onChange={set('bien_contratado')}
                       >
-                        <option value="servicio" className="bg-slate-900">Servicio</option>
-                        <option value="producto" className="bg-slate-900">Producto</option>
+                        <option value="servicio" className="bg-grafito-900">Servicio</option>
+                        <option value="producto" className="bg-grafito-900">Producto</option>
                       </select>
                     </Campo>
                     <Campo etiqueta="Monto reclamado en S/ (opcional)">
@@ -370,7 +370,7 @@ const ReclamacionesPage = () => {
                   hechos de lo que el consumidor pide, y responder sin saber que
                   se pide no cierra nada. */}
               <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-7">
-                <h2 className="font-heading text-sm font-bold uppercase tracking-widest text-slate-400">
+                <h2 className="font-heading text-sm font-bold uppercase tracking-widest text-grafito-400">
                   4. Detalle y pedido
                 </h2>
                 <div className="mt-5 space-y-4">
@@ -409,14 +409,14 @@ const ReclamacionesPage = () => {
               {/* Aviso obligatorio: el plazo de respuesta y que la hoja no
                   sustituye ni bloquea la via de INDECOPI. Va junto al boton
                   para que se lea antes de enviar, no despues. */}
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-sm leading-relaxed text-slate-400">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-sm leading-relaxed text-grafito-400">
                 <p>
                   La respuesta se enviará a tu correo en un plazo máximo de{' '}
-                  <strong className="text-slate-200">15 días hábiles</strong>.
+                  <strong className="text-grafito-200">15 días hábiles</strong>.
                 </p>
                 <p className="mt-2">
                   Presentar este reclamo no impide acudir a{' '}
-                  <strong className="text-slate-200">INDECOPI</strong> ni a otras
+                  <strong className="text-grafito-200">INDECOPI</strong> ni a otras
                   vías de solución de controversias.
                 </p>
               </div>
@@ -446,7 +446,7 @@ const ReclamacionesPage = () => {
             <h1 className="font-heading mt-5 text-2xl font-black tracking-tight">
               Hoja registrada
             </h1>
-            <p className="mt-3 leading-relaxed text-slate-400">
+            <p className="mt-3 leading-relaxed text-grafito-400">
               Guarda este código. Es el número de tu hoja de reclamación y es lo
               que te pedirán si acudes a INDECOPI.
             </p>
@@ -456,11 +456,11 @@ const ReclamacionesPage = () => {
             >
               {hoja.codigo}
             </p>
-            <p className="mt-5 text-sm leading-relaxed text-slate-400">
-              Registrada el <strong className="text-slate-200">{formatearFecha(hoja.fecha)}</strong>. Enviamos una
-              copia a <strong className="text-slate-200">{datos.email.trim()}</strong> y te
+            <p className="mt-5 text-sm leading-relaxed text-grafito-400">
+              Registrada el <strong className="text-grafito-200">{formatearFecha(hoja.fecha)}</strong>. Enviamos una
+              copia a <strong className="text-grafito-200">{datos.email.trim()}</strong> y te
               responderemos en un plazo máximo de{' '}
-              <strong className="text-slate-200">{hoja.plazo_habiles} días hábiles</strong>.
+              <strong className="text-grafito-200">{hoja.plazo_habiles} días hábiles</strong>.
             </p>
             <Link
               to="/"

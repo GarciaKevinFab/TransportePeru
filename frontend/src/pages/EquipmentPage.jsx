@@ -100,7 +100,7 @@ const EquipmentPage = () => {
   };
 
   const getEquipmentStatus = (items) => {
-    if (!items || items.length === 0) return { label: 'Sin datos', color: 'bg-slate-100 text-slate-600' };
+    if (!items || items.length === 0) return { label: 'Sin datos', color: 'bg-grafito-100 text-grafito-600' };
     const total = items.length;
     const good = items.filter(i => i.condition === 'bueno' && i.quantity > 0).length;
     const bad = items.filter(i => i.condition === 'malo' || i.condition === 'vencido').length;
@@ -207,10 +207,10 @@ const EquipmentPage = () => {
     <div className="space-y-6 page-fade-in">
       {/* Header */}
       <div>
-        <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-slate-900">
+        <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
           Equipamiento y Asignaciones
         </h1>
-        <p className="text-slate-500 mt-1">
+        <p className="text-grafito-500 mt-1">
           Gestión de EPP por vehículo y asignación de choferes
         </p>
       </div>
@@ -221,7 +221,7 @@ const EquipmentPage = () => {
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Vehículos</p>
+                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Vehículos</p>
                 <p className="font-heading text-3xl font-bold text-blue-600 mt-1">{totalVehicles}</p>
               </div>
               <Truck className="w-8 h-8 text-blue-500" />
@@ -232,7 +232,7 @@ const EquipmentPage = () => {
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">EPP Completo</p>
+                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">EPP Completo</p>
                 <p className="font-heading text-3xl font-bold text-green-600 mt-1">{completeEPP}</p>
               </div>
               <CheckCircle className="w-8 h-8 text-green-500" />
@@ -243,7 +243,7 @@ const EquipmentPage = () => {
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">EPP Pendiente</p>
+                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">EPP Pendiente</p>
                 <p className="font-heading text-3xl font-bold text-yellow-600 mt-1">{pendingEPP}</p>
               </div>
               <AlertTriangle className="w-8 h-8 text-yellow-500" />
@@ -254,7 +254,7 @@ const EquipmentPage = () => {
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Con Chofer</p>
+                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Con Chofer</p>
                 <p className="font-heading text-3xl font-bold text-marca-600 mt-1">{assignedDrivers}</p>
               </div>
               <UserCheck className="w-8 h-8 text-marca-500" />
@@ -267,7 +267,7 @@ const EquipmentPage = () => {
       <Card className="bg-white">
         <CardContent className="py-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-grafito-400" />
             <Input
               placeholder="Buscar por placa o marca..."
               value={searchTerm}
@@ -302,7 +302,7 @@ const EquipmentPage = () => {
           ) : (
             <>
             {/* Movil: tarjetas. Seis columnas en 375px esconden estado y acciones tras un arrastre lateral que nadie descubre. */}
-            <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+            <div className="md:hidden divide-y divide-grafito-100 dark:divide-grafito-800">
               {filteredVehicles.map((vehicle) => {
                 const eqStatus = getEquipmentStatus(equipmentMap[vehicle.id]);
                 const driverName = getDriverName(vehicle.assigned_driver_id);
@@ -313,19 +313,19 @@ const EquipmentPage = () => {
                         <span className="font-mono font-bold truncate">{vehicle.plate}</span>
                         <Badge className={eqStatus.color}>{eqStatus.label}</Badge>
                       </div>
-                      <p className="mt-0.5 truncate text-xs text-slate-500">
+                      <p className="mt-0.5 truncate text-xs text-grafito-500">
                         {vehicle.vehicle_type === 'tracto' ? 'Tracto' : 'Carreta'}
                         {' · '}
                         {vehicle.brand || '-'} {vehicle.model || ''}
                       </p>
-                      <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                      <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-grafito-500">
                         {driverName ? (
                           <span className="inline-flex items-center gap-1 truncate text-green-700 font-medium">
                             <UserCheck className="h-3 w-3" />
                             {driverName}
                           </span>
                         ) : (
-                          <span className="text-slate-400">Sin chofer asignado</span>
+                          <span className="text-grafito-400">Sin chofer asignado</span>
                         )}
                       </p>
                     </div>
@@ -356,7 +356,7 @@ const EquipmentPage = () => {
                   <TableRow key={vehicle.id} className="table-dense hover:bg-marca-50">
                     <TableCell className="font-mono font-bold">{vehicle.plate}</TableCell>
                     <TableCell>
-                      <Badge variant="outline" className={vehicle.vehicle_type === 'tracto' ? 'border-marca-300 text-marca-700 bg-marca-50' : 'border-slate-300 text-slate-700 bg-slate-50'}>
+                      <Badge variant="outline" className={vehicle.vehicle_type === 'tracto' ? 'border-marca-300 text-marca-700 bg-marca-50' : 'border-grafito-300 text-grafito-700 bg-grafito-50'}>
                         {vehicle.vehicle_type === 'tracto' ? 'Tracto' : 'Carreta'}
                       </Badge>
                     </TableCell>
@@ -365,7 +365,7 @@ const EquipmentPage = () => {
                       {driverName ? (
                         <span className="text-green-700 font-medium">{driverName}</span>
                       ) : (
-                        <span className="text-slate-400">Sin asignar</span>
+                        <span className="text-grafito-400">Sin asignar</span>
                       )}
                     </TableCell>
                     <TableCell>

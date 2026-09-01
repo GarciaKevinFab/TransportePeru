@@ -298,10 +298,10 @@ const ReportsPage = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-slate-900">
+          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
             Reportes
           </h1>
-          <p className="text-slate-500 mt-1">
+          <p className="text-grafito-500 mt-1">
             Generación y exportación de reportes del sistema
           </p>
         </div>
@@ -309,32 +309,32 @@ const ReportsPage = () => {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="bg-slate-100 rounded-sm">
-          <TabsTrigger value="trips" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
+        <TabsList className="bg-grafito-100 rounded-sm">
+          <TabsTrigger value="trips" className="rounded-sm data-[state=active]:bg-grafito-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
             <Route className="w-4 h-4 mr-2" />
             Viajes
           </TabsTrigger>
-          <TabsTrigger value="fuel" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
+          <TabsTrigger value="fuel" className="rounded-sm data-[state=active]:bg-grafito-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
             <Fuel className="w-4 h-4 mr-2" />
             Combustible
           </TabsTrigger>
-          <TabsTrigger value="maintenance" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
+          <TabsTrigger value="maintenance" className="rounded-sm data-[state=active]:bg-grafito-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
             <Wrench className="w-4 h-4 mr-2" />
             Mantenimiento
           </TabsTrigger>
-          <TabsTrigger value="tires" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
+          <TabsTrigger value="tires" className="rounded-sm data-[state=active]:bg-grafito-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
             <CircleDot className="w-4 h-4 mr-2" />
             Llantas
           </TabsTrigger>
-          <TabsTrigger value="viaticos" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
+          <TabsTrigger value="viaticos" className="rounded-sm data-[state=active]:bg-grafito-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
             <Wallet className="w-4 h-4 mr-2" />
             Viáticos
           </TabsTrigger>
-          <TabsTrigger value="cost_per_km" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
+          <TabsTrigger value="cost_per_km" className="rounded-sm data-[state=active]:bg-grafito-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
             <Gauge className="w-4 h-4 mr-2" />
             Costo/km
           </TabsTrigger>
-          <TabsTrigger value="docs_expiring" className="rounded-sm data-[state=active]:bg-slate-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
+          <TabsTrigger value="docs_expiring" className="rounded-sm data-[state=active]:bg-grafito-900 data-[state=active]:text-white font-bold uppercase text-xs tracking-wide">
             <ShieldAlert className="w-4 h-4 mr-2" />
             Docs. por Vencer
           </TabsTrigger>
@@ -419,31 +419,31 @@ const ReportsPage = () => {
               <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
                 <Card className="bg-white border-l-4 border-l-blue-500">
                   <CardContent className="py-4">
-                    <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Total Viajes</p>
+                    <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Total Viajes</p>
                     <p className="font-heading text-3xl font-bold text-blue-600 mt-1">{tripsReport.totals.count}</p>
                   </CardContent>
                 </Card>
                 <Card className="bg-white border-l-4 border-l-green-500">
                   <CardContent className="py-4">
-                    <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Km Recorridos</p>
+                    <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Km Recorridos</p>
                     <p className="font-heading text-2xl font-bold text-green-600 mt-1">{tripsReport.totals.total_km.toLocaleString()}</p>
                   </CardContent>
                 </Card>
                 <Card className="bg-white border-l-4 border-l-marca-500">
                   <CardContent className="py-4">
-                    <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Anticipos</p>
+                    <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Anticipos</p>
                     <p className="font-heading text-xl font-bold text-marca-600 mt-1">S/ {tripsReport.totals.total_advances.toLocaleString()}</p>
                   </CardContent>
                 </Card>
                 <Card className="bg-white border-l-4 border-l-red-500">
                   <CardContent className="py-4">
-                    <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Gastos</p>
+                    <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Gastos</p>
                     <p className="font-heading text-xl font-bold text-red-600 mt-1">S/ {tripsReport.totals.total_expenses.toLocaleString()}</p>
                   </CardContent>
                 </Card>
-                <Card className="bg-white border-l-4 border-l-slate-500">
+                <Card className="bg-white border-l-4 border-l-grafito-500">
                   <CardContent className="py-4">
-                    <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Balance</p>
+                    <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Balance</p>
                     <p className={`font-heading text-xl font-bold mt-1 ${tripsReport.totals.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                       S/ {Math.abs(tripsReport.totals.balance).toLocaleString()}
                     </p>
@@ -496,7 +496,7 @@ const ReportsPage = () => {
           )}
           {!tripsReport && (
             <Card className="bg-white">
-              <CardContent className="py-16 text-center text-slate-400">
+              <CardContent className="py-16 text-center text-grafito-400">
                 <BarChart3 className="w-12 h-12 mx-auto mb-4" />
                 <p>Seleccione los filtros y haga clic en "Generar" para ver el reporte</p>
               </CardContent>
@@ -511,26 +511,26 @@ const ReportsPage = () => {
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                 <Card className="bg-white border-l-4 border-l-blue-500">
                   <CardContent className="py-4">
-                    <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Total Cargas</p>
+                    <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Total Cargas</p>
                     <p className="font-heading text-3xl font-bold text-blue-600 mt-1">{fuelReport.totals.total_loads}</p>
                   </CardContent>
                 </Card>
                 <Card className="bg-white border-l-4 border-l-green-500">
                   <CardContent className="py-4">
-                    <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Total Litros</p>
+                    <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Total Litros</p>
                     <p className="font-heading text-2xl font-bold text-green-600 mt-1">{fuelReport.totals.total_liters.toLocaleString()}</p>
                   </CardContent>
                 </Card>
                 <Card className="bg-white border-l-4 border-l-marca-500">
                   <CardContent className="py-4">
-                    <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Total Gastado</p>
+                    <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Total Gastado</p>
                     <p className="font-heading text-xl font-bold text-marca-600 mt-1">S/ {fuelReport.totals.total_amount.toLocaleString()}</p>
                   </CardContent>
                 </Card>
-                <Card className="bg-white border-l-4 border-l-slate-500">
+                <Card className="bg-white border-l-4 border-l-grafito-500">
                   <CardContent className="py-4">
-                    <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Precio Promedio</p>
-                    <p className="font-heading text-xl font-bold text-slate-600 mt-1">S/ {fuelReport.totals.avg_price_per_liter.toFixed(2)}/L</p>
+                    <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Precio Promedio</p>
+                    <p className="font-heading text-xl font-bold text-grafito-600 mt-1">S/ {fuelReport.totals.avg_price_per_liter.toFixed(2)}/L</p>
                   </CardContent>
                 </Card>
               </div>
@@ -569,7 +569,7 @@ const ReportsPage = () => {
           )}
           {!fuelReport && (
             <Card className="bg-white">
-              <CardContent className="py-16 text-center text-slate-400">
+              <CardContent className="py-16 text-center text-grafito-400">
                 <Fuel className="w-12 h-12 mx-auto mb-4" />
                 <p>Seleccione los filtros y haga clic en "Generar" para ver el reporte</p>
               </CardContent>
@@ -584,25 +584,25 @@ const ReportsPage = () => {
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                 <Card className="bg-white border-l-4 border-l-blue-500">
                   <CardContent className="py-4">
-                    <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Total OTs</p>
+                    <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Total OTs</p>
                     <p className="font-heading text-3xl font-bold text-blue-600 mt-1">{maintenanceReport.totals.count}</p>
                   </CardContent>
                 </Card>
                 <Card className="bg-white border-l-4 border-l-marca-500">
                   <CardContent className="py-4">
-                    <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Costo Total</p>
+                    <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Costo Total</p>
                     <p className="font-heading text-xl font-bold text-marca-600 mt-1">S/ {maintenanceReport.totals.total_cost.toLocaleString()}</p>
                   </CardContent>
                 </Card>
                 <Card className="bg-white border-l-4 border-l-green-500">
                   <CardContent className="py-4">
-                    <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Completadas</p>
+                    <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Completadas</p>
                     <p className="font-heading text-3xl font-bold text-green-600 mt-1">{maintenanceReport.by_status.completada || 0}</p>
                   </CardContent>
                 </Card>
                 <Card className="bg-white border-l-4 border-l-yellow-500">
                   <CardContent className="py-4">
-                    <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">En Proceso</p>
+                    <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">En Proceso</p>
                     <p className="font-heading text-3xl font-bold text-yellow-600 mt-1">{maintenanceReport.by_status.en_proceso || 0}</p>
                   </CardContent>
                 </Card>
@@ -633,7 +633,7 @@ const ReportsPage = () => {
                             <Badge variant="outline" className={
                               wo.priority === 'critica' ? 'bg-red-100 text-red-700' :
                               wo.priority === 'alta' ? 'bg-marca-100 text-marca-700' :
-                              'bg-slate-100'
+                              'bg-grafito-100'
                             }>
                               {wo.priority}
                             </Badge>
@@ -652,7 +652,7 @@ const ReportsPage = () => {
           )}
           {!maintenanceReport && (
             <Card className="bg-white">
-              <CardContent className="py-16 text-center text-slate-400">
+              <CardContent className="py-16 text-center text-grafito-400">
                 <Wrench className="w-12 h-12 mx-auto mb-4" />
                 <p>Seleccione los filtros y haga clic en "Generar" para ver el reporte</p>
               </CardContent>
@@ -668,13 +668,13 @@ const ReportsPage = () => {
                 <div className="grid grid-cols-2 gap-4 flex-1 min-w-[240px]">
                   <Card className="bg-white border-l-4 border-l-red-500">
                     <CardContent className="py-4">
-                      <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">A Reemplazar</p>
+                      <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">A Reemplazar</p>
                       <p className="font-heading text-3xl font-bold text-red-600 mt-1">{tiresReport.total_replace || 0}</p>
                     </CardContent>
                   </Card>
                   <Card className="bg-white border-l-4 border-l-yellow-500">
                     <CardContent className="py-4">
-                      <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">A Reencauchar</p>
+                      <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">A Reencauchar</p>
                       <p className="font-heading text-3xl font-bold text-yellow-600 mt-1">{tiresReport.total_retread || 0}</p>
                     </CardContent>
                   </Card>
@@ -698,7 +698,7 @@ const ReportsPage = () => {
                 if (!hasData) {
                   return (
                     <Card className="bg-white">
-                      <CardContent className="py-16 text-center text-slate-400">
+                      <CardContent className="py-16 text-center text-grafito-400">
                         <CircleDot className="w-12 h-12 mx-auto mb-4" />
                         <p>No hay llantas que requieran reemplazo o reencauche</p>
                       </CardContent>
@@ -749,7 +749,7 @@ const ReportsPage = () => {
             </>
           ) : (
             <Card className="bg-white">
-              <CardContent className="py-16 text-center text-slate-400">
+              <CardContent className="py-16 text-center text-grafito-400">
                 <CircleDot className="w-12 h-12 mx-auto mb-4" />
                 <p>Haga clic en "Generar" para ver el reporte de llantas</p>
               </CardContent>
@@ -770,7 +770,7 @@ const ReportsPage = () => {
               if (rows.length === 0) {
                 return (
                   <Card className="bg-white">
-                    <CardContent className="py-16 text-center text-slate-400">
+                    <CardContent className="py-16 text-center text-grafito-400">
                       <Wallet className="w-12 h-12 mx-auto mb-4" />
                       <p>No hay datos de viáticos para el periodo seleccionado</p>
                     </CardContent>
@@ -782,19 +782,19 @@ const ReportsPage = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                     <Card className="bg-white border-l-4 border-l-blue-500">
                       <CardContent className="py-4">
-                        <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Presupuesto</p>
+                        <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Presupuesto</p>
                         <p className="font-heading text-xl font-bold text-blue-600 mt-1">S/ {(Number(totals.budget) || 0).toLocaleString()}</p>
                       </CardContent>
                     </Card>
                     <Card className="bg-white border-l-4 border-l-marca-500">
                       <CardContent className="py-4">
-                        <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Gastado</p>
+                        <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Gastado</p>
                         <p className="font-heading text-xl font-bold text-marca-600 mt-1">S/ {(Number(totals.spent) || 0).toLocaleString()}</p>
                       </CardContent>
                     </Card>
                     <Card className="bg-white border-l-4 border-l-green-500">
                       <CardContent className="py-4">
-                        <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Saldo</p>
+                        <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Saldo</p>
                         <p className={`font-heading text-xl font-bold mt-1 ${(Number(totals.balance) || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                           S/ {(Number(totals.balance) || 0).toLocaleString()}
                         </p>
@@ -803,7 +803,7 @@ const ReportsPage = () => {
                   </div>
                   <Card className="bg-white section-enter">
                     <CardHeader className="flex-row items-center justify-between">
-                      <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest">
+                      <CardTitle className="text-sm font-bold uppercase text-grafito-500 tracking-widest">
                         Consolidado por Chofer
                       </CardTitle>
                       <Button
@@ -865,7 +865,7 @@ const ReportsPage = () => {
             })()
           ) : (
             <Card className="bg-white">
-              <CardContent className="py-16 text-center text-slate-400">
+              <CardContent className="py-16 text-center text-grafito-400">
                 <Wallet className="w-12 h-12 mx-auto mb-4" />
                 <p>Seleccione los filtros y haga clic en "Generar" para ver el reporte</p>
               </CardContent>
@@ -881,7 +881,7 @@ const ReportsPage = () => {
               if (rows.length === 0) {
                 return (
                   <Card className="bg-white">
-                    <CardContent className="py-16 text-center text-slate-400">
+                    <CardContent className="py-16 text-center text-grafito-400">
                       <Gauge className="w-12 h-12 mx-auto mb-4" />
                       <p>No hay datos de costo por km para el periodo seleccionado</p>
                     </CardContent>
@@ -896,7 +896,7 @@ const ReportsPage = () => {
                 <>
                   <Card className="bg-white section-enter mb-4">
                     <CardHeader>
-                      <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest">
+                      <CardTitle className="text-sm font-bold uppercase text-grafito-500 tracking-widest">
                         Costo por Km (S/ / km)
                       </CardTitle>
                     </CardHeader>
@@ -904,7 +904,7 @@ const ReportsPage = () => {
                       <div style={{ width: '100%', height: 280 }}>
                         <ResponsiveContainer>
                           <BarChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e6e4e1" />
                             <XAxis dataKey="plate" tick={{ fontSize: 12 }} />
                             <YAxis tick={{ fontSize: 12 }} />
                             <RechartsTooltip formatter={(v) => `S/ ${Number(v).toFixed(2)}`} />
@@ -917,7 +917,7 @@ const ReportsPage = () => {
 
                   <Card className="bg-white section-enter">
                     <CardHeader className="flex-row items-center justify-between">
-                      <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest">
+                      <CardTitle className="text-sm font-bold uppercase text-grafito-500 tracking-widest">
                         Detalle por Unidad
                       </CardTitle>
                       <Button
@@ -977,7 +977,7 @@ const ReportsPage = () => {
             })()
           ) : (
             <Card className="bg-white">
-              <CardContent className="py-16 text-center text-slate-400">
+              <CardContent className="py-16 text-center text-grafito-400">
                 <Gauge className="w-12 h-12 mx-auto mb-4" />
                 <p>Seleccione los filtros y haga clic en "Generar" para ver el reporte</p>
               </CardContent>
@@ -993,7 +993,7 @@ const ReportsPage = () => {
               if (rows.length === 0) {
                 return (
                   <Card className="bg-white">
-                    <CardContent className="py-16 text-center text-slate-400">
+                    <CardContent className="py-16 text-center text-grafito-400">
                       <ShieldAlert className="w-12 h-12 mx-auto mb-4" />
                       <p>No hay documentos próximos a vencer</p>
                     </CardContent>
@@ -1010,7 +1010,7 @@ const ReportsPage = () => {
               return (
                 <Card className="bg-white section-enter">
                   <CardHeader className="flex-row items-center justify-between">
-                    <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest">
+                    <CardTitle className="text-sm font-bold uppercase text-grafito-500 tracking-widest">
                       Documentos Próximos a Vencer / Vencidos
                     </CardTitle>
                     <Button
@@ -1067,7 +1067,7 @@ const ReportsPage = () => {
             })()
           ) : (
             <Card className="bg-white">
-              <CardContent className="py-16 text-center text-slate-400">
+              <CardContent className="py-16 text-center text-grafito-400">
                 <ShieldAlert className="w-12 h-12 mx-auto mb-4" />
                 <p>Haga clic en "Generar" para ver los documentos por vencer</p>
               </CardContent>

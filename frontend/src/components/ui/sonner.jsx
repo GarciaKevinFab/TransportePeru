@@ -33,9 +33,9 @@ const Toaster = ({
       toastOptions={{
         classNames: {
           toast:
-            "group toast group-[.toaster]:bg-white/95 group-[.toaster]:text-slate-900 group-[.toaster]:border group-[.toaster]:border-slate-200 group-[.toaster]:shadow-xl group-[.toaster]:rounded-xl group-[.toaster]:backdrop-blur-md",
+            "group toast group-[.toaster]:bg-white/95 group-[.toaster]:text-grafito-900 group-[.toaster]:border group-[.toaster]:border-grafito-200 group-[.toaster]:shadow-xl group-[.toaster]:rounded-xl group-[.toaster]:backdrop-blur-md",
           title: "group-[.toast]:font-semibold group-[.toast]:text-sm",
-          description: "group-[.toast]:text-slate-500 group-[.toast]:text-xs",
+          description: "group-[.toast]:text-grafito-500 group-[.toast]:text-xs",
           actionButton:
             "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground group-[.toast]:rounded-md",
           cancelButton:

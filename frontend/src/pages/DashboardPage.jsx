@@ -94,7 +94,7 @@ const DashboardPage = () => {
     red:    '#dc2626',
     yellow: '#ca8a04',
     purple: '#7c3aed',
-    slate:  '#475569',
+    slate:  '#55514c',
   };
 
   const KPICard = ({ title, value, subtitle, icon: Icon, trend, color = 'slate', onClick, stagger = 1 }) => {
@@ -141,7 +141,7 @@ const DashboardPage = () => {
               )}
               {Math.abs(trend)}%
             </span>
-            <span className="text-xs text-slate-500">vs mes anterior</span>
+            <span className="text-xs text-grafito-500">vs mes anterior</span>
           </div>
         )}
       </div>
@@ -162,7 +162,7 @@ const DashboardPage = () => {
       case 'completado': return 'bg-green-100 text-green-800';
       case 'programado': return 'bg-yellow-100 text-yellow-800';
       case 'cancelado': return 'bg-red-100 text-red-800';
-      default: return 'bg-slate-100 text-slate-800';
+      default: return 'bg-grafito-100 text-grafito-800';
     }
   };
 
@@ -185,10 +185,10 @@ const DashboardPage = () => {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-slate-900">
+            <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
               Hola, {user?.name?.split(' ')[0]}
             </h1>
-            <p className="text-slate-500 mt-1">
+            <p className="text-grafito-500 mt-1">
               {format(new Date(), "EEEE, d 'de' MMMM", { locale: es })}
             </p>
           </div>
@@ -265,13 +265,13 @@ const DashboardPage = () => {
         {/* Scheduled Trips */}
         <Card className="bg-white">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest">
+            <CardTitle className="text-sm font-bold uppercase text-grafito-500 tracking-widest">
               Mis Próximos Viajes
             </CardTitle>
           </CardHeader>
           <CardContent>
             {scheduledTrips.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-40 text-slate-400">
+              <div className="flex flex-col items-center justify-center h-40 text-grafito-400">
                 <Calendar className="w-12 h-12 mb-2" />
                 <p>No tienes viajes programados</p>
               </div>
@@ -280,15 +280,15 @@ const DashboardPage = () => {
                 {scheduledTrips.slice(0, 5).map((trip) => (
                   <div
                     key={trip.id}
-                    className="flex items-center gap-3 p-4 bg-slate-50 rounded-sm hover:bg-slate-100 transition-colors"
+                    className="flex items-center gap-3 p-4 bg-grafito-50 rounded-sm hover:bg-grafito-100 transition-colors"
                   >
                     <div className="w-12 h-12 bg-marca-100 rounded-full flex items-center justify-center">
                       <Truck className="w-6 h-6 text-marca-600" />
                     </div>
                     <div className="flex-1">
-                      <p className="font-bold text-slate-800">{trip.client_name || 'Sin cliente'}</p>
-                      <p className="text-sm text-slate-500">{trip.cargo_description}</p>
-                      <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
+                      <p className="font-bold text-grafito-800">{trip.client_name || 'Sin cliente'}</p>
+                      <p className="text-sm text-grafito-500">{trip.cargo_description}</p>
+                      <div className="flex items-center gap-2 text-xs text-grafito-400 mt-1">
                         <Clock className="w-3 h-3" />
                         {format(new Date(trip.scheduled_date), "dd/MM/yyyy HH:mm", { locale: es })}
                       </div>
@@ -304,7 +304,7 @@ const DashboardPage = () => {
         </Card>
 
         {/* Quick Actions for Driver */}
-        <Card className="bg-slate-900 text-white section-enter section-stagger-3">
+        <Card className="bg-grafito-900 text-white section-enter section-stagger-3">
           <CardContent className="py-6">
             <div className="flex flex-col md:flex-row items-center justify-between gap-4">
               <div>
@@ -359,7 +359,7 @@ const DashboardPage = () => {
           // el rojo se queda como brasa en la esquina, que es la proporcion
           // que tiene la marca.
           backgroundImage:
-            'linear-gradient(135deg, #0b0b0d 0%, #1e293b 58%, color-mix(in srgb, var(--brand-color) 16%, #1e293b) 100%)',
+            'linear-gradient(135deg, #0b0908 0%, #191614 52%, #2a2725 78%, color-mix(in srgb, var(--brand-color) 14%, #221f1d) 100%)',
         }}
       >
         {/* Decorative shapes */}
@@ -386,13 +386,13 @@ const DashboardPage = () => {
 
         <div className="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-xs sm:text-sm font-semibold uppercase tracking-widest text-slate-300/80">
+            <p className="text-xs sm:text-sm font-semibold uppercase tracking-widest text-grafito-300/80">
               {format(new Date(), "EEEE, d 'de' MMMM", { locale: es })}
             </p>
             <h1 className="font-heading text-3xl sm:text-4xl font-black uppercase tracking-tight mt-1">
               Hola, <span className="gradient-text">{user?.name?.split(' ')[0] || 'Equipo'}</span>
             </h1>
-            <p className="text-slate-300 mt-2 max-w-xl text-sm sm:text-base">
+            <p className="text-grafito-300 mt-2 max-w-xl text-sm sm:text-base">
               {isAdmin ? 'Vista general de tu operación: flota, viajes, alertas y vencimientos.' :
                isOperaciones ? 'Gestiona las operaciones y viajes del día.' :
                isFlota ? 'Controla el estado de tu flota y documentación.' :
@@ -406,7 +406,7 @@ const DashboardPage = () => {
             <div className="hidden md:flex items-center gap-3 px-4 py-2 rounded-xl glass-dark-strong">
               <Truck className="w-5 h-5" style={{ color: 'var(--brand-color)' }} />
               <div>
-                <p className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">Flota</p>
+                <p className="text-[10px] uppercase tracking-widest text-grafito-400 font-semibold">Flota</p>
                 <p className="font-heading font-bold text-lg leading-none">{kpis?.vehicles?.total || 0}</p>
               </div>
             </div>
@@ -552,23 +552,23 @@ const DashboardPage = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 section-enter section-stagger-2">
           <Card className="bg-white">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest">
+              <CardTitle className="text-sm font-bold uppercase text-grafito-500 tracking-widest">
                 Disponibilidad de Flota
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-end gap-2">
-                <span className="font-heading text-4xl font-bold text-slate-900">
+                <span className="font-heading text-4xl font-bold text-grafito-900">
                   {kpis?.vehicles?.availability_rate || 0}%
                 </span>
               </div>
-              <div className="mt-4 h-2 bg-slate-100 rounded-full overflow-hidden">
+              <div className="mt-4 h-2 bg-grafito-100 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-green-500 transition-all duration-500"
                   style={{ width: `${kpis?.vehicles?.availability_rate || 0}%` }}
                 />
               </div>
-              <div className="flex justify-between text-xs text-slate-500 mt-2">
+              <div className="flex justify-between text-xs text-grafito-500 mt-2">
                 <span>{kpis?.vehicles?.available || 0} disponibles</span>
                 <span>{kpis?.vehicles?.in_trip || 0} en viaje</span>
                 <span>{kpis?.vehicles?.in_maintenance || 0} en mant.</span>
@@ -578,16 +578,16 @@ const DashboardPage = () => {
 
           <Card className="bg-white">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest">
+              <CardTitle className="text-sm font-bold uppercase text-grafito-500 tracking-widest">
                 Choferes Registrados
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-end gap-2">
-                <span className="font-heading text-4xl font-bold text-slate-900">
+                <span className="font-heading text-4xl font-bold text-grafito-900">
                   {kpis?.drivers?.total || 0}
                 </span>
-                <Users className="w-6 h-6 text-slate-400 mb-2" />
+                <Users className="w-6 h-6 text-grafito-400 mb-2" />
               </div>
               <Button
                 variant="link"
@@ -602,18 +602,18 @@ const DashboardPage = () => {
 
           <Card className="bg-white">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest">
+              <CardTitle className="text-sm font-bold uppercase text-grafito-500 tracking-widest">
                 Órdenes de Trabajo
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-end gap-2">
-                <span className="font-heading text-4xl font-bold text-slate-900">
+                <span className="font-heading text-4xl font-bold text-grafito-900">
                   {kpis?.maintenance?.open_orders || 0}
                 </span>
-                <Wrench className="w-6 h-6 text-slate-400 mb-2" />
+                <Wrench className="w-6 h-6 text-grafito-400 mb-2" />
               </div>
-              <p className="text-sm text-slate-500 mt-2">órdenes abiertas</p>
+              <p className="text-sm text-grafito-500 mt-2">órdenes abiertas</p>
               <Button
                 variant="link"
                 className="p-0 h-auto mt-2 text-marca-600"
@@ -641,9 +641,9 @@ const DashboardPage = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 section-enter section-stagger-3">
         {/* Critical Alerts */}
         {(isAdmin || isOperaciones || isFlota || isMantenimiento) && (
-          <Card className="bg-white rounded-xl border-slate-200">
+          <Card className="bg-white rounded-xl border-grafito-200">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest flex items-center gap-2">
+              <CardTitle className="text-sm font-bold uppercase text-grafito-500 tracking-widest flex items-center gap-2">
                 Alertas Recientes
                 {alerts.some(a => a.severity === 'critical') && (
                   <span className="pulse-alert inline-block w-2 h-2 rounded-full bg-red-500" />
@@ -656,7 +656,7 @@ const DashboardPage = () => {
             <CardContent>
               <ScrollArea className="h-[280px]">
                 {alerts.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                  <div className="flex flex-col items-center justify-center h-full text-grafito-400">
                     <CheckCircle className="w-12 h-12 mb-2" />
                     <p className="text-sm">No hay alertas activas</p>
                   </div>
@@ -674,7 +674,7 @@ const DashboardPage = () => {
                       return (
                         <div
                           key={alert.id}
-                          className={`flex items-start gap-3 p-3 rounded-lg border border-slate-200/70 bg-white hover:bg-slate-50 hover:shadow-md transition-all duration-200 tap-scale ${sevClass}`}
+                          className={`flex items-start gap-3 p-3 rounded-lg border border-grafito-200/70 bg-white hover:bg-grafito-50 hover:shadow-md transition-all duration-200 tap-scale ${sevClass}`}
                         >
                           <div
                             className="w-9 h-9 flex-shrink-0 rounded-lg flex items-center justify-center"
@@ -686,10 +686,10 @@ const DashboardPage = () => {
                             <AlertTriangle className="w-4 h-4" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-slate-800 truncate">
+                            <p className="text-sm font-medium text-grafito-800 truncate">
                               {alert.message}
                             </p>
-                            <p className="text-xs text-slate-500 mt-1">
+                            <p className="text-xs text-grafito-500 mt-1">
                               {format(new Date(alert.created_at), "dd/MM/yyyy HH:mm", { locale: es })}
                             </p>
                           </div>
@@ -711,9 +711,9 @@ const DashboardPage = () => {
 
         {/* Recent Trips */}
         {(isAdmin || isOperaciones || isContabilidad) && (
-          <Card className="bg-white rounded-xl border-slate-200">
+          <Card className="bg-white rounded-xl border-grafito-200">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest">
+              <CardTitle className="text-sm font-bold uppercase text-grafito-500 tracking-widest">
                 Viajes Recientes
               </CardTitle>
               <Button variant="ghost" size="sm" onClick={() => navigate('/trips')}>
@@ -723,7 +723,7 @@ const DashboardPage = () => {
             <CardContent>
               <ScrollArea className="h-[280px]">
                 {!recentActivity?.trips?.length ? (
-                  <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                  <div className="flex flex-col items-center justify-center h-full text-grafito-400">
                     <Route className="w-12 h-12 mb-2" />
                     <p className="text-sm">No hay viajes recientes</p>
                   </div>
@@ -732,7 +732,7 @@ const DashboardPage = () => {
                     {recentActivity.trips.map((trip) => (
                       <div
                         key={trip.id}
-                        className="flex items-center gap-3 p-3 rounded-lg border border-slate-200/70 bg-white hover:bg-slate-50 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer tap-scale"
+                        className="flex items-center gap-3 p-3 rounded-lg border border-grafito-200/70 bg-white hover:bg-grafito-50 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer tap-scale"
                         onClick={() => navigate(`/trips/${trip.id}`)}
                       >
                         <div
@@ -745,10 +745,10 @@ const DashboardPage = () => {
                           <Truck className="w-5 h-5" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-slate-800 truncate">
+                          <p className="text-sm font-semibold text-grafito-800 truncate">
                             {trip.client_name || 'Sin cliente'}
                           </p>
-                          <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-0.5">
+                          <div className="flex items-center gap-1.5 text-xs text-grafito-500 mt-0.5">
                             <Clock className="w-3 h-3" />
                             {format(new Date(trip.scheduled_date), "dd/MM/yyyy", { locale: es })}
                           </div>
@@ -771,7 +771,7 @@ const DashboardPage = () => {
         className="text-white section-enter section-stagger-4 relative overflow-hidden border-0"
         style={{
           backgroundImage:
-            'linear-gradient(135deg, #0f172a 0%, #1e293b 60%, color-mix(in srgb, var(--brand-color) 22%, #1e293b) 100%)',
+            'linear-gradient(135deg, #191614 0%, #2a2725 62%, color-mix(in srgb, var(--brand-color) 15%, #262321) 100%)',
         }}
       >
         <div
@@ -785,7 +785,7 @@ const DashboardPage = () => {
               <h3 className="font-heading text-xl font-bold uppercase tracking-wide">
                 Acciones Rápidas
               </h3>
-              <p className="text-slate-400 mt-1">
+              <p className="text-grafito-400 mt-1">
                 Accede rápidamente a las funciones más utilizadas
               </p>
             </div>

@@ -49,47 +49,47 @@ const CambiarPasswordPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
+    <div className="min-h-screen bg-grafito-950 text-grafito-100 flex items-center justify-center p-6">
       <div className="w-full max-w-sm">
-        <div className="rounded-2xl border border-amber-500/25 bg-slate-900/60 p-6">
+        <div className="rounded-2xl border border-amber-500/25 bg-grafito-900/60 p-6">
           <ShieldAlert className="mb-3 h-9 w-9 text-amber-400" />
           <h1 className="font-heading text-xl font-bold">Cambia tu contraseña</h1>
-          <p className="mt-2 text-sm text-slate-400">
+          <p className="mt-2 text-sm text-grafito-400">
             La que estás usando te la puso otra persona, así que la conocen dos.
             Elige una que solo sepas tú para continuar.
           </p>
 
           <form onSubmit={guardar} className="mt-5 space-y-4">
             <div className="space-y-2">
-              <Label className="text-slate-300">Contraseña actual</Label>
+              <Label className="text-grafito-300">Contraseña actual</Label>
               <Input
                 type="password"
                 required
                 value={actual}
                 onChange={(e) => setActual(e.target.value)}
-                className="bg-slate-950/60 border-white/10"
+                className="bg-grafito-950/60 border-white/10"
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-slate-300">Nueva contraseña</Label>
+              <Label className="text-grafito-300">Nueva contraseña</Label>
               <Input
                 type="password"
                 required
                 value={nueva}
                 onChange={(e) => setNueva(e.target.value)}
                 placeholder="Mínimo 8 caracteres"
-                className="bg-slate-950/60 border-white/10"
+                className="bg-grafito-950/60 border-white/10"
               />
               {corta && <p className="text-xs text-amber-400">Necesita al menos 8 caracteres.</p>}
             </div>
             <div className="space-y-2">
-              <Label className="text-slate-300">Repítela</Label>
+              <Label className="text-grafito-300">Repítela</Label>
               <Input
                 type="password"
                 required
                 value={repetida}
                 onChange={(e) => setRepetida(e.target.value)}
-                className="bg-slate-950/60 border-white/10"
+                className="bg-grafito-950/60 border-white/10"
               />
               {distintas && <p className="text-xs text-amber-400">No coinciden.</p>}
             </div>
@@ -111,9 +111,9 @@ const CambiarPasswordPage = () => {
           </form>
         </div>
 
-        <p className="mt-6 text-center text-sm text-slate-500">
+        <p className="mt-6 text-center text-sm text-grafito-500">
           Entraste como {user?.email || user?.name}.{' '}
-          <button type="button" onClick={logout} className="underline underline-offset-4 hover:text-slate-300">
+          <button type="button" onClick={logout} className="underline underline-offset-4 hover:text-grafito-300">
             Cerrar sesión
           </button>
         </p>

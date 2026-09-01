@@ -131,10 +131,10 @@ const TireDimensionReportPage = () => {
           Volver
         </Button>
         <div className="flex-1">
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-slate-900">
+          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
             Llantas Requeridas por Dimensión
           </h1>
-          <p className="text-slate-500 mt-1">
+          <p className="text-grafito-500 mt-1">
             Necesidades de reemplazo y reencauche agregadas a nivel de flota
           </p>
         </div>
@@ -166,8 +166,8 @@ const TireDimensionReportPage = () => {
                 <RefreshCw className="w-5 h-5 text-red-600" />
               </div>
               <div>
-                <p className="text-xs text-slate-500 uppercase font-bold">Total a Reemplazar</p>
-                <p className="font-heading text-2xl font-bold text-slate-900 font-mono">
+                <p className="text-xs text-grafito-500 uppercase font-bold">Total a Reemplazar</p>
+                <p className="font-heading text-2xl font-bold text-grafito-900 font-mono">
                   {totalReplace}
                 </p>
               </div>
@@ -181,8 +181,8 @@ const TireDimensionReportPage = () => {
                 <Recycle className="w-5 h-5 text-yellow-600" />
               </div>
               <div>
-                <p className="text-xs text-slate-500 uppercase font-bold">Total a Reencauchar</p>
-                <p className="font-heading text-2xl font-bold text-slate-900 font-mono">
+                <p className="text-xs text-grafito-500 uppercase font-bold">Total a Reencauchar</p>
+                <p className="font-heading text-2xl font-bold text-grafito-900 font-mono">
                   {totalRetread}
                 </p>
               </div>
@@ -194,13 +194,13 @@ const TireDimensionReportPage = () => {
       {/* Aggregated table */}
       <Card className="bg-white">
         <CardHeader>
-          <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest">
+          <CardTitle className="text-sm font-bold uppercase text-grafito-500 tracking-widest">
             Resumen por Dimensión y Tipo de Posición
           </CardTitle>
         </CardHeader>
         <CardContent>
           {aggregatedRows.length === 0 ? (
-            <div className="text-center py-8 text-slate-400" data-testid="tire-dimension-report-empty">
+            <div className="text-center py-8 text-grafito-400" data-testid="tire-dimension-report-empty">
               <CircleDot className="w-12 h-12 mx-auto mb-2" />
               <p>No hay llantas que requieran reemplazo o reencauche</p>
             </div>
@@ -228,7 +228,7 @@ const TireDimensionReportPage = () => {
                       </TableCell>
                     </TableRow>
                   ))}
-                  <TableRow className="border-t-2 border-slate-300 font-bold">
+                  <TableRow className="border-t-2 border-grafito-300 font-bold">
                     <TableCell colSpan={2}>TOTAL</TableCell>
                     <TableCell className="text-right text-red-600">{totalReplace}</TableCell>
                     <TableCell className="text-right text-yellow-600">{totalRetread}</TableCell>
@@ -244,7 +244,7 @@ const TireDimensionReportPage = () => {
       {flatTires.length > 0 && (
         <Card className="bg-white">
           <CardHeader>
-            <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest">
+            <CardTitle className="text-sm font-bold uppercase text-grafito-500 tracking-widest">
               Informe Detallado por Llanta
             </CardTitle>
           </CardHeader>
