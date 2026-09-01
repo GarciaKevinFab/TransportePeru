@@ -11182,6 +11182,49 @@ for _tipo, _ext in [
     mimetypes.add_type(_tipo, _ext)
 
 FRONTEND_BUILD = ROOT_DIR.parent / "frontend" / "build"
+
+# Cuanto puede guardarse cada cosa.
+#
+# El middleware de seguridad pone `Cache-Control: no-store` con setdefault, o
+# sea: solo si nadie lo puso antes. Para la API es lo correcto -ningun JSON con
+# datos de un cliente debe quedarse en un disco ajeno-, pero se aplicaba
+# TAMBIEN a los ficheros estaticos, y ahi hacia dano de verdad:
+#
+#   `no-store` es la directiva mas fuerte que existe: prohibe guardar a
+#   Cloudflare Y al navegador. Lo medido era `cf-cache-status: BYPASS` en todo
+#   -logo, CSS, bundle y las tres capturas-. Cada visita, incluso recargar la
+#   misma pestana, volvia a traer ~250 KB de WebP desde el origen por el tunel.
+#   El apartado "El producto, visto" se quedaba en negro varios segundos: justo
+#   el que existe para ensenar el producto.
+#
+# Se separa en tres casos porque el riesgo de cada uno es distinto:
+_UN_ANO = 60 * 60 * 24 * 365
+_UN_DIA = 60 * 60 * 24
+
+
+def _politica_de_cache(ruta: Path) -> str:
+    """Devuelve el Cache-Control que le corresponde a un fichero del build."""
+    nombre = ruta.name
+
+    # index.html NUNCA se cachea en duro: es el que nombra al bundle. Si un
+    # navegador se queda con el viejo pide un JS que ya no existe y la
+    # aplicacion no arranca. `no-cache` no es "no guardes" sino "pregunta antes
+    # de usarlo": con ETag la respuesta suele ser un 304 vacio.
+    if nombre == "index.html":
+        return "public, no-cache, must-revalidate"
+
+    # Lo que lleva hash de contenido en el nombre (main.4f2a1c.js) es inmutable
+    # por definicion: si cambia el contenido, cambia el nombre.
+    if re.search(r"\.[0-9a-f]{8,}\.[a-z0-9]+$", nombre):
+        return f"public, max-age={_UN_ANO}, immutable"
+
+    # El resto -capturas, logo, favicon, fuentes- conserva el nombre entre
+    # despliegues, asi que no puede ser inmutable: un dia de cache y ademas se
+    # deja servir caducado mientras se revalida por detras, para que cambiar
+    # una captura no obligue a nadie a esperar.
+    return f"public, max-age={_UN_DIA}, stale-while-revalidate={_UN_DIA * 7}"
+
+
 if FRONTEND_BUILD.exists():
     app.mount("/static", StaticFiles(directory=str(FRONTEND_BUILD / "static")), name="react-static")
 
@@ -11192,8 +11235,15 @@ if FRONTEND_BUILD.exists():
             raise HTTPException(status_code=404, detail="Not found")
         file_path = FRONTEND_BUILD / full_path
         if full_path and file_path.exists() and file_path.is_file():
-            return FileResponse(str(file_path))
-        return FileResponse(str(FRONTEND_BUILD / "index.html"))
+            return FileResponse(
+                str(file_path),
+                headers={"Cache-Control": _politica_de_cache(file_path)},
+            )
+        indice = FRONTEND_BUILD / "index.html"
+        return FileResponse(
+            str(indice),
+            headers={"Cache-Control": _politica_de_cache(indice)},
+        )
 
 # CORS
 _env = os.environ.get("ENV", "development").lower()
@@ -11245,7 +11295,25 @@ async def security_headers(request: Request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
-    response.headers.setdefault("Cache-Control", "no-store")
+
+    # `no-store` por defecto: ninguna respuesta de la API debe quedarse
+    # guardada en un disco intermedio.
+    #
+    # Excepto /static, que es el bundle de React que monta StaticFiles. Ese
+    # mount no pasa por serve_react, asi que sin esta salvedad se quedaba con
+    # el no-store y el navegador volvia a descargar el JS entero en cada
+    # navegacion. Son ficheros con hash de contenido en el nombre y publicos
+    # por definicion -los sirve cualquiera que abra la pagina-, asi que
+    # cachearlos no expone nada.
+    #
+    # /uploads se queda FUERA de la excepcion a proposito: ahi viven ficheros
+    # que sube cada empresa (logos, documentos) y no son publicos.
+    if request.url.path.startswith("/static/"):
+        response.headers.setdefault(
+            "Cache-Control", f"public, max-age={_UN_ANO}, immutable"
+        )
+    else:
+        response.headers.setdefault("Cache-Control", "no-store")
     return response
 
 # Logging

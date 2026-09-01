@@ -278,7 +278,15 @@ const LandingPage = () => (
         demostracion. Nunca de un cliente: las placas, los choferes y los
         viajes de G&E son datos de su operacion, y una pagina publica no es
         sitio para ellos. */}
-    <Seccion id="el-producto" className="border-t border-white/5 !py-0 pb-20 md:pb-28">
+    {/* overflow-x-clip: la captura en perspectiva se sale del ancho.
+        Al inclinarla con rotateX y origen arriba, el borde de abajo se acerca
+        al ojo y la perspectiva lo ENSANCHA un 17%: el bloque mide 1152 px pero
+        pinta 1282, y esos ~6 px por lado le daban barra horizontal a toda la
+        pagina. Se recorta aqui, en la seccion, que ocupa el ancho de la
+        ventana: se va lo que sobresale de la pantalla sin cortar nada de la
+        imagen. `clip` y no `hidden` porque `hidden` crea un contenedor de
+        scroll y romperia cualquier position:sticky de dentro. */}
+    <Seccion id="el-producto" className="overflow-x-clip border-t border-white/5 !py-0 pb-20 md:pb-28">
       <figure className="relative -mt-6 md:-mt-10">
         {/* Resplandor detras del marco: separa la captura del fondo sin
             necesidad de un borde grueso. */}
