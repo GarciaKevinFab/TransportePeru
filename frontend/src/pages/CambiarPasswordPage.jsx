@@ -103,7 +103,7 @@ const CambiarPasswordPage = () => {
             <Button
               type="submit"
               disabled={guardando || !actual || nueva.length < 8 || nueva !== repetida}
-              className="w-full bg-orange-500 hover:bg-orange-600"
+              className="w-full bg-marca-500 hover:bg-marca-600"
             >
               {guardando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Guardar y continuar

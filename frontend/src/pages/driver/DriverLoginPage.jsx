@@ -47,7 +47,7 @@ const DriverLoginPage = () => {
 
       {/* Logo */}
       <div className="mb-8 text-center">
-        <div className="w-20 h-20 bg-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+        <div className="w-20 h-20 bg-marca-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
           <Truck className="w-10 h-10 text-white" />
         </div>
         <h1 className="text-2xl font-bold text-white">TransportePeru</h1>
@@ -95,7 +95,7 @@ const DriverLoginPage = () => {
 
             <Button
               type="submit"
-              className="w-full h-12 bg-orange-500 hover:bg-orange-600 text-white font-bold text-lg"
+              className="w-full h-12 bg-marca-500 hover:bg-marca-600 text-white font-bold text-lg"
               disabled={loading || dni.length !== 8 || pin.length !== 6}
               data-testid="driver-login-btn"
             >

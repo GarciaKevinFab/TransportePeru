@@ -427,13 +427,13 @@ const DetraccionesPage = () => {
             <p className="text-sm text-slate-500">{soles(depositedAmount)}</p>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-orange-500" data-testid="stat-total">
+        <Card className="bg-white border-l-4 border-l-marca-500" data-testid="stat-total">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Total del periodo</p>
-              <Coins className="w-4 h-4 text-orange-600" />
+              <Coins className="w-4 h-4 text-marca-600" />
             </div>
-            <p className="font-heading text-2xl font-bold text-orange-600 mt-1">{soles(totalAmount)}</p>
+            <p className="font-heading text-2xl font-bold text-marca-600 mt-1">{soles(totalAmount)}</p>
             <p className="text-sm text-slate-500">{totalCount} detracciones</p>
           </CardContent>
         </Card>
@@ -532,7 +532,7 @@ const DetraccionesPage = () => {
                     </p>
                     <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
                       <span>{localDate(d.fecha_emision)}</span>
-                      <span className="font-bold text-orange-600">
+                      <span className="font-bold text-marca-600">
                         {soles(d.detraccion_amount ?? d.amount)}
                       </span>
                       {d.constancia_number && <span className="font-mono">{d.constancia_number}</span>}
@@ -573,7 +573,7 @@ const DetraccionesPage = () => {
                     </TableCell>
                     <TableCell>{soles(d.base_amount)}</TableCell>
                     <TableCell>{(Number(d.rate) || 0).toFixed(2)}%</TableCell>
-                    <TableCell className="font-bold text-orange-600">
+                    <TableCell className="font-bold text-marca-600">
                       {soles(d.detraccion_amount ?? d.amount)}
                     </TableCell>
                     <TableCell className="font-mono text-xs">{d.constancia_number || '-'}</TableCell>
@@ -719,7 +719,7 @@ const DetraccionesPage = () => {
               </div>
               <div className="flex justify-between text-lg font-bold border-t pt-2">
                 <span>Monto detracción (referencial)</span>
-                <span className="text-orange-600" data-testid="form-computed-amount">{soles(computedAmount)}</span>
+                <span className="text-marca-600" data-testid="form-computed-amount">{soles(computedAmount)}</span>
               </div>
               {belowMinimum && (
                 <p className="text-xs text-yellow-700">
@@ -772,7 +772,7 @@ const DetraccionesPage = () => {
             {selected && (
               <div className="bg-slate-50 rounded-lg p-3 text-sm flex justify-between">
                 <span>Monto a depositar</span>
-                <span className="font-bold text-orange-600">
+                <span className="font-bold text-marca-600">
                   {soles(selected.detraccion_amount ?? selected.amount)}
                 </span>
               </div>

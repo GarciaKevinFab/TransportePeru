@@ -204,7 +204,7 @@ const TireGraphsPage = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
       </div>
     );
   }
@@ -307,8 +307,8 @@ const TireGraphsPage = () => {
             <Card className="bg-white">
               <CardContent className="pt-6">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-sm bg-orange-50">
-                    <TrendingDown className="w-5 h-5 text-orange-600" />
+                  <div className="p-2 rounded-sm bg-marca-50">
+                    <TrendingDown className="w-5 h-5 text-marca-600" />
                   </div>
                   <div>
                     <p className="text-xs text-slate-500 uppercase font-bold">Costo / mm</p>
@@ -332,7 +332,7 @@ const TireGraphsPage = () => {
             <CardContent>
               {loadingProjection || loadingInspections ? (
                 <div className="flex items-center justify-center h-24">
-                  <Loader2 className="w-6 h-6 animate-spin text-orange-500" />
+                  <Loader2 className="w-6 h-6 animate-spin text-marca-500" />
                 </div>
               ) : !enoughForProjection || !projection ? (
                 <div
@@ -358,8 +358,8 @@ const TireGraphsPage = () => {
                   )}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="flex items-center gap-3 p-4 rounded-sm bg-slate-50">
-                      <div className="p-2 rounded-sm bg-orange-50">
-                        <Hourglass className="w-5 h-5 text-orange-600" />
+                      <div className="p-2 rounded-sm bg-marca-50">
+                        <Hourglass className="w-5 h-5 text-marca-600" />
                       </div>
                       <div>
                         <p className="text-xs text-slate-500 uppercase font-bold">Km Restantes</p>
@@ -424,7 +424,7 @@ const TireGraphsPage = () => {
             <CardContent>
               {loadingInspections ? (
                 <div className="flex items-center justify-center h-64">
-                  <Loader2 className="w-6 h-6 animate-spin text-orange-500" />
+                  <Loader2 className="w-6 h-6 animate-spin text-marca-500" />
                 </div>
               ) : !hasDepth ? (
                 <div className="text-center py-12 text-slate-400" data-testid="tire-graphs-depth-empty">
@@ -465,7 +465,7 @@ const TireGraphsPage = () => {
                         type="monotone"
                         dataKey="depth"
                         name="Profundidad mín. (mm)"
-                        stroke="#f97316"
+                        stroke="#e00000"
                         strokeWidth={2}
                         dot={{ r: 3 }}
                         connectNulls

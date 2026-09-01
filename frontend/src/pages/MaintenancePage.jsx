@@ -331,7 +331,7 @@ const MaintenancePage = () => {
     const styles = {
       baja: 'bg-slate-100 text-slate-700',
       normal: 'bg-blue-100 text-blue-700',
-      alta: 'bg-orange-100 text-orange-700',
+      alta: 'bg-marca-100 text-marca-700',
       critica: 'bg-red-100 text-red-700',
     };
     return <Badge className={styles[priority] || 'bg-slate-100'}>{priority.toUpperCase()}</Badge>;
@@ -483,7 +483,7 @@ const MaintenancePage = () => {
         <CardContent className="p-0 overflow-x-auto">
           {maintLoading ? (
             <div className="flex items-center justify-center h-32">
-              <Loader2 className="w-6 h-6 animate-spin text-orange-500" />
+              <Loader2 className="w-6 h-6 animate-spin text-marca-500" />
             </div>
           ) : Object.keys(maintStatuses).length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-slate-400">
@@ -521,7 +521,7 @@ const MaintenancePage = () => {
                         </TableCell>
                         <TableCell className="text-right font-mono font-bold">
                           {kmRemaining != null ? (
-                            <span className={kmRemaining <= 0 ? 'text-red-600' : st.due_soon ? 'text-orange-600' : 'text-slate-900'}>
+                            <span className={kmRemaining <= 0 ? 'text-red-600' : st.due_soon ? 'text-marca-600' : 'text-slate-900'}>
                               {Number(kmRemaining).toLocaleString('es-PE')} km
                             </span>
                           ) : '-'}
@@ -533,7 +533,7 @@ const MaintenancePage = () => {
                               Servicio vencido
                             </Badge>
                           ) : st.due_soon ? (
-                            <Badge className="bg-orange-100 text-orange-800">
+                            <Badge className="bg-marca-100 text-marca-800">
                               <AlertTriangle className="w-3 h-3 mr-1" />
                               Faltan {Number(kmRemaining).toLocaleString('es-PE')} km
                             </Badge>
@@ -577,7 +577,7 @@ const MaintenancePage = () => {
         <CardContent className="p-0 overflow-x-auto">
           {loading ? (
             <div className="flex items-center justify-center h-64">
-              <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+              <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
             </div>
           ) : filteredOrders.length === 0 ? (
             /* Una orden de trabajo cuelga de un vehiculo: sin flota cargada,

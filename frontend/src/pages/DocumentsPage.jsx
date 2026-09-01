@@ -187,7 +187,7 @@ const DocumentsPage = () => {
         href={resolveFileUrl(doc.file_url)}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-slate-400 hover:text-orange-500"
+        className="text-slate-400 hover:text-marca-500"
         title="Ver / descargar archivo"
         onClick={(e) => e.stopPropagation()}
         data-testid="doc-file-link"
@@ -325,7 +325,7 @@ const DocumentsPage = () => {
             <CardContent className="p-0 overflow-x-auto">
               {loading ? (
                 <div className="flex items-center justify-center h-64">
-                  <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+                  <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
                 </div>
               ) : !matrix?.matrix?.length ? (
                 /* La matriz vacia no es "sin documentos": es que aun no hay
@@ -403,7 +403,7 @@ const DocumentsPage = () => {
                   </TableHeader>
                   <TableBody>
                     {matrix.matrix.map((row) => (
-                      <TableRow key={row.entity.id} className="table-dense hover:bg-orange-50">
+                      <TableRow key={row.entity.id} className="table-dense hover:bg-marca-50">
                         <TableCell className="sticky left-0 bg-white z-10 font-medium">
                           {entityType === 'vehicle' ? (
                             <span className="font-mono">{row.entity.plate}</span>

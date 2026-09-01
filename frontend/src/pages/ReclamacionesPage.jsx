@@ -39,7 +39,7 @@ const Campo = ({ etiqueta, children }) => (
 );
 
 const inputCls =
-  'w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-slate-100 placeholder:text-slate-500 outline-none transition focus:border-orange-500/60 focus:bg-white/[0.07]';
+  'w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-slate-100 placeholder:text-slate-500 outline-none transition focus:border-marca-500/60 focus:bg-white/[0.07]';
 
 // La fecha llega del servidor en ISO ("2026-08-31T23:04:12.285074+00:00"), que
 // es lo correcto para viajar y lo peor posible para leer. Aqui se pinta en la
@@ -178,7 +178,7 @@ const ReclamacionesPage = () => {
                 {PROVEEDOR.domicilio}
                 <br />
                 {PROVEEDOR.telefono} ·{' '}
-                <a href={`mailto:${PROVEEDOR.email}`} className="text-orange-400 underline-offset-2 hover:underline">
+                <a href={`mailto:${PROVEEDOR.email}`} className="text-marca-400 underline-offset-2 hover:underline">
                   {PROVEEDOR.email}
                 </a>
               </p>
@@ -201,7 +201,7 @@ const ReclamacionesPage = () => {
                       key={valor}
                       className={`cursor-pointer rounded-xl border p-4 transition ${
                         datos.tipo === valor
-                          ? 'border-orange-500/60 bg-orange-500/10'
+                          ? 'border-marca-500/60 bg-marca-500/10'
                           : 'border-white/10 bg-white/[0.02] hover:border-white/20'
                       }`}
                     >
@@ -212,7 +212,7 @@ const ReclamacionesPage = () => {
                           value={valor}
                           checked={datos.tipo === valor}
                           onChange={set('tipo')}
-                          className="h-4 w-4 accent-orange-500"
+                          className="h-4 w-4 accent-marca-500"
                         />
                         <span className="font-heading font-bold">{titulo}</span>
                       </span>
@@ -299,7 +299,7 @@ const ReclamacionesPage = () => {
                       onChange={(e) =>
                         setDatos((d) => ({ ...d, es_menor_edad: e.target.checked }))
                       }
-                      className="mt-0.5 h-4 w-4 accent-orange-500"
+                      className="mt-0.5 h-4 w-4 accent-marca-500"
                     />
                     <span className="text-sm text-slate-300">
                       Soy menor de edad
@@ -424,7 +424,7 @@ const ReclamacionesPage = () => {
               <button
                 type="submit"
                 disabled={enviando}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-orange-500 px-6 py-3.5 font-bold text-white transition hover:bg-orange-400 disabled:opacity-60"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-marca-500 px-6 py-3.5 font-bold text-white transition hover:bg-marca-400 disabled:opacity-60"
                 data-testid="reclamo-enviar-btn"
               >
                 {enviando ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
@@ -451,7 +451,7 @@ const ReclamacionesPage = () => {
               que te pedirán si acudes a INDECOPI.
             </p>
             <p
-              className="font-heading mt-6 select-all break-all rounded-xl border border-orange-500/30 bg-orange-500/10 px-6 py-5 text-3xl font-black tracking-tight text-orange-300"
+              className="font-heading mt-6 select-all break-all rounded-xl border border-marca-500/30 bg-marca-500/10 px-6 py-5 text-3xl font-black tracking-tight text-marca-300"
               data-testid="reclamo-codigo"
             >
               {hoja.codigo}

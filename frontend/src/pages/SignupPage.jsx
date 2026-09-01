@@ -30,7 +30,7 @@ const Campo = ({ etiqueta, campo, valor, onChange, tipo = 'text', placeholder, .
       value={valor}
       onChange={onChange}
       placeholder={placeholder}
-      className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-slate-100 placeholder:text-slate-500 outline-none transition focus:border-orange-500/60 focus:bg-white/[0.07]"
+      className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-slate-100 placeholder:text-slate-500 outline-none transition focus:border-marca-500/60 focus:bg-white/[0.07]"
       {...resto}
     />
   </div>
@@ -145,7 +145,7 @@ const SignupPage = () => {
             <button
               type="submit"
               disabled={enviando}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-orange-500 px-6 py-3.5 font-bold text-white transition hover:bg-orange-400 disabled:opacity-60"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-marca-500 px-6 py-3.5 font-bold text-white transition hover:bg-marca-400 disabled:opacity-60"
             >
               {enviando && <Loader2 className="h-4 w-4 animate-spin" />}
               {enviando ? 'Creando tu cuenta...' : 'Empezar gratis'}
@@ -155,11 +155,11 @@ const SignupPage = () => {
             <p className="text-center text-xs text-slate-500">
               Sin tarjeta. Puedes dejarlo cuando quieras. Al crear la cuenta
               aceptas los{' '}
-              <Link to="/terminos" className="text-slate-400 underline underline-offset-4 hover:text-orange-400">
+              <Link to="/terminos" className="text-slate-400 underline underline-offset-4 hover:text-marca-400">
                 términos
               </Link>{' '}
               y la{' '}
-              <Link to="/privacidad" className="text-slate-400 underline underline-offset-4 hover:text-orange-400">
+              <Link to="/privacidad" className="text-slate-400 underline underline-offset-4 hover:text-marca-400">
                 política de privacidad
               </Link>
               .
@@ -169,7 +169,7 @@ const SignupPage = () => {
 
           <p className="mt-6 text-center text-sm text-slate-400">
             ¿Ya tienes cuenta?{' '}
-            <Link to="/login" className="font-semibold text-orange-500 underline underline-offset-4 hover:text-orange-400">
+            <Link to="/login" className="font-semibold text-marca-500 underline underline-offset-4 hover:text-marca-400">
               Entrar
             </Link>
           </p>
@@ -181,9 +181,9 @@ const SignupPage = () => {
 
           <p className="lg:hidden text-center text-slate-400 text-xs mt-6">
             &copy; 2026 CargoXprez &mdash;{' '}
-            <Link to="/privacidad" className="underline underline-offset-4 hover:text-orange-500">Privacidad</Link>{' '}
+            <Link to="/privacidad" className="underline underline-offset-4 hover:text-marca-500">Privacidad</Link>{' '}
             &middot;{' '}
-            <Link to="/terminos" className="underline underline-offset-4 hover:text-orange-500">Términos</Link>
+            <Link to="/terminos" className="underline underline-offset-4 hover:text-marca-500">Términos</Link>
           </p>
         </div>
       </div>

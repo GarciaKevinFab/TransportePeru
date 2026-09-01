@@ -94,9 +94,9 @@ const PanelMarca = ({ marca = 'CargoXprez', titulo, descripcion, puntos = [] }) 
     {/* Pie legal */}
     <div className="relative z-10 text-slate-400 text-xs">
       &copy; 2026 {marca} &mdash;{' '}
-      <a href="/privacidad" className="underline underline-offset-4 hover:text-orange-500">Privacidad</a>{' '}
+      <a href="/privacidad" className="underline underline-offset-4 hover:text-marca-500">Privacidad</a>{' '}
       &middot;{' '}
-      <a href="/terminos" className="underline underline-offset-4 hover:text-orange-500">T&eacute;rminos</a>
+      <a href="/terminos" className="underline underline-offset-4 hover:text-marca-500">T&eacute;rminos</a>
     </div>
   </div>
 );

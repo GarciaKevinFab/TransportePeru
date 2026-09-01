@@ -24,7 +24,7 @@ export const getStatusBadge = (status) => {
 
 export const getTypeBadge = (type) => {
   return type === 'tracto' ? (
-    <Badge variant="outline" className="border-orange-300 text-orange-700 bg-orange-50">
+    <Badge variant="outline" className="border-marca-300 text-marca-700 bg-marca-50">
       <Truck className="w-3 h-3 mr-1" />
       Tracto
     </Badge>

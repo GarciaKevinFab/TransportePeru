@@ -94,7 +94,7 @@ const DriverHomePage = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
       </div>
     );
   }
@@ -237,7 +237,7 @@ const DriverHomePage = () => {
                 maintStatus.km_remaining <= 0
                   ? 'bg-red-50 border-red-200'
                   : maintStatus.due_soon
-                  ? 'bg-orange-50 border-orange-200'
+                  ? 'bg-marca-50 border-marca-200'
                   : 'bg-white border-slate-200'
               }`}
             >
@@ -248,7 +248,7 @@ const DriverHomePage = () => {
                       maintStatus.km_remaining <= 0
                         ? 'bg-red-100 text-red-600'
                         : maintStatus.due_soon
-                        ? 'bg-orange-100 text-orange-600'
+                        ? 'bg-marca-100 text-marca-600'
                         : 'bg-slate-100 text-slate-600'
                     }`}
                   >
@@ -260,7 +260,7 @@ const DriverHomePage = () => {
                     ) : (
                       <p
                         className={`font-bold ${
-                          maintStatus.due_soon ? 'text-orange-700' : 'text-slate-800'
+                          maintStatus.due_soon ? 'text-marca-700' : 'text-slate-800'
                         }`}
                       >
                         Faltan {Number(maintStatus.km_remaining).toLocaleString('es-PE')} km para el mantenimiento
@@ -273,7 +273,7 @@ const DriverHomePage = () => {
                     </p>
                   </div>
                   {maintStatus.due_soon && (
-                    <Badge className="bg-orange-500 text-white flex-shrink-0">
+                    <Badge className="bg-marca-500 text-white flex-shrink-0">
                       <AlertTriangle className="w-3 h-3 mr-1" />
                       Pronto
                     </Badge>

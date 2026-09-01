@@ -95,7 +95,7 @@ const TireLifecyclePage = () => {
     { value: 'en_uso', label: 'En Uso', color: 'bg-blue-100 text-blue-700' },
     { value: 'almacen', label: 'En Almacén', color: 'bg-slate-100 text-slate-700' },
     { value: 'reencauche', label: 'Reencauche', color: 'bg-yellow-100 text-yellow-700' },
-    { value: 'reparacion', label: 'En Reparación', color: 'bg-orange-100 text-orange-700' },
+    { value: 'reparacion', label: 'En Reparación', color: 'bg-marca-100 text-marca-700' },
     { value: 'baja', label: 'Baja', color: 'bg-red-100 text-red-700' },
     { value: 'descartada', label: 'Descartada', color: 'bg-red-100 text-red-700' },
   ];
@@ -343,7 +343,7 @@ const TireLifecyclePage = () => {
             <CardContent className="p-0 overflow-x-auto">
               {loading ? (
                 <div className="flex items-center justify-center h-64">
-                  <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+                  <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
                 </div>
               ) : filteredTires.length === 0 ? (
                 // Dos vacios distintos, y el codigo ya sabe cual es cual sin
@@ -484,20 +484,20 @@ const TireLifecyclePage = () => {
                 </div>
               </CardContent>
             </Card>
-            <Card className="bg-white border-l-4 border-l-orange-500">
+            <Card className="bg-white border-l-4 border-l-marca-500">
               <CardContent className="py-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">
                       Motivos Distintos
                     </p>
-                    <p className="font-heading text-3xl font-bold text-orange-600 mt-1">
+                    <p className="font-heading text-3xl font-bold text-marca-600 mt-1">
                       {scrapByReason
                         ? (renderGroup(scrapByReason) || []).length
                         : '-'}
                     </p>
                   </div>
-                  <CircleDot className="w-8 h-8 text-orange-500" />
+                  <CircleDot className="w-8 h-8 text-marca-500" />
                 </div>
               </CardContent>
             </Card>
@@ -554,7 +554,7 @@ const TireLifecyclePage = () => {
             <CardContent className="p-0 overflow-x-auto">
               {scrapLoading ? (
                 <div className="flex items-center justify-center h-48">
-                  <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+                  <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
                 </div>
               ) : scrapItems.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-48 text-slate-400">

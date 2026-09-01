@@ -83,7 +83,7 @@ const SettingsPage = () => {
     phone: '',
     email: '',
     logo_url: '',
-    brand_color: '#f97316',
+    brand_color: '#e00000',
     config: {},
   });
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -126,7 +126,7 @@ const SettingsPage = () => {
         phone: companyRes.data?.phone || '',
         email: companyRes.data?.email || '',
         logo_url: companyRes.data?.logo_url || '',
-        brand_color: companyRes.data?.brand_color || '#f97316',
+        brand_color: companyRes.data?.brand_color || '#e00000',
         config: companyRes.data?.config || {},
       });
       setDocumentTypes(docTypesRes.data);
@@ -306,7 +306,7 @@ const SettingsPage = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
       </div>
     );
   }
@@ -394,13 +394,13 @@ const SettingsPage = () => {
                   <div className="flex items-center gap-3">
                     <input
                       type="color"
-                      value={companyForm.brand_color || '#f97316'}
+                      value={companyForm.brand_color || '#e00000'}
                       onChange={(e) => setCompanyForm({ ...companyForm, brand_color: e.target.value })}
                       className="w-12 h-12 rounded-lg cursor-pointer border border-slate-300 p-1"
                     />
                     <div className="space-y-1">
                       <Input
-                        value={companyForm.brand_color || '#f97316'}
+                        value={companyForm.brand_color || '#e00000'}
                         onChange={(e) => setCompanyForm({ ...companyForm, brand_color: e.target.value })}
                         className="rounded-sm w-28 font-mono text-sm"
                         maxLength={7}
@@ -409,7 +409,7 @@ const SettingsPage = () => {
                     </div>
                   </div>
                   <div className="flex gap-2 mt-2">
-                    {['#f97316', '#3b82f6', '#10b981', '#ef4444', '#8b5cf6', '#06b6d4'].map(color => (
+                    {['#e00000', '#3b82f6', '#10b981', '#ef4444', '#8b5cf6', '#06b6d4'].map(color => (
                       <button
                         key={color}
                         className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${companyForm.brand_color === color ? 'border-slate-900 scale-110' : 'border-transparent'}`}
@@ -573,7 +573,7 @@ const SettingsPage = () => {
                       <TableCell>
                         <Badge variant="outline" className={
                           dt.block_rule === 'bloquea_inicio' ? 'bg-red-100 text-red-700' :
-                          dt.block_rule === 'bloquea_asignacion' ? 'bg-orange-100 text-orange-700' :
+                          dt.block_rule === 'bloquea_asignacion' ? 'bg-marca-100 text-marca-700' :
                           'bg-slate-100'
                         }>
                           {blockRules.find(r => r.value === dt.block_rule)?.label || dt.block_rule}

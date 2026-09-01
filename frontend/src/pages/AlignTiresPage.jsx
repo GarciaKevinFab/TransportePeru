@@ -117,7 +117,7 @@ const AlignTiresPage = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
       </div>
     );
   }

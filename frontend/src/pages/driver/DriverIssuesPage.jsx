@@ -252,7 +252,7 @@ const DriverIssuesPage = () => {
                   onClick={() => setFormData({ ...formData, issue_type: type.value })}
                   className={`p-3 rounded-lg border text-left transition-all ${
                     formData.issue_type === type.value
-                      ? 'border-orange-500 bg-orange-50 ring-2 ring-orange-200'
+                      ? 'border-marca-500 bg-marca-50 ring-2 ring-marca-200'
                       : 'border-slate-200 hover:border-slate-300'
                   }`}
                 >

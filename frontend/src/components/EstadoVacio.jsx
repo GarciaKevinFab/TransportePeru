@@ -24,8 +24,8 @@ import { ArrowRight, Plus } from 'lucide-react';
 const EstadoVacio = ({ icono: Icono, titulo, texto, accion, enlace, filtrado = false }) => (
   <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
     {Icono && (
-      <div className="mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-orange-50 dark:bg-orange-500/10">
-        <Icono className="h-7 w-7 text-orange-500" />
+      <div className="mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-marca-50 dark:bg-marca-500/10">
+        <Icono className="h-7 w-7 text-marca-500" />
       </div>
     )}
     <h3 className="font-heading text-lg font-bold tracking-tight text-slate-900 dark:text-slate-100">

@@ -198,7 +198,7 @@ const EquipmentPage = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
       </div>
     );
   }
@@ -250,14 +250,14 @@ const EquipmentPage = () => {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-orange-500 card-enter card-stagger-4">
+        <Card className="bg-white border-l-4 border-l-marca-500 card-enter card-stagger-4">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Con Chofer</p>
-                <p className="font-heading text-3xl font-bold text-orange-600 mt-1">{assignedDrivers}</p>
+                <p className="font-heading text-3xl font-bold text-marca-600 mt-1">{assignedDrivers}</p>
               </div>
-              <UserCheck className="w-8 h-8 text-orange-500" />
+              <UserCheck className="w-8 h-8 text-marca-500" />
             </div>
           </CardContent>
         </Card>
@@ -353,10 +353,10 @@ const EquipmentPage = () => {
                 const eqStatus = getEquipmentStatus(equipmentMap[vehicle.id]);
                 const driverName = getDriverName(vehicle.assigned_driver_id);
                 return (
-                  <TableRow key={vehicle.id} className="table-dense hover:bg-orange-50">
+                  <TableRow key={vehicle.id} className="table-dense hover:bg-marca-50">
                     <TableCell className="font-mono font-bold">{vehicle.plate}</TableCell>
                     <TableCell>
-                      <Badge variant="outline" className={vehicle.vehicle_type === 'tracto' ? 'border-orange-300 text-orange-700 bg-orange-50' : 'border-slate-300 text-slate-700 bg-slate-50'}>
+                      <Badge variant="outline" className={vehicle.vehicle_type === 'tracto' ? 'border-marca-300 text-marca-700 bg-marca-50' : 'border-slate-300 text-slate-700 bg-slate-50'}>
                         {vehicle.vehicle_type === 'tracto' ? 'Tracto' : 'Carreta'}
                       </Badge>
                     </TableCell>

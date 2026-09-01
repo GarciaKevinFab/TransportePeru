@@ -245,10 +245,10 @@ const LiquidacionFletePage = () => {
                 <p className="font-heading text-3xl font-bold text-slate-700 mt-1">{borradorCount}</p>
               </CardContent>
             </Card>
-            <Card className="bg-white border-l-4 border-l-orange-500">
+            <Card className="bg-white border-l-4 border-l-marca-500">
               <CardContent className="py-4">
                 <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Total a cobrar</p>
-                <p className="font-heading text-2xl font-bold text-orange-600 mt-1">{soles(totalACobrar)}</p>
+                <p className="font-heading text-2xl font-bold text-marca-600 mt-1">{soles(totalACobrar)}</p>
               </CardContent>
             </Card>
             <Card className="bg-white border-l-4 border-l-green-500">

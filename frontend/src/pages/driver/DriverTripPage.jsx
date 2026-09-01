@@ -136,7 +136,7 @@ const DriverTripPage = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
       </div>
     );
   }
@@ -317,7 +317,7 @@ const DriverTripPage = () => {
             <DialogTitle>Iniciar Viaje</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="p-4 bg-orange-50 rounded-lg">
+            <div className="p-4 bg-marca-50 rounded-lg">
               <p className="font-bold text-slate-800">{selectedTrip?.client_name}</p>
               <p className="text-sm text-slate-600">{selectedTrip?.cargo_description}</p>
             </div>
@@ -342,7 +342,7 @@ const DriverTripPage = () => {
               Cancelar
             </Button>
             <Button
-              className="bg-orange-500 hover:bg-orange-600"
+              className="bg-marca-500 hover:bg-marca-600"
               onClick={handleStartTrip}
               disabled={saving || kmStart === ''}
             >

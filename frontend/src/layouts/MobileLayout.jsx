@@ -55,7 +55,7 @@ const MobileLayout = ({ children }) => {
       {/* Mobile Header */}
       <header className="bg-slate-900 text-white px-4 py-3 flex items-center justify-between sticky top-0 z-50 safe-area-top">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center font-bold">
+          <div className="w-10 h-10 bg-marca-500 rounded-full flex items-center justify-center font-bold">
             {user?.name?.charAt(0)?.toUpperCase() || 'C'}
           </div>
           <div>
@@ -133,7 +133,7 @@ const MobileLayout = ({ children }) => {
               className={({ isActive }) =>
                 `flex flex-col items-center py-2 px-3 rounded-lg transition-colors ${
                   isActive 
-                    ? 'text-orange-600 bg-orange-50' 
+                    ? 'text-marca-600 bg-marca-50' 
                     : 'text-slate-500 hover:text-slate-700'
                 }`
               }

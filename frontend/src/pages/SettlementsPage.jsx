@@ -368,14 +368,14 @@ const SettlementsPage = () => {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-orange-500 card-enter card-stagger-4">
+        <Card className="bg-white border-l-4 border-l-marca-500 card-enter card-stagger-4">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Viajes Totales</p>
-                <p className="font-heading text-3xl font-bold text-orange-600 mt-1">{trips.length}</p>
+                <p className="font-heading text-3xl font-bold text-marca-600 mt-1">{trips.length}</p>
               </div>
-              <Truck className="w-8 h-8 text-orange-500" />
+              <Truck className="w-8 h-8 text-marca-500" />
             </div>
           </CardContent>
         </Card>
@@ -414,7 +414,7 @@ const SettlementsPage = () => {
         <CardContent className="p-0 overflow-x-auto">
           {loading ? (
             <div className="flex items-center justify-center h-64">
-              <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+              <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
             </div>
           ) : filteredTrips.length === 0 ? (
             /* La liquidacion nace del viaje: sin viajes no hay nada que
@@ -657,15 +657,15 @@ const SettlementsPage = () => {
                     </div>
                   </CardContent>
                 </Card>
-                <Card className={balance >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-orange-50 border-orange-200'}>
+                <Card className={balance >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-marca-50 border-marca-200'}>
                   <CardContent className="py-3">
                     <div className="flex items-center gap-2">
-                      <Calculator className={`w-5 h-5 ${balance >= 0 ? 'text-blue-600' : 'text-orange-600'}`} />
+                      <Calculator className={`w-5 h-5 ${balance >= 0 ? 'text-blue-600' : 'text-marca-600'}`} />
                       <div>
-                        <p className={`text-xs uppercase font-bold ${balance >= 0 ? 'text-blue-700' : 'text-orange-700'}`}>
+                        <p className={`text-xs uppercase font-bold ${balance >= 0 ? 'text-blue-700' : 'text-marca-700'}`}>
                           {balance >= 0 ? 'A Favor Empresa' : 'A Favor Chofer'}
                         </p>
-                        <p className={`font-heading text-xl font-bold ${balance >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>
+                        <p className={`font-heading text-xl font-bold ${balance >= 0 ? 'text-blue-600' : 'text-marca-600'}`}>
                           S/ {Math.abs(balance).toFixed(2)}
                         </p>
                       </div>
@@ -738,7 +738,7 @@ const SettlementsPage = () => {
                                   <button
                                     type="button"
                                     onClick={() => openPhoto(expense.receipt_url, `${catInfo.label} — ${expense.provider || 'Comprobante'}`)}
-                                    className="inline-block border-2 border-slate-200 rounded p-0.5 hover:border-orange-400"
+                                    className="inline-block border-2 border-slate-200 rounded p-0.5 hover:border-marca-400"
                                     title="Ver comprobante"
                                   >
                                     <img

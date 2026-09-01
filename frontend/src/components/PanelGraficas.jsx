@@ -24,7 +24,7 @@ import api from '../services/api';
  *    se veria como una recta. Asi se ve como lo que es, un cero.
  */
 
-const NARANJA = '#f97316';
+const NARANJA = '#e00000';
 const AZUL = '#60a5fa';
 
 const soles = (n) =>

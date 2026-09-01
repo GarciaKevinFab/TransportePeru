@@ -84,18 +84,18 @@ const IssuesPage = () => {
   });
 
   const issueTypes = [
-    { value: 'incidente', label: 'Incidente', icon: AlertTriangle, color: 'text-orange-500' },
+    { value: 'incidente', label: 'Incidente', icon: AlertTriangle, color: 'text-marca-500' },
     { value: 'multa', label: 'Multa', icon: FileText, color: 'text-red-500' },
     { value: 'siniestro', label: 'Siniestro', icon: Car, color: 'text-red-600' },
     { value: 'checklist_critico', label: 'Checklist Crítico', icon: AlertCircle, color: 'text-yellow-500' },
-    { value: 'llanta_critica', label: 'Llanta Crítica', icon: AlertCircle, color: 'text-orange-600' },
+    { value: 'llanta_critica', label: 'Llanta Crítica', icon: AlertCircle, color: 'text-marca-600' },
     { value: 'otro', label: 'Otro', icon: AlertTriangle, color: 'text-slate-500' },
   ];
 
   const severities = [
     { value: 'baja', label: 'Baja', color: 'bg-slate-100 text-slate-700' },
     { value: 'media', label: 'Media', color: 'bg-yellow-100 text-yellow-700' },
-    { value: 'alta', label: 'Alta', color: 'bg-orange-100 text-orange-700' },
+    { value: 'alta', label: 'Alta', color: 'bg-marca-100 text-marca-700' },
     { value: 'critica', label: 'Crítica', color: 'bg-red-100 text-red-700' },
   ];
 
@@ -299,12 +299,12 @@ const IssuesPage = () => {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-orange-500 card-enter card-stagger-4">
+        <Card className="bg-white border-l-4 border-l-marca-500 card-enter card-stagger-4">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Costo Total</p>
-                <p className="font-heading text-2xl font-bold text-orange-600 mt-1">
+                <p className="font-heading text-2xl font-bold text-marca-600 mt-1">
                   S/ {totalCost.toLocaleString()}
                 </p>
               </div>
@@ -371,7 +371,7 @@ const IssuesPage = () => {
         <CardContent className="p-0 overflow-x-auto">
           {loading ? (
             <div className="flex items-center justify-center h-64">
-              <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+              <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
             </div>
           ) : filteredIssues.length === 0 ? (
             /* Vacio con guia: si hay incidentes pero el filtro no casa, no se

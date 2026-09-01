@@ -75,7 +75,7 @@ const Campo = ({ etiqueta, children }) => (
 );
 
 const inputCls =
-  'w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-slate-100 placeholder:text-slate-500 outline-none transition focus:border-orange-500/60 focus:bg-white/[0.07]';
+  'w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-slate-100 placeholder:text-slate-500 outline-none transition focus:border-marca-500/60 focus:bg-white/[0.07]';
 
 const CheckoutPage = () => {
   const [params] = useSearchParams();
@@ -243,7 +243,7 @@ const CheckoutPage = () => {
                 </div>
                 <p className="mt-5 text-xs text-slate-500">
                   ¿Solo quieres probar? El{' '}
-                  <Link to="/registro" className="text-orange-400 underline-offset-2 hover:underline">
+                  <Link to="/registro" className="text-marca-400 underline-offset-2 hover:underline">
                     plan Gratis
                   </Link>{' '}
                   no pide tarjeta.
@@ -304,7 +304,7 @@ const CheckoutPage = () => {
                   <button
                     type="submit"
                     disabled={enviando}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-orange-500 px-6 py-3.5 font-bold text-white transition hover:bg-orange-400 disabled:opacity-60"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-marca-500 px-6 py-3.5 font-bold text-white transition hover:bg-marca-400 disabled:opacity-60"
                     data-testid="checkout-pagar-btn"
                   >
                     {enviando ? <Loader2 className="h-5 w-5 animate-spin" /> : <CreditCard className="h-5 w-5" />}
@@ -343,12 +343,12 @@ const CheckoutPage = () => {
                   <CheckCircle className="h-7 w-7 text-green-400" />
                 </span>
               ) : pasarela === 'confirmando' ? (
-                <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-orange-500/10">
-                  <Loader2 className="h-7 w-7 animate-spin text-orange-400" />
+                <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-marca-500/10">
+                  <Loader2 className="h-7 w-7 animate-spin text-marca-400" />
                 </span>
               ) : (
-                <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-orange-500/10">
-                  <Clock className="h-7 w-7 text-orange-400" />
+                <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-marca-500/10">
+                  <Clock className="h-7 w-7 text-marca-400" />
                 </span>
               )}
 
@@ -369,7 +369,7 @@ const CheckoutPage = () => {
                   </p>
                   <Link
                     to="/login"
-                    className="mt-7 inline-flex items-center justify-center gap-2 rounded-full bg-orange-500 px-6 py-3 font-bold text-white transition hover:bg-orange-400"
+                    className="mt-7 inline-flex items-center justify-center gap-2 rounded-full bg-marca-500 px-6 py-3 font-bold text-white transition hover:bg-marca-400"
                   >
                     Entrar a mi cuenta
                   </Link>
@@ -427,7 +427,7 @@ const CheckoutPage = () => {
 
             <p className="mt-5 text-center text-xs text-slate-500">
               ¿Algún problema con tu compra? Escríbenos o usa el{' '}
-              <Link to="/reclamaciones" className="text-orange-400 underline-offset-2 hover:underline">
+              <Link to="/reclamaciones" className="text-marca-400 underline-offset-2 hover:underline">
                 Libro de Reclamaciones
               </Link>.
             </p>

@@ -190,7 +190,7 @@ const CompaniesPage = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
       </div>
     );
   }
@@ -229,13 +229,13 @@ const CompaniesPage = () => {
             <p className="text-green-100">Usuarios Totales</p>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white card-enter card-stagger-3">
+        <Card className="bg-gradient-to-br from-marca-500 to-marca-600 text-white card-enter card-stagger-3">
           <CardContent className="p-4">
             <Truck className="w-8 h-8 mb-2 opacity-80" />
             <p className="text-3xl font-bold">
               {companies.reduce((sum, c) => sum + (c.vehicle_count || 0), 0) || '-'}
             </p>
-            <p className="text-orange-100">Vehículos Totales</p>
+            <p className="text-marca-100">Vehículos Totales</p>
           </CardContent>
         </Card>
       </div>
@@ -293,7 +293,7 @@ const CompaniesPage = () => {
               </TableHeader>
               <TableBody>
                 {companies.map((company) => (
-                  <TableRow key={company.id} className="hover:bg-orange-50">
+                  <TableRow key={company.id} className="hover:bg-marca-50">
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
@@ -519,11 +519,11 @@ const CompaniesPage = () => {
                   <p className="text-sm text-green-600">Vehículos</p>
                 </CardContent>
               </Card>
-              <Card className="bg-orange-50">
+              <Card className="bg-marca-50">
                 <CardContent className="p-4 text-center">
-                  <Route className="w-8 h-8 text-orange-600 mx-auto mb-2" />
-                  <p className="text-2xl font-bold text-orange-900">{companyStats.trips}</p>
-                  <p className="text-sm text-orange-600">Viajes</p>
+                  <Route className="w-8 h-8 text-marca-600 mx-auto mb-2" />
+                  <p className="text-2xl font-bold text-marca-900">{companyStats.trips}</p>
+                  <p className="text-sm text-marca-600">Viajes</p>
                 </CardContent>
               </Card>
               <Card className="bg-purple-50">

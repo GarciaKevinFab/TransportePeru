@@ -429,7 +429,7 @@ const TripsPage = () => {
         <CardContent className="p-0 overflow-x-auto">
           {loading ? (
             <div className="flex items-center justify-center h-64">
-              <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+              <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
             </div>
           ) : filteredTrips.length === 0 ? (
             /* El orden de las guias sigue el orden real del arranque: sin
@@ -516,7 +516,7 @@ const TripsPage = () => {
               </TableHeader>
               <TableBody>
                 {filteredTrips.map((trip) => (
-                  <TableRow key={trip.id} className="table-dense hover:bg-orange-50">
+                  <TableRow key={trip.id} className="table-dense hover:bg-marca-50">
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4 text-slate-400" />
@@ -918,7 +918,7 @@ const TripsPage = () => {
           </DialogHeader>
           <div className="grid gap-4 py-4">
             {actionTrip && (
-              <div className="p-3 bg-orange-50 rounded-sm">
+              <div className="p-3 bg-marca-50 rounded-sm">
                 <p className="font-medium text-slate-800">{actionTrip.client_name || 'Sin cliente'}</p>
                 <p className="text-xs text-slate-500 font-mono">{getVehiclePlate(actionTrip.tracto_id)}</p>
               </div>

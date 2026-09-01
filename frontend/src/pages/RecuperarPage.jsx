@@ -19,7 +19,7 @@ const Marco = ({ children }) => (
   <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
     <div className="w-full max-w-sm">
       <div className="mb-8 flex flex-col items-center gap-3">
-        <span className="grid h-12 w-12 place-items-center rounded-xl bg-orange-500">
+        <span className="grid h-12 w-12 place-items-center rounded-xl bg-marca-500">
           <Truck className="h-6 w-6 text-white" />
         </span>
         <span className="font-heading text-2xl font-black uppercase tracking-tight">CargoXprez</span>
@@ -91,7 +91,7 @@ export const OlvidePage = () => {
             className="bg-slate-950/60 border-white/10"
           />
         </div>
-        <Button type="submit" disabled={enviando || !email} className="w-full bg-orange-500 hover:bg-orange-600">
+        <Button type="submit" disabled={enviando || !email} className="w-full bg-marca-500 hover:bg-marca-600">
           {enviando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Enviar enlace
         </Button>
@@ -143,7 +143,7 @@ export const RestablecerPage = () => {
             Ábrelo tal cual llegó al correo, sin recortarlo.
           </p>
           <Link to="/olvide">
-            <Button className="mt-5 w-full bg-orange-500 hover:bg-orange-600">
+            <Button className="mt-5 w-full bg-marca-500 hover:bg-marca-600">
               Pedir uno nuevo
             </Button>
           </Link>
@@ -187,7 +187,7 @@ export const RestablecerPage = () => {
         <Button
           type="submit"
           disabled={guardando || clave.length < 8 || clave !== repetida}
-          className="w-full bg-orange-500 hover:bg-orange-600"
+          className="w-full bg-marca-500 hover:bg-marca-600"
         >
           {guardando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Guardar y entrar

@@ -168,7 +168,7 @@ const LoginPage = () => {
                     <p className="pt-1 text-center text-sm">
                       <a
                         href="/olvide"
-                        className="text-slate-500 underline underline-offset-4 hover:text-orange-500"
+                        className="text-slate-500 underline underline-offset-4 hover:text-marca-500"
                       >
                         ¿Olvidaste tu contraseña?
                       </a>
@@ -241,7 +241,7 @@ const LoginPage = () => {
             ¿Tu empresa aún no usa CargoXprez?{' '}
             <a
               href="/registro"
-              className="font-semibold text-orange-500 underline underline-offset-4 hover:text-orange-400"
+              className="font-semibold text-marca-500 underline underline-offset-4 hover:text-marca-400"
             >
               Crear cuenta gratis
             </a>
@@ -255,9 +255,9 @@ const LoginPage = () => {
           {/* Mobile footer */}
           <p className="lg:hidden text-center text-slate-400 text-xs mt-6">
             &copy; 2026 {marca} &mdash;{' '}
-            <a href="/privacidad" className="underline underline-offset-4 hover:text-orange-500">Privacidad</a>{' '}
+            <a href="/privacidad" className="underline underline-offset-4 hover:text-marca-500">Privacidad</a>{' '}
             &middot;{' '}
-            <a href="/terminos" className="underline underline-offset-4 hover:text-orange-500">Términos</a>
+            <a href="/terminos" className="underline underline-offset-4 hover:text-marca-500">Términos</a>
           </p>
         </div>
       </div>

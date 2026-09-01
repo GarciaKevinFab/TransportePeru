@@ -358,7 +358,7 @@ const TireSchemaPage = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
       </div>
     );
   }
@@ -443,7 +443,7 @@ const TireSchemaPage = () => {
         <Card className="bg-white" data-testid="tire-diagnostics-panel">
           <CardHeader>
             <CardTitle className="text-sm font-bold uppercase text-slate-500 tracking-widest flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-orange-500" />
+              <AlertTriangle className="w-4 h-4 text-marca-500" />
               Diagnósticos
             </CardTitle>
           </CardHeader>

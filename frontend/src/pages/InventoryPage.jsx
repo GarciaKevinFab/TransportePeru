@@ -252,10 +252,10 @@ const InventoryPage = () => {
             </p>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-orange-500 card-enter card-stagger-4">
+        <Card className="bg-white border-l-4 border-l-marca-500 card-enter card-stagger-4">
           <CardContent className="py-4">
             <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Proveedores</p>
-            <p className="font-heading text-3xl font-bold text-orange-600 mt-1">{suppliers.length}</p>
+            <p className="font-heading text-3xl font-bold text-marca-600 mt-1">{suppliers.length}</p>
           </CardContent>
         </Card>
       </div>
@@ -301,7 +301,7 @@ const InventoryPage = () => {
             <CardContent className="p-0 overflow-x-auto">
               {loading ? (
                 <div className="flex items-center justify-center h-64">
-                  <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+                  <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
                 </div>
               ) : filteredItems.length === 0 ? (
                 /* Con datos pero sin coincidencias (busqueda o boton de stock

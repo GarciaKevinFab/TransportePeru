@@ -337,7 +337,7 @@ const MaintenancePlansPanel = ({ vehicles = [] }) => {
                   <tbody>
                     {selectedPlan.sections?.map((section, si) => (
                       <React.Fragment key={si}>
-                        <tr className="bg-orange-50">
+                        <tr className="bg-marca-50">
                           <td colSpan={4 + (selectedPlan.intervals?.length || 0)} className="p-2 border border-slate-300 font-bold uppercase tracking-wide">
                             <span style={{ color: 'var(--brand-color)' }} className="font-mono mr-2">{section.code}</span>
                             {section.name}

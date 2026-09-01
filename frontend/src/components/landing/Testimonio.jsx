@@ -33,12 +33,12 @@ const Testimonio = () => {
 
   return (
     <figure className="mx-auto max-w-3xl">
-      <Quote className="h-8 w-8 text-orange-500/70" aria-hidden="true" />
+      <Quote className="h-8 w-8 text-marca-500/70" aria-hidden="true" />
       <blockquote className="font-heading mt-6 text-2xl font-bold leading-snug tracking-tight text-slate-100 md:text-3xl">
         «{frase}»
       </blockquote>
       <figcaption className="mt-6 flex items-center gap-3 text-sm">
-        <span className="h-px w-8 bg-orange-500" aria-hidden="true" />
+        <span className="h-px w-8 bg-marca-500" aria-hidden="true" />
         <span className="text-slate-300">
           <strong className="font-semibold text-slate-100">{nombre}</strong>
           {cargo && <span className="text-slate-400"> · {cargo}</span>}

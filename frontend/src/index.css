@@ -8,7 +8,7 @@
   --font-heading: 'Barlow Condensed', sans-serif;
   --font-body: 'Inter', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
-  --brand-color: #f97316;
+  --brand-color: #e00000;
 }
 
 body {
@@ -95,14 +95,14 @@ code {
     --secondary-foreground: 222 47% 11%;
     --muted: 210 40% 96%;
     --muted-foreground: 215 16% 47%;
-    --accent: 24 95% 53%;
+    --accent: 0 100% 44%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
     --border: 214 32% 91%;
     --input: 214 32% 91%;
-    --ring: 24 95% 53%;
-    --chart-1: 24 95% 53%;
+    --ring: 0 100% 44%;
+    --chart-1: 0 100% 44%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
@@ -135,13 +135,13 @@ code {
     --secondary-foreground: 210 40% 98%;
     --muted: 217 33% 17%;
     --muted-foreground: 215 20% 65%;
-    --accent: 24 95% 53%;
+    --accent: 0 100% 44%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 62% 30%;
     --destructive-foreground: 210 40% 98%;
     --border: 217 33% 17%;
     --input: 217 33% 17%;
-    --ring: 24 95% 53%;
+    --ring: 0 100% 44%;
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
@@ -671,7 +671,7 @@ code {
 .dark .trend-down { background-color: rgba(239, 68, 68, 0.16) !important; color: #fca5a5 !important; }
 
 /* Fondos de acento suaves que quedan brillantes en oscuro */
-.dark .bg-orange-50 { background-color: rgba(249, 115, 22, 0.12) !important; }
+.dark .bg-marca-50 { background-color: rgba(249, 115, 22, 0.12) !important; }
 .dark .bg-green-50  { background-color: rgba(34, 197, 94, 0.12) !important; }
 .dark .bg-red-50    { background-color: rgba(239, 68, 68, 0.12) !important; }
 .dark .bg-yellow-50 { background-color: rgba(234, 179, 8, 0.12) !important; }

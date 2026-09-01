@@ -107,7 +107,7 @@ const MainLayout = ({ children }) => {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [companyBrand, setCompanyBrand] = useState({ name: 'TransPeru', logo_url: '', brand_color: '#f97316' });
+  const [companyBrand, setCompanyBrand] = useState({ name: 'TransPeru', logo_url: '', brand_color: '#e00000' });
   const [logoError, setLogoError] = useState(false);
 
   const loadCompanyBrand = () => {
@@ -116,11 +116,11 @@ const MainLayout = ({ children }) => {
         setCompanyBrand({
           name: res.data.name || 'TransPeru',
           logo_url: res.data.logo_url || '',
-          brand_color: res.data.brand_color || '#f97316',
+          brand_color: res.data.brand_color || '#e00000',
         });
         setLogoError(false);
         // Apply brand color as CSS variable for the whole app
-        document.documentElement.style.setProperty('--brand-color', res.data.brand_color || '#f97316');
+        document.documentElement.style.setProperty('--brand-color', res.data.brand_color || '#e00000');
       }
     }).catch(() => {});
   };

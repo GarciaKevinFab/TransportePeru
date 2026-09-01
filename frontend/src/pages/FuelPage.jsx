@@ -640,14 +640,14 @@ const FuelPage = () => {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-orange-500 card-enter card-stagger-3">
+        <Card className="bg-white border-l-4 border-l-marca-500 card-enter card-stagger-3">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Total Gastado</p>
-                <p className="font-heading text-xl font-bold text-orange-600 mt-1">S/ {totalAmount.toLocaleString()}</p>
+                <p className="font-heading text-xl font-bold text-marca-600 mt-1">S/ {totalAmount.toLocaleString()}</p>
               </div>
-              <TrendingUp className="w-8 h-8 text-orange-500" />
+              <TrendingUp className="w-8 h-8 text-marca-500" />
             </div>
           </CardContent>
         </Card>
@@ -680,7 +680,7 @@ const FuelPage = () => {
             <CardContent className="p-0 overflow-x-auto">
               {loading ? (
                 <div className="flex items-center justify-center h-64">
-                  <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+                  <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
                 </div>
               ) : vouchers.length === 0 ? (
                 /* El vale pide un tracto en el formulario: sin flota, la guia
@@ -737,7 +737,7 @@ const FuelPage = () => {
                             <div className="w-9 h-9 border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-slate-300 text-[10px]">V</div>
                           )}
                           {voucher.invoice_photo_url ? (
-                            <button onClick={() => openPhoto(voucher.invoice_photo_url, `Factura ${voucher.invoice_number || ''}`)} className="border-2 border-orange-300 rounded p-0.5 hover:border-orange-500" title="Foto de factura">
+                            <button onClick={() => openPhoto(voucher.invoice_photo_url, `Factura ${voucher.invoice_number || ''}`)} className="border-2 border-marca-300 rounded p-0.5 hover:border-marca-500" title="Foto de factura">
                               <img src={resolvePhoto(voucher.invoice_photo_url)} alt="factura" className="w-8 h-8 object-cover rounded" />
                             </button>
                           ) : (
@@ -793,7 +793,7 @@ const FuelPage = () => {
                               <div className="w-9 h-9 border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-slate-300 text-[10px]">V</div>
                             )}
                             {voucher.invoice_photo_url ? (
-                              <button onClick={() => openPhoto(voucher.invoice_photo_url, `Factura ${voucher.invoice_number || ''}`)} className="border-2 border-orange-300 rounded p-0.5 hover:border-orange-500" title="Foto de factura">
+                              <button onClick={() => openPhoto(voucher.invoice_photo_url, `Factura ${voucher.invoice_number || ''}`)} className="border-2 border-marca-300 rounded p-0.5 hover:border-marca-500" title="Foto de factura">
                                 <img src={resolvePhoto(voucher.invoice_photo_url)} alt="factura" className="w-8 h-8 object-cover rounded" />
                               </button>
                             ) : (
@@ -821,7 +821,7 @@ const FuelPage = () => {
             <CardContent className="p-0 overflow-x-auto">
               {loading ? (
                 <div className="flex items-center justify-center h-64">
-                  <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+                  <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
                 </div>
               ) : loads.length === 0 ? (
                 /* La carga tambien exige tracto: misma guia que en vales. */
@@ -878,7 +878,7 @@ const FuelPage = () => {
                             <div className="w-9 h-9 border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-slate-300 text-[10px]">V</div>
                           )}
                           {invoicePhoto ? (
-                            <button onClick={() => openPhoto(invoicePhoto, `Factura ${load.invoice_number || ''}`)} className="border-2 border-orange-300 rounded p-0.5 hover:border-orange-500" title="Foto de factura">
+                            <button onClick={() => openPhoto(invoicePhoto, `Factura ${load.invoice_number || ''}`)} className="border-2 border-marca-300 rounded p-0.5 hover:border-marca-500" title="Foto de factura">
                               <img src={resolvePhoto(invoicePhoto)} alt="factura" className="w-8 h-8 object-cover rounded" />
                             </button>
                           ) : (
@@ -943,7 +943,7 @@ const FuelPage = () => {
                               <div className="w-9 h-9 border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-slate-300 text-[10px]">V</div>
                             )}
                             {invoicePhoto ? (
-                              <button onClick={() => openPhoto(invoicePhoto, `Factura ${load.invoice_number || ''}`)} className="border-2 border-orange-300 rounded p-0.5 hover:border-orange-500" title="Foto de factura">
+                              <button onClick={() => openPhoto(invoicePhoto, `Factura ${load.invoice_number || ''}`)} className="border-2 border-marca-300 rounded p-0.5 hover:border-marca-500" title="Foto de factura">
                                 <img src={resolvePhoto(invoicePhoto)} alt="factura" className="w-8 h-8 object-cover rounded" />
                               </button>
                             ) : (

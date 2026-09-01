@@ -52,14 +52,14 @@ const Marco = ({ titulo, children }) => (
                    [&_h2]:mt-10 [&_h2]:mb-3 [&_h2]:tracking-tight
                    [&_p]:mb-4 [&_ul]:mb-4 [&_ul]:space-y-2 [&_ul]:pl-5 [&_li]:list-disc
                    [&_strong]:text-slate-100 [&_strong]:font-semibold
-                   [&_a]:text-orange-400 [&_a]:underline [&_a]:underline-offset-4"
+                   [&_a]:text-marca-400 [&_a]:underline [&_a]:underline-offset-4"
       >
         {children}
       </div>
 
       <footer className="mt-16 border-t border-white/5 pt-6 text-sm text-slate-500">
         ¿Dudas sobre esto? Escríbenos a{' '}
-        <a href="mailto:soporte@sisac.pe" className="text-orange-400 underline underline-offset-4">
+        <a href="mailto:soporte@sisac.pe" className="text-marca-400 underline underline-offset-4">
           soporte@sisac.pe
         </a>
         .

@@ -188,7 +188,7 @@ const RotateTiresPage = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
       </div>
     );
   }
@@ -218,11 +218,11 @@ const RotateTiresPage = () => {
       </div>
 
       {/* Instructions / selection banner */}
-      <Card className={selectedOrigin ? 'bg-orange-50 border-orange-300' : 'bg-white'}>
+      <Card className={selectedOrigin ? 'bg-marca-50 border-marca-300' : 'bg-white'}>
         <CardContent className="py-4">
           {selectedOrigin ? (
             <div className="flex items-center gap-3 text-sm">
-              <RotateCw className="w-5 h-5 text-orange-500 animate-spin" />
+              <RotateCw className="w-5 h-5 text-marca-500 animate-spin" />
               <span className="font-medium text-slate-800">
                 Origen seleccionado:{' '}
                 <Badge variant="outline" className="font-mono">
@@ -291,7 +291,7 @@ const RotateTiresPage = () => {
                       className="flex items-center gap-2 p-2 rounded-sm border border-slate-200 bg-slate-50"
                     >
                       {op.type === 'swap' ? (
-                        <Repeat className="w-4 h-4 text-orange-500 shrink-0" />
+                        <Repeat className="w-4 h-4 text-marca-500 shrink-0" />
                       ) : (
                         <ArrowRight className="w-4 h-4 text-emerald-500 shrink-0" />
                       )}

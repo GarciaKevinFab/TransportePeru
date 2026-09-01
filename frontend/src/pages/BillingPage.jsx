@@ -298,7 +298,7 @@ const BillingPage = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
       </div>
     );
   }
@@ -355,10 +355,10 @@ const BillingPage = () => {
             <p className="text-xs text-slate-400">{facturasEmitidas} emitidas</p>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-orange-500 col-span-2 card-enter card-stagger-3">
+        <Card className="bg-white border-l-4 border-l-marca-500 col-span-2 card-enter card-stagger-3">
           <CardContent className="py-4">
             <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Total Facturado</p>
-            <p className="font-heading text-3xl font-bold text-orange-600 mt-1">
+            <p className="font-heading text-3xl font-bold text-marca-600 mt-1">
               S/ {totalFacturado.toFixed(2)}
             </p>
           </CardContent>
@@ -726,7 +726,7 @@ const BillingPage = () => {
               </div>
               <div className="flex justify-between text-lg font-bold border-t pt-2">
                 <span>Total</span>
-                <span className="text-orange-600">S/ {facturaTotal.toFixed(2)}</span>
+                <span className="text-marca-600">S/ {facturaTotal.toFixed(2)}</span>
               </div>
             </div>
           </div>

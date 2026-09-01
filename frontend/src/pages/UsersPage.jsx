@@ -60,7 +60,7 @@ const ROLES = [
   { value: 'operaciones', label: 'Operaciones', icon: User, color: 'bg-blue-100 text-blue-800' },
   { value: 'flota', label: 'Flota', icon: Truck, color: 'bg-green-100 text-green-800' },
   { value: 'mantenimiento', label: 'Mantenimiento', icon: User, color: 'bg-yellow-100 text-yellow-800' },
-  { value: 'almacen', label: 'Almacén', icon: User, color: 'bg-orange-100 text-orange-800' },
+  { value: 'almacen', label: 'Almacén', icon: User, color: 'bg-marca-100 text-marca-800' },
   { value: 'contabilidad', label: 'Contabilidad', icon: User, color: 'bg-teal-100 text-teal-800' },
   { value: 'chofer', label: 'Chofer', icon: Truck, color: 'bg-slate-100 text-slate-800' },
 ];
@@ -410,7 +410,7 @@ const UsersPage = () => {
         <CardContent className="p-0 overflow-x-auto">
           {loading ? (
             <div className="flex items-center justify-center h-64">
-              <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+              <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
             </div>
           ) : filteredUsers.length === 0 ? (
             users.length > 0 ? (
@@ -476,7 +476,7 @@ const UsersPage = () => {
               </TableHeader>
               <TableBody>
                 {filteredUsers.map((userItem) => (
-                  <TableRow key={userItem.id} className="table-dense hover:bg-orange-50">
+                  <TableRow key={userItem.id} className="table-dense hover:bg-marca-50">
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 font-bold">

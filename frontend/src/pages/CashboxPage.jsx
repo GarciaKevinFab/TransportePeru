@@ -424,13 +424,13 @@ const CashboxPage = () => {
             <p className="font-heading text-2xl font-bold text-red-600 mt-1">{soles(totalExpense)}</p>
           </CardContent>
         </Card>
-        <Card className="bg-white border-l-4 border-l-orange-500" data-testid="stat-balance">
+        <Card className="bg-white border-l-4 border-l-marca-500" data-testid="stat-balance">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Saldo</p>
-              <Wallet className="w-4 h-4 text-orange-600" />
+              <Wallet className="w-4 h-4 text-marca-600" />
             </div>
-            <p className={`font-heading text-2xl font-bold mt-1 ${(Number(currentBalance) || 0) >= 0 ? 'text-orange-600' : 'text-red-600'}`}>
+            <p className={`font-heading text-2xl font-bold mt-1 ${(Number(currentBalance) || 0) >= 0 ? 'text-marca-600' : 'text-red-600'}`}>
               {soles(currentBalance)}
             </p>
           </CardContent>
@@ -652,10 +652,10 @@ const CashboxPage = () => {
                 <p className="font-heading text-2xl font-bold text-slate-700 mt-1">{soles(openingBalance)}</p>
               </CardContent>
             </Card>
-            <Card className="bg-white border-l-4 border-l-orange-500" data-testid="stat-closing-balance">
+            <Card className="bg-white border-l-4 border-l-marca-500" data-testid="stat-closing-balance">
               <CardContent className="py-4">
                 <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Saldo Final</p>
-                <p className={`font-heading text-2xl font-bold mt-1 ${(Number(closingBalance) || 0) >= 0 ? 'text-orange-600' : 'text-red-600'}`}>
+                <p className={`font-heading text-2xl font-bold mt-1 ${(Number(closingBalance) || 0) >= 0 ? 'text-marca-600' : 'text-red-600'}`}>
                   {soles(closingBalance)}
                 </p>
               </CardContent>

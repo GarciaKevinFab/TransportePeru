@@ -429,10 +429,10 @@ const ReportsPage = () => {
                     <p className="font-heading text-2xl font-bold text-green-600 mt-1">{tripsReport.totals.total_km.toLocaleString()}</p>
                   </CardContent>
                 </Card>
-                <Card className="bg-white border-l-4 border-l-orange-500">
+                <Card className="bg-white border-l-4 border-l-marca-500">
                   <CardContent className="py-4">
                     <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Anticipos</p>
-                    <p className="font-heading text-xl font-bold text-orange-600 mt-1">S/ {tripsReport.totals.total_advances.toLocaleString()}</p>
+                    <p className="font-heading text-xl font-bold text-marca-600 mt-1">S/ {tripsReport.totals.total_advances.toLocaleString()}</p>
                   </CardContent>
                 </Card>
                 <Card className="bg-white border-l-4 border-l-red-500">
@@ -521,10 +521,10 @@ const ReportsPage = () => {
                     <p className="font-heading text-2xl font-bold text-green-600 mt-1">{fuelReport.totals.total_liters.toLocaleString()}</p>
                   </CardContent>
                 </Card>
-                <Card className="bg-white border-l-4 border-l-orange-500">
+                <Card className="bg-white border-l-4 border-l-marca-500">
                   <CardContent className="py-4">
                     <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Total Gastado</p>
-                    <p className="font-heading text-xl font-bold text-orange-600 mt-1">S/ {fuelReport.totals.total_amount.toLocaleString()}</p>
+                    <p className="font-heading text-xl font-bold text-marca-600 mt-1">S/ {fuelReport.totals.total_amount.toLocaleString()}</p>
                   </CardContent>
                 </Card>
                 <Card className="bg-white border-l-4 border-l-slate-500">
@@ -588,10 +588,10 @@ const ReportsPage = () => {
                     <p className="font-heading text-3xl font-bold text-blue-600 mt-1">{maintenanceReport.totals.count}</p>
                   </CardContent>
                 </Card>
-                <Card className="bg-white border-l-4 border-l-orange-500">
+                <Card className="bg-white border-l-4 border-l-marca-500">
                   <CardContent className="py-4">
                     <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Costo Total</p>
-                    <p className="font-heading text-xl font-bold text-orange-600 mt-1">S/ {maintenanceReport.totals.total_cost.toLocaleString()}</p>
+                    <p className="font-heading text-xl font-bold text-marca-600 mt-1">S/ {maintenanceReport.totals.total_cost.toLocaleString()}</p>
                   </CardContent>
                 </Card>
                 <Card className="bg-white border-l-4 border-l-green-500">
@@ -632,7 +632,7 @@ const ReportsPage = () => {
                           <TableCell>
                             <Badge variant="outline" className={
                               wo.priority === 'critica' ? 'bg-red-100 text-red-700' :
-                              wo.priority === 'alta' ? 'bg-orange-100 text-orange-700' :
+                              wo.priority === 'alta' ? 'bg-marca-100 text-marca-700' :
                               'bg-slate-100'
                             }>
                               {wo.priority}
@@ -786,10 +786,10 @@ const ReportsPage = () => {
                         <p className="font-heading text-xl font-bold text-blue-600 mt-1">S/ {(Number(totals.budget) || 0).toLocaleString()}</p>
                       </CardContent>
                     </Card>
-                    <Card className="bg-white border-l-4 border-l-orange-500">
+                    <Card className="bg-white border-l-4 border-l-marca-500">
                       <CardContent className="py-4">
                         <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Gastado</p>
-                        <p className="font-heading text-xl font-bold text-orange-600 mt-1">S/ {(Number(totals.spent) || 0).toLocaleString()}</p>
+                        <p className="font-heading text-xl font-bold text-marca-600 mt-1">S/ {(Number(totals.spent) || 0).toLocaleString()}</p>
                       </CardContent>
                     </Card>
                     <Card className="bg-white border-l-4 border-l-green-500">
@@ -848,7 +848,7 @@ const ReportsPage = () => {
                                 <TableCell>{r.driver_name || getDriverName(r.driver_id)}</TableCell>
                                 <TableCell>{r.period || '-'}</TableCell>
                                 <TableCell>S/ {(Number(r.budget) || 0).toFixed(2)}</TableCell>
-                                <TableCell className="text-orange-600">S/ {(Number(r.spent) || 0).toFixed(2)}</TableCell>
+                                <TableCell className="text-marca-600">S/ {(Number(r.spent) || 0).toFixed(2)}</TableCell>
                                 <TableCell className={balance >= 0 ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}>
                                   S/ {balance.toFixed(2)}
                                 </TableCell>
@@ -908,7 +908,7 @@ const ReportsPage = () => {
                             <XAxis dataKey="plate" tick={{ fontSize: 12 }} />
                             <YAxis tick={{ fontSize: 12 }} />
                             <RechartsTooltip formatter={(v) => `S/ ${Number(v).toFixed(2)}`} />
-                            <Bar dataKey="cpk" fill="#f97316" radius={[4, 4, 0, 0]} name="Costo/km" />
+                            <Bar dataKey="cpk" fill="#e00000" radius={[4, 4, 0, 0]} name="Costo/km" />
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
@@ -965,7 +965,7 @@ const ReportsPage = () => {
                               <TableCell>S/ {(Number(r.tire_cost) || 0).toFixed(2)}</TableCell>
                               <TableCell>S/ {(Number(r.maintenance_cost) || 0).toFixed(2)}</TableCell>
                               <TableCell className="font-bold">S/ {(Number(r.total_cost) || 0).toFixed(2)}</TableCell>
-                              <TableCell className="font-bold text-orange-600">S/ {(Number(r.cost_per_km) || 0).toFixed(2)}</TableCell>
+                              <TableCell className="font-bold text-marca-600">S/ {(Number(r.cost_per_km) || 0).toFixed(2)}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
@@ -1004,7 +1004,7 @@ const ReportsPage = () => {
                 const d = Number(days);
                 if (Number.isNaN(d)) return <Badge variant="outline">-</Badge>;
                 if (d < 0) return <Badge variant="outline" className="bg-red-100 text-red-700">Vencido ({Math.abs(d)}d)</Badge>;
-                if (d <= 15) return <Badge variant="outline" className="bg-orange-100 text-orange-700">{d}d</Badge>;
+                if (d <= 15) return <Badge variant="outline" className="bg-marca-100 text-marca-700">{d}d</Badge>;
                 return <Badge variant="outline" className="bg-yellow-100 text-yellow-700">{d}d</Badge>;
               };
               return (

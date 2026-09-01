@@ -43,7 +43,7 @@ export const ComparativaPlanes = () => (
               key={plan}
               scope="col"
               className={`px-3 py-4 text-center font-heading text-base font-bold tracking-tight ${
-                plan === 'Pro' ? 'text-orange-400' : 'text-slate-200'
+                plan === 'Pro' ? 'text-marca-400' : 'text-slate-200'
               }`}
             >
               {plan}
@@ -60,7 +60,7 @@ export const ComparativaPlanes = () => (
             {celdas.map((c, i) => (
               <td key={i} className="px-3 py-3.5 text-center">
                 {c === true ? (
-                  <Check className="mx-auto h-4 w-4 text-orange-500" aria-label="Incluido" />
+                  <Check className="mx-auto h-4 w-4 text-marca-500" aria-label="Incluido" />
                 ) : c === false ? (
                   // Un guion y no una cruz: una cruz roja se lee como error, y
                   // esto no es un fallo, es que ese plan no lo trae.
@@ -121,7 +121,7 @@ export const Preguntas = () => (
           <span className="font-heading text-lg font-bold tracking-tight text-slate-100">{p}</span>
           <span
             aria-hidden="true"
-            className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-white/10 text-slate-400 transition group-open:rotate-45 group-open:border-orange-500/40 group-open:text-orange-400"
+            className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-white/10 text-slate-400 transition group-open:rotate-45 group-open:border-marca-500/40 group-open:text-marca-400"
           >
             +
           </span>

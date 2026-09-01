@@ -137,8 +137,8 @@ const Seccion = ({ id, children, className = '' }) => (
 
 const Etiqueta = ({ children }) => (
   <div className="flex items-center gap-3 mb-5">
-    <span className="h-px w-8 bg-orange-500" />
-    <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-orange-400">
+    <span className="h-px w-8 bg-marca-500" />
+    <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-marca-400">
       {children}
     </span>
   </div>
@@ -190,7 +190,7 @@ const Cabecera = () => {
         <div className="flex items-center gap-2">
           <Link
             to="/registro"
-            className="inline-flex items-center gap-2 rounded-full bg-orange-500 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-orange-400 sm:px-5"
+            className="inline-flex items-center gap-2 rounded-full bg-marca-500 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-marca-400 sm:px-5"
           >
             Empezar <ArrowRight className="hidden h-4 w-4 sm:block" />
           </Link>
@@ -222,7 +222,7 @@ const Cabecera = () => {
           <Link
             to="/login"
             onClick={() => setAbierto(false)}
-            className="block py-3.5 text-[15px] font-semibold text-orange-400"
+            className="block py-3.5 text-[15px] font-semibold text-marca-400"
           >
             Entrar al sistema
           </Link>
@@ -254,7 +254,7 @@ const LandingPage = () => (
       <div className="mt-10 flex flex-wrap items-center gap-4">
         <Link
           to="/registro"
-          className="inline-flex items-center gap-2 rounded-full bg-orange-500 px-7 py-3.5 font-bold text-white transition hover:bg-orange-400"
+          className="inline-flex items-center gap-2 rounded-full bg-marca-500 px-7 py-3.5 font-bold text-white transition hover:bg-marca-400"
         >
           Empezar gratis <ArrowRight className="h-4 w-4" />
         </Link>
@@ -267,7 +267,7 @@ const LandingPage = () => (
       </div>
 
       <p className="mt-6 flex items-center gap-2 text-sm text-slate-500">
-        <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
+        <span className="h-1.5 w-1.5 rounded-full bg-marca-500" />
         14 días de prueba. Sin tarjeta.
       </p>
     </Seccion>
@@ -352,7 +352,7 @@ const LandingPage = () => (
 
     <Seccion className="border-t border-white/5">
       <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-8 md:p-12">
-        <p className="font-mono text-xs uppercase tracking-[0.2em] text-orange-400">
+        <p className="font-mono text-xs uppercase tracking-[0.2em] text-marca-400">
           En producción, no en demostración
         </p>
         <p className="font-heading mt-5 max-w-2xl text-2xl font-bold leading-snug tracking-tight md:text-3xl">
@@ -366,7 +366,7 @@ const LandingPage = () => (
             ['5', 'meses sin volver al cuaderno'],
           ].map(([cifra, texto]) => (
             <div key={texto}>
-              <dt className="font-heading text-4xl font-black tracking-tight text-orange-400">
+              <dt className="font-heading text-4xl font-black tracking-tight text-marca-400">
                 <Cifra valor={cifra} />
               </dt>
               <dd className="mt-1.5 text-sm leading-snug text-slate-400">{texto}</dd>
@@ -392,9 +392,9 @@ const LandingPage = () => (
         {PASOS.map(({ n, titulo, texto, icono: Icono }) => (
           <div key={n}>
             <div className="mb-5 flex items-center gap-3">
-              <span className="text-xs font-bold tracking-[0.2em] text-orange-500">{n}</span>
+              <span className="text-xs font-bold tracking-[0.2em] text-marca-500">{n}</span>
               <span className="h-px flex-1 bg-white/10" />
-              <Icono className="h-5 w-5 text-orange-500" />
+              <Icono className="h-5 w-5 text-marca-500" />
             </div>
             <h3 className="font-heading text-xl font-bold tracking-tight">{titulo}</h3>
             <p className="mt-3 leading-relaxed text-slate-400">{texto}</p>
@@ -412,7 +412,7 @@ const LandingPage = () => (
         {MODULOS.map(({ icono: Icono, nombre, texto }, i) => (
           <Revelado key={nombre} retraso={(i % 3) * 90}>
             <div className="border-t border-white/10 pt-5">
-              <Icono className="h-5 w-5 text-orange-500" />
+              <Icono className="h-5 w-5 text-marca-500" />
               <h3 className="mt-3 font-bold">{nombre}</h3>
               <p className="mt-1.5 text-sm leading-relaxed text-slate-400">{texto}</p>
             </div>
@@ -429,8 +429,8 @@ const LandingPage = () => (
       <div className="mt-14 grid gap-12 md:grid-cols-2">
         {DIFERENCIAS.map(({ icono: Icono, titulo, texto }) => (
           <div key={titulo} className="flex gap-5">
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-orange-500/10">
-              <Icono className="h-5 w-5 text-orange-400" />
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-marca-500/10">
+              <Icono className="h-5 w-5 text-marca-400" />
             </span>
             <div>
               <h3 className="font-heading text-xl font-bold tracking-tight">{titulo}</h3>
@@ -455,12 +455,12 @@ const LandingPage = () => (
             key={p.nombre}
             className={`flex flex-col rounded-2xl border p-8 ${
               p.destacado
-                ? 'border-orange-500/50 bg-orange-500/[0.07]'
+                ? 'border-marca-500/50 bg-marca-500/[0.07]'
                 : 'border-white/10 bg-white/[0.02]'
             }`}
           >
             {p.destacado && (
-              <span className="mb-4 self-start rounded-full bg-orange-500 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white">
+              <span className="mb-4 self-start rounded-full bg-marca-500 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white">
                 El mas elegido
               </span>
             )}
@@ -471,12 +471,12 @@ const LandingPage = () => (
               <span className="font-heading text-4xl font-black tracking-tight">{p.precio}</span>
               {p.periodo && <span className="text-slate-400">{p.periodo}</span>}
             </div>
-            <p className="mt-2 text-sm font-semibold text-orange-400">{p.limite}</p>
+            <p className="mt-2 text-sm font-semibold text-marca-400">{p.limite}</p>
 
             <ul className="mt-7 space-y-3">
               {p.incluye.map((i) => (
                 <li key={i} className="flex items-start gap-2.5 text-sm text-slate-300">
-                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-marca-500" />
                   {i}
                 </li>
               ))}
@@ -486,7 +486,7 @@ const LandingPage = () => (
               to={p.ruta}
               className={`mt-8 inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 font-bold transition ${
                 p.destacado
-                  ? 'bg-orange-500 text-white hover:bg-orange-400'
+                  ? 'bg-marca-500 text-white hover:bg-marca-400'
                   : 'border border-white/15 text-white hover:bg-white/5'
               }`}
             >
@@ -517,7 +517,7 @@ const LandingPage = () => (
         </p>
         <Link
           to="/registro"
-          className="mt-9 inline-flex items-center gap-2 rounded-full bg-orange-500 px-8 py-4 font-bold text-white transition hover:bg-orange-400"
+          className="mt-9 inline-flex items-center gap-2 rounded-full bg-marca-500 px-8 py-4 font-bold text-white transition hover:bg-marca-400"
         >
           Empezar gratis <ArrowRight className="h-4 w-4" />
         </Link>
@@ -534,7 +534,7 @@ const LandingPage = () => (
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <div className="flex items-center gap-2.5">
-              <span className="grid h-9 w-9 place-items-center rounded-lg bg-orange-500">
+              <span className="grid h-9 w-9 place-items-center rounded-lg bg-marca-500">
                 <Truck className="h-5 w-5 text-white" />
               </span>
               <span className="font-heading text-lg font-black uppercase tracking-tight text-slate-100">
@@ -608,8 +608,8 @@ const LandingPage = () => (
             to="/reclamaciones"
             className="group inline-flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 transition hover:border-white/20 hover:bg-white/[0.06]"
           >
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-orange-500/15">
-              <BookOpen className="h-4 w-4 text-orange-400" />
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-marca-500/15">
+              <BookOpen className="h-4 w-4 text-marca-400" />
             </span>
             <span className="leading-tight">
               <span className="block text-[11px] font-bold uppercase tracking-widest text-slate-500">

@@ -234,7 +234,7 @@ const DriverExpensesPage = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
       </div>
     );
   }
@@ -260,7 +260,7 @@ const DriverExpensesPage = () => {
           <p className="font-bold text-lg mt-1">{activeTrip.client_name || 'Sin cliente'}</p>
           <p className="text-sm text-slate-300">{activeTrip.cargo_description || ''}</p>
           <div className="flex gap-4 mt-3 text-sm">
-            <Badge variant="outline" className="border-orange-500 text-orange-400">
+            <Badge variant="outline" className="border-marca-500 text-marca-400">
               {activeTrip.status === 'en_curso' ? 'En Curso' : 'Programado'}
             </Badge>
             <span className="text-slate-400">
@@ -387,7 +387,7 @@ const DriverExpensesPage = () => {
                         <button
                           type="button"
                           onClick={() => openReceipt(expense.receipt_url)}
-                          className="mt-1 border-2 border-slate-200 rounded p-0.5 hover:border-orange-400"
+                          className="mt-1 border-2 border-slate-200 rounded p-0.5 hover:border-marca-400"
                           title="Ver comprobante"
                         >
                           <img
@@ -410,7 +410,7 @@ const DriverExpensesPage = () => {
       <div className="fixed bottom-6 right-6 z-50">
         <Button
           size="lg"
-          className="rounded-full w-14 h-14 shadow-xl bg-orange-500 hover:bg-orange-600"
+          className="rounded-full w-14 h-14 shadow-xl bg-marca-500 hover:bg-marca-600"
           onClick={() => setShowAddDialog(true)}
         >
           <Plus className="w-7 h-7" />
@@ -481,10 +481,10 @@ const DriverExpensesPage = () => {
                 <div className="grid grid-cols-2 gap-3">
                   <Button
                     variant="outline"
-                    className="h-24 flex-col gap-2 border-dashed border-2 hover:border-orange-400 hover:bg-orange-50"
+                    className="h-24 flex-col gap-2 border-dashed border-2 hover:border-marca-400 hover:bg-marca-50"
                     onClick={handleCameraCapture}
                   >
-                    <Camera className="w-8 h-8 text-orange-500" />
+                    <Camera className="w-8 h-8 text-marca-500" />
                     <span className="text-xs font-medium">Escanear con Cámara</span>
                   </Button>
                   <Button

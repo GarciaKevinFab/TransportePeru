@@ -78,9 +78,17 @@ const DashboardPage = () => {
     fetchData();
   }, [fetchData]);
 
-  // Map semantic color → concrete CSS color (avoids dynamic Tailwind classes that get purged)
+  // Color semantico -> color CSS concreto (evita clases dinamicas de Tailwind,
+  // que el purgador se lleva por delante).
+  //
+  // REGLA: el acento de una tarjeta dice QUE SIGNIFICA el numero, no de quien
+  // es la marca. Rojo es peligro y nada mas: desde que la marca es roja, usar
+  // el color de marca en una tarjeta la volvia indistinguible de una alarma
+  // -"Vehiculos disponibles" y "Alertas activas" quedaban identicos-. La marca
+  // vive en la navegacion, los botones y el logo, que es donde el logotipo
+  // pone su rojo: como acento, no como fondo.
   const colorMap = {
-    orange: 'var(--brand-color)',
+    marca:  'var(--brand-color)',
     blue:   '#2563eb',
     green:  '#16a34a',
     red:    '#dc2626',
@@ -89,9 +97,9 @@ const DashboardPage = () => {
     slate:  '#475569',
   };
 
-  const KPICard = ({ title, value, subtitle, icon: Icon, trend, color = 'orange', onClick, stagger = 1 }) => {
+  const KPICard = ({ title, value, subtitle, icon: Icon, trend, color = 'slate', onClick, stagger = 1 }) => {
     const staggerClass = `card-stagger-${Math.min(stagger, 8)}`;
-    const accent = colorMap[color] || colorMap.orange;
+    const accent = colorMap[color] || colorMap.slate;
     return (
       <div
         className={`metric-tile card-3d card-enter ${staggerClass} ${onClick ? 'cursor-pointer tap-scale' : ''}`}
@@ -115,7 +123,7 @@ const DashboardPage = () => {
           <div
             className="flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center icon-3d"
             style={{
-              backgroundImage: `linear-gradient(135deg, color-mix(in srgb, ${accent} 18%, #ffffff) 0%, color-mix(in srgb, ${accent} 8%, #ffffff) 100%)`,
+              backgroundImage: `linear-gradient(135deg, color-mix(in srgb, ${accent} 11%, #ffffff) 0%, color-mix(in srgb, ${accent} 5%, #ffffff) 100%)`,
               color: accent,
             }}
           >
@@ -161,7 +169,7 @@ const DashboardPage = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
       </div>
     );
   }
@@ -214,7 +222,7 @@ const DashboardPage = () => {
                     Ver Checklist
                   </Button>
                   <Button 
-                    className="bg-orange-500 hover:bg-orange-600 text-white"
+                    className="bg-marca-500 hover:bg-marca-600 text-white"
                     onClick={() => navigate('/driver/fuel')}
                   >
                     <Fuel className="w-4 h-4 mr-2" />
@@ -249,7 +257,7 @@ const DashboardPage = () => {
             value={activeTrip ? 'Si' : 'No'}
             subtitle={activeTrip?.client_name || '-'}
             icon={Route}
-            color="orange"
+            color="blue"
             stagger={3}
           />
         </div>
@@ -274,8 +282,8 @@ const DashboardPage = () => {
                     key={trip.id}
                     className="flex items-center gap-3 p-4 bg-slate-50 rounded-sm hover:bg-slate-100 transition-colors"
                   >
-                    <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
-                      <Truck className="w-6 h-6 text-orange-600" />
+                    <div className="w-12 h-12 bg-marca-100 rounded-full flex items-center justify-center">
+                      <Truck className="w-6 h-6 text-marca-600" />
                     </div>
                     <div className="flex-1">
                       <p className="font-bold text-slate-800">{trip.client_name || 'Sin cliente'}</p>
@@ -344,8 +352,14 @@ const DashboardPage = () => {
       <div
         className="relative overflow-hidden rounded-2xl p-6 sm:p-8 text-white smooth-appear"
         style={{
+          // El logotipo es 40% negro y solo 5% rojo: el rojo es el ACENTO, no
+          // el fondo. Con la mezcla al 35% que habia (heredada de cuando la
+          // marca era naranja) el panel entero quedaba lavado de rojo y la
+          // pantalla de inicio parecia una alarma. Al 16% el grafito manda y
+          // el rojo se queda como brasa en la esquina, que es la proporcion
+          // que tiene la marca.
           backgroundImage:
-            'linear-gradient(135deg, #0f172a 0%, #1e293b 55%, color-mix(in srgb, var(--brand-color) 35%, #1e293b) 100%)',
+            'linear-gradient(135deg, #0b0b0d 0%, #1e293b 58%, color-mix(in srgb, var(--brand-color) 16%, #1e293b) 100%)',
         }}
       >
         {/* Decorative shapes */}
@@ -416,7 +430,7 @@ const DashboardPage = () => {
             value={kpis?.vehicles?.available || 0}
             subtitle={`de ${kpis?.vehicles?.total || 0} totales`}
             icon={Truck}
-            color="orange"
+            color="slate"
             onClick={() => navigate('/vehicles')}
             stagger={1}
           />
@@ -464,7 +478,7 @@ const DashboardPage = () => {
               value={kpis?.maintenance?.open_orders || 0}
               subtitle="ordenes de trabajo"
               icon={Wrench}
-              color="orange"
+              color="purple"
               onClick={() => navigate('/maintenance')}
               stagger={1}
             />
@@ -495,7 +509,7 @@ const DashboardPage = () => {
               value={kpis?.settlements?.pending || 0}
               subtitle="por revisar"
               icon={DollarSign}
-              color="orange"
+              color="slate"
               onClick={() => navigate('/settlements')}
               stagger={1}
             />
@@ -526,7 +540,7 @@ const DashboardPage = () => {
               value={kpis?.maintenance?.open_orders || 0}
               subtitle="con consumo"
               icon={Wrench}
-              color="orange"
+              color="purple"
               stagger={2}
             />
           </>
@@ -577,7 +591,7 @@ const DashboardPage = () => {
               </div>
               <Button
                 variant="link"
-                className="p-0 h-auto mt-4 text-orange-600"
+                className="p-0 h-auto mt-4 text-marca-600"
                 onClick={() => navigate('/users?role=chofer')}
               >
                 Ver todos los choferes
@@ -602,7 +616,7 @@ const DashboardPage = () => {
               <p className="text-sm text-slate-500 mt-2">órdenes abiertas</p>
               <Button
                 variant="link"
-                className="p-0 h-auto mt-2 text-orange-600"
+                className="p-0 h-auto mt-2 text-marca-600"
                 onClick={() => navigate('/maintenance')}
               >
                 Ver mantenimiento

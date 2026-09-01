@@ -335,7 +335,7 @@ const UnitsPage = () => {
         <CardContent className="p-0 overflow-x-auto">
           {loading ? (
             <div className="flex items-center justify-center h-64">
-              <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+              <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
             </div>
           ) : units.length === 0 ? (
             /* Vacio con guia: una unidad se arma sobre un tracto. Sin tractos
@@ -425,7 +425,7 @@ const UnitsPage = () => {
                     <TableRow key={unit.id} className="table-dense table-row-lift" data-testid={`unit-row-${unit.id}`}>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <Truck className="w-4 h-4 text-orange-500" />
+                          <Truck className="w-4 h-4 text-marca-500" />
                           <span className="font-mono font-bold text-slate-900">
                             {resolveTractoPlate(unit)}
                           </span>

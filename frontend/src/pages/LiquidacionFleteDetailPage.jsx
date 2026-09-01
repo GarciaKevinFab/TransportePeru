@@ -336,9 +336,9 @@ const LiquidacionFleteDetailPage = () => {
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-        <Card className="bg-white border-l-4 border-l-orange-500"><CardContent className="py-4">
+        <Card className="bg-white border-l-4 border-l-marca-500"><CardContent className="py-4">
           <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">A cobrar</p>
-          <p className="font-heading text-xl font-bold text-orange-600 mt-1">{soles(liquidacion.total_a_cobrar)}</p>
+          <p className="font-heading text-xl font-bold text-marca-600 mt-1">{soles(liquidacion.total_a_cobrar)}</p>
         </CardContent></Card>
         <Card className="bg-white border-l-4 border-l-blue-500"><CardContent className="py-4">
           <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Combustible</p>

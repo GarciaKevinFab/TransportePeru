@@ -13,6 +13,30 @@ module.exports = {
   			sm: 'calc(var(--radius) - 4px)'
   		},
   		colors: {
+  			// La escala de la marca, sacada del logotipo: el rojo del logo es
+  			// exactamente #e00000 y aqui es el 500, que es el tono que el codigo
+  			// ya usaba como principal (antes era orange-500). El 600 queda como
+  			// el estado :hover, igual que antes, asi que el sistema de
+  			// interaccion no cambia: cambia el color.
+  			//
+  			// Se llama 'marca' y no 'red' a proposito. El rojo de tailwind sigue
+  			// existiendo y significa OTRA cosa -documento vencido, llanta
+  			// critica, eliminar-, y mezclar las dos escalas en un mismo nombre
+  			// era garantizar que un dia una alarma se pintara con el color de un
+  			// boton.
+  			marca: {
+  				50:  '#fff1f1',
+  				100: '#ffe0e0',
+  				200: '#ffc7c7',
+  				300: '#ffa0a0',
+  				400: '#ff5a5a',
+  				500: '#e00000',
+  				600: '#c00000',
+  				700: '#9e0303',
+  				800: '#830909',
+  				900: '#6d0d0d',
+  				950: '#3c0303'
+  			},
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
   			brand: {

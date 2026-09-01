@@ -294,7 +294,7 @@ const ChecklistWizardPage = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
       </div>
     );
   }
@@ -343,11 +343,11 @@ const ChecklistWizardPage = () => {
                   key={step.id}
                   onClick={() => setCurrentStep(idx)}
                   className={`flex flex-col items-center gap-1 transition-colors ${
-                    isActive ? 'text-orange-600' : isCompleted ? 'text-green-600' : 'text-slate-400'
+                    isActive ? 'text-marca-600' : isCompleted ? 'text-green-600' : 'text-slate-400'
                   }`}
                 >
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${
-                    isActive ? 'border-orange-600 bg-orange-50' : isCompleted ? 'border-green-600 bg-green-50' : 'border-slate-300'
+                    isActive ? 'border-marca-600 bg-marca-50' : isCompleted ? 'border-green-600 bg-green-50' : 'border-slate-300'
                   }`}>
                     <Icon className="w-5 h-5" />
                   </div>

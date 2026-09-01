@@ -281,7 +281,7 @@ const DriverFuelPage = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
       </div>
     );
   }
@@ -291,7 +291,7 @@ const DriverFuelPage = () => {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-900">Combustible</h1>
         <Button 
-          className="bg-orange-500 hover:bg-orange-600"
+          className="bg-marca-500 hover:bg-marca-600"
           onClick={() => setShowAddDialog(true)}
         >
           <Plus className="w-4 h-4 mr-2" />
@@ -428,8 +428,8 @@ const DriverFuelPage = () => {
             </div>
 
             {/* INVOICE PHOTO */}
-            <div className="space-y-2 p-3 bg-orange-50 rounded-lg border border-orange-200">
-              <Label className="flex items-center gap-2 text-orange-900 font-semibold">
+            <div className="space-y-2 p-3 bg-marca-50 rounded-lg border border-marca-200">
+              <Label className="flex items-center gap-2 text-marca-900 font-semibold">
                 <FileText className="w-4 h-4" /> Factura
               </Label>
               <Input
@@ -520,7 +520,7 @@ const DriverFuelPage = () => {
               Cancelar
             </Button>
             <Button 
-              className="bg-orange-500 hover:bg-orange-600"
+              className="bg-marca-500 hover:bg-marca-600"
               onClick={handleSaveLoad}
               disabled={saving || !formData.vehicle_id || !formData.liters}
             >

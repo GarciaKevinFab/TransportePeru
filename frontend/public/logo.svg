@@ -1,28 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="CargoXprez">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="CargoXprez">
   <title>CargoXprez</title>
-  <!--
-    Fuente vectorial de la marca. De aqui salen todos los PNG y el .ico; si se
-    cambia algo, hay que regenerarlos para que no divergan.
-
-    Dos galones hacia la derecha: el de delante solido, el de atras tenue. Lo
-    que da sensacion de avance es el desfase entre los dos, no el detalle.
-
-    La regla que manda: tiene que reconocerse a 16 px en una pestana. Por eso un
-    galon grueso y nada mas -un camion dibujado a ese tamano es una mancha
-    naranja-. Los numeros coinciden con los del generador de iconos.
-  -->
-  <defs>
-    <linearGradient id="fp-degradado" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#fb923c"/>
-      <stop offset="1" stop-color="#ea580c"/>
-    </linearGradient>
-  </defs>
-
-  <!-- rx = 22.6% del lado, la proporcion de los iconos de aplicacion actuales -->
-  <rect width="1024" height="1024" rx="231" fill="url(#fp-degradado)"/>
-
-  <g fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M268 380 L418 512 L268 644" stroke-width="74" opacity=".51"/>
-    <path d="M468 326 L676 512 L468 698" stroke-width="104"/>
+  <!-- La X del logotipo, la parte que sigue siendo legible cuando el icono
+       mide 32 px. Va inclinada -8 grados como en la marca, que esta dibujada
+       "en movimiento", y las estelas llevan el rojo (#e00000) para que no se
+       lea como una equis de cerrar. -->
+  <rect width="512" height="512" rx="112" fill="#0a0a0c"/>
+  <g transform="rotate(-8 256 256)">
+    <g stroke="#f5f5f7" stroke-width="59" stroke-linecap="butt">
+      <line x1="143" y1="143" x2="369" y2="369"/>
+      <line x1="369" y1="143" x2="143" y2="369"/>
+    </g>
+    <g stroke="#e00000" stroke-width="11" stroke-linecap="round">
+      <line x1="26" y1="169" x2="113" y2="169"/>
+      <line x1="26" y1="256" x2="95"  y2="256"/>
+      <line x1="26" y1="343" x2="77"  y2="343"/>
+    </g>
   </g>
 </svg>

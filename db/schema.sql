@@ -108,7 +108,7 @@ create table companies (
   phone text,
   email text,
   logo_url text,
-  brand_color text not null default '#f97316',
+  brand_color text not null default '#e00000',
   -- Suscripcion (ver migracion 015). El plan es texto libre: los niveles y sus
   -- precios son catalogo comercial, no esquema.
   plan text not null default 'trial',
