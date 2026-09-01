@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
 import { PROVEEDOR } from '../config/proveedor';
-import { Truck, ArrowLeft, BookOpen, Loader2, CheckCircle, Send } from 'lucide-react';
+import { ArrowLeft, BookOpen, Loader2, CheckCircle, Send } from 'lucide-react';
+import LogoMarca from '../components/LogoMarca';
 
 /**
  * Libro de Reclamaciones virtual.
@@ -130,11 +131,8 @@ const ReclamacionesPage = () => {
     <div className="min-h-screen bg-slate-950 text-slate-100 antialiased">
       {/* Barra minima, como en el checkout: logo de vuelta y nada mas. */}
       <header className="flex items-center justify-between px-6 py-5 md:px-10">
-        <Link to="/" className="flex items-center gap-2.5">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-orange-500">
-            <Truck className="h-5 w-5 text-white" />
-          </span>
-          <span className="font-heading text-lg font-black tracking-tight">FLETEPRO</span>
+        <Link to="/" className="flex items-center">
+          <LogoMarca className="h-14 w-auto" />
         </Link>
         <span className="flex items-center gap-1.5 text-xs text-slate-400">
           <BookOpen className="h-3.5 w-3.5" />
@@ -362,7 +360,7 @@ const ReclamacionesPage = () => {
                       className={inputCls}
                       value={datos.descripcion_bien}
                       onChange={set('descripcion_bien')}
-                      placeholder="Plan Pro de FletePro, contratado el 12 de agosto"
+                      placeholder="Plan Pro de CargoXprez, contratado el 12 de agosto"
                     />
                   </Campo>
                 </div>

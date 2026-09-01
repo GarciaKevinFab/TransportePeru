@@ -2629,14 +2629,14 @@ async def olvide_mi_password(request: Request, datos: OlvideRequest):
 
     texto = (
         nombre + ",\n\n"
-        "Pediste crear una contraseña nueva para tu cuenta de FletePro.\n\n"
+        "Pediste crear una contraseña nueva para tu cuenta de CargoXprez.\n\n"
         "Abre este enlace y elige una:\n" + enlace + "\n\n"
         "Caduca en " + str(minutos) + " minutos y solo se puede usar una vez.\n\n"
         "Si no fuiste tú, ignora este correo: tu contraseña sigue igual.\n"
     )
     html = (
         "<p>" + nombre + ",</p>"
-        "<p>Pediste crear una contraseña nueva para tu cuenta de FletePro.</p>"
+        "<p>Pediste crear una contraseña nueva para tu cuenta de CargoXprez.</p>"
         "<p><a href=\"" + enlace + "\" style=\"display:inline-block;background:#f97316;"
         "color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;"
         "font-weight:600\">Crear contraseña nueva</a></p>"
@@ -2645,7 +2645,7 @@ async def olvide_mi_password(request: Request, datos: OlvideRequest):
         "solo se puede usar una vez. Si no fuiste tú, ignora este correo: tu "
         "contraseña sigue igual.</p>"
     )
-    await correo.enviar(usuario["email"], "Recupera el acceso a FletePro", texto, html)
+    await correo.enviar(usuario["email"], "Recupera el acceso a CargoXprez", texto, html)
     return generico
 
 
@@ -11090,7 +11090,7 @@ async def crear_reclamacion(request: Request, datos: ReclamacionRequest):
             f"Presentar esta hoja no impide acudir a INDECOPI ni a la vía judicial.\n"
         )
         try:
-            await correo.enviar(email, f"Tu {etiqueta} {codigo} — FletePro", texto)
+            await correo.enviar(email, f"Tu {etiqueta} {codigo} — CargoXprez", texto)
         except Exception as e:
             logger.error("reclamaciones: no se pudo enviar la copia de %s: %s", codigo, e)
         # Copia a quien tiene que atenderlo. Sin esto el libro seria un buzon

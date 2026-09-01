@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 import { PROVEEDOR } from '../config/proveedor';
-import { Truck, Lock, ShieldCheck, ArrowLeft, Loader2, CheckCircle, CreditCard, Clock } from 'lucide-react';
+import { Lock, ShieldCheck, ArrowLeft, Loader2, CheckCircle, CreditCard, Clock } from 'lucide-react';
+import LogoMarca from '../components/LogoMarca';
 
 /**
  * Checkout publico del plan Pro: resumen del pedido, datos de facturacion y
@@ -190,11 +191,8 @@ const CheckoutPage = () => {
       {/* Barra minima: logo de vuelta a la landing y el candado. En un
           checkout, cuanta menos navegacion, mejor. */}
       <header className="flex items-center justify-between px-6 py-5 md:px-10">
-        <Link to="/" className="flex items-center gap-2.5">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-orange-500">
-            <Truck className="h-5 w-5 text-white" />
-          </span>
-          <span className="font-heading text-lg font-black tracking-tight">FLETEPRO</span>
+        <Link to="/" className="flex items-center">
+          <LogoMarca className="h-14 w-auto" />
         </Link>
         <span className="flex items-center gap-1.5 text-xs text-slate-400">
           <Lock className="h-3.5 w-3.5" />

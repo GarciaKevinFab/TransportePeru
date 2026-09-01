@@ -20,7 +20,7 @@ const LoginPage = () => {
   // escrito a mano como "G&E Transporta" desde que el sistema tenia un solo
   // cliente: a partir del segundo, eso es el nombre de otro en la puerta.
   const { tenant } = useTenant();
-  const marca = tenant?.name || 'FletePro';
+  const marca = tenant?.name || 'CargoXprez';
   const [loading, setLoading] = useState(false);
 
   // Admin form state
@@ -238,7 +238,7 @@ const LoginPage = () => {
           </Card>
 
           <p className="mt-6 text-center text-sm text-slate-400">
-            ¿Tu empresa aún no usa FletePro?{' '}
+            ¿Tu empresa aún no usa CargoXprez?{' '}
             <a
               href="/registro"
               className="font-semibold text-orange-500 underline underline-offset-4 hover:text-orange-400"

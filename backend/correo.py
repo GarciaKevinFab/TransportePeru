@@ -89,7 +89,7 @@ def configurado() -> bool:
 def _remitente(c):
     """Cabecera From. Sin SMTP_REMITENTE se cae al propio usuario, que es lo
     unico que el servidor va a aceptar igualmente."""
-    return c["remitente"] or formataddr(("FletePro", c["usuario"]))
+    return c["remitente"] or formataddr(("CargoXprez", c["usuario"]))
 
 
 def _enviar_sincrono(destino: str, asunto: str, texto: str, html: str) -> None:

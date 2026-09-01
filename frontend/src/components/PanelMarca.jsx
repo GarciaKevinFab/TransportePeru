@@ -1,5 +1,6 @@
 import React from 'react';
-import { Truck, CheckCircle2 } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
+import LogoMarca from './LogoMarca';
 
 /**
  * El panel de marca de las pantallas de acceso: la mitad izquierda con el
@@ -15,7 +16,7 @@ import { Truck, CheckCircle2 } from 'lucide-react';
  * unico que importa, y este panel entero seria un scroll de adorno antes de
  * poder escribir.
  */
-const PanelMarca = ({ marca = 'FletePro', titulo, descripcion, puntos = [] }) => (
+const PanelMarca = ({ marca = 'CargoXprez', titulo, descripcion, puntos = [] }) => (
   <div
     className="hidden lg:flex relative flex-1 flex-col justify-between p-12 text-white overflow-hidden"
     style={{
@@ -65,14 +66,8 @@ const PanelMarca = ({ marca = 'FletePro', titulo, descripcion, puntos = [] }) =>
 
     {/* Marca, que vuelve al inicio */}
     <div className="relative z-10 logo-appear">
-      <a href="/" className="flex items-center gap-3 group">
-        <div
-          className="w-12 h-12 rounded-lg flex items-center justify-center icon-3d glow-brand-soft transition-transform"
-          style={{ backgroundColor: 'var(--brand-color)' }}
-        >
-          <Truck className="w-7 h-7 text-white" />
-        </div>
-        <span className="font-heading text-xl font-black tracking-tight uppercase">{marca}</span>
+      <a href="/" className="inline-flex items-center">
+        <LogoMarca className="h-20 w-auto" />
       </a>
     </div>
 

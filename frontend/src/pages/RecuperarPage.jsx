@@ -22,7 +22,7 @@ const Marco = ({ children }) => (
         <span className="grid h-12 w-12 place-items-center rounded-xl bg-orange-500">
           <Truck className="h-6 w-6 text-white" />
         </span>
-        <span className="font-heading text-2xl font-black uppercase tracking-tight">FletePro</span>
+        <span className="font-heading text-2xl font-black uppercase tracking-tight">CargoXprez</span>
       </div>
       <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-6">{children}</div>
       <p className="mt-6 text-center text-sm text-slate-400">

@@ -21,8 +21,14 @@ import {
  * NOMBRE DEL PRODUCTO
  *
  *   El repo no traia ninguno: todo estaba marcado como "G&E Transporta S.A.C",
- *   que es UN INQUILINO, no el producto. Se usa FletePro por coherencia con
- *   LicitaPro, de la misma casa. Cambiarlo es tocar esta constante y nada mas.
+ *   que es UN INQUILINO, no el producto. Durante un tiempo se llamo FletePro,
+ *   un nombre provisional inventado aqui. Ahora es CargoXprez, que es la marca
+ *   REGISTRADA ante INDECOPI (Certificado N° 00165238) -o sea, un nombre que
+ *   se puede defender, a diferencia del anterior-.
+ *
+ *   El nombre sale de config/proveedor.js y no de una constante local: lo usan
+ *   tambien los textos legales, el checkout y los correos, y en un sitio donde
+ *   el nombre es una marca registrada no puede haber dos versiones de el.
  *
  * TEMA FIJO EN OSCURO
  *
@@ -30,7 +36,7 @@ import {
  *   conmutador de tema: es una pagina de venta, se disena para una sola
  *   lectura, y quien la ve todavia no tiene preferencia guardada.
  */
-const PRODUCTO = 'FletePro';
+const PRODUCTO = PROVEEDOR.producto;
 
 const PASOS = [
   {
@@ -156,13 +162,20 @@ const Cabecera = () => {
   return (
     <header className="sticky top-0 z-50 border-b border-white/5 bg-slate-950/80 backdrop-blur">
       <nav className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
-        <Link to="/" className="flex items-center gap-2.5" onClick={() => setAbierto(false)}>
-          <span className="grid h-9 w-9 place-items-center rounded-lg bg-orange-500">
-            <Truck className="h-5 w-5 text-white" />
-          </span>
-          <span className="font-heading text-lg font-black uppercase tracking-tight">
-            {PRODUCTO}
-          </span>
+        {/* El logo de la marca registrada, no un icono generico. Lleva el
+            nombre dentro, asi que sustituye tambien al texto.
+
+            El drop-shadow claro NO es decoracion: el logotipo tiene contornos
+            y camion negros, y sobre este fondo casi negro se perderian. El
+            halo los separa del fondo sin retocar el archivo -que es la marca
+            registrada y se reivindica en sus colores-. */}
+        <Link to="/" className="flex items-center" onClick={() => setAbierto(false)}>
+          <img
+            src="/cargoxprez.png"
+            alt={PRODUCTO}
+            className="h-14 w-auto sm:h-16"
+            style={{ filter: 'drop-shadow(0 0 1px rgba(255,255,255,.75)) drop-shadow(0 1px 3px rgba(255,255,255,.25))' }}
+          />
         </Link>
 
         <div className="hidden items-center gap-8 md:flex">
@@ -281,7 +294,7 @@ const LandingPage = () => (
         <div className="relative overflow-hidden rounded-xl border border-white/10 bg-slate-900/60 shadow-2xl shadow-black/60 ring-1 ring-white/5">
           <img
             src="/capturas/panel.webp"
-            alt="Panel de FletePro: vehículos disponibles, viajes activos, alertas y documentos por vencer"
+            alt="Panel de CargoXprez: vehículos disponibles, viajes activos, alertas y documentos por vencer"
             width={1600}
             height={1000}
             loading="lazy"
@@ -343,7 +356,7 @@ const LandingPage = () => (
           En producción, no en demostración
         </p>
         <p className="font-heading mt-5 max-w-2xl text-2xl font-bold leading-snug tracking-tight md:text-3xl">
-          Una transportista peruana mueve su flota con FletePro desde marzo de 2026.
+          Una transportista peruana mueve su flota con CargoXprez desde marzo de 2026.
         </p>
         <dl className="mt-10 grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-4">
           {[

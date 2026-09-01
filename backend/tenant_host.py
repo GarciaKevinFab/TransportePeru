@@ -72,7 +72,12 @@ DOMINIO_BASE = os.environ.get("TENANT_BASE_DOMAIN", "").strip().lower().strip(".
 # solo para su relleno, porque son palabras que van a crecer -hoy 'api', manana
 # 'facturacion'- y no quiero una migracion por cada una.
 RESERVADOS = {
-    # marca y servicio
+    # marca y servicio. 'fletepro' se queda al lado de 'cargoxprez' aunque el
+    # producto ya no se llame asi: mientras el subdominio viejo siga resuelto
+    # en el tunel tiene que seguir cayendo en la landing, y en cualquier caso
+    # un slug que alguna vez fue la marca no puede quedar libre para que lo
+    # tome una empresa cliente.
+    "cargoxprez", "cargo", "xprez",
     "fletepro", "sisac", "transportes", "app", "api", "www", "admin",
     "soporte", "ayuda", "help", "status", "blog", "docs", "cuenta",
     # infraestructura y correo

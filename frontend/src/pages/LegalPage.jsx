@@ -1,12 +1,13 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { PROVEEDOR } from '../config/proveedor';
-import { Truck, ArrowLeft } from 'lucide-react';
+import { PROVEEDOR, MARCA } from '../config/proveedor';
+import { ArrowLeft } from 'lucide-react';
+import LogoMarca from '../components/LogoMarca';
 
 /**
  * Privacidad y Términos.
  *
- * No existían, y no es un detalle de formulario: FletePro trata datos
+ * No existían, y no es un detalle de formulario: CargoXprez trata datos
  * personales de gente que NO es su cliente —los choferes de la transportista:
  * su DNI, su licencia, sus fotos— y la Ley 29733 de Protección de Datos
  * Personales obliga a decir qué se recoge, para qué y por cuánto tiempo.
@@ -27,11 +28,8 @@ const Marco = ({ titulo, children }) => (
   <div className="min-h-screen bg-slate-950 text-slate-100">
     <header className="border-b border-white/5">
       <div className="mx-auto flex w-full max-w-3xl items-center justify-between px-6 py-4">
-        <Link to="/" className="flex items-center gap-2.5">
-          <span className="grid h-9 w-9 place-items-center rounded-lg bg-orange-500">
-            <Truck className="h-5 w-5 text-white" />
-          </span>
-          <span className="font-heading text-lg font-black uppercase tracking-tight">FletePro</span>
+        <Link to="/" className="flex items-center">
+          <LogoMarca className="h-14 w-auto" />
         </Link>
         <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-100">
           <ArrowLeft className="h-4 w-4" />
@@ -100,7 +98,7 @@ export const PrivacidadPage = () => (
     <h2>Quién responde por cada dato</h2>
     <p>
       Hay una distinción que importa. La <strong>empresa de transporte</strong> que
-      contrata FletePro es la responsable de los datos que carga: los de sus
+      contrata CargoXprez es la responsable de los datos que carga: los de sus
       choferes, sus vehículos y sus operaciones. Nosotros los tratamos por
       encargo suyo, como proveedores del sistema donde viven.
     </p>
@@ -169,7 +167,7 @@ export const PrivacidadPage = () => (
     <h2>Tus derechos</h2>
     <p>
       Puedes acceder a tus datos, rectificarlos, cancelarlos u oponerte a su
-      tratamiento. Si eres chofer de una empresa que usa FletePro, lo más rápido
+      tratamiento. Si eres chofer de una empresa que usa CargoXprez, lo más rápido
       es pedírselo a tu empresa, que es quien los administra; si prefieres,
       escríbenos y lo canalizamos.
     </p>
@@ -189,13 +187,13 @@ export const PrivacidadPage = () => (
 export const TerminosPage = () => (
   <Marco titulo="Términos del servicio">
     <p>
-      Al crear una cuenta en FletePro aceptas estas condiciones. Están escritas
+      Al crear una cuenta en CargoXprez aceptas estas condiciones. Están escritas
       para entenderse; si algo no queda claro, pregúntanos antes de contratar.
     </p>
 
     <h2>Qué es el servicio</h2>
     <p>
-      FletePro es un sistema en la nube para gestionar flotas de transporte:
+      CargoXprez es un sistema en la nube para gestionar flotas de transporte:
       viajes, combustible, llantas, mantenimiento, documentos y comprobantes. Se
       presta como servicio; no se entrega ni se licencia el programa.
     </p>
@@ -286,7 +284,7 @@ export const TerminosPage = () => (
 
     <h2>Uso aceptable</h2>
     <p>
-      No se puede usar FletePro para actividades ilegales, ni intentar acceder a
+      No se puede usar CargoXprez para actividades ilegales, ni intentar acceder a
       datos de otras empresas, ni sobrecargar el sistema a propósito. Una cuenta
       que haga eso se suspende.
     </p>
@@ -298,7 +296,7 @@ export const TerminosPage = () => (
       terceros —SUNAT, WhatsApp, tu conexión—.
     </p>
     <p>
-      FletePro es una herramienta de gestión, <strong>no un sustituto de tus
+      CargoXprez es una herramienta de gestión, <strong>no un sustituto de tus
       obligaciones legales</strong>. Los avisos de vencimiento ayudan, pero tener
       el SOAT al día y la documentación en regla sigue siendo responsabilidad de
       la empresa.
@@ -318,11 +316,12 @@ export const TerminosPage = () => (
       {/* El aviso de marca va en los terminos y no solo en el pie: aqui es
           donde el cliente acepta que el uso del servicio no le transfiere
           ningun derecho sobre ella. */}
-      <strong>{PROVEEDOR.marcaRegistrada}®</strong> es marca registrada de{' '}
-      {PROVEEDOR.razonSocial} ante INDECOPI. El software, la marca, el logotipo
-      y los contenidos del servicio son de su propiedad. Contratar el servicio
-      te da derecho a usarlo mientras dure tu plan, no a usar la marca ni a
-      copiar el software.
+      <strong>{MARCA.nombre}®</strong> es marca registrada ante INDECOPI
+      (Certificado {MARCA.certificado}, clase {MARCA.clase} de la Clasificación
+      de Niza), vigente hasta el {MARCA.vigenciaHasta}. El software, la marca,
+      el logotipo y los contenidos del servicio están protegidos. Contratar el
+      servicio te da derecho a usarlo mientras dure tu plan, no a usar la marca
+      ni a copiar el software.
     </p>
     <p>
       Lo que cargas tú —tus viajes, tu flota, tus documentos, tus fotos— sigue

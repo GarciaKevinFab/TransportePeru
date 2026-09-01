@@ -1,6 +1,6 @@
 {
-  "name": "FletePro",
-  "short_name": "FletePro",
+  "name": "CargoXprez",
+  "short_name": "CargoXprez",
   "description": "Sistema de Gestion de Flota y Transporte",
   "start_url": "/",
   "display": "standalone",

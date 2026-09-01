@@ -109,7 +109,7 @@ const SignupPage = () => {
                 <Truck className="w-8 h-8 text-white" />
               </span>
               <span className="font-heading text-3xl font-black text-slate-100 tracking-tight uppercase">
-                FletePro
+                CargoXprez
               </span>
             </Link>
             <p className="text-slate-400 text-sm mt-1">Sistema de Gestión de Flota</p>
@@ -180,7 +180,7 @@ const SignupPage = () => {
           </p>
 
           <p className="lg:hidden text-center text-slate-400 text-xs mt-6">
-            &copy; 2026 FletePro &mdash;{' '}
+            &copy; 2026 CargoXprez &mdash;{' '}
             <Link to="/privacidad" className="underline underline-offset-4 hover:text-orange-500">Privacidad</Link>{' '}
             &middot;{' '}
             <Link to="/terminos" className="underline underline-offset-4 hover:text-orange-500">Términos</Link>
