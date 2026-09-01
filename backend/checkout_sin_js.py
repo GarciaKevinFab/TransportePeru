@@ -125,11 +125,26 @@ ESTILOS = """
 
 
 def _pie_proveedor() -> str:
+    """Quien cobra, con sus vias de contacto.
+
+    EL <!--email_off--> NO ES DECORACION
+
+      Cloudflare tiene activada "Email Address Obfuscation" en esta zona:
+      reescribe cada mailto: como /cdn-cgi/l/email-protection y sustituye el
+      texto por un script. Comprobado aqui mismo -- el correo salia como
+      "[email protected]" a traves de Cloudflare.
+
+      Justo lo que este modulo viene a arreglar: la pagina existe para quien NO
+      ejecuta JavaScript, y dejar su unica via de contacto detras de un script
+      seria volver a empezar. `<!--email_off-->` es el mecanismo que documenta
+      la propia Cloudflare para excluir un bloque, y se usa solo aqui: en el
+      resto del sitio la ofuscacion sigue frenando a los recolectores.
+    """
     return f"""
   <p class="pie">
     Contratas con <strong>{_e(proveedor.RAZON_SOCIAL)}</strong> — RUC {_e(proveedor.RUC)}.<br>
     {_e(proveedor.DOMICILIO)}<br>
-    <a href="mailto:{_e(proveedor.EMAIL)}">{_e(proveedor.EMAIL)}</a> ·
+    <!--email_off--><a href="mailto:{_e(proveedor.EMAIL)}">{_e(proveedor.EMAIL)}</a><!--/email_off--> ·
     <a href="tel:{_e(proveedor.telefono_uri())}">{_e(proveedor.TELEFONO)}</a><br>
     <a href="/terminos">Términos del servicio</a> ·
     <a href="/privacidad">Política de privacidad</a> ·
