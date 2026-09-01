@@ -3,7 +3,11 @@
 // Subir este numero al cambiar lo que se precachea. El activate de abajo borra
 // toda cache que no se llame asi, y esa es la unica forma de limpiar lo viejo
 // en un navegador que ya visito la web.
-const CACHE_NAME = 'transperu-v2';
+// v3: los iconos cambiaron (la X paso a ser un camion) y esta cache es
+// CACHE-FIRST para todo lo que no sea navegacion, asi que a quien ya
+// visito la web se le seguia sirviendo el favicon viejo para siempre.
+// Subir el nombre es lo unico que dispara la limpieza del activate.
+const CACHE_NAME = 'cargoxprez-v3';
 const OFFLINE_URL = '/offline.html';
 
 // Lo minimo para que la aplicacion abra sin red. NO va aqui ningun /static/js:
