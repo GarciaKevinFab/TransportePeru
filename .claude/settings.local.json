@@ -2,7 +2,14 @@
   "permissions": {
     "allow": [
       "Bash(npx craco:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit -m ':*)",
+      "Bash(git push:*)",
+      "Bash(grep -n \"const response = await api\\\\|const response = await axios\\\\|const response = await fetch\" /e/Proyectos/TransportePeru/frontend/src/pages/*.jsx)",
+      "Bash(grep -n \"} catch \\(error\\) {\" /e/Proyectos/TransportePeru/frontend/src/pages/*.jsx /e/Proyectos/TransportePeru/frontend/src/pages/driver/*.jsx)",
+      "Bash(grep -n \"console.error\" /e/Proyectos/TransportePeru/frontend/src/pages/*.jsx /e/Proyectos/TransportePeru/frontend/src/pages/driver/*.jsx)",
+      "Bash(npm run:*)",
+      "Bash(curl -s -X POST http://localhost:8001/api/seed -H \"Content-Type: application/json\" -H \"ngrok-skip-browser-warning: true\")"
     ]
   }
 }

@@ -172,3 +172,5 @@ INFO:     127.0.0.1:50929 - "GET /api/settlements HTTP/1.1" 200 OK
 2026-08-30 19:22:57,066 - server - INFO - Barrido de alertas/mantenimiento ejecutado
 2026-08-31 01:23:00,846 - root - ERROR - run_maintenance_sweep companies error: [WinError 1225] El equipo remoto rechazó la conexión de red
 2026-08-31 01:23:00,848 - server - INFO - Barrido de alertas/mantenimiento ejecutado
+2026-08-31 07:23:04,588 - root - ERROR - run_maintenance_sweep companies error: [WinError 1225] El equipo remoto rechazó la conexión de red
+2026-08-31 07:23:04,589 - server - INFO - Barrido de alertas/mantenimiento ejecutado
