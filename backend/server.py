@@ -9,6 +9,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import db_pg
 import tenant_host
 import correo
+import plantillas_correo
 
 import os
 import logging
@@ -2627,23 +2628,19 @@ async def olvide_mi_password(request: Request, datos: OlvideRequest):
     minutos = int(VIDA_DEL_ENLACE.total_seconds() // 60)
     nombre = (usuario.get("name") or "").split(" ")[0] or "Hola"
 
-    texto = (
-        nombre + ",\n\n"
-        "Pediste crear una contraseña nueva para tu cuenta de CargoXprez.\n\n"
-        "Abre este enlace y elige una:\n" + enlace + "\n\n"
-        "Caduca en " + str(minutos) + " minutos y solo se puede usar una vez.\n\n"
-        "Si no fuiste tú, ignora este correo: tu contraseña sigue igual.\n"
-    )
-    html = (
-        "<p>" + nombre + ",</p>"
-        "<p>Pediste crear una contraseña nueva para tu cuenta de CargoXprez.</p>"
-        "<p><a href=\"" + enlace + "\" style=\"display:inline-block;background:#f97316;"
-        "color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;"
-        "font-weight:600\">Crear contraseña nueva</a></p>"
-        "<p style=\"color:#64748b;font-size:13px\">O copia este enlace:<br>" + enlace + "</p>"
-        "<p style=\"color:#64748b;font-size:13px\">Caduca en " + str(minutos) + " minutos y "
-        "solo se puede usar una vez. Si no fuiste tú, ignora este correo: tu "
-        "contraseña sigue igual.</p>"
+    texto, html = plantillas_correo.componer(
+        titulo="Recupera el acceso a tu cuenta",
+        preencabezado=("Enlace para crear una contraseña nueva. Caduca en "
+                       f"{minutos} minutos."),
+        intro=[f"{nombre},",
+               "Pediste crear una contraseña nueva para tu cuenta de "
+               "CargoXprez. Pulsa el botón y elige una."],
+        boton={"texto": "Crear contraseña nueva", "url": enlace},
+        cierre=["Si el botón no funciona, copia este enlace en tu navegador:",
+                enlace],
+        aviso=(f"El enlace caduca en {minutos} minutos y solo se puede usar una "
+               "vez. Si no fuiste tú, ignora este correo: tu contraseña sigue "
+               "igual."),
     )
     await correo.enviar(usuario["email"], "Recupera el acceso a CargoXprez", texto, html)
     return generico
@@ -11083,18 +11080,31 @@ async def crear_reclamacion(request: Request, datos: ReclamacionRequest):
     # devolvio, que es lo que le sirve a la persona para acudir a INDECOPI.
     if correo.configurado():
         etiqueta = "reclamo" if tipo == "reclamo" else "queja"
-        texto = (
-            f"Hola {nombre}:\n\n"
-            f"Recibimos tu {etiqueta} y quedó registrado con el código {codigo}.\n\n"
-            f"Lo que nos contaste:\n{detalle}\n\n"
-            f"Lo que pides:\n{pedido}\n\n"
-            f"Te responderemos a este correo en un plazo máximo de "
-            f"{DIAS_HABILES_RECLAMO} días hábiles. Guarda este código: es el "
-            f"número de tu hoja en nuestro Libro de Reclamaciones.\n\n"
-            f"Presentar esta hoja no impide acudir a INDECOPI ni a la vía judicial.\n"
+        # Los mismos datos alimentan la copia del consumidor y el aviso
+        # interno: escritos dos veces, tarde o temprano acaban diciendo cosas
+        # distintas sobre la misma hoja.
+        datos_hoja = [
+            ("Código de tu hoja", codigo),
+            ("Tipo", etiqueta.capitalize()),
+            ("Lo que nos contaste", detalle),
+            ("Lo que pides", pedido),
+            ("Plazo de respuesta", f"{DIAS_HABILES_RECLAMO} días hábiles"),
+        ]
+        texto, html = plantillas_correo.componer(
+            titulo=f"Registramos tu {etiqueta}",
+            preencabezado=(f"Código {codigo}. Te respondemos en "
+                           f"{DIAS_HABILES_RECLAMO} días hábiles."),
+            intro=[f"Hola {nombre}:",
+                   f"Recibimos tu {etiqueta} y quedó registrada en nuestro Libro "
+                   f"de Reclamaciones. Guarda el código: es el número de tu hoja."],
+            filas=datos_hoja,
+            cierre=["Te responderemos a este mismo correo dentro del plazo."],
+            aviso="Presentar esta hoja no impide acudir a INDECOPI ni a la vía "
+                  "judicial.",
         )
         try:
-            await correo.enviar(email, f"Tu {etiqueta} {codigo} — CargoXprez", texto)
+            await correo.enviar(email, f"Tu {etiqueta} {codigo} — CargoXprez",
+                                texto, html)
         except Exception as e:
             logger.error("reclamaciones: no se pudo enviar la copia de %s: %s", codigo, e)
         # Copia a quien tiene que atenderlo. Sin esto el libro seria un buzon
@@ -11103,10 +11113,20 @@ async def crear_reclamacion(request: Request, datos: ReclamacionRequest):
         destino_interno = os.environ.get("RECLAMACIONES_EMAIL", "").strip()
         if destino_interno:
             try:
+                texto_interno, html_interno = plantillas_correo.componer(
+                    titulo=f"Nueva {etiqueta} en el Libro de Reclamaciones",
+                    preencabezado=f"{codigo} · {nombre}",
+                    intro=[f"Entró una {etiqueta} nueva por la web. El plazo de "
+                           f"{DIAS_HABILES_RECLAMO} días hábiles ya corre."],
+                    filas=datos_hoja + [
+                        ("Quién reclama", nombre),
+                        ("Contacto", f"{email} / {datos.telefono or 'sin teléfono'}"),
+                        ("Documento", f"{datos.documento_tipo} {documento_numero}"),
+                    ],
+                )
                 await correo.enviar(
                     destino_interno, f"[{codigo}] {etiqueta} de {nombre}",
-                    f"{texto}\nContacto: {email} / {datos.telefono or 'sin teléfono'}\n"
-                    f"Documento: {datos.documento_tipo} {documento_numero}\n",
+                    texto_interno, html_interno,
                 )
             except Exception as e:
                 logger.error("reclamaciones: no se pudo avisar internamente de %s: %s", codigo, e)
