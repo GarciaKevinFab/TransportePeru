@@ -328,12 +328,13 @@
 }
 
 /* --- Sidebar nav item hover --- */
-.sidebar-item-animated {
-  transition: background-color 0.15s ease, color 0.15s ease, padding-left 0.15s ease;
+/* El hover desplaza el contenido con transform, no con padding: el padding
+   relanza el layout de toda la columna en cada fotograma. */
+.sidebar-item-animated > * {
+  transition: transform var(--dur-2) var(--ease-out);
 }
-
-.sidebar-item-animated:hover {
-  padding-left: 20px;
+.sidebar-item-animated:hover > * {
+  transform: translateX(3px);
 }
 
 /* --- Smooth progress bar fill --- */
@@ -559,25 +560,15 @@
 }
 
 /* --- Gradient text --- */
+/* Antes era un degradado recortado en el texto. Nada de degradados en texto:
+   la palabra destacada va en el color de marca aclarado, que sobre el grafito
+   oscuro de las cabeceras donde se usa (login, panel) supera 4,5:1. */
 .gradient-text {
-  background: linear-gradient(
-    135deg,
-    var(--brand-color) 0%,
-    color-mix(in srgb, var(--brand-color) 60%, #f59e0b) 50%,
-    color-mix(in srgb, var(--brand-color) 80%, #ef4444) 100%
-  );
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
+  color: color-mix(in srgb, var(--brand-color) 78%, #ffffff);
 }
 
 .gradient-text-slate {
-  background: linear-gradient(135deg, #191614 0%, #423e3a 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
+  color: #191614;
 }
 
 /* --- 3D icon wrapper --- */
@@ -859,7 +850,7 @@
   button:active {
     transform: none !important;
   }
-  .sidebar-item-animated:hover { padding-left: 12px; }
+  .sidebar-item-animated:hover > * { transform: none !important; }
   .revelado { transform: none !important; transition-property: opacity !important; }
 
   @keyframes page-fade-in   { from { opacity: 0; } to { opacity: 1; } }

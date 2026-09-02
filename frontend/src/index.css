@@ -446,7 +446,7 @@ tbody tr:nth-child(8) { animation-delay: 210ms; }
   @apply relative flex items-center gap-3 mx-2 my-0.5 px-3 py-2.5 rounded-lg text-grafito-300 cursor-pointer;
   min-height: 42px;
   border-left: 3px solid transparent;
-  transition: background-color 0.2s ease, color 0.2s ease, border-left-color 0.2s ease, padding-left 0.15s ease;
+  transition: background-color var(--dur-2) var(--ease-out), color var(--dur-2) var(--ease-out), border-left-color var(--dur-2) var(--ease-out);
 }
 
 .sidebar-item:hover {
