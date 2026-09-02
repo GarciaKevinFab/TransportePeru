@@ -59,6 +59,25 @@ venv/
 backend/uploads/
 # MongoDB dumps / backups
 mongo_dump/
+
+# Volcados de la base de datos.
+#
+# `mongo_dump/` y `**/*.tar.gz` NO cubrian los nombres que quedan en la raiz:
+# `mongodump.gz` no es un .tar.gz, y `respaldo_pre_admins_20260831_043554.dump`
+# no encajaba con nada. Cuando /opt/transporteperu paso a ser un repositorio,
+# esos archivos -16 MB de datos de produccion, incluida la tabla de
+# administradores- quedaron a un `git add -A` de acabar publicados.
+#
+# LAS REGLAS VAN ANCLADAS A LA RAIZ CON `/` A PROPOSITO. Un `*.sql` suelto
+# taparia tambien db/migrations/, que son 24 archivos versionados: la siguiente
+# migracion se ignoraria en silencio y nadie se enteraria hasta que faltara en
+# produccion. Los volcados viven en la raiz; las migraciones, en db/.
+/*.dump
+/*.sql
+/*.sql.gz
+/mongodump*
+/respaldo_*
+backups/
 # Environment files (explicit)
 .env
 backend/.env
