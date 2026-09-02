@@ -9,7 +9,28 @@
   --font-body: 'Inter', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
   --brand-color: #e00000;
+
+  /* SISTEMA DE MOVIMIENTO. Una sola curva de salida para todo lo que entra
+     o se despliega, una de ida y vuelta para lo que cambia de estado, y tres
+     duraciones. Cualquier animacion nueva se escribe con estos tokens. */
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+  --ease-in-out: cubic-bezier(.77, 0, .175, 1);
+  --dur-1: 120ms;
+  --dur-2: 180ms;
+  --dur-3: 240ms;
 }
+
+/* SUPERFICIES DEL NAVEGADOR
+   Los numeros de tablas y contadores van en cifras tabulares para que las
+   columnas no bailen al cambiar un 1 por un 8. Los titulares se equilibran
+   y los parrafos largos evitan la viuda. Las anclas dejan sitio a la
+   cabecera pegajosa. */
+td, th, .num, .kpi-value, .metrica-valor, .font-mono {
+  font-variant-numeric: tabular-nums;
+}
+h1, h2 { text-wrap: balance; }
+p { text-wrap: pretty; }
+[id] { scroll-margin-top: 6rem; }
 
 body {
   margin: 0;
@@ -106,11 +127,12 @@ code {
     --border: 30 10% 89%;
     --input: 30 10% 89%;
     --ring: 0 100% 44%;
+    /* Graficas: marca, dos grafitos y un ambar. El azul no es de la casa. */
     --chart-1: 0 100% 44%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
+    --chart-2: 24 6% 32%;
+    --chart-3: 32 95% 44%;
+    --chart-4: 26 7% 62%;
+    --chart-5: 0 100% 68%;
     /* Radio base elevado: rounded-sm≈6px, md≈8px, lg≈10px.
        Moderniza globalmente inputs/selects/botones que usan estas clases. */
     --radius: 0.625rem;
@@ -119,6 +141,7 @@ code {
     --success: 142 76% 36%;
     --warning: 45 93% 47%;
     --error: 0 84% 60%;
+    /* Solo para avisos que de verdad son informacion; nunca como acento. */
     --info: 217 91% 60%;
 
     /* Superficies de página (gris muy sutil) y offset del anillo de foco */
@@ -147,11 +170,11 @@ code {
     --border: 24 8% 17%;
     --input: 24 8% 17%;
     --ring: 0 100% 44%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    --chart-1: 0 100% 68%;
+    --chart-2: 26 7% 72%;
+    --chart-3: 43 96% 56%;
+    --chart-4: 24 6% 45%;
+    --chart-5: 0 100% 44%;
 
     --page-bg: #121010;
     --ring-offset-bg: #191614;
@@ -184,6 +207,54 @@ code {
   background-color: color-mix(in srgb, var(--brand-color) 6%, transparent);
 }
 
+/* TABLAS QUE NUNCA DESBORDAN LA PAGINA
+   El contenedor desplaza en horizontal (con inercia en iOS) y la primera
+   columna se queda pegada, con fondo, para que la fila siga teniendo nombre
+   mientras se arrastra. En el telefono la celda pegajosa lleva un filete a
+   la derecha que marca donde empieza lo que se mueve. */
+.tabla-desplazable {
+  position: relative;
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+.tabla-desplazable > table { min-width: 100%; }
+.tabla-desplazable th:first-child,
+.tabla-desplazable td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background-color: hsl(var(--card));
+}
+.tabla-desplazable thead th:first-child { z-index: 2; }
+.tabla-desplazable .table-dense th:first-child { background-color: #fafaf9; }
+.tabla-desplazable tbody tr:hover td:first-child {
+  background-color: color-mix(in srgb, var(--brand-color) 6%, hsl(var(--card)));
+}
+@media (max-width: 767px) {
+  .tabla-desplazable th:first-child,
+  .tabla-desplazable td:first-child {
+    box-shadow: inset -1px 0 0 hsl(var(--border));
+  }
+}
+
+/* Filas: entran escalonadas solo las ocho primeras (30 ms entre filas). */
+@keyframes fila-entra {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+tbody tr:nth-child(-n + 8) {
+  animation: fila-entra var(--dur-3) var(--ease-out) both;
+}
+tbody tr:nth-child(2) { animation-delay: 30ms; }
+tbody tr:nth-child(3) { animation-delay: 60ms; }
+tbody tr:nth-child(4) { animation-delay: 90ms; }
+tbody tr:nth-child(5) { animation-delay: 120ms; }
+tbody tr:nth-child(6) { animation-delay: 150ms; }
+tbody tr:nth-child(7) { animation-delay: 180ms; }
+tbody tr:nth-child(8) { animation-delay: 210ms; }
+
 /* Status badges */
 .badge-success {
   @apply bg-green-100 text-green-800 border-green-200;
@@ -198,57 +269,113 @@ code {
 }
 
 .badge-info {
-  @apply bg-blue-100 text-blue-800 border-blue-200;
+  @apply bg-grafito-100 text-grafito-800 border-grafito-200;
 }
 
-/* KPI Card styles — tarjeta con esquina redondeada, sombra suave y hover-lift */
-.kpi-card {
-  @apply bg-white border border-grafito-200 p-6 flex flex-col justify-between;
-  border-left: 4px solid var(--brand-color);
-  border-radius: 0.875rem;
+/* TARJETA DE METRICA: UNA SOLA PARA TODA LA APLICACION
+   Sin filete lateral de color ni icono fantasma detras: el valor manda. El
+   tono va en el chip del icono, arriba a la derecha, y dice que SIGNIFICA el
+   numero: alerta = rojo semantico, aviso/vencimiento = ambar, ok = verde,
+   neutro = grafito. El color de marca solo para lo que es de la marca. */
+.metrica {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  width: 100%;
+  text-align: left;
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: calc(var(--radius) + 4px);
+  padding: 1.125rem 1.25rem;
   box-shadow:
-    0 1px 3px rgba(11, 9, 8, 0.06),
-    0 1px 2px rgba(11, 9, 8, 0.04);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+    0 1px 2px rgba(25, 22, 20, 0.05),
+    0 1px 3px rgba(25, 22, 20, 0.04);
+  transition:
+    box-shadow var(--dur-3) var(--ease-out),
+    border-color var(--dur-3) var(--ease-out),
+    transform var(--dur-3) var(--ease-out);
 }
-
-.kpi-card:hover {
-  transform: translateY(-2px);
+.metrica[data-clic] { cursor: pointer; }
+.metrica[data-clic]:hover {
+  border-color: color-mix(in srgb, var(--metrica-tono) 35%, hsl(var(--border)));
   box-shadow:
-    0 12px 28px -10px rgba(11, 9, 8, 0.14),
-    0 4px 10px -4px rgba(11, 9, 8, 0.06);
+    0 10px 24px -14px rgba(25, 22, 20, 0.22),
+    0 2px 6px -2px rgba(25, 22, 20, 0.06);
+  transform: translateY(-1px);
 }
+.metrica[data-clic]:active { transform: scale(0.985); }
+.metrica-cabecera {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.metrica-rotulo {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #736f69;
+}
+.metrica-chip {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.625rem;
+  color: var(--metrica-tono);
+  background-color: color-mix(in srgb, var(--metrica-tono) 12%, transparent);
+}
+.metrica-valor {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: clamp(1.875rem, 1.4vw + 1.25rem, 2.5rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: #191614;
+  font-variant-numeric: tabular-nums;
+}
+.metrica-detalle {
+  margin-top: 0.375rem;
+  font-size: 0.75rem;
+  color: #736f69;
+}
+.metrica-tono-marca  { --metrica-tono: var(--brand-color); }
+.metrica-tono-neutro { --metrica-tono: #55514c; }
+.metrica-tono-alerta { --metrica-tono: #dc2626; }
+.metrica-tono-aviso  { --metrica-tono: #b45309; }
+.metrica-tono-ok     { --metrica-tono: #15803d; }
 
+/* Alias para codigo antiguo: mismas reglas, ningun filete. */
 .kpi-value {
   @apply font-heading text-4xl font-bold text-grafito-900 tracking-tight;
 }
-
 .kpi-label {
   @apply text-xs font-bold uppercase text-grafito-500 tracking-widest mt-2;
 }
-
-/* Icono tintado en círculo para KPIs / stat cards (por categoría de acento) */
 .stat-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 2.75rem;
   height: 2.75rem;
-  border-radius: 9999px;
-  background-color: color-mix(in srgb, var(--brand-color) 14%, transparent);
+  border-radius: 0.75rem;
+  background-color: color-mix(in srgb, var(--brand-color) 12%, transparent);
   color: var(--brand-color);
   flex-shrink: 0;
 }
-.stat-icon-brand   { background-color: color-mix(in srgb, var(--brand-color) 14%, transparent); color: var(--brand-color); }
-.stat-icon-blue    { background-color: rgba(59, 130, 246, 0.14);  color: #2563eb; }
-.stat-icon-green   { background-color: rgba(34, 197, 94, 0.14);   color: #16a34a; }
-.stat-icon-amber   { background-color: rgba(234, 179, 8, 0.16);   color: #b45309; }
-.stat-icon-red     { background-color: rgba(239, 68, 68, 0.14);   color: #dc2626; }
-.stat-icon-slate   { background-color: rgba(115, 111, 105, 0.14); color: #55514c; }
+.stat-icon-brand { background-color: color-mix(in srgb, var(--brand-color) 12%, transparent); color: var(--brand-color); }
+.stat-icon-green { background-color: rgba(21, 128, 61, 0.12);  color: #15803d; }
+.stat-icon-amber { background-color: rgba(180, 83, 9, 0.12);   color: #b45309; }
+.stat-icon-red   { background-color: rgba(220, 38, 38, 0.12);  color: #dc2626; }
+.stat-icon-slate { background-color: rgba(85, 81, 76, 0.12);   color: #55514c; }
 
 /* Button styles */
 .btn-primary {
-  @apply bg-grafito-900 text-white hover:bg-grafito-800 rounded-lg uppercase font-bold tracking-wide text-sm h-10 px-6 transition-all;
+  @apply bg-grafito-900 text-white hover:bg-grafito-800 rounded-lg uppercase font-bold tracking-wide text-sm h-10 px-6 transition-[transform,box-shadow,background-color,color] duration-150;
   box-shadow: 0 1px 2px rgba(25, 22, 20, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
@@ -290,7 +417,7 @@ code {
     color-mix(in srgb, var(--brand-color) 88%, #000000) 100%
   );
   background-color: var(--brand-color);
-  @apply text-white rounded-lg uppercase font-bold tracking-wide text-sm h-10 px-6 transition-all;
+  @apply text-white rounded-lg uppercase font-bold tracking-wide text-sm h-10 px-6 transition-[transform,box-shadow,filter,background-color,color] duration-150;
   box-shadow:
     0 1px 2px color-mix(in srgb, var(--brand-color) 35%, transparent),
     0 4px 10px color-mix(in srgb, var(--brand-color) 18%, transparent),
@@ -399,7 +526,7 @@ code {
 }
 
 .animate-slide-in {
-  animation: slideIn 0.2s ease-out;
+  animation: slideIn var(--dur-2) var(--ease-out);
 }
 
 @keyframes pulse-orange {
@@ -479,56 +606,6 @@ code {
   backdrop-filter: saturate(160%) blur(14px);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 0.75rem;
-}
-
-/* Metric tile - modern KPI card */
-.metric-tile {
-  position: relative;
-  background: #ffffff;
-  border: 1px solid rgb(230, 228, 225);
-  border-left: 4px solid var(--brand-color);
-  border-radius: 0.75rem;
-  padding: 1.25rem;
-  overflow: hidden;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-  box-shadow:
-    0 1px 3px rgba(25, 22, 20, 0.05),
-    0 1px 2px rgba(25, 22, 20, 0.03);
-}
-
-.metric-tile:hover {
-  transform: translateY(-2px);
-  box-shadow:
-    0 12px 28px -10px rgba(25, 22, 20, 0.14),
-    0 4px 10px -4px rgba(25, 22, 20, 0.06);
-}
-
-.metric-tile .metric-watermark {
-  position: absolute;
-  right: -8px;
-  bottom: -10px;
-  opacity: 0.06;
-  pointer-events: none;
-  transition: opacity 0.2s ease, transform 0.2s ease;
-}
-
-.metric-tile:hover .metric-watermark {
-  opacity: 0.1;
-  transform: translateY(-2px);
-}
-
-.metric-tile .metric-value {
-  @apply font-heading font-bold text-grafito-900 tracking-tight;
-  font-size: clamp(1.875rem, 2vw + 1rem, 2.5rem);
-  line-height: 1.05;
-}
-
-.metric-tile .metric-label {
-  @apply text-[11px] font-bold uppercase text-grafito-500 tracking-widest;
-}
-
-.metric-tile .metric-sub {
-  @apply text-xs text-grafito-500 mt-1;
 }
 
 /* Trend chip */
@@ -613,24 +690,41 @@ code {
 }
 .dark .table-dense td {
   color: #d0cdc8 !important;
-  border-bottom-color: #263449 !important;
+  border-bottom-color: #423e3a !important;
 }
 .dark .table-dense tr:hover {
   background-color: rgba(224, 0, 0, 0.12) !important;
 }
 
 /* KPI / métricas */
-.dark .kpi-card { background-color: #2a2725 !important; border-color: #423e3a !important; }
 .dark .kpi-value { color: #f3f2f0 !important; }
 .dark .kpi-label { color: #a19d97 !important; }
 
-.dark .metric-tile {
-  background: #2a2725 !important;
-  border-color: #423e3a !important;
+.dark .metrica {
+  background-color: #2a2725;
+  border-color: #423e3a;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
 }
-.dark .metric-tile .metric-value { color: #f3f2f0 !important; }
-.dark .metric-tile .metric-label,
-.dark .metric-tile .metric-sub { color: #a19d97 !important; }
+.dark .metrica[data-clic]:hover {
+  box-shadow: 0 12px 28px -14px rgba(0, 0, 0, 0.6), 0 4px 10px -4px rgba(0, 0, 0, 0.4);
+}
+.dark .metrica-valor { color: #f3f2f0; }
+.dark .metrica-rotulo,
+.dark .metrica-detalle { color: #a19d97; }
+/* Los tonos suben un peldano de luz sobre la tarjeta oscura. */
+.dark .metrica-tono-marca  { --metrica-tono: color-mix(in srgb, var(--brand-color) 55%, #ffffff); }
+.dark .metrica-tono-neutro { --metrica-tono: #d0cdc8; }
+.dark .metrica-tono-alerta { --metrica-tono: #fca5a5; }
+.dark .metrica-tono-aviso  { --metrica-tono: #fcd34d; }
+.dark .metrica-tono-ok     { --metrica-tono: #86efac; }
+
+/* Tablas desplazables en oscuro */
+.dark .tabla-desplazable th:first-child,
+.dark .tabla-desplazable td:first-child,
+.dark .tabla-desplazable .table-dense th:first-child { background-color: #2a2725; }
+.dark .tabla-desplazable tbody tr:hover td:first-child {
+  background-color: color-mix(in srgb, var(--brand-color) 12%, #2a2725);
+}
 
 /* Etiquetas de inputs */
 .dark .input-label { color: #a19d97 !important; }
@@ -663,7 +757,7 @@ code {
 .dark .badge-success { background-color: rgba(34, 197, 94, 0.16) !important; color: #86efac !important; border-color: rgba(34, 197, 94, 0.35) !important; }
 .dark .badge-warning { background-color: rgba(234, 179, 8, 0.16) !important; color: #fde047 !important; border-color: rgba(234, 179, 8, 0.35) !important; }
 .dark .badge-error   { background-color: rgba(239, 68, 68, 0.16) !important; color: #fca5a5 !important; border-color: rgba(239, 68, 68, 0.35) !important; }
-.dark .badge-info    { background-color: rgba(59, 130, 246, 0.16) !important; color: #93c5fd !important; border-color: rgba(59, 130, 246, 0.35) !important; }
+.dark .badge-info    { background-color: rgba(208, 205, 200, 0.14) !important; color: #e6e4e1 !important; border-color: rgba(208, 205, 200, 0.3) !important; }
 
 /* Matriz de documentos */
 .dark .doc-cell.vigente   { background-color: rgba(34, 197, 94, 0.16) !important; color: #86efac !important; }

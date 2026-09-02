@@ -20,7 +20,7 @@
 /* Card hover effect */
 .card-hover:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 10px 25px -8px rgba(25, 22, 20, 0.12);
 }
 
 /* Status dot animation */
@@ -166,7 +166,7 @@
 @keyframes page-fade-in {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
@@ -175,7 +175,7 @@
 }
 
 .page-fade-in {
-  animation: page-fade-in 0.25s ease-out both;
+  animation: page-fade-in 220ms var(--ease-out) both;
 }
 
 /* --- Card entrance animation (slide up + fade in) --- */
@@ -191,7 +191,7 @@
 }
 
 .card-enter {
-  animation: card-enter 0.3s ease-out both;
+  animation: card-enter var(--dur-3) var(--ease-out) both;
 }
 
 /* Stagger delays for cards */
@@ -210,7 +210,7 @@
 }
 
 .btn-press {
-  transition: transform 0.1s ease;
+  transition: transform 160ms var(--ease-out);
 }
 
 /* --- Loading skeleton pulse (dark theme variant) --- */
@@ -354,7 +354,7 @@
 }
 
 .section-enter {
-  animation: section-enter 0.3s ease-out both;
+  animation: section-enter var(--dur-3) var(--ease-out) both;
 }
 
 .section-stagger-1 { animation-delay: 0.08s; }
@@ -720,9 +720,14 @@
 }
 
 .pill-info {
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.16) 0%, rgba(37, 99, 235, 0.06) 100%);
-  color: #1d4ed8;
-  border: 1px solid rgba(37, 99, 235, 0.25);
+  background: linear-gradient(135deg, rgba(25, 22, 20, 0.10) 0%, rgba(25, 22, 20, 0.04) 100%);
+  color: #2a2725;
+  border: 1px solid rgba(25, 22, 20, 0.16);
+}
+.dark .pill-info {
+  background: rgba(230, 228, 225, 0.12);
+  color: #e6e4e1;
+  border-color: rgba(230, 228, 225, 0.28);
 }
 
 /* --- Particles / dots overlay (login background) --- */
@@ -756,44 +761,6 @@
   bottom: 8%;
   left: 12%;
   animation: float-soft 10s ease-in-out infinite reverse;
-}
-
-/* --- Enhanced metric-tile: gradient bg + larger hover --- */
-.metric-tile {
-  background: linear-gradient(
-    135deg,
-    #ffffff 0%,
-    color-mix(in srgb, var(--brand-color) 4%, #ffffff) 100%
-  );
-}
-
-.metric-tile::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    color-mix(in srgb, var(--brand-color) 30%, transparent) 50%,
-    transparent 100%
-  );
-  pointer-events: none;
-  opacity: 0.7;
-}
-
-.metric-tile:hover {
-  transform: translateY(-4px);
-  box-shadow:
-    0 20px 36px -12px rgba(25, 22, 20, 0.18),
-    0 8px 16px -8px rgba(25, 22, 20, 0.08);
-}
-
-.metric-tile:hover .metric-watermark {
-  opacity: 0.14;
-  transform: translateY(-4px) rotate(-4deg);
 }
 
 /* --- Sidebar nav hover micro-interaction --- */
@@ -846,16 +813,16 @@
 
 /* --- Severity-colored card border --- */
 .severity-critical {
-  border-left: 4px solid #dc2626 !important;
-  background: linear-gradient(90deg, rgba(220, 38, 38, 0.05) 0%, transparent 50%);
+  border-color: rgba(220, 38, 38, 0.35) !important;
+  background: linear-gradient(90deg, rgba(220, 38, 38, 0.06) 0%, transparent 60%);
 }
 .severity-warning {
-  border-left: 4px solid #ca8a04 !important;
-  background: linear-gradient(90deg, rgba(234, 179, 8, 0.05) 0%, transparent 50%);
+  border-color: rgba(180, 83, 9, 0.35) !important;
+  background: linear-gradient(90deg, rgba(180, 83, 9, 0.06) 0%, transparent 60%);
 }
 .severity-info {
-  border-left: 4px solid #2563eb !important;
-  background: linear-gradient(90deg, rgba(37, 99, 235, 0.04) 0%, transparent 50%);
+  border-color: rgba(85, 81, 76, 0.3) !important;
+  background: linear-gradient(90deg, rgba(85, 81, 76, 0.06) 0%, transparent 60%);
 }
 
 /* --- Table row hover lift --- */
@@ -864,10 +831,10 @@
 }
 .table-row-lift:hover {
   background-color: color-mix(in srgb, var(--brand-color) 5%, #ffffff);
-  box-shadow: inset 3px 0 0 var(--brand-color);
+  box-shadow: inset 1px 0 0 var(--brand-color);
 }
 
-/* --- Reduced motion respect --- */
+/* --- Movimiento reducido: todo se reduce a opacidad --- */
 @media (prefers-reduced-motion: reduce) {
   .float-animation,
   .float-rotate,
@@ -879,7 +846,34 @@
     animation: none !important;
   }
   .card-3d:hover,
-  .metric-tile:hover {
+  .card-surface:hover,
+  .metrica[data-clic]:hover,
+  .metrica[data-clic]:active,
+  .tap-scale:active,
+  .btn-press:active,
+  .btn-brand:active,
+  .btn-primary:hover,
+  .btn-action:hover,
+  .icon-3d:hover,
+  .avatar-ring:hover,
+  button:active {
     transform: none !important;
   }
+  .sidebar-item-animated:hover { padding-left: 12px; }
+  .revelado { transform: none !important; transition-property: opacity !important; }
+
+  @keyframes page-fade-in   { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes card-enter     { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes section-enter  { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes smooth-appear  { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes login-card-enter { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes logo-appear    { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes number-flip    { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes kpi-count-in   { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes dialog-scale-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes toast-slide-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes slideIn        { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes fila-entra     { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes hero-entra     { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes sidebar-slide-in { from { opacity: 0; } to { opacity: 1; } }
 }
