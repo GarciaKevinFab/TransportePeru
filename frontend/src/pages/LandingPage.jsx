@@ -177,11 +177,17 @@ const Cabecera = () => {
 
         <div className="hidden items-center gap-8 md:flex">
           {ENLACES_NAV.map(([href, texto]) => (
-            <a key={href} href={href} className="text-sm text-grafito-300 transition hover:text-white">
+            <a
+              key={href}
+              href={href}
+              /* inline-flex + min-h-11: los enlaces median 17 px de alto, menos
+                 de la mitad del objetivo tactil de 44 que pide la guia. */
+              className="inline-flex min-h-11 items-center text-sm text-grafito-300 transition hover:text-white"
+            >
               {texto}
             </a>
           ))}
-          <Link to="/login" className="text-sm text-grafito-300 transition hover:text-white">Entrar</Link>
+          <Link to="/login" className="inline-flex min-h-11 items-center text-sm text-grafito-300 transition hover:text-white">Entrar</Link>
         </div>
 
         <div className="flex items-center gap-2">
@@ -578,15 +584,15 @@ const LandingPage = () => (
               <h3 className="font-heading text-sm font-bold uppercase tracking-wide text-grafito-400">
                 {titulo}
               </h3>
-              <ul className="mt-4 space-y-2.5">
+              <ul className="mt-2">
                 {enlaces.map(([href, texto]) => (
                   <li key={href}>
                     {href.startsWith('/') ? (
-                      <Link to={href} className="text-sm text-grafito-400 transition hover:text-white">
+                      <Link to={href} className="inline-flex min-h-11 items-center text-sm text-grafito-400 transition hover:text-white">
                         {texto}
                       </Link>
                     ) : (
-                      <a href={href} className="text-sm text-grafito-400 transition hover:text-white">
+                      <a href={href} className="inline-flex min-h-11 items-center text-sm text-grafito-400 transition hover:text-white">
                         {texto}
                       </a>
                     )}
