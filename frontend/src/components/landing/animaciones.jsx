@@ -42,7 +42,15 @@ export const Revelado = ({ children, retraso = 0, className = '' }) => {
     if (visto || !ref.current) return undefined;
     const io = new IntersectionObserver(
       ([e]) => {
-        if (e.isIntersecting) {
+        // Entra... O YA QUEDO POR ENCIMA.
+        //
+        // Lo segundo no es un adorno: con `isIntersecting` a secas, saltar de
+        // golpe -la barra de scroll, la tecla Fin, o llegar por un ancla como
+        // #planes- lleva al bloque de "abajo" a "arriba" sin que llegue a
+        // intersectar en ningun fotograma. El observador no dispara y el
+        // bloque se queda invisible PARA SIEMPRE, aunque el lector pase por
+        // encima.
+        if (e.isIntersecting || e.boundingClientRect.top <= 0) {
           setVisto(true);
           io.disconnect();
         }
