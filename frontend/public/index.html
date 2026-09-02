@@ -258,14 +258,19 @@ html:not(.dark) .sb-credito:not(.sb-claro):not(.sb-oscuro) {
 }
 
 /* --- Pantallas estrechas --------------------------------------------------
-   Sobre 375 px una pastilla de 214 px se come el ancho. Se encoge, y el punto
-   desaparece porque es lo unico que no aporta informacion. */
+   Encogerlo no bastaba. Aun reducido medía ~180 px y, al ir fijo en la esquina
+   inferior, seguia tapando el texto de la portada: en un movil de 375 px se
+   comia tres palabras de cada linea que le tocara debajo.
+
+   Se queda en el isotipo. La firma sigue estando -y los lectores de pantalla
+   la leen igual, porque el aria-label del enlace la lleva entera-, pero ocupa
+   lo que un boton y deja ver lo que hay detras. Es el mismo criterio que ya
+   usa ZenStay en movil. */
 @media (max-width: 30rem) {
-  .sb-credito { right: .6rem !important; bottom: .6rem !important; padding: .3rem .5rem !important; gap: .4rem !important; border-radius: .6rem !important; }
+  .sb-credito { right: .6rem !important; bottom: .6rem !important; padding: .35rem !important; gap: 0 !important; border-radius: .7rem !important; opacity: .82; }
   .sb-credito.sb-izquierda { left: .6rem !important; }
-  .sb-credito .sb-marca { height: 1rem !important; }
-  .sb-credito .sb-etiqueta { font-size: .45rem !important; }
-  .sb-credito .sb-nombre { font-size: .7rem !important; }
+  .sb-credito .sb-marca { height: 1.15rem !important; }
+  .sb-credito .sb-texto { display: none !important; }
   .sb-credito .sb-punto { display: none !important; }
 }
 

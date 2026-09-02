@@ -132,7 +132,7 @@ const PLANES = [
 ];
 
 const Seccion = ({ id, children, className = '' }) => (
-  <section id={id} className={`px-6 py-20 md:py-28 ${className}`}>
+  <section id={id} className={`px-6 py-24 md:py-36 ${className}`}>
     <div className="mx-auto w-full max-w-6xl">{children}</div>
   </section>
 );
@@ -162,7 +162,7 @@ const Cabecera = () => {
   const [abierto, setAbierto] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-white/5 bg-grafito-950/80 backdrop-blur">
+    <header className="sticky top-0 z-50 border-b border-white/5 bg-grafito-950/70 backdrop-blur-xl backdrop-saturate-150">
       <nav className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
         {/* El logo de la marca registrada, no un icono generico. Lleva el
             nombre dentro, asi que sustituye tambien al texto.
@@ -236,7 +236,7 @@ const LandingPage = () => (
     <Seccion className="pt-20 md:pt-28">
       <Etiqueta>Gestión de flota para transportistas del Perú</Etiqueta>
 
-      <h1 className="font-heading max-w-4xl text-5xl font-black leading-[1.05] tracking-tight md:text-7xl">
+      <h1 className="font-heading max-w-4xl text-5xl font-black leading-[1.04] tracking-[-0.03em] md:text-[5rem] md:leading-[1.02] md:tracking-[-0.035em]">
         Tu flota ya genera los datos.
         <span className="block text-grafito-400">El problema es que viven</span>
         <span className="block">en seis cuadernos distintos.</span>
@@ -278,7 +278,15 @@ const LandingPage = () => (
         demostracion. Nunca de un cliente: las placas, los choferes y los
         viajes de G&E son datos de su operacion, y una pagina publica no es
         sitio para ellos. */}
-    <Seccion id="el-producto" className="border-t border-white/5 !py-0 pb-20 md:pb-28">
+    {/* overflow-x-clip: la captura en perspectiva se sale del ancho.
+        Al inclinarla con rotateX y origen arriba, el borde de abajo se acerca
+        al ojo y la perspectiva lo ENSANCHA un 17%: el bloque mide 1152 px pero
+        pinta 1282, y esos ~6 px por lado le daban barra horizontal a toda la
+        pagina. Se recorta aqui, en la seccion, que ocupa el ancho de la
+        ventana: se va lo que sobresale de la pantalla sin cortar nada de la
+        imagen. `clip` y no `hidden` porque `hidden` crea un contenedor de
+        scroll y romperia cualquier position:sticky de dentro. */}
+    <Seccion id="el-producto" className="overflow-x-clip border-t border-white/5 !py-0 pb-20 md:pb-28">
       <figure className="relative -mt-6 md:-mt-10">
         {/* Resplandor detras del marco: separa la captura del fondo sin
             necesidad de un borde grueso. */}
@@ -288,7 +296,7 @@ const LandingPage = () => (
                      bg-[radial-gradient(60%_60%_at_50%_0%,rgba(224,0,0,0.16),transparent_70%)] blur-2xl"
         />
         <CapturaTilt>
-        <div className="relative overflow-hidden rounded-xl border border-white/10 bg-grafito-900/60 shadow-2xl shadow-black/60 ring-1 ring-white/5">
+        <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-grafito-900/60 shadow-2xl shadow-black/60 ring-1 ring-white/5">
           <img
             src="/capturas/panel.webp"
             alt="Panel de CargoXprez: vehículos disponibles, viajes activos, alertas y documentos por vencer"
@@ -324,7 +332,7 @@ const LandingPage = () => (
         ].map((c) => (
           <Revelado key={c.src} retraso={0}>
           <figure className="group">
-            <div className="overflow-hidden rounded-lg border border-white/10 bg-grafito-900/60 transition group-hover:border-white/20">
+            <div className="overflow-hidden rounded-2xl border border-white/10 bg-grafito-900/60 transition group-hover:border-white/20">
               <img
                 src={c.src}
                 alt={c.alt}
@@ -348,7 +356,7 @@ const LandingPage = () => (
     </Seccion>
 
     <Seccion className="border-t border-white/5">
-      <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-8 md:p-12">
+      <div className="rounded-3xl border border-white/10 bg-white/[0.02] p-8 md:p-14">
         <p className="font-mono text-xs uppercase tracking-[0.2em] text-marca-400">
           En producción, no en demostración
         </p>
@@ -453,7 +461,7 @@ const LandingPage = () => (
         {PLANES.map((p) => (
           <div
             key={p.nombre}
-            className={`flex flex-col rounded-2xl border p-8 ${
+            className={`flex flex-col rounded-3xl border p-8 md:p-10 ${
               p.destacado
                 ? 'border-marca-500/50 bg-marca-500/[0.07]'
                 : 'border-white/10 bg-white/[0.02]'
@@ -507,7 +515,7 @@ const LandingPage = () => (
     </Seccion>
 
     <Seccion className="border-t border-white/5">
-      <div className="rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-transparent p-10 text-center md:p-16">
+      <div className="rounded-[2rem] border border-white/10 bg-gradient-to-b from-white/[0.06] to-transparent p-10 text-center md:p-20">
         <h2 className="font-heading mx-auto max-w-2xl text-3xl font-black tracking-tight md:text-4xl">
           Tu próximo viaje puede estar acá dentro.
         </h2>
