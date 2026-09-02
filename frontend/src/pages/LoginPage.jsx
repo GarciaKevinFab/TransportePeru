@@ -230,7 +230,7 @@ const LoginPage = () => {
               </Tabs>
 
               {error && (
-                <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md flex items-center gap-2 text-red-700 text-sm">
+                <div role="alert" className="mt-4 flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2.5 text-sm text-red-300">
                   <AlertCircle className="w-4 h-4 flex-shrink-0" />
                   {error}
                 </div>

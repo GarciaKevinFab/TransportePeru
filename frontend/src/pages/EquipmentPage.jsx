@@ -41,6 +41,8 @@ import {
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import EstadoVacio from '../components/EstadoVacio';
+import { EsqueletoPagina } from '../components/Esqueletos';
+import TarjetaMetrica from '../components/TarjetaMetrica';
 
 const EquipmentPage = () => {
   const navigate = useNavigate();
@@ -109,7 +111,7 @@ const EquipmentPage = () => {
     if (bad > 0) return { label: `${bad} con problemas`, color: 'bg-red-100 text-red-700' };
     if (pending > 0) return { label: `${pending} pendientes`, color: 'bg-yellow-100 text-yellow-700' };
     if (good === total) return { label: 'Completo', color: 'bg-green-100 text-green-700' };
-    return { label: `${good}/${total}`, color: 'bg-blue-100 text-blue-700' };
+    return { label: `${good}/${total}`, color: 'bg-grafito-200 text-grafito-800' };
   };
 
   const handleOpenEdit = async (vehicle) => {
@@ -197,9 +199,7 @@ const EquipmentPage = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
-      </div>
+      <EsqueletoPagina />
     );
   }
 
@@ -217,50 +217,34 @@ const EquipmentPage = () => {
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-white border-l-4 border-l-blue-500 card-enter card-stagger-1">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Vehículos</p>
-                <p className="font-heading text-3xl font-bold text-blue-600 mt-1">{totalVehicles}</p>
-              </div>
-              <Truck className="w-8 h-8 text-blue-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-white border-l-4 border-l-green-500 card-enter card-stagger-2">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">EPP Completo</p>
-                <p className="font-heading text-3xl font-bold text-green-600 mt-1">{completeEPP}</p>
-              </div>
-              <CheckCircle className="w-8 h-8 text-green-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-white border-l-4 border-l-yellow-500 card-enter card-stagger-3">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">EPP Pendiente</p>
-                <p className="font-heading text-3xl font-bold text-yellow-600 mt-1">{pendingEPP}</p>
-              </div>
-              <AlertTriangle className="w-8 h-8 text-yellow-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-white border-l-4 border-l-marca-500 card-enter card-stagger-4">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Con Chofer</p>
-                <p className="font-heading text-3xl font-bold text-marca-600 mt-1">{assignedDrivers}</p>
-              </div>
-              <UserCheck className="w-8 h-8 text-marca-500" />
-            </div>
-          </CardContent>
-        </Card>
+        <TarjetaMetrica
+          titulo="Vehículos"
+          valor={totalVehicles}
+          icono={Truck}
+          tono="neutro"
+          className="card-enter card-stagger-1"
+        />
+        <TarjetaMetrica
+          titulo="EPP Completo"
+          valor={completeEPP}
+          icono={CheckCircle}
+          tono="ok"
+          className="card-enter card-stagger-2"
+        />
+        <TarjetaMetrica
+          titulo="EPP Pendiente"
+          valor={pendingEPP}
+          icono={AlertTriangle}
+          tono="aviso"
+          className="card-enter card-stagger-3"
+        />
+        <TarjetaMetrica
+          titulo="Con Chofer"
+          valor={assignedDrivers}
+          icono={UserCheck}
+          tono="marca"
+          className="card-enter card-stagger-4"
+        />
       </div>
 
       {/* Search */}

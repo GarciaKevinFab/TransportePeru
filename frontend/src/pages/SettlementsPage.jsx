@@ -50,6 +50,9 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import EstadoVacio from '../components/EstadoVacio';
+import EncabezadoPagina from '../components/EncabezadoPagina';
+import { EsqueletoTabla } from '../components/Esqueletos';
+import TarjetaMetrica from '../components/TarjetaMetrica';
 
 // Viáticos por viaje (regla de negocio): S/ 540 por viaje
 const VIATICO_POR_VIAJE = 540;
@@ -110,7 +113,7 @@ const SettlementsPage = () => {
 
   const settlementStatuses = [
     { value: 'pending', label: 'Pendiente', color: 'bg-yellow-100 text-yellow-700' },
-    { value: 'en_revision', label: 'En Revisión', color: 'bg-blue-100 text-blue-700' },
+    { value: 'en_revision', label: 'En Revisión', color: 'bg-grafito-200 text-grafito-800' },
     { value: 'aprobado', label: 'Aprobado', color: 'bg-green-100 text-green-700' },
     { value: 'cerrado', label: 'Cerrado', color: 'bg-grafito-100 text-grafito-700' },
   ];
@@ -318,67 +321,41 @@ const SettlementsPage = () => {
   return (
     <div className="space-y-6 page-fade-in" data-testid="settlements-page">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
-            Viáticos y Liquidación
-          </h1>
-          <p className="text-grafito-500 mt-1">
-            Gestión de anticipos, gastos y liquidación de viajes
-          </p>
-        </div>
-      </div>
+      <EncabezadoPagina
+        titulo="Viáticos y Liquidación"
+        subtitulo="Gestión de anticipos, gastos y liquidación de viajes"
+      />
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-white border-l-4 border-l-yellow-500 card-enter card-stagger-1">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Pendientes</p>
-                <p className="font-heading text-3xl font-bold text-yellow-600 mt-1">{pendingTrips}</p>
-              </div>
-              <Clock className="w-8 h-8 text-yellow-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-white border-l-4 border-l-blue-500 card-enter card-stagger-2">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Por Rendir</p>
-                <p className="font-heading text-2xl font-bold text-blue-600 mt-1">
-                  S/ {totalPendingAdvances.toLocaleString()}
-                </p>
-              </div>
-              <DollarSign className="w-8 h-8 text-blue-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-white border-l-4 border-l-green-500 card-enter card-stagger-3">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Cerrados</p>
-                <p className="font-heading text-3xl font-bold text-green-600 mt-1">
-                  {trips.filter(t => t.settlement_status === 'cerrado').length}
-                </p>
-              </div>
-              <CheckCircle className="w-8 h-8 text-green-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-white border-l-4 border-l-marca-500 card-enter card-stagger-4">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Viajes Totales</p>
-                <p className="font-heading text-3xl font-bold text-marca-600 mt-1">{trips.length}</p>
-              </div>
-              <Truck className="w-8 h-8 text-marca-500" />
-            </div>
-          </CardContent>
-        </Card>
+        <TarjetaMetrica
+          titulo="Pendientes"
+          valor={pendingTrips}
+          icono={Clock}
+          tono="aviso"
+          className="card-enter card-stagger-1"
+        />
+        <TarjetaMetrica
+          titulo="Por Rendir"
+          valor={<>S/ {totalPendingAdvances.toLocaleString()}</>}
+          icono={DollarSign}
+          tono="neutro"
+          className="card-enter card-stagger-2"
+        />
+        <TarjetaMetrica
+          titulo="Cerrados"
+          valor={trips.filter(t => t.settlement_status === 'cerrado').length}
+          icono={CheckCircle}
+          tono="ok"
+          className="card-enter card-stagger-3"
+        />
+        <TarjetaMetrica
+          titulo="Viajes Totales"
+          valor={trips.length}
+          icono={Truck}
+          tono="marca"
+          className="card-enter card-stagger-4"
+        />
       </div>
 
       {/* Filters */}
@@ -413,9 +390,7 @@ const SettlementsPage = () => {
       <Card className="bg-white section-enter section-stagger-1">
         <CardContent className="p-0 overflow-x-auto">
           {loading ? (
-            <div className="flex items-center justify-center h-64">
-              <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
-            </div>
+            <EsqueletoTabla />
           ) : filteredTrips.length === 0 ? (
             /* La liquidacion nace del viaje: sin viajes no hay nada que
                rendir, y la guia lleva a programar el primero en vez de
@@ -657,15 +632,15 @@ const SettlementsPage = () => {
                     </div>
                   </CardContent>
                 </Card>
-                <Card className={balance >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-marca-50 border-marca-200'}>
+                <Card className={balance >= 0 ? 'bg-grafito-100 border-grafito-200' : 'bg-marca-50 border-marca-200'}>
                   <CardContent className="py-3">
                     <div className="flex items-center gap-2">
-                      <Calculator className={`w-5 h-5 ${balance >= 0 ? 'text-blue-600' : 'text-marca-600'}`} />
+                      <Calculator className={`w-5 h-5 ${balance >= 0 ? 'text-grafito-600' : 'text-marca-600'}`} />
                       <div>
-                        <p className={`text-xs uppercase font-bold ${balance >= 0 ? 'text-blue-700' : 'text-marca-700'}`}>
+                        <p className={`text-xs uppercase font-bold ${balance >= 0 ? 'text-grafito-700' : 'text-marca-700'}`}>
                           {balance >= 0 ? 'A Favor Empresa' : 'A Favor Chofer'}
                         </p>
-                        <p className={`font-heading text-xl font-bold ${balance >= 0 ? 'text-blue-600' : 'text-marca-600'}`}>
+                        <p className={`font-heading text-xl font-bold ${balance >= 0 ? 'text-grafito-600' : 'text-marca-600'}`}>
                           S/ {Math.abs(balance).toFixed(2)}
                         </p>
                       </div>

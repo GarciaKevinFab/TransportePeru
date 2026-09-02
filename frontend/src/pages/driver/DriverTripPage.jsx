@@ -153,14 +153,14 @@ const DriverTripPage = () => {
         <Card
           className="text-white overflow-hidden border-0 smooth-appear card-3d glow-on-hover"
           style={{
-            backgroundImage: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+            backgroundImage: 'linear-gradient(135deg, #2a2725 0%, #191614 100%)',
           }}
         >
           <CardContent className="p-4 relative">
             <div
               aria-hidden
               className="absolute -top-12 -right-10 w-44 h-44 rounded-full blur-3xl opacity-30 float-animation"
-              style={{ background: '#60a5fa' }}
+              style={{ background: 'var(--brand-color)' }}
             />
             <div className="relative">
             <div className="flex items-center justify-between mb-4">
@@ -176,11 +176,11 @@ const DriverTripPage = () => {
             </h3>
             
             <div className="grid grid-cols-2 gap-3 text-sm mb-4">
-              <div className="flex items-center gap-2 text-blue-100">
+              <div className="flex items-center gap-2 text-grafito-300">
                 <Package className="w-4 h-4" />
                 <span>{activeTrip.cargo_description || '-'}</span>
               </div>
-              <div className="flex items-center gap-2 text-blue-100">
+              <div className="flex items-center gap-2 text-grafito-300">
                 <MapPin className="w-4 h-4" />
                 <span>{activeTrip.cargo_weight ? `${activeTrip.cargo_weight} kg` : '-'}</span>
               </div>

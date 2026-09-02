@@ -27,6 +27,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import EstadoVacio from '../components/EstadoVacio';
+import EncabezadoPagina from '../components/EncabezadoPagina';
+import TarjetaMetrica from '../components/TarjetaMetrica';
 
 const soles = (value) =>
   `S/ ${(Number(value) || 0).toLocaleString('es-PE', {
@@ -45,7 +47,7 @@ const localDate = (value) => {
 const STATUS_LABEL = {
   borrador: { label: 'Borrador', className: 'bg-grafito-100 text-grafito-600' },
   en_revision: { label: 'En revisión', className: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
-  aprobada: { label: 'Aprobada', className: 'bg-blue-100 text-blue-700 border-blue-200' },
+  aprobada: { label: 'Aprobada', className: 'bg-grafito-200 text-grafito-800 border-grafito-300' },
   cerrada: { label: 'Cerrada', className: 'bg-green-100 text-green-700 border-green-200' },
 };
 
@@ -209,16 +211,10 @@ const LiquidacionFletePage = () => {
 
   return (
     <div className="space-y-6 page-fade-in" data-testid="liquidacion-flete-page">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
-            Liquidación de Flete
-          </h1>
-          <p className="text-grafito-500 mt-1">
-            Guía remitente, ticket UNACEM, vale y factura de combustible por viaje — agrupados por proveedor y periodo.
-          </p>
-        </div>
-      </div>
+      <EncabezadoPagina
+        titulo="Liquidación de Flete"
+        subtitulo="Guía remitente, ticket UNACEM, vale y factura de combustible por viaje — agrupados por proveedor y periodo."
+      />
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
@@ -239,24 +235,21 @@ const LiquidacionFletePage = () => {
         {/* ================= LIQUIDACIONES ================= */}
         <TabsContent value="liquidaciones" className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Card className="bg-white border-l-4 border-l-grafito-400">
-              <CardContent className="py-4">
-                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Borradores</p>
-                <p className="font-heading text-3xl font-bold text-grafito-700 mt-1">{borradorCount}</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-white border-l-4 border-l-marca-500">
-              <CardContent className="py-4">
-                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Total a cobrar</p>
-                <p className="font-heading text-2xl font-bold text-marca-600 mt-1">{soles(totalACobrar)}</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-white border-l-4 border-l-green-500">
-              <CardContent className="py-4">
-                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Utilidad neta</p>
-                <p className="font-heading text-2xl font-bold text-green-600 mt-1">{soles(totalUtilidad)}</p>
-              </CardContent>
-            </Card>
+            <TarjetaMetrica
+              titulo="Borradores"
+              valor={borradorCount}
+              tono="neutro"
+            />
+            <TarjetaMetrica
+              titulo="Total a cobrar"
+              valor={soles(totalACobrar)}
+              tono="marca"
+            />
+            <TarjetaMetrica
+              titulo="Utilidad neta"
+              valor={soles(totalUtilidad)}
+              tono="ok"
+            />
           </div>
 
           <Card className="bg-white section-enter">
@@ -824,7 +817,7 @@ const WhatsappPendientesTab = ({ liquidaciones, proveedorName }) => {
                   <TableCell>{confidenceBadge(p.confidence)}</TableCell>
                   <TableCell className="font-mono text-xs">{(p.trip_id || '').substring(0, 8) || '-'}</TableCell>
                   <TableCell>
-                    <a href={p.file_url?.startsWith('/uploads') ? `${process.env.REACT_APP_BACKEND_URL || ''}${p.file_url}` : p.file_url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline flex items-center gap-1">
+                    <a href={p.file_url?.startsWith('/uploads') ? `${process.env.REACT_APP_BACKEND_URL || ''}${p.file_url}` : p.file_url} target="_blank" rel="noreferrer" className="text-grafito-600 hover:underline flex items-center gap-1">
                       <ImageIcon className="w-4 h-4" /> Ver
                     </a>
                   </TableCell>

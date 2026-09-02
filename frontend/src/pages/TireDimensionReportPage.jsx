@@ -12,8 +12,9 @@ import {
   TableHeader,
   TableRow,
 } from '../components/ui/table';
-import { ArrowLeft, Loader2, CircleDot, Download, RefreshCw, Recycle } from 'lucide-react';
+import { ArrowLeft, CircleDot, Download, RefreshCw, Recycle } from 'lucide-react';
 import { toast } from 'sonner';
+import { EsqueletoPagina } from '../components/Esqueletos';
 
 const POSITION_LABELS = {
   direccional: 'Direccional',
@@ -112,9 +113,7 @@ const TireDimensionReportPage = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
-      </div>
+      <EsqueletoPagina />
     );
   }
 

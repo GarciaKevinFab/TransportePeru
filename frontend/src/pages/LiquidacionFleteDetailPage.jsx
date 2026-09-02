@@ -22,6 +22,7 @@ import {
   CheckCircle2, FileSpreadsheet, Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import TarjetaMetrica from '../components/TarjetaMetrica';
 
 const soles = (value) =>
   `S/ ${(Number(value) || 0).toLocaleString('es-PE', {
@@ -40,7 +41,7 @@ const localDate = (value) => {
 const STATUS_LABEL = {
   borrador: { label: 'Borrador', className: 'bg-grafito-100 text-grafito-600' },
   en_revision: { label: 'En revisión', className: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
-  aprobada: { label: 'Aprobada', className: 'bg-blue-100 text-blue-700 border-blue-200' },
+  aprobada: { label: 'Aprobada', className: 'bg-grafito-200 text-grafito-800 border-grafito-300' },
   cerrada: { label: 'Cerrada', className: 'bg-green-100 text-green-700 border-green-200' },
 };
 
@@ -336,26 +337,31 @@ const LiquidacionFleteDetailPage = () => {
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-        <Card className="bg-white border-l-4 border-l-marca-500"><CardContent className="py-4">
-          <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">A cobrar</p>
-          <p className="font-heading text-xl font-bold text-marca-600 mt-1">{soles(liquidacion.total_a_cobrar)}</p>
-        </CardContent></Card>
-        <Card className="bg-white border-l-4 border-l-blue-500"><CardContent className="py-4">
-          <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Combustible</p>
-          <p className="font-heading text-xl font-bold text-blue-600 mt-1">{soles(liquidacion.total_combustible)}</p>
-        </CardContent></Card>
-        <Card className="bg-white border-l-4 border-l-purple-500"><CardContent className="py-4">
-          <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Detracción</p>
-          <p className="font-heading text-xl font-bold text-purple-600 mt-1">{soles(liquidacion.total_detraccion)}</p>
-        </CardContent></Card>
-        <Card className="bg-white border-l-4 border-l-grafito-400"><CardContent className="py-4">
-          <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Viáticos</p>
-          <p className="font-heading text-xl font-bold text-grafito-700 mt-1">{soles(liquidacion.total_viaticos)}</p>
-        </CardContent></Card>
-        <Card className="bg-white border-l-4 border-l-green-500"><CardContent className="py-4">
-          <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Utilidad neta</p>
-          <p className="font-heading text-xl font-bold text-green-600 mt-1">{soles(liquidacion.total_utilidad_neta)}</p>
-        </CardContent></Card>
+        <TarjetaMetrica
+          titulo="A cobrar"
+          valor={soles(liquidacion.total_a_cobrar)}
+          tono="marca"
+        />
+        <TarjetaMetrica
+          titulo="Combustible"
+          valor={soles(liquidacion.total_combustible)}
+          tono="neutro"
+        />
+        <TarjetaMetrica
+          titulo="Detracción"
+          valor={soles(liquidacion.total_detraccion)}
+          tono="neutro"
+        />
+        <TarjetaMetrica
+          titulo="Viáticos"
+          valor={soles(liquidacion.total_viaticos)}
+          tono="neutro"
+        />
+        <TarjetaMetrica
+          titulo="Utilidad neta"
+          valor={soles(liquidacion.total_utilidad_neta)}
+          tono="ok"
+        />
       </div>
 
       <Card className="bg-white section-enter">
@@ -558,7 +564,7 @@ const LiquidacionFleteDetailPage = () => {
                         <ImageIcon className="w-3.5 h-3.5" />
                       </Button>
                     </div>
-                    {docStatus[kind] === 'ocr' && <p className="text-xs text-blue-600 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Extrayendo datos...</p>}
+                    {docStatus[kind] === 'ocr' && <p className="text-xs text-grafito-600 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Extrayendo datos...</p>}
                     {docStatus[kind] === 'uploading' && <p className="text-xs text-grafito-400 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Guardando...</p>}
                   </div>
                 ))}

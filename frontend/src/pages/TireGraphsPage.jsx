@@ -36,6 +36,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { EsqueletoPagina } from '../components/Esqueletos';
 
 // Profundidad mínima legal / crítica (mm). El backend usa 3mm por defecto.
 const CRITICAL_DEPTH_MM = 3;
@@ -203,9 +204,7 @@ const TireGraphsPage = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
-      </div>
+      <EsqueletoPagina />
     );
   }
 
@@ -277,8 +276,8 @@ const TireGraphsPage = () => {
             <Card className="bg-white">
               <CardContent className="pt-6">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-sm bg-blue-50">
-                    <Route className="w-5 h-5 text-blue-600" />
+                  <div className="p-2 rounded-sm bg-grafito-100">
+                    <Route className="w-5 h-5 text-grafito-600" />
                   </div>
                   <div>
                     <p className="text-xs text-grafito-500 uppercase font-bold">Km Recorridos</p>
@@ -372,8 +371,8 @@ const TireGraphsPage = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-3 p-4 rounded-sm bg-grafito-50">
-                      <div className="p-2 rounded-sm bg-blue-50">
-                        <CalendarClock className="w-5 h-5 text-blue-600" />
+                      <div className="p-2 rounded-sm bg-grafito-100">
+                        <CalendarClock className="w-5 h-5 text-grafito-600" />
                       </div>
                       <div>
                         <p className="text-xs text-grafito-500 uppercase font-bold">
@@ -515,7 +514,7 @@ const TireGraphsPage = () => {
                         type="monotone"
                         dataKey="pressure"
                         name="Presión (PSI)"
-                        stroke="#2563eb"
+                        stroke="#55514c"
                         strokeWidth={2}
                         dot={{ r: 3 }}
                         connectNulls

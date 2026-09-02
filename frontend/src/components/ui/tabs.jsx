@@ -10,7 +10,7 @@ const Tabs = TabsPrimitive.Root
    el borde que de verdad esconde algo. Se recalcula al desplazar y al
    cambiar de tamano; sin ResizeObserver (navegadores viejos) queda el
    estado inicial, que ya es correcto para la carga. */
-const usarDesborde = (ref) => {
+const useDesborde = (ref) => {
   const [desborde, setDesborde] = React.useState('ninguno');
   React.useEffect(() => {
     const el = ref.current;
@@ -46,7 +46,7 @@ const TabsList = React.forwardRef(({ className, ...props }, refExterno) => {
     if (typeof refExterno === 'function') refExterno(nodo);
     else if (refExterno) refExterno.current = nodo;
   }, [refExterno]);
-  const desborde = usarDesborde(refInterno);
+  const desborde = useDesborde(refInterno);
 
   return (
     <TabsPrimitive.List

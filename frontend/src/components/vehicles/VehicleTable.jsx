@@ -23,7 +23,6 @@ import {
   Eye,
   Edit,
   Trash2,
-  Loader2,
   CircleDot,
   UserCheck,
   Shield,
@@ -32,6 +31,7 @@ import {
   Unlink,
 } from 'lucide-react';
 import { getStatusBadge, getTypeBadge } from './vehicleBadges';
+import { EsqueletoTabla } from '../Esqueletos';
 
 const VehicleTable = ({
   vehicles,
@@ -122,9 +122,7 @@ const VehicleTable = ({
     <Card className="bg-white section-enter section-stagger-1">
       <CardContent className="p-0 overflow-x-auto">
         {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
-          </div>
+          <EsqueletoTabla />
         ) : vehicles.length === 0 ? (
           totalVehiculos === 0 ? (
             <EstadoVacio

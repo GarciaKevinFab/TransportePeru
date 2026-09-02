@@ -337,11 +337,11 @@ const DriverFuelPage = () => {
             <p className="text-sm text-green-100">Litros cargados</p>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
+        <Card className="bg-grafito-900 text-white">
           <CardContent className="p-4">
             <DollarSign className="w-6 h-6 mb-2 opacity-80" />
             <p className="text-2xl font-bold">S/ {totalSpent.toFixed(0)}</p>
-            <p className="text-sm text-blue-100">Total gastado</p>
+            <p className="text-sm text-grafito-300">Total gastado</p>
           </CardContent>
         </Card>
       </div>
@@ -398,8 +398,8 @@ const DriverFuelPage = () => {
 
           <div className="space-y-4 py-2 max-h-[70vh] overflow-y-auto">
             {/* VOUCHER PHOTO */}
-            <div className="space-y-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
-              <Label className="flex items-center gap-2 text-blue-900 font-semibold">
+            <div className="space-y-2 p-3 bg-grafito-100 rounded-lg border border-grafito-200">
+              <Label className="flex items-center gap-2 text-grafito-900 font-semibold">
                 <Receipt className="w-4 h-4" /> Vale de Combustible
               </Label>
               <Input
@@ -457,7 +457,7 @@ const DriverFuelPage = () => {
                 </div>
               )}
               {extractingOCR && (
-                <p className="text-xs text-blue-700 flex items-center gap-1">
+                <p className="text-xs text-grafito-700 flex items-center gap-1">
                   <TrendingUp className="w-3 h-3" /> Extrayendo datos con IA...
                 </p>
               )}

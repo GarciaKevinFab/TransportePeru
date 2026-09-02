@@ -40,6 +40,9 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import EstadoVacio from '../components/EstadoVacio';
+import EncabezadoPagina from '../components/EncabezadoPagina';
+import { EsqueletoTabla } from '../components/Esqueletos';
+import TarjetaMetrica from '../components/TarjetaMetrica';
 
 const InventoryPage = () => {
   const [loading, setLoading] = useState(true);
@@ -209,55 +212,51 @@ const InventoryPage = () => {
   return (
     <div className="space-y-6 page-fade-in" data-testid="inventory-page">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
-            Inventario
-          </h1>
-          <p className="text-grafito-500 mt-1">
-            Gestión de repuestos, stock y proveedores
-          </p>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-3">
-          <Button variant="outline" className="btn-press" onClick={() => setShowSupplierDialog(true)}>
-            <Building className="w-4 h-4 mr-2" />
-            Nuevo Proveedor
-          </Button>
-          <Button className="btn-action btn-press" onClick={() => setShowItemDialog(true)} data-testid="new-item-btn">
-            <Plus className="w-4 h-4 mr-2" />
-            Nuevo Item
-          </Button>
-        </div>
-      </div>
+      <EncabezadoPagina
+        titulo="Inventario"
+        subtitulo="Gestión de repuestos, stock y proveedores"
+        acciones={(
+          <>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button variant="outline" className="btn-press" onClick={() => setShowSupplierDialog(true)}>
+                <Building className="w-4 h-4 mr-2" />
+                Nuevo Proveedor
+              </Button>
+              <Button className="btn-action btn-press" onClick={() => setShowItemDialog(true)} data-testid="new-item-btn">
+                <Plus className="w-4 h-4 mr-2" />
+                Nuevo Item
+              </Button>
+            </div>
+          </>
+        )}
+      />
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-white border-l-4 border-l-blue-500 card-enter card-stagger-1">
-          <CardContent className="py-4">
-            <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Total Items</p>
-            <p className="font-heading text-3xl font-bold text-blue-600 mt-1">{items.length}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-white border-l-4 border-l-red-500 card-enter card-stagger-2">
-          <CardContent className="py-4">
-            <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Stock Bajo</p>
-            <p className="font-heading text-3xl font-bold text-red-600 mt-1">{lowStockItems.length}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-white border-l-4 border-l-green-500 card-enter card-stagger-3">
-          <CardContent className="py-4">
-            <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Valor Total</p>
-            <p className="font-heading text-3xl font-bold text-green-600 mt-1">
-              S/ {items.reduce((a, b) => a + (b.current_stock * b.unit_cost), 0).toLocaleString()}
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="bg-white border-l-4 border-l-marca-500 card-enter card-stagger-4">
-          <CardContent className="py-4">
-            <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Proveedores</p>
-            <p className="font-heading text-3xl font-bold text-marca-600 mt-1">{suppliers.length}</p>
-          </CardContent>
-        </Card>
+        <TarjetaMetrica
+          titulo="Total Items"
+          valor={items.length}
+          tono="neutro"
+          className="card-enter card-stagger-1"
+        />
+        <TarjetaMetrica
+          titulo="Stock Bajo"
+          valor={lowStockItems.length}
+          tono="alerta"
+          className="card-enter card-stagger-2"
+        />
+        <TarjetaMetrica
+          titulo="Valor Total"
+          valor={<>S/ {items.reduce((a, b) => a + (b.current_stock * b.unit_cost), 0).toLocaleString()}</>}
+          tono="ok"
+          className="card-enter card-stagger-3"
+        />
+        <TarjetaMetrica
+          titulo="Proveedores"
+          valor={suppliers.length}
+          tono="marca"
+          className="card-enter card-stagger-4"
+        />
       </div>
 
       {/* Tabs */}
@@ -300,9 +299,7 @@ const InventoryPage = () => {
           <Card className="bg-white section-enter">
             <CardContent className="p-0 overflow-x-auto">
               {loading ? (
-                <div className="flex items-center justify-center h-64">
-                  <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
-                </div>
+                <EsqueletoTabla />
               ) : filteredItems.length === 0 ? (
                 /* Con datos pero sin coincidencias (busqueda o boton de stock
                    bajo) no se ofrece crear nada; sin ningun item, la tabla

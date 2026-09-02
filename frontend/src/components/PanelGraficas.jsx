@@ -25,7 +25,7 @@ import api from '../services/api';
  */
 
 const NARANJA = '#e00000';
-const AZUL = '#60a5fa';
+const GRAFITO = '#55514c';
 
 const soles = (n) =>
   'S/ ' + Number(n || 0).toLocaleString('es-PE', { maximumFractionDigits: 0 });
@@ -150,7 +150,7 @@ const PanelGraficas = ({ semanas = 12 }) => {
               content={<Etiqueta formato={(v) => `${v} ${v === 1 ? 'viaje' : 'viajes'}`} />}
               cursor={{ fill: 'rgba(161,157,151,0.12)' }}
             />
-            <Bar dataKey="viajes" fill={AZUL} radius={[4, 4, 0, 0]} maxBarSize={38} isAnimationActive={false} />
+            <Bar dataKey="viajes" fill={GRAFITO} radius={[4, 4, 0, 0]} maxBarSize={38} isAnimationActive={false} />
           </BarChart>
         </ResponsiveContainer>
       </Marco>

@@ -136,7 +136,7 @@ const NotificationsPopover = () => {
                 <div 
                   key={notification.id}
                   className={`p-3 cursor-pointer hover:bg-grafito-50 transition-colors ${
-                    !notification.is_read ? 'bg-blue-50/50' : ''
+                    !notification.is_read ? 'bg-marca-50/60' : ''
                   }`}
                   onClick={() => !notification.is_read && handleMarkAsRead(notification.id)}
                 >
@@ -159,7 +159,7 @@ const NotificationsPopover = () => {
                       </p>
                     </div>
                     {!notification.is_read && (
-                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-2" />
+                      <div className="w-2 h-2 bg-grafito-1000 rounded-full mt-2" />
                     )}
                   </div>
                 </div>

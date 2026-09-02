@@ -85,7 +85,7 @@ const DriverHomePage = () => {
   }, [user?.id, fetchData]);
 
   const quickActions = [
-    { icon: FileText, label: 'Checklist', path: '/driver/checklist', gradient: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)' },
+    { icon: FileText, label: 'Checklist', path: '/driver/checklist', gradient: 'linear-gradient(135deg, #423e3a 0%, #2a2725 100%)' },
     { icon: Fuel, label: 'Combustible', path: '/driver/fuel', gradient: 'linear-gradient(135deg, #10b981 0%, #047857 100%)' },
     { icon: AlertTriangle, label: 'Reportar', path: '/driver/issues', gradient: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)' },
     { icon: Truck, label: 'Mi Viaje', path: '/driver/trip', gradient: 'linear-gradient(135deg, var(--brand-color) 0%, color-mix(in srgb, var(--brand-color) 70%, #b91c1c) 100%)' },
@@ -134,14 +134,14 @@ const DriverHomePage = () => {
         <Card
           className="text-white overflow-hidden border-0 smooth-appear smooth-appear-1 card-3d glow-on-hover"
           style={{
-            backgroundImage: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+            backgroundImage: 'linear-gradient(135deg, #2a2725 0%, #191614 100%)',
           }}
         >
           <CardContent className="p-4 relative">
             <div
               aria-hidden
               className="absolute -top-10 -right-10 w-40 h-40 rounded-full blur-3xl opacity-30 float-animation"
-              style={{ background: '#60a5fa' }}
+              style={{ background: 'var(--brand-color)' }}
             />
             <div className="relative">
               <div className="flex items-center justify-between mb-3">
@@ -157,11 +157,11 @@ const DriverHomePage = () => {
               <h3 className="font-heading font-black text-xl mb-1 tracking-tight">
                 {activeTrip.client_name || 'Sin cliente'}
               </h3>
-              <p className="text-blue-100 text-sm mb-3">
+              <p className="text-grafito-300 text-sm mb-3">
                 {activeTrip.cargo_description || 'Sin descripción'}
               </p>
 
-              <div className="flex items-center gap-4 text-sm text-blue-100 mb-4">
+              <div className="flex items-center gap-4 text-sm text-grafito-300 mb-4">
                 <div className="flex items-center gap-1.5">
                   <Package className="w-4 h-4" />
                   {activeTrip.cargo_weight ? `${activeTrip.cargo_weight} kg` : '-'}
@@ -173,7 +173,7 @@ const DriverHomePage = () => {
               </div>
 
               <Button
-                className="w-full bg-white text-blue-700 hover:bg-blue-50 rounded-lg btn-shine tap-scale font-semibold"
+                className="w-full bg-white text-grafito-900 hover:bg-grafito-100 rounded-lg btn-shine tap-scale font-semibold"
                 onClick={() => navigate('/driver/trip')}
               >
                 Ver Detalles del Viaje

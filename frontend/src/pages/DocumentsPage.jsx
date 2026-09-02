@@ -46,6 +46,9 @@ import { toast } from 'sonner';
 import { format, differenceInDays } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import EstadoVacio from '../components/EstadoVacio';
+import EncabezadoPagina from '../components/EncabezadoPagina';
+import { EsqueletoTabla } from '../components/Esqueletos';
+import TarjetaMetrica from '../components/TarjetaMetrica';
 
 // Los archivos locales se sirven en `${BACKEND_URL}/uploads/...` (URL relativa);
 // los de S3 ya vienen como URL absoluta.
@@ -260,27 +263,25 @@ const DocumentsPage = () => {
   return (
     <div className="space-y-6 page-fade-in" data-testid="documents-page">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
-            Documentos
-          </h1>
-          <p className="text-grafito-500 mt-1">
-            Matriz de documentos y vencimientos
-          </p>
-        </div>
-        <Button
-          className="btn-action btn-press"
-          onClick={() => {
-            setFormData({ ...formData, entity_type: entityType });
-            setShowCreateDialog(true);
-          }}
-          data-testid="new-document-btn"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Nuevo Documento
-        </Button>
-      </div>
+      <EncabezadoPagina
+        titulo="Documentos"
+        subtitulo="Matriz de documentos y vencimientos"
+        acciones={(
+          <>
+            <Button
+              className="btn-action btn-press"
+              onClick={() => {
+                setFormData({ ...formData, entity_type: entityType });
+                setShowCreateDialog(true);
+              }}
+              data-testid="new-document-btn"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Nuevo Documento
+            </Button>
+          </>
+        )}
+      />
 
       {/* Tabs */}
       <Tabs value={entityType} onValueChange={setEntityType}>
@@ -324,9 +325,7 @@ const DocumentsPage = () => {
             </CardHeader>
             <CardContent className="p-0 overflow-x-auto">
               {loading ? (
-                <div className="flex items-center justify-center h-64">
-                  <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
-                </div>
+                <EsqueletoTabla />
               ) : !matrix?.matrix?.length ? (
                 /* La matriz vacia no es "sin documentos": es que aun no hay
                    filas (vehiculos o choferes) a las que colgarlos. La guia
@@ -433,72 +432,48 @@ const DocumentsPage = () => {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-white border-l-4 border-l-green-500 card-enter card-stagger-1">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Vigentes</p>
-                <p className="font-heading text-3xl font-bold text-green-600 mt-1">
-                  {matrix?.matrix?.reduce((acc, row) => 
+        <TarjetaMetrica
+          titulo="Vigentes"
+          valor={<>{matrix?.matrix?.reduce((acc, row) => 
                     acc + Object.values(row.documents).filter(d => {
                       if (!d?.expiry_date) return true;
                       return differenceInDays(new Date(d.expiry_date), new Date()) > 30;
-                    }).length, 0) || 0}
-                </p>
-              </div>
-              <CheckCircle className="w-8 h-8 text-green-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-white border-l-4 border-l-yellow-500 card-enter card-stagger-2">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Por Vencer</p>
-                <p className="font-heading text-3xl font-bold text-yellow-600 mt-1">
-                  {matrix?.matrix?.reduce((acc, row) => 
+                    }).length, 0) || 0}</>}
+          icono={CheckCircle}
+          tono="ok"
+          className="card-enter card-stagger-1"
+        />
+        <TarjetaMetrica
+          titulo="Por Vencer"
+          valor={<>{matrix?.matrix?.reduce((acc, row) => 
                     acc + Object.values(row.documents).filter(d => {
                       if (!d?.expiry_date) return false;
                       const days = differenceInDays(new Date(d.expiry_date), new Date());
                       return days >= 0 && days <= 30;
-                    }).length, 0) || 0}
-                </p>
-              </div>
-              <Clock className="w-8 h-8 text-yellow-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-white border-l-4 border-l-red-500 card-enter card-stagger-3">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Vencidos</p>
-                <p className="font-heading text-3xl font-bold text-red-600 mt-1">
-                  {matrix?.matrix?.reduce((acc, row) => 
+                    }).length, 0) || 0}</>}
+          icono={Clock}
+          tono="aviso"
+          className="card-enter card-stagger-2"
+        />
+        <TarjetaMetrica
+          titulo="Vencidos"
+          valor={<>{matrix?.matrix?.reduce((acc, row) => 
                     acc + Object.values(row.documents).filter(d => {
                       if (!d?.expiry_date) return false;
                       return differenceInDays(new Date(d.expiry_date), new Date()) < 0;
-                    }).length, 0) || 0}
-                </p>
-              </div>
-              <AlertTriangle className="w-8 h-8 text-red-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-white border-l-4 border-l-grafito-500 card-enter card-stagger-4">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Pendientes</p>
-                <p className="font-heading text-3xl font-bold text-grafito-600 mt-1">
-                  {matrix?.matrix?.reduce((acc, row) => 
+                    }).length, 0) || 0}</>}
+          icono={AlertTriangle}
+          tono="alerta"
+          className="card-enter card-stagger-3"
+        />
+        <TarjetaMetrica
+          titulo="Pendientes"
+          valor={matrix?.matrix?.reduce((acc, row) => 
                     acc + Object.values(row.documents).filter(d => !d).length, 0) || 0}
-                </p>
-              </div>
-              <XCircle className="w-8 h-8 text-grafito-500" />
-            </div>
-          </CardContent>
-        </Card>
+          icono={XCircle}
+          tono="neutro"
+          className="card-enter card-stagger-4"
+        />
       </div>
 
       {/* Create Document Dialog */}

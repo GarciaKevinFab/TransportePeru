@@ -59,6 +59,8 @@ import { format } from 'date-fns';
 import EstadoVacio from '../components/EstadoVacio';
 import { es } from 'date-fns/locale';
 import { useAuth } from '../context/AuthContext';
+import EncabezadoPagina from '../components/EncabezadoPagina';
+import { EsqueletoTabla } from '../components/Esqueletos';
 
 const TripsPage = () => {
   const navigate = useNavigate();
@@ -294,7 +296,7 @@ const TripsPage = () => {
   const getStatusBadge = (status) => {
     const styles = {
       programado: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      en_curso: 'bg-blue-100 text-blue-800 border-blue-200',
+      en_curso: 'bg-grafito-200 text-grafito-800 border-grafito-300',
       completado: 'bg-green-100 text-green-800 border-green-200',
       cancelado: 'bg-red-100 text-red-800 border-red-200',
     };
@@ -379,20 +381,18 @@ const TripsPage = () => {
   return (
     <div className="space-y-6 page-fade-in" data-testid="trips-page">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
-            Viajes
-          </h1>
-          <p className="text-grafito-500 mt-1">
-            Gestión y seguimiento de viajes
-          </p>
-        </div>
-        <Button className="btn-action btn-press" onClick={() => setShowCreateDialog(true)} data-testid="new-trip-btn">
-          <Plus className="w-4 h-4 mr-2" />
-          Nuevo Viaje
-        </Button>
-      </div>
+      <EncabezadoPagina
+        titulo="Viajes"
+        subtitulo="Gestión y seguimiento de viajes"
+        acciones={(
+          <>
+            <Button className="btn-action btn-press" onClick={() => setShowCreateDialog(true)} data-testid="new-trip-btn">
+              <Plus className="w-4 h-4 mr-2" />
+              Nuevo Viaje
+            </Button>
+          </>
+        )}
+      />
 
       {/* Filters */}
       <Card className="bg-white section-enter">
@@ -428,9 +428,7 @@ const TripsPage = () => {
       <Card className="bg-white section-enter section-stagger-1">
         <CardContent className="p-0 overflow-x-auto">
           {loading ? (
-            <div className="flex items-center justify-center h-64">
-              <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
-            </div>
+            <EsqueletoTabla />
           ) : filteredTrips.length === 0 ? (
             /* El orden de las guias sigue el orden real del arranque: sin
                tractos no hay viaje posible, sin choferes tampoco. Mandar a la

@@ -10,6 +10,7 @@ import { ArrowLeft, ArrowRight, Loader2, RotateCw, X, Repeat, CircleDot } from '
 import { toast } from 'sonner';
 import TruckSchema from '../components/tires/TruckSchema';
 import { getRenderConfig } from '../components/tires/tireSchema';
+import { EsqueletoPagina } from '../components/Esqueletos';
 
 // Compute a coarse status for a tire based on its last inspection depths.
 const computeTireStatus = (tire) => {
@@ -187,9 +188,7 @@ const RotateTiresPage = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
-      </div>
+      <EsqueletoPagina />
     );
   }
 

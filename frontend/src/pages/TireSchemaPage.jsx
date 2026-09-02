@@ -54,6 +54,7 @@ import { es } from 'date-fns/locale';
 import TruckSchema from '../components/tires/TruckSchema';
 import AxleConfigDialog from '../components/tires/AxleConfigDialog';
 import { getRenderConfig, deriveAxleConfig } from '../components/tires/tireSchema';
+import { EsqueletoPagina } from '../components/Esqueletos';
 
 const TireSchemaPage = () => {
   const { vehicleId } = useParams();
@@ -344,9 +345,9 @@ const TireSchemaPage = () => {
     warning: 'bg-yellow-100 text-yellow-700 border-yellow-200',
     media: 'bg-yellow-100 text-yellow-700 border-yellow-200',
     medium: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-    info: 'bg-blue-100 text-blue-700 border-blue-200',
-    baja: 'bg-blue-100 text-blue-700 border-blue-200',
-    low: 'bg-blue-100 text-blue-700 border-blue-200',
+    info: 'bg-grafito-200 text-grafito-800 border-grafito-300',
+    baja: 'bg-grafito-200 text-grafito-800 border-grafito-300',
+    low: 'bg-grafito-200 text-grafito-800 border-grafito-300',
   };
   const severityClass = (sev) => severityStyles[String(sev || '').toLowerCase()] || 'bg-grafito-100 text-grafito-600 border-grafito-200';
 
@@ -357,9 +358,7 @@ const TireSchemaPage = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
-      </div>
+      <EsqueletoPagina />
     );
   }
 

@@ -47,6 +47,8 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import EncabezadoPagina from '../components/EncabezadoPagina';
+import TarjetaMetrica from '../components/TarjetaMetrica';
 
 const ReportsPage = () => {
   const [loading, setLoading] = useState(false);
@@ -296,16 +298,10 @@ const ReportsPage = () => {
   return (
     <div className="space-y-6 page-fade-in" data-testid="reports-page">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
-            Reportes
-          </h1>
-          <p className="text-grafito-500 mt-1">
-            Generación y exportación de reportes del sistema
-          </p>
-        </div>
-      </div>
+      <EncabezadoPagina
+        titulo="Reportes"
+        subtitulo="Generación y exportación de reportes del sistema"
+      />
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -417,38 +413,31 @@ const ReportsPage = () => {
             <>
               {/* Stats */}
               <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
-                <Card className="bg-white border-l-4 border-l-blue-500">
-                  <CardContent className="py-4">
-                    <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Total Viajes</p>
-                    <p className="font-heading text-3xl font-bold text-blue-600 mt-1">{tripsReport.totals.count}</p>
-                  </CardContent>
-                </Card>
-                <Card className="bg-white border-l-4 border-l-green-500">
-                  <CardContent className="py-4">
-                    <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Km Recorridos</p>
-                    <p className="font-heading text-2xl font-bold text-green-600 mt-1">{tripsReport.totals.total_km.toLocaleString()}</p>
-                  </CardContent>
-                </Card>
-                <Card className="bg-white border-l-4 border-l-marca-500">
-                  <CardContent className="py-4">
-                    <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Anticipos</p>
-                    <p className="font-heading text-xl font-bold text-marca-600 mt-1">S/ {tripsReport.totals.total_advances.toLocaleString()}</p>
-                  </CardContent>
-                </Card>
-                <Card className="bg-white border-l-4 border-l-red-500">
-                  <CardContent className="py-4">
-                    <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Gastos</p>
-                    <p className="font-heading text-xl font-bold text-red-600 mt-1">S/ {tripsReport.totals.total_expenses.toLocaleString()}</p>
-                  </CardContent>
-                </Card>
-                <Card className="bg-white border-l-4 border-l-grafito-500">
-                  <CardContent className="py-4">
-                    <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Balance</p>
-                    <p className={`font-heading text-xl font-bold mt-1 ${tripsReport.totals.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      S/ {Math.abs(tripsReport.totals.balance).toLocaleString()}
-                    </p>
-                  </CardContent>
-                </Card>
+                <TarjetaMetrica
+                  titulo="Total Viajes"
+                  valor={tripsReport.totals.count}
+                  tono="neutro"
+                />
+                <TarjetaMetrica
+                  titulo="Km Recorridos"
+                  valor={tripsReport.totals.total_km.toLocaleString()}
+                  tono="ok"
+                />
+                <TarjetaMetrica
+                  titulo="Anticipos"
+                  valor={<>S/ {tripsReport.totals.total_advances.toLocaleString()}</>}
+                  tono="marca"
+                />
+                <TarjetaMetrica
+                  titulo="Gastos"
+                  valor={<>S/ {tripsReport.totals.total_expenses.toLocaleString()}</>}
+                  tono="alerta"
+                />
+                <TarjetaMetrica
+                  titulo="Balance"
+                  valor={<>S/ {Math.abs(tripsReport.totals.balance).toLocaleString()}</>}
+                  tono={tripsReport.totals.balance >= 0 ? 'ok' : 'alerta'}
+                />
               </div>
 
               {/* Table */}
@@ -509,30 +498,26 @@ const ReportsPage = () => {
           {fuelReport && (
             <>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                <Card className="bg-white border-l-4 border-l-blue-500">
-                  <CardContent className="py-4">
-                    <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Total Cargas</p>
-                    <p className="font-heading text-3xl font-bold text-blue-600 mt-1">{fuelReport.totals.total_loads}</p>
-                  </CardContent>
-                </Card>
-                <Card className="bg-white border-l-4 border-l-green-500">
-                  <CardContent className="py-4">
-                    <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Total Litros</p>
-                    <p className="font-heading text-2xl font-bold text-green-600 mt-1">{fuelReport.totals.total_liters.toLocaleString()}</p>
-                  </CardContent>
-                </Card>
-                <Card className="bg-white border-l-4 border-l-marca-500">
-                  <CardContent className="py-4">
-                    <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Total Gastado</p>
-                    <p className="font-heading text-xl font-bold text-marca-600 mt-1">S/ {fuelReport.totals.total_amount.toLocaleString()}</p>
-                  </CardContent>
-                </Card>
-                <Card className="bg-white border-l-4 border-l-grafito-500">
-                  <CardContent className="py-4">
-                    <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Precio Promedio</p>
-                    <p className="font-heading text-xl font-bold text-grafito-600 mt-1">S/ {fuelReport.totals.avg_price_per_liter.toFixed(2)}/L</p>
-                  </CardContent>
-                </Card>
+                <TarjetaMetrica
+                  titulo="Total Cargas"
+                  valor={fuelReport.totals.total_loads}
+                  tono="neutro"
+                />
+                <TarjetaMetrica
+                  titulo="Total Litros"
+                  valor={fuelReport.totals.total_liters.toLocaleString()}
+                  tono="ok"
+                />
+                <TarjetaMetrica
+                  titulo="Total Gastado"
+                  valor={<>S/ {fuelReport.totals.total_amount.toLocaleString()}</>}
+                  tono="marca"
+                />
+                <TarjetaMetrica
+                  titulo="Precio Promedio"
+                  valor={<>S/ {fuelReport.totals.avg_price_per_liter.toFixed(2)}/L</>}
+                  tono="neutro"
+                />
               </div>
 
               <Card className="bg-white section-enter">
@@ -582,30 +567,26 @@ const ReportsPage = () => {
           {maintenanceReport && (
             <>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                <Card className="bg-white border-l-4 border-l-blue-500">
-                  <CardContent className="py-4">
-                    <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Total OTs</p>
-                    <p className="font-heading text-3xl font-bold text-blue-600 mt-1">{maintenanceReport.totals.count}</p>
-                  </CardContent>
-                </Card>
-                <Card className="bg-white border-l-4 border-l-marca-500">
-                  <CardContent className="py-4">
-                    <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Costo Total</p>
-                    <p className="font-heading text-xl font-bold text-marca-600 mt-1">S/ {maintenanceReport.totals.total_cost.toLocaleString()}</p>
-                  </CardContent>
-                </Card>
-                <Card className="bg-white border-l-4 border-l-green-500">
-                  <CardContent className="py-4">
-                    <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Completadas</p>
-                    <p className="font-heading text-3xl font-bold text-green-600 mt-1">{maintenanceReport.by_status.completada || 0}</p>
-                  </CardContent>
-                </Card>
-                <Card className="bg-white border-l-4 border-l-yellow-500">
-                  <CardContent className="py-4">
-                    <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">En Proceso</p>
-                    <p className="font-heading text-3xl font-bold text-yellow-600 mt-1">{maintenanceReport.by_status.en_proceso || 0}</p>
-                  </CardContent>
-                </Card>
+                <TarjetaMetrica
+                  titulo="Total OTs"
+                  valor={maintenanceReport.totals.count}
+                  tono="neutro"
+                />
+                <TarjetaMetrica
+                  titulo="Costo Total"
+                  valor={<>S/ {maintenanceReport.totals.total_cost.toLocaleString()}</>}
+                  tono="marca"
+                />
+                <TarjetaMetrica
+                  titulo="Completadas"
+                  valor={maintenanceReport.by_status.completada || 0}
+                  tono="ok"
+                />
+                <TarjetaMetrica
+                  titulo="En Proceso"
+                  valor={maintenanceReport.by_status.en_proceso || 0}
+                  tono="aviso"
+                />
               </div>
 
               <Card className="bg-white section-enter">
@@ -666,18 +647,16 @@ const ReportsPage = () => {
             <>
               <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
                 <div className="grid grid-cols-2 gap-4 flex-1 min-w-[240px]">
-                  <Card className="bg-white border-l-4 border-l-red-500">
-                    <CardContent className="py-4">
-                      <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">A Reemplazar</p>
-                      <p className="font-heading text-3xl font-bold text-red-600 mt-1">{tiresReport.total_replace || 0}</p>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-white border-l-4 border-l-yellow-500">
-                    <CardContent className="py-4">
-                      <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">A Reencauchar</p>
-                      <p className="font-heading text-3xl font-bold text-yellow-600 mt-1">{tiresReport.total_retread || 0}</p>
-                    </CardContent>
-                  </Card>
+                  <TarjetaMetrica
+                    titulo="A Reemplazar"
+                    valor={tiresReport.total_replace || 0}
+                    tono="alerta"
+                  />
+                  <TarjetaMetrica
+                    titulo="A Reencauchar"
+                    valor={tiresReport.total_retread || 0}
+                    tono="aviso"
+                  />
                 </div>
                 <Link to="/tires/required-by-dimension">
                   <Button variant="outline" data-testid="tires-by-dimension-link">
@@ -780,26 +759,21 @@ const ReportsPage = () => {
               return (
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-                    <Card className="bg-white border-l-4 border-l-blue-500">
-                      <CardContent className="py-4">
-                        <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Presupuesto</p>
-                        <p className="font-heading text-xl font-bold text-blue-600 mt-1">S/ {(Number(totals.budget) || 0).toLocaleString()}</p>
-                      </CardContent>
-                    </Card>
-                    <Card className="bg-white border-l-4 border-l-marca-500">
-                      <CardContent className="py-4">
-                        <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Gastado</p>
-                        <p className="font-heading text-xl font-bold text-marca-600 mt-1">S/ {(Number(totals.spent) || 0).toLocaleString()}</p>
-                      </CardContent>
-                    </Card>
-                    <Card className="bg-white border-l-4 border-l-green-500">
-                      <CardContent className="py-4">
-                        <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Saldo</p>
-                        <p className={`font-heading text-xl font-bold mt-1 ${(Number(totals.balance) || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          S/ {(Number(totals.balance) || 0).toLocaleString()}
-                        </p>
-                      </CardContent>
-                    </Card>
+                    <TarjetaMetrica
+                      titulo="Presupuesto"
+                      valor={<>S/ {(Number(totals.budget) || 0).toLocaleString()}</>}
+                      tono="neutro"
+                    />
+                    <TarjetaMetrica
+                      titulo="Gastado"
+                      valor={<>S/ {(Number(totals.spent) || 0).toLocaleString()}</>}
+                      tono="marca"
+                    />
+                    <TarjetaMetrica
+                      titulo="Saldo"
+                      valor={<>S/ {(Number(totals.balance) || 0).toLocaleString()}</>}
+                      tono={(Number(totals.balance) || 0) >= 0 ? 'ok' : 'alerta'}
+                    />
                   </div>
                   <Card className="bg-white section-enter">
                     <CardHeader className="flex-row items-center justify-between">
