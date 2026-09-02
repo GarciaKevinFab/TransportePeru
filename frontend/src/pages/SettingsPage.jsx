@@ -408,11 +408,27 @@ const SettingsPage = () => {
                       <p className="text-xs text-grafito-500">Se usa en sidebar y botones</p>
                     </div>
                   </div>
-                  <div className="flex gap-2 mt-2">
-                    {['#e00000', '#3b82f6', '#10b981', '#ef4444', '#8b5cf6', '#06b6d4'].map(color => (
+                  {/* Eran seis circulos de 32 px sin nombre: con lector de
+                      pantalla se oian como seis "boton" seguidos, sin decir de
+                      que color era cada uno ni cual estaba puesto. Y con el
+                      dedo, 32 px es poco para acertar en una fila apretada.
+                      En telefono suben a 44; en escritorio vuelven a 32. */}
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {[
+                      ['#e00000', 'Rojo'],
+                      ['#3b82f6', 'Azul'],
+                      ['#10b981', 'Verde'],
+                      ['#ef4444', 'Coral'],
+                      ['#8b5cf6', 'Morado'],
+                      ['#06b6d4', 'Turquesa'],
+                    ].map(([color, nombre]) => (
                       <button
                         key={color}
-                        className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${companyForm.brand_color === color ? 'border-grafito-900 scale-110' : 'border-transparent'}`}
+                        type="button"
+                        aria-label={`Color de marca ${nombre}`}
+                        aria-pressed={companyForm.brand_color === color}
+                        title={nombre}
+                        className={`w-11 h-11 sm:w-8 sm:h-8 rounded-full border-2 transition-transform hover:scale-110 ${companyForm.brand_color === color ? 'border-grafito-900 scale-110' : 'border-transparent'}`}
                         style={{ backgroundColor: color }}
                         onClick={() => setCompanyForm({ ...companyForm, brand_color: color })}
                       />
