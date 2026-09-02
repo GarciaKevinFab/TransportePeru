@@ -94,7 +94,11 @@ code {
     --secondary: 30 14% 96%;
     --secondary-foreground: 24 12% 9%;
     --muted: 30 14% 96%;
-    --muted-foreground: 24 6% 45%;
+    /* 45% daba 4.30:1 sobre el gris de las pestanas, por debajo del 4.5
+       que pide un texto normal. Es el color del rotulo secundario de toda
+       la aplicacion -pestanas, pies de tarjeta, ayudas-, asi que el fallo
+       se repetia en cada pantalla. 43% lo deja en 4.63:1. */
+    --muted-foreground: 24 6% 43%;
     --accent: 0 100% 44%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 84% 60%;
@@ -134,7 +138,8 @@ code {
     --secondary: 24 8% 16%;
     --secondary-foreground: 30 20% 98%;
     --muted: 24 8% 16%;
-    --muted-foreground: 26 7% 64%;
+    /* Mismo motivo que en claro, al reves: 64% daba 4.22:1. Sube a 68%. */
+    --muted-foreground: 26 7% 68%;
     --accent: 0 100% 44%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 62% 30%;
@@ -676,12 +681,69 @@ code {
 .dark .trend-up   { background-color: rgba(34, 197, 94, 0.16) !important; color: #86efac !important; }
 .dark .trend-down { background-color: rgba(239, 68, 68, 0.16) !important; color: #fca5a5 !important; }
 
-/* Fondos de acento suaves que quedan brillantes en oscuro */
-.dark .bg-marca-50 { background-color: rgba(224, 0, 0, 0.12) !important; }
-.dark .bg-green-50  { background-color: rgba(34, 197, 94, 0.12) !important; }
-.dark .bg-red-50    { background-color: rgba(239, 68, 68, 0.12) !important; }
-.dark .bg-yellow-50 { background-color: rgba(234, 179, 8, 0.12) !important; }
-.dark .bg-blue-50   { background-color: rgba(59, 130, 246, 0.12) !important; }
+/* ACENTOS SUAVES EN MODO OSCURO: EL FONDO Y EL TEXTO VAN JUNTOS
+   ------------------------------------------------------------------
+   Aqui solo se oscurecian los FONDOS. El texto que va encima -que en toda
+   la aplicacion es el tono 700 u 800 del mismo color, elegido para lucir
+   sobre un fondo claro- se quedaba como estaba. Al cambiar a oscuro cada
+   uno de esos avisos se volvia ilegible: "Configuracion SUNAT pendiente"
+   daba 2.63:1 sobre su propia tarjeta, y la cifra de facturacion en rojo
+   de marca, 2.29:1, cuando el minimo exigible es 4.5 y 3.
+   No era un caso suelto: `.dark .bg-white` tambien pasa a #2a2725, asi que
+   en oscuro NO queda ni un fondo claro y los 133 usos de esos tonos
+   estaban sobre oscuro.
+   Los sustitutos son el tono 300 de cada color, medido sobre el fondo mas
+   claro que existe en oscuro (#2a2725): entre 8:1 y 11:1. El rojo de la
+   marca sube a marca-400 (#ff5a5a, 4.73:1); mas oscuro que eso no llega
+   al minimo por mucho que se acerque al rojo del logotipo. */
+.dark .bg-marca-50,  .dark .bg-marca-100  { background-color: rgba(224, 0, 0, 0.12) !important; }
+.dark .bg-green-50,  .dark .bg-green-100  { background-color: rgba(34, 197, 94, 0.12) !important; }
+.dark .bg-red-50,    .dark .bg-red-100    { background-color: rgba(239, 68, 68, 0.12) !important; }
+.dark .bg-yellow-50, .dark .bg-yellow-100 { background-color: rgba(234, 179, 8, 0.12) !important; }
+.dark .bg-blue-50,   .dark .bg-blue-100   { background-color: rgba(59, 130, 246, 0.12) !important; }
+.dark .bg-amber-50,  .dark .bg-amber-100  { background-color: rgba(245, 158, 11, 0.12) !important; }
+.dark .bg-orange-50, .dark .bg-orange-100 { background-color: rgba(249, 115, 22, 0.12) !important; }
+.dark .bg-purple-50, .dark .bg-purple-100 { background-color: rgba(168, 85, 247, 0.12) !important; }
+.dark .bg-emerald-50,.dark .bg-emerald-100{ background-color: rgba(16, 185, 129, 0.12) !important; }
+
+/* El tono 600 entra tambien: azul da 2.80:1, morado 2.69 y verde 4.39
+   sobre la tarjeta oscura. El amarillo, el ambar y el naranja se quedan
+   fuera porque su 600 ya es claro de por si (4.93:1) y aclararlo mas lo
+   convierte en un amarillo que quema. */
+.dark .text-marca-500,
+.dark .text-marca-600,
+.dark .text-marca-700,
+.dark .text-marca-800,
+.dark .text-marca-900   { color: #ff5a5a !important; }
+.dark .text-yellow-700,
+.dark .text-yellow-800,
+.dark .text-yellow-900  { color: #fde047 !important; }
+.dark .text-red-600,
+.dark .text-red-700,
+.dark .text-red-800,
+.dark .text-red-900     { color: #fca5a5 !important; }
+.dark .text-green-600,
+.dark .text-green-700,
+.dark .text-green-800,
+.dark .text-green-900   { color: #86efac !important; }
+.dark .text-blue-600,
+.dark .text-blue-700,
+.dark .text-blue-800,
+.dark .text-blue-900    { color: #93c5fd !important; }
+.dark .text-amber-700,
+.dark .text-amber-800,
+.dark .text-amber-900   { color: #fcd34d !important; }
+.dark .text-orange-700,
+.dark .text-orange-800,
+.dark .text-orange-900  { color: #fdba74 !important; }
+.dark .text-purple-600,
+.dark .text-purple-700,
+.dark .text-purple-800,
+.dark .text-purple-900  { color: #d8b4fe !important; }
+.dark .text-emerald-600,
+.dark .text-emerald-700,
+.dark .text-emerald-800,
+.dark .text-emerald-900 { color: #6ee7b7 !important; }
 
 /* Sombras de tarjetas: más profundas sobre fondo oscuro */
 .dark .card,
@@ -698,3 +760,51 @@ code {
     display: none !important;
   }
 }
+
+/* ZONA TACTIL MINIMA EN TELEFONO
+   ------------------------------------------------------------------
+   La aplicacion tiene 140 controles con una altura fija de 32 o 40 px
+   escrita a mano en el propio className: botones de fila de tabla, de
+   dialogo, de barra de filtros. Corregirlos uno a uno significaba tocar
+   140 sitios y volver a fallar en el siguiente que se escribiera.
+   Esta regla pone el suelo donde importa -en el telefono, donde se pulsa
+   con el dedo- y desaparece a partir de 640 px, donde el raton hace que
+   un control alto solo ocupe sitio.
+   min-height no afecta a los enlaces en linea dentro de un parrafo, que
+   siguen siendo texto; solo alcanza a lo que ya es bloque o flex, que es
+   justo lo que se pulsa. */
+@media (max-width: 639px) {
+  button,
+  [role="button"],
+  [role="tab"],
+  select,
+  summary {
+    min-height: 44px;
+  }
+
+  /* Excepciones: no son objetivos que se pulsen al vuelo sino adornos o
+     controles con forma propia, y estirarlos los deforma. */
+  .sb-credito,
+  [role="switch"],
+  [data-radix-collection-item][role="option"],
+  .no-tactil {
+    min-height: 0;
+  }
+}
+
+/* DOS COLORES QUE SOLO FALLAN EN EL TEMA CLARO
+   ------------------------------------------------------------------
+   El bloque de arriba corrige el tema oscuro. Estos dos fallan al reves,
+   y por eso no se ven ahi:
+
+   grafito-400 (#a19d97) es el gris del texto secundario -"0 emitidas",
+   "Sin logo", "Seleccione los filtros y haga clic en Generar"- y sobre
+   blanco da 2.70:1, muy por debajo del 4.5 exigible. Sobre el fondo
+   oscuro, en cambio, da 5.37 y esta bien; de ahi que solo se corrija
+   fuera de .dark. El sustituto es el 500 de la misma escala (4.99:1):
+   el mismo gris, un peldano mas firme.
+
+   yellow-600 sobre el amarillo palido de los avisos da 2.84:1 -amarillo
+   sobre amarillo-. Baja al 700, que sobre ese mismo fondo da 4.76. */
+:root:not(.dark) .text-grafito-400 { color: #736f69; }
+:root:not(.dark) .text-yellow-600  { color: #a16207; }

@@ -84,7 +84,19 @@ const NotificationsPopover = () => {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative">
+        {/* Sin aria-label esto era un boton mudo: quien navega con lector de
+            pantalla oia "boton" y nada mas. El numero de avisos sin leer entra
+            en el nombre porque es justo el dato por el que se pulsa. */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative"
+          aria-label={
+            unreadCount > 0
+              ? `Notificaciones, ${unreadCount} sin leer`
+              : 'Notificaciones'
+          }
+        >
           {unreadCount > 0 ? (
             <BellRing className="w-5 h-5" />
           ) : (

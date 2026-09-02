@@ -356,7 +356,12 @@ const MainLayout = ({ children }) => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-h-screen">
+      {/* min-w-0 no es un detalle: sin el, este hijo flex no puede encogerse
+          por debajo de su contenido, asi que cualquier fila ancha de dentro
+          -las pestanas de Informes, una tabla larga- estiraba la columna
+          entera y con ella la cabecera y el menu. La pagina se desplazaba de
+          lado en el telefono y la marca quedaba fuera de la pantalla. */}
+      <div className="flex-1 flex flex-col min-h-screen min-w-0">
         {/* Header */}
         <header
           className="h-16 backdrop-blur-md border-b border-transparent flex items-center justify-between px-3 sm:px-4 md:px-6 sticky top-0 z-30"
@@ -414,7 +419,7 @@ const MainLayout = ({ children }) => {
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
-                  className="flex items-center gap-2 h-10 px-2 sm:px-3 rounded-full hover:bg-grafito-100 transition-colors"
+                  className="flex items-center gap-2 h-11 px-2 sm:h-10 sm:px-3 rounded-full hover:bg-grafito-100 transition-colors"
                   data-testid="user-menu-btn"
                 >
                   <div
