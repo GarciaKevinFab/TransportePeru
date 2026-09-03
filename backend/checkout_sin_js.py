@@ -171,8 +171,9 @@ def _formulario(plan: str, descripcion: str, importe: dict,
     <div class="fila"><span>Valor de venta</span><span>S/ {importe['base']:.2f}</span></div>
     <div class="fila"><span>IGV (18%)</span><span>S/ {importe['igv']:.2f}</span></div>
     <div class="fila total"><span>Total al mes</span><span>S/ {importe['total']:.2f}</span></div>
-    <p class="nota">Precio en soles, con IGV incluido. Se renueva cada mes y
-       puedes cancelar cuando quieras. ¿Solo quieres probar? El plan Gratis no
+    <p class="nota">Precio en soles, con IGV incluido. Es un pago único por mes:
+       no guardamos tu tarjeta ni queda ningún cobro programado, y te avisamos
+       por correo antes de que venza. ¿Solo quieres probar? El plan Gratis no
        pide tarjeta.</p>
   </div>
 
