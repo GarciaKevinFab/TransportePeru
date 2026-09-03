@@ -44,6 +44,8 @@ import {
   Image,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import EncabezadoPagina from '../components/EncabezadoPagina';
+import { EsqueletoPagina } from '../components/Esqueletos';
 
 const SettingsPage = () => {
   const [loading, setLoading] = useState(true);
@@ -305,25 +307,17 @@ const SettingsPage = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
-      </div>
+      <EsqueletoPagina />
     );
   }
 
   return (
     <div className="space-y-6 page-fade-in" data-testid="settings-page">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
-            Configuración
-          </h1>
-          <p className="text-grafito-500 mt-1">
-            Configuración general del sistema
-          </p>
-        </div>
-      </div>
+      <EncabezadoPagina
+        titulo="Configuración"
+        subtitulo="Configuración general del sistema"
+      />
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>

@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import EstadoVacio from '../components/EstadoVacio';
 import { useAuth } from '../context/AuthContext';
+import { EsqueletoPagina } from '../components/Esqueletos';
 
 const CompaniesPage = () => {
   const { user } = useAuth();
@@ -189,9 +190,7 @@ const CompaniesPage = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
-      </div>
+      <EsqueletoPagina />
     );
   }
 
@@ -213,11 +212,11 @@ const CompaniesPage = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white card-enter card-stagger-1">
+        <Card className="bg-grafito-900 text-white card-enter card-stagger-1">
           <CardContent className="p-4">
             <Building2 className="w-8 h-8 mb-2 opacity-80" />
             <p className="text-3xl font-bold">{companies.length}</p>
-            <p className="text-blue-100">Empresas Registradas</p>
+            <p className="text-grafito-300">Empresas Registradas</p>
           </CardContent>
         </Card>
         <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white card-enter card-stagger-2">
@@ -296,8 +295,8 @@ const CompaniesPage = () => {
                   <TableRow key={company.id} className="hover:bg-marca-50">
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                          <Building2 className="w-5 h-5 text-blue-600" />
+                        <div className="w-10 h-10 bg-grafito-100 rounded-full flex items-center justify-center">
+                          <Building2 className="w-5 h-5 text-grafito-600" />
                         </div>
                         <div>
                           <p className="font-bold text-grafito-800">{company.name}</p>
@@ -505,11 +504,11 @@ const CompaniesPage = () => {
           </DialogHeader>
           {companyStats && (
             <div className="grid grid-cols-2 gap-4 py-4">
-              <Card className="bg-blue-50">
+              <Card className="bg-grafito-100">
                 <CardContent className="p-4 text-center">
-                  <Users className="w-8 h-8 text-blue-600 mx-auto mb-2" />
-                  <p className="text-2xl font-bold text-blue-900">{companyStats.users}</p>
-                  <p className="text-sm text-blue-600">Usuarios</p>
+                  <Users className="w-8 h-8 text-grafito-600 mx-auto mb-2" />
+                  <p className="text-2xl font-bold text-grafito-900">{companyStats.users}</p>
+                  <p className="text-sm text-grafito-600">Usuarios</p>
                 </CardContent>
               </Card>
               <Card className="bg-green-50">

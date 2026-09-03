@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { dashboardApi, alertsApi, tripsApi } from '../services/api';
 import PanelGraficas from '../components/PanelGraficas';
+import TarjetaMetrica from '../components/TarjetaMetrica';
+import EncabezadoPagina from '../components/EncabezadoPagina';
+import { EsqueletoPanel } from '../components/Esqueletos';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
@@ -12,12 +15,9 @@ import {
   AlertTriangle,
   FileText,
   Wrench,
-  TrendingUp,
-  TrendingDown,
   Clock,
   CheckCircle,
   ArrowRight,
-  Loader2,
   RefreshCw,
   Fuel,
   Calendar,
@@ -78,75 +78,24 @@ const DashboardPage = () => {
     fetchData();
   }, [fetchData]);
 
-  // Color semantico -> color CSS concreto (evita clases dinamicas de Tailwind,
-  // que el purgador se lleva por delante).
-  //
-  // REGLA: el acento de una tarjeta dice QUE SIGNIFICA el numero, no de quien
-  // es la marca. Rojo es peligro y nada mas: desde que la marca es roja, usar
-  // el color de marca en una tarjeta la volvia indistinguible de una alarma
-  // -"Vehiculos disponibles" y "Alertas activas" quedaban identicos-. La marca
-  // vive en la navegacion, los botones y el logo, que es donde el logotipo
-  // pone su rojo: como acento, no como fondo.
-  const colorMap = {
-    marca:  'var(--brand-color)',
-    blue:   '#2563eb',
-    green:  '#16a34a',
-    red:    '#dc2626',
-    yellow: '#ca8a04',
-    purple: '#7c3aed',
-    slate:  '#55514c',
-  };
-
-  const KPICard = ({ title, value, subtitle, icon: Icon, trend, color = 'slate', onClick, stagger = 1 }) => {
-    const staggerClass = `card-stagger-${Math.min(stagger, 8)}`;
-    const accent = colorMap[color] || colorMap.slate;
-    return (
-      <div
-        className={`metric-tile card-3d card-enter ${staggerClass} ${onClick ? 'cursor-pointer tap-scale' : ''}`}
-        style={{ borderLeftColor: accent }}
-        onClick={onClick}
-        data-testid={`kpi-${title?.toLowerCase?.().replace(/\s+/g, '-')}`}
-      >
-        {/* Watermark icon */}
-        <Icon
-          className="metric-watermark"
-          style={{ width: '120px', height: '120px', color: accent }}
-          aria-hidden
-        />
-
-        <div className="relative flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="metric-label">{title}</p>
-            <p className="metric-value number-flip mt-1">{value}</p>
-            {subtitle && <p className="metric-sub">{subtitle}</p>}
-          </div>
-          <div
-            className="flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center icon-3d"
-            style={{
-              backgroundImage: `linear-gradient(135deg, color-mix(in srgb, ${accent} 11%, #ffffff) 0%, color-mix(in srgb, ${accent} 5%, #ffffff) 100%)`,
-              color: accent,
-            }}
-          >
-            <Icon className="w-5 h-5" />
-          </div>
-        </div>
-
-        {trend !== undefined && (
-          <div className="relative flex items-center gap-2 mt-4">
-            <span className={trend >= 0 ? 'trend-up' : 'trend-down'}>
-              {trend >= 0 ? (
-                <TrendingUp className="w-3 h-3" />
-              ) : (
-                <TrendingDown className="w-3 h-3" />
-              )}
-              {Math.abs(trend)}%
-            </span>
-            <span className="text-xs text-grafito-500">vs mes anterior</span>
-          </div>
-        )}
-      </div>
-    );
-  };
+  /* La tarjeta de metrica es una para toda la aplicacion (TarjetaMetrica).
+     Aqui solo se decide el TONO, que dice que significa el numero: rojo es
+     peligro y nada mas, ambar lo que va a vencer, verde lo que va bien,
+     grafito un conteo sin juicio. La marca vive en la navegacion y los
+     botones; en una tarjeta la volveria indistinguible de una alarma. */
+  const KPICard = ({ title, value, subtitle, icon, trend, tono = 'neutro', onClick, stagger = 1 }) => (
+    <TarjetaMetrica
+      titulo={title}
+      valor={value}
+      detalle={subtitle}
+      icono={icon}
+      tono={tono}
+      onClick={onClick}
+      tendencia={trend}
+      className={`card-enter card-stagger-${Math.min(stagger, 8)}`}
+      data-testid={`kpi-${title?.toLowerCase?.().replace(/\s+/g, '-')}`}
+    />
+  );
 
   const getSeverityColor = (severity) => {
     switch (severity) {
@@ -158,7 +107,7 @@ const DashboardPage = () => {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'en_curso': return 'bg-blue-100 text-blue-800';
+      case 'en_curso': return 'bg-grafito-200 text-grafito-800';
       case 'completado': return 'bg-green-100 text-green-800';
       case 'programado': return 'bg-yellow-100 text-yellow-800';
       case 'cancelado': return 'bg-red-100 text-red-800';
@@ -167,11 +116,7 @@ const DashboardPage = () => {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
-      </div>
-    );
+    return <EsqueletoPanel />;
   }
 
   // ============== DRIVER DASHBOARD ==============
@@ -182,46 +127,45 @@ const DashboardPage = () => {
 
     return (
       <div className="space-y-6 page-fade-in" data-testid="dashboard-page">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
-              Hola, {user?.name?.split(' ')[0]}
-            </h1>
-            <p className="text-grafito-500 mt-1">
-              {format(new Date(), "EEEE, d 'de' MMMM", { locale: es })}
-            </p>
-          </div>
-          <Button variant="outline" onClick={fetchData} className="gap-2">
-            <RefreshCw className="w-4 h-4" />
-            Actualizar
-          </Button>
-        </div>
+        <EncabezadoPagina
+          titulo={<>Hola, {user?.name?.split(' ')[0]}</>}
+          subtitulo={format(new Date(), "EEEE, d 'de' MMMM", { locale: es })}
+          acciones={(
+            <Button variant="outline" onClick={fetchData} className="gap-2">
+              <RefreshCw className="w-4 h-4" />
+              Actualizar
+            </Button>
+          )}
+        />
 
         {/* Active Trip Banner */}
         {activeTrip && (
-          <Card className="bg-blue-600 text-white">
+          <Card className="border-0 bg-grafito-900 text-white">
             <CardContent className="py-6">
               <div className="flex flex-col md:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center">
+                  <div
+                    className="w-16 h-16 rounded-2xl flex items-center justify-center"
+                    style={{ backgroundColor: 'color-mix(in srgb, var(--brand-color) 22%, transparent)', color: 'var(--brand-color)' }}
+                  >
                     <Route className="w-8 h-8" />
                   </div>
                   <div>
-                    <p className="text-blue-200 text-sm font-bold uppercase">Viaje Activo</p>
+                    <p className="text-grafito-300 text-sm font-bold uppercase tracking-wider">Viaje Activo</p>
                     <p className="font-heading text-2xl font-bold">{activeTrip.client_name || 'Sin cliente'}</p>
-                    <p className="text-blue-200">{activeTrip.cargo_description || 'Sin descripción'}</p>
+                    <p className="text-grafito-300">{activeTrip.cargo_description || 'Sin descripción'}</p>
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <Button 
-                    className="bg-white text-blue-600 hover:bg-blue-50"
+                  <Button
+                    variant="outline"
+                    className="bg-transparent border-white/25 text-white hover:bg-white/10 hover:text-white"
                     onClick={() => navigate('/driver/checklist')}
                   >
                     <FileText className="w-4 h-4 mr-2" />
                     Ver Checklist
                   </Button>
-                  <Button 
+                  <Button
                     className="bg-marca-500 hover:bg-marca-600 text-white"
                     onClick={() => navigate('/driver/fuel')}
                   >
@@ -241,7 +185,7 @@ const DashboardPage = () => {
             value={completedTrips.length}
             subtitle="este mes"
             icon={CheckCircle}
-            color="green"
+            tono="ok"
             stagger={1}
           />
           <KPICard
@@ -249,7 +193,7 @@ const DashboardPage = () => {
             value={scheduledTrips.length}
             subtitle="próximos"
             icon={Calendar}
-            color="blue"
+            tono="neutro"
             stagger={2}
           />
           <KPICard
@@ -257,7 +201,7 @@ const DashboardPage = () => {
             value={activeTrip ? 'Si' : 'No'}
             subtitle={activeTrip?.client_name || '-'}
             icon={Route}
-            color="blue"
+            tono="neutro"
             stagger={3}
           />
         </div>
@@ -430,7 +374,7 @@ const DashboardPage = () => {
             value={kpis?.vehicles?.available || 0}
             subtitle={`de ${kpis?.vehicles?.total || 0} totales`}
             icon={Truck}
-            color="slate"
+            tono="marca"
             onClick={() => navigate('/vehicles')}
             stagger={1}
           />
@@ -442,7 +386,7 @@ const DashboardPage = () => {
             value={kpis?.trips?.active || 0}
             subtitle={`${kpis?.trips?.completed || 0} completados`}
             icon={Route}
-            color="blue"
+            tono="neutro"
             onClick={() => navigate('/trips')}
             stagger={2}
           />
@@ -454,7 +398,7 @@ const DashboardPage = () => {
             value={kpis?.alerts?.total || 0}
             subtitle={`${kpis?.alerts?.critical || 0} críticas`}
             icon={AlertTriangle}
-            color="red"
+            tono="alerta"
             stagger={3}
           />
         )}
@@ -465,7 +409,7 @@ const DashboardPage = () => {
             value={kpis?.documents?.expiring || 0}
             subtitle="próximos 30 días"
             icon={FileText}
-            color="yellow"
+            tono="aviso"
             onClick={() => navigate('/documents')}
             stagger={4}
           />
@@ -478,7 +422,7 @@ const DashboardPage = () => {
               value={kpis?.maintenance?.open_orders || 0}
               subtitle="ordenes de trabajo"
               icon={Wrench}
-              color="purple"
+              tono="neutro"
               onClick={() => navigate('/maintenance')}
               stagger={1}
             />
@@ -487,7 +431,7 @@ const DashboardPage = () => {
               value={kpis?.vehicles?.in_maintenance || 0}
               subtitle="en taller"
               icon={Truck}
-              color="yellow"
+              tono="aviso"
               onClick={() => navigate('/vehicles?status=en_mantenimiento')}
               stagger={2}
             />
@@ -496,7 +440,7 @@ const DashboardPage = () => {
               value={kpis?.maintenance?.critical_orders || 0}
               subtitle="prioridad alta"
               icon={AlertTriangle}
-              color="red"
+              tono="alerta"
               stagger={3}
             />
           </>
@@ -509,7 +453,7 @@ const DashboardPage = () => {
               value={kpis?.settlements?.pending || 0}
               subtitle="por revisar"
               icon={DollarSign}
-              color="slate"
+              tono="neutro"
               onClick={() => navigate('/settlements')}
               stagger={1}
             />
@@ -518,7 +462,7 @@ const DashboardPage = () => {
               value={kpis?.trips?.completed || 0}
               subtitle="este mes"
               icon={Route}
-              color="green"
+              tono="ok"
               stagger={2}
             />
           </>
@@ -531,7 +475,7 @@ const DashboardPage = () => {
               value={kpis?.inventory?.low_stock || 0}
               subtitle="requieren reposicion"
               icon={Package}
-              color="red"
+              tono="alerta"
               onClick={() => navigate('/inventory')}
               stagger={1}
             />
@@ -540,7 +484,7 @@ const DashboardPage = () => {
               value={kpis?.maintenance?.open_orders || 0}
               subtitle="con consumo"
               icon={Wrench}
-              color="purple"
+              tono="neutro"
               stagger={2}
             />
           </>
@@ -666,7 +610,7 @@ const DashboardPage = () => {
                       const sevColor =
                         alert.severity === 'critical' ? '#dc2626'
                         : alert.severity === 'warning' ? '#ca8a04'
-                        : '#2563eb';
+                        : '#55514c';
                       const sevClass =
                         alert.severity === 'critical' ? 'severity-critical'
                         : alert.severity === 'warning' ? 'severity-warning'

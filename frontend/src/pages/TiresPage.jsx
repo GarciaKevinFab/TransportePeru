@@ -44,6 +44,9 @@ import {
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import EstadoVacio from '../components/EstadoVacio';
+import EncabezadoPagina from '../components/EncabezadoPagina';
+import { EsqueletoTabla } from '../components/Esqueletos';
+import TarjetaMetrica from '../components/TarjetaMetrica';
 
 const TiresPage = () => {
   const navigate = useNavigate();
@@ -92,7 +95,7 @@ const TiresPage = () => {
 
   const tireStatuses = [
     { value: 'nuevo', label: 'Nuevo', color: 'bg-green-100 text-green-700' },
-    { value: 'en_uso', label: 'En Uso', color: 'bg-blue-100 text-blue-700' },
+    { value: 'en_uso', label: 'En Uso', color: 'bg-grafito-200 text-grafito-800' },
     { value: 'almacen', label: 'En Almacén', color: 'bg-grafito-100 text-grafito-700' },
     { value: 'reencauche', label: 'Reencauche', color: 'bg-yellow-100 text-yellow-700' },
     { value: 'baja', label: 'Baja', color: 'bg-red-100 text-red-700' },
@@ -316,85 +319,65 @@ const TiresPage = () => {
   return (
     <div className="space-y-6 page-fade-in" data-testid="tires-page">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
-            Gestión de Llantas
-          </h1>
-          <p className="text-grafito-500 mt-1">
-            Inventario, montaje, inspecciones y reportes de llantas
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => navigate('/tires/lifecycle')}
-            data-testid="tire-lifecycle-btn"
-          >
-            <History className="w-4 h-4 mr-2" />
-            Ciclo de vida
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => navigate('/tires/required-by-dimension')}
-            data-testid="tire-required-btn"
-          >
-            <Gauge className="w-4 h-4 mr-2" />
-            Llantas requeridas
-          </Button>
-          <Button className="btn-action btn-press" onClick={() => setShowCreateDialog(true)} data-testid="new-tire-btn">
-            <Plus className="w-4 h-4 mr-2" />
-            Nueva Llanta
-          </Button>
-        </div>
-      </div>
+      <EncabezadoPagina
+        titulo="Gestión de Llantas"
+        subtitulo="Inventario, montaje, inspecciones y reportes de llantas"
+        acciones={(
+          <>
+            <Button
+              variant="outline"
+              onClick={() => navigate('/tires/lifecycle')}
+              data-testid="tire-lifecycle-btn"
+            >
+              <History className="w-4 h-4 mr-2" />
+              Ciclo de vida
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => navigate('/tires/required-by-dimension')}
+              data-testid="tire-required-btn"
+            >
+              <Gauge className="w-4 h-4 mr-2" />
+              Llantas requeridas
+            </Button>
+            <Button className="btn-action btn-press" onClick={() => setShowCreateDialog(true)} data-testid="new-tire-btn">
+              <Plus className="w-4 h-4 mr-2" />
+              Nueva Llanta
+            </Button>
+          </>
+        )}
+      />
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-white border-l-4 border-l-blue-500 card-enter card-stagger-1">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">En Uso</p>
-                <p className="font-heading text-3xl font-bold text-blue-600 mt-1">{inUseTires}</p>
-              </div>
-              <Truck className="w-8 h-8 text-blue-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-white border-l-4 border-l-grafito-500 card-enter card-stagger-2">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">En Almacén</p>
-                <p className="font-heading text-3xl font-bold text-grafito-600 mt-1">{storageTires}</p>
-              </div>
-              <CircleDot className="w-8 h-8 text-grafito-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-white border-l-4 border-l-red-500 card-enter card-stagger-3">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Críticas</p>
-                <p className="font-heading text-3xl font-bold text-red-600 mt-1">{criticalTires}</p>
-              </div>
-              <AlertTriangle className="w-8 h-8 text-red-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-white border-l-4 border-l-yellow-500 card-enter card-stagger-4">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Inspección</p>
-                <p className="font-heading text-3xl font-bold text-yellow-600 mt-1">{inspectionRequired}</p>
-              </div>
-              <Gauge className="w-8 h-8 text-yellow-500" />
-            </div>
-          </CardContent>
-        </Card>
+        <TarjetaMetrica
+          titulo="En Uso"
+          valor={inUseTires}
+          icono={Truck}
+          tono="neutro"
+          className="card-enter card-stagger-1"
+        />
+        <TarjetaMetrica
+          titulo="En Almacén"
+          valor={storageTires}
+          icono={CircleDot}
+          tono="neutro"
+          className="card-enter card-stagger-2"
+        />
+        <TarjetaMetrica
+          titulo="Críticas"
+          valor={criticalTires}
+          icono={AlertTriangle}
+          tono="alerta"
+          className="card-enter card-stagger-3"
+        />
+        <TarjetaMetrica
+          titulo="Inspección"
+          valor={inspectionRequired}
+          icono={Gauge}
+          tono="aviso"
+          className="card-enter card-stagger-4"
+        />
       </div>
 
       {/* Tabs */}
@@ -441,9 +424,7 @@ const TiresPage = () => {
           <Card className="bg-white section-enter">
             <CardContent className="p-0 overflow-x-auto">
               {loading ? (
-                <div className="flex items-center justify-center h-64">
-                  <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
-                </div>
+                <EsqueletoTabla />
               ) : filteredTires.length === 0 ? (
                 tires.length > 0 ? (
                   <EstadoVacio
@@ -766,7 +747,7 @@ const TiresPage = () => {
               </div>
             </div>
             {selectedTire?.current_vehicle_id && (
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-sm text-sm text-blue-800">
+              <div className="p-3 bg-grafito-100 border border-grafito-200 rounded-sm text-sm text-grafito-800">
                 <strong>Esta llanta está montada</strong> en {getVehiclePlate(selectedTire.current_vehicle_id)} posición {selectedTire.current_position}.
                 Para cambiar vehículo o posición, primero desmonte y vuelva a montar.
               </div>

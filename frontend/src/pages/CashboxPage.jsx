@@ -54,6 +54,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import EstadoVacio from '../components/EstadoVacio';
+import EncabezadoPagina from '../components/EncabezadoPagina';
+import TarjetaMetrica from '../components/TarjetaMetrica';
 
 const CATEGORIES = [
   { value: 'combustible', label: 'Combustible' },
@@ -373,68 +375,56 @@ const CashboxPage = () => {
   return (
     <div className="space-y-6 page-fade-in" data-testid="cashbox-page">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
-            Caja
-          </h1>
-          <p className="text-grafito-500 mt-1">
-            Control de ingresos y egresos, kardex de caja y análisis por rubro
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            className="border-green-600 text-green-700 hover:bg-green-50"
-            onClick={() => openCreate('ingreso')}
-            data-testid="new-income-btn"
-          >
-            <ArrowDownCircle className="w-4 h-4 mr-2" />
-            Nuevo Ingreso
-          </Button>
-          <Button
-            variant="outline"
-            className="border-red-600 text-red-700 hover:bg-red-50"
-            onClick={() => openCreate('egreso')}
-            data-testid="new-expense-btn"
-          >
-            <ArrowUpCircle className="w-4 h-4 mr-2" />
-            Nuevo Egreso
-          </Button>
-        </div>
-      </div>
+      <EncabezadoPagina
+        titulo="Caja"
+        subtitulo="Control de ingresos y egresos, kardex de caja y análisis por rubro"
+        acciones={(
+          <>
+            <Button
+              variant="outline"
+              className="border-green-600 text-green-700 hover:bg-green-50"
+              onClick={() => openCreate('ingreso')}
+              data-testid="new-income-btn"
+            >
+              <ArrowDownCircle className="w-4 h-4 mr-2" />
+              Nuevo Ingreso
+            </Button>
+            <Button
+              variant="outline"
+              className="border-red-600 text-red-700 hover:bg-red-50"
+              onClick={() => openCreate('egreso')}
+              data-testid="new-expense-btn"
+            >
+              <ArrowUpCircle className="w-4 h-4 mr-2" />
+              Nuevo Egreso
+            </Button>
+          </>
+        )}
+      />
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="bg-white border-l-4 border-l-green-500" data-testid="stat-income">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Total Ingresos</p>
-              <ArrowDownCircle className="w-4 h-4 text-green-600" />
-            </div>
-            <p className="font-heading text-2xl font-bold text-green-600 mt-1">{soles(totalIncome)}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-white border-l-4 border-l-red-500" data-testid="stat-expense">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Total Egresos</p>
-              <ArrowUpCircle className="w-4 h-4 text-red-600" />
-            </div>
-            <p className="font-heading text-2xl font-bold text-red-600 mt-1">{soles(totalExpense)}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-white border-l-4 border-l-marca-500" data-testid="stat-balance">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Saldo</p>
-              <Wallet className="w-4 h-4 text-marca-600" />
-            </div>
-            <p className={`font-heading text-2xl font-bold mt-1 ${(Number(currentBalance) || 0) >= 0 ? 'text-marca-600' : 'text-red-600'}`}>
-              {soles(currentBalance)}
-            </p>
-          </CardContent>
-        </Card>
+        <TarjetaMetrica
+          titulo="Total Ingresos"
+          valor={soles(totalIncome)}
+          icono={ArrowDownCircle}
+          tono="ok"
+          data-testid="stat-income"
+        />
+        <TarjetaMetrica
+          titulo="Total Egresos"
+          valor={soles(totalExpense)}
+          icono={ArrowUpCircle}
+          tono="alerta"
+          data-testid="stat-expense"
+        />
+        <TarjetaMetrica
+          titulo="Saldo"
+          valor={soles(currentBalance)}
+          icono={Wallet}
+          tono={(Number(currentBalance) || 0) >= 0 ? 'ok' : 'alerta'}
+          data-testid="stat-balance"
+        />
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange}>
@@ -646,20 +636,18 @@ const CashboxPage = () => {
         {/* --- Kardex --- */}
         <TabsContent value="kardex" className="mt-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-            <Card className="bg-white border-l-4 border-l-grafito-500" data-testid="stat-opening-balance">
-              <CardContent className="py-4">
-                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Saldo Inicial</p>
-                <p className="font-heading text-2xl font-bold text-grafito-700 mt-1">{soles(openingBalance)}</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-white border-l-4 border-l-marca-500" data-testid="stat-closing-balance">
-              <CardContent className="py-4">
-                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Saldo Final</p>
-                <p className={`font-heading text-2xl font-bold mt-1 ${(Number(closingBalance) || 0) >= 0 ? 'text-marca-600' : 'text-red-600'}`}>
-                  {soles(closingBalance)}
-                </p>
-              </CardContent>
-            </Card>
+            <TarjetaMetrica
+              titulo="Saldo Inicial"
+              valor={soles(openingBalance)}
+              tono="neutro"
+              data-testid="stat-opening-balance"
+            />
+            <TarjetaMetrica
+              titulo="Saldo Final"
+              valor={soles(closingBalance)}
+              tono={(Number(closingBalance) || 0) >= 0 ? 'ok' : 'alerta'}
+              data-testid="stat-closing-balance"
+            />
           </div>
 
           <Card className="bg-white section-enter">

@@ -54,6 +54,9 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import EstadoVacio from '../components/EstadoVacio';
 import { useAuth } from '../context/AuthContext';
+import EncabezadoPagina from '../components/EncabezadoPagina';
+import { EsqueletoTabla } from '../components/Esqueletos';
+import TarjetaMetrica from '../components/TarjetaMetrica';
 
 const API_ORIGIN = process.env.REACT_APP_BACKEND_URL || '';
 // Resuelve URLs relativas de /uploads contra el backend; deja pasar base64 y absolutas
@@ -595,72 +598,54 @@ const FuelPage = () => {
       />
 
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
-            Combustible
-          </h1>
-          <p className="text-grafito-500 mt-1">
-            Gestión de vales y cargas de combustible
-          </p>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-2">
-          <Button variant="outline" className="btn-press" onClick={() => { resetVoucherForm(); setShowVoucherDialog(true); }}>
-            <Ticket className="w-4 h-4 mr-2" />
-            Nuevo Vale
-          </Button>
-          <Button className="btn-action btn-press" onClick={() => { resetLoadForm(); setShowLoadDialog(true); }}>
-            <Plus className="w-4 h-4 mr-2" />
-            Registrar Carga
-          </Button>
-        </div>
-      </div>
+      <EncabezadoPagina
+        titulo="Combustible"
+        subtitulo="Gestión de vales y cargas de combustible"
+        acciones={(
+          <>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button variant="outline" className="btn-press" onClick={() => { resetVoucherForm(); setShowVoucherDialog(true); }}>
+                <Ticket className="w-4 h-4 mr-2" />
+                Nuevo Vale
+              </Button>
+              <Button className="btn-action btn-press" onClick={() => { resetLoadForm(); setShowLoadDialog(true); }}>
+                <Plus className="w-4 h-4 mr-2" />
+                Registrar Carga
+              </Button>
+            </div>
+          </>
+        )}
+      />
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-white border-l-4 border-l-blue-500 card-enter card-stagger-1">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Vales Activos</p>
-                <p className="font-heading text-3xl font-bold text-blue-600 mt-1">{activeVouchers}</p>
-              </div>
-              <Ticket className="w-8 h-8 text-blue-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-white border-l-4 border-l-green-500 card-enter card-stagger-2">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Total Litros</p>
-                <p className="font-heading text-2xl font-bold text-green-600 mt-1">{totalLiters.toLocaleString()}</p>
-              </div>
-              <Fuel className="w-8 h-8 text-green-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-white border-l-4 border-l-marca-500 card-enter card-stagger-3">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Total Gastado</p>
-                <p className="font-heading text-xl font-bold text-marca-600 mt-1">S/ {totalAmount.toLocaleString()}</p>
-              </div>
-              <TrendingUp className="w-8 h-8 text-marca-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-white border-l-4 border-l-grafito-500 card-enter card-stagger-4">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Precio Promedio</p>
-                <p className="font-heading text-xl font-bold text-grafito-600 mt-1">S/ {avgPrice.toFixed(2)}/L</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <TarjetaMetrica
+          titulo="Vales Activos"
+          valor={activeVouchers}
+          icono={Ticket}
+          tono="neutro"
+          className="card-enter card-stagger-1"
+        />
+        <TarjetaMetrica
+          titulo="Total Litros"
+          valor={totalLiters.toLocaleString()}
+          icono={Fuel}
+          tono="ok"
+          className="card-enter card-stagger-2"
+        />
+        <TarjetaMetrica
+          titulo="Total Gastado"
+          valor={<>S/ {totalAmount.toLocaleString()}</>}
+          icono={TrendingUp}
+          tono="marca"
+          className="card-enter card-stagger-3"
+        />
+        <TarjetaMetrica
+          titulo="Precio Promedio"
+          valor={<>S/ {avgPrice.toFixed(2)}/L</>}
+          tono="neutro"
+          className="card-enter card-stagger-4"
+        />
       </div>
 
       {/* Tabs */}
@@ -679,9 +664,7 @@ const FuelPage = () => {
           <Card className="bg-white section-enter">
             <CardContent className="p-0 overflow-x-auto">
               {loading ? (
-                <div className="flex items-center justify-center h-64">
-                  <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
-                </div>
+                <EsqueletoTabla />
               ) : vouchers.length === 0 ? (
                 /* El vale pide un tracto en el formulario: sin flota, la guia
                    manda primero a Vehiculos en vez de abrir un selector vacio. */
@@ -730,7 +713,7 @@ const FuelPage = () => {
                         </p>
                         <div className="mt-2 flex items-center gap-1">
                           {(voucher.voucher_photo_url || voucher.photo_url) ? (
-                            <button onClick={() => openPhoto(voucher.voucher_photo_url || voucher.photo_url, `Vale ${voucher.voucher_number}`)} className="border-2 border-blue-300 rounded p-0.5 hover:border-blue-500" title="Foto del vale">
+                            <button onClick={() => openPhoto(voucher.voucher_photo_url || voucher.photo_url, `Vale ${voucher.voucher_number}`)} className="border-2 border-grafito-300 rounded p-0.5 hover:border-grafito-500" title="Foto del vale">
                               <img src={resolvePhoto(voucher.voucher_photo_url || voucher.photo_url)} alt="vale" className="w-8 h-8 object-cover rounded" />
                             </button>
                           ) : (
@@ -786,7 +769,7 @@ const FuelPage = () => {
                         <TableCell>
                           <div className="flex items-center gap-1">
                             {(voucher.voucher_photo_url || voucher.photo_url) ? (
-                              <button onClick={() => openPhoto(voucher.voucher_photo_url || voucher.photo_url, `Vale ${voucher.voucher_number}`)} className="border-2 border-blue-300 rounded p-0.5 hover:border-blue-500" title="Foto del vale">
+                              <button onClick={() => openPhoto(voucher.voucher_photo_url || voucher.photo_url, `Vale ${voucher.voucher_number}`)} className="border-2 border-grafito-300 rounded p-0.5 hover:border-grafito-500" title="Foto del vale">
                                 <img src={resolvePhoto(voucher.voucher_photo_url || voucher.photo_url)} alt="vale" className="w-8 h-8 object-cover rounded" />
                               </button>
                             ) : (
@@ -820,9 +803,7 @@ const FuelPage = () => {
           <Card className="bg-white section-enter">
             <CardContent className="p-0 overflow-x-auto">
               {loading ? (
-                <div className="flex items-center justify-center h-64">
-                  <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
-                </div>
+                <EsqueletoTabla />
               ) : loads.length === 0 ? (
                 /* La carga tambien exige tracto: misma guia que en vales. */
                 tractos.length === 0 ? (
@@ -871,7 +852,7 @@ const FuelPage = () => {
                         </p>
                         <div className="mt-2 flex items-center gap-1">
                           {voucherPhoto ? (
-                            <button onClick={() => openPhoto(voucherPhoto, `Vale ${load.voucher_number || ''}`)} className="border-2 border-blue-300 rounded p-0.5 hover:border-blue-500" title="Foto del vale">
+                            <button onClick={() => openPhoto(voucherPhoto, `Vale ${load.voucher_number || ''}`)} className="border-2 border-grafito-300 rounded p-0.5 hover:border-grafito-500" title="Foto del vale">
                               <img src={resolvePhoto(voucherPhoto)} alt="vale" className="w-8 h-8 object-cover rounded" />
                             </button>
                           ) : (
@@ -936,7 +917,7 @@ const FuelPage = () => {
                         <TableCell>
                           <div className="flex items-center justify-center gap-1">
                             {voucherPhoto ? (
-                              <button onClick={() => openPhoto(voucherPhoto, `Vale ${load.voucher_number || ''}`)} className="border-2 border-blue-300 rounded p-0.5 hover:border-blue-500" title="Foto del vale">
+                              <button onClick={() => openPhoto(voucherPhoto, `Vale ${load.voucher_number || ''}`)} className="border-2 border-grafito-300 rounded p-0.5 hover:border-grafito-500" title="Foto del vale">
                                 <img src={resolvePhoto(voucherPhoto)} alt="vale" className="w-8 h-8 object-cover rounded" />
                               </button>
                             ) : (

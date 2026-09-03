@@ -59,6 +59,9 @@ import { toast } from 'sonner';
 import { es } from 'date-fns/locale';
 import EstadoVacio from '../components/EstadoVacio';
 import { useAuth } from '../context/AuthContext';
+import EncabezadoPagina from '../components/EncabezadoPagina';
+import { EsqueletoTabla } from '../components/Esqueletos';
+import TarjetaMetrica from '../components/TarjetaMetrica';
 
 const MaintenancePage = () => {
   const navigate = useNavigate();
@@ -314,7 +317,7 @@ const MaintenancePage = () => {
   const getStatusBadge = (status) => {
     const styles = {
       abierta: 'bg-yellow-100 text-yellow-800',
-      en_proceso: 'bg-blue-100 text-blue-800',
+      en_proceso: 'bg-grafito-200 text-grafito-800',
       completada: 'bg-green-100 text-green-800',
       cancelada: 'bg-red-100 text-red-800',
     };
@@ -330,7 +333,7 @@ const MaintenancePage = () => {
   const getPriorityBadge = (priority) => {
     const styles = {
       baja: 'bg-grafito-100 text-grafito-700',
-      normal: 'bg-blue-100 text-blue-700',
+      normal: 'bg-grafito-200 text-grafito-800',
       alta: 'bg-marca-100 text-marca-700',
       critica: 'bg-red-100 text-red-700',
     };
@@ -388,22 +391,16 @@ const MaintenancePage = () => {
   return (
     <div className="space-y-6 page-fade-in" data-testid="maintenance-page">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
-            Mantenimiento
-          </h1>
-          <p className="text-grafito-500 mt-1">
-            Órdenes de trabajo y planes preventivos por vehículo
-          </p>
-        </div>
-        {activeTab === 'orders' && (
-          <Button className="btn-action btn-press" onClick={() => setShowCreateDialog(true)} data-testid="new-workorder-btn">
-            <Plus className="w-4 h-4 mr-2" />
-            Nueva Orden
-          </Button>
-        )}
-      </div>
+      <EncabezadoPagina
+        titulo="Mantenimiento"
+        subtitulo="Órdenes de trabajo y planes preventivos por vehículo"
+        acciones={activeTab === 'orders' && (
+            <Button className="btn-action btn-press" onClick={() => setShowCreateDialog(true)} data-testid="new-workorder-btn">
+              <Plus className="w-4 h-4 mr-2" />
+              Nueva Orden
+            </Button>
+          )}
+      />
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="bg-grafito-100 rounded-sm">
@@ -421,54 +418,34 @@ const MaintenancePage = () => {
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-white border-l-4 border-l-yellow-500 card-enter card-stagger-1">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Abiertas</p>
-                <p className="font-heading text-3xl font-bold text-yellow-600 mt-1">{openOrders}</p>
-              </div>
-              <Clock className="w-8 h-8 text-yellow-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-white border-l-4 border-l-blue-500 card-enter card-stagger-2">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">En Proceso</p>
-                <p className="font-heading text-3xl font-bold text-blue-600 mt-1">{inProgressOrders}</p>
-              </div>
-              <Wrench className="w-8 h-8 text-blue-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-white border-l-4 border-l-green-500 card-enter card-stagger-3">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Completadas</p>
-                <p className="font-heading text-3xl font-bold text-green-600 mt-1">
-                  {workOrders.filter(o => o.status === 'completada').length}
-                </p>
-              </div>
-              <CheckCircle className="w-8 h-8 text-green-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-white border-l-4 border-l-red-500 card-enter card-stagger-4">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Críticas</p>
-                <p className="font-heading text-3xl font-bold text-red-600 mt-1">
-                  {workOrders.filter(o => o.priority === 'critica' && o.status !== 'completada').length}
-                </p>
-              </div>
-              <AlertTriangle className="w-8 h-8 text-red-500" />
-            </div>
-          </CardContent>
-        </Card>
+        <TarjetaMetrica
+          titulo="Abiertas"
+          valor={openOrders}
+          icono={Clock}
+          tono="aviso"
+          className="card-enter card-stagger-1"
+        />
+        <TarjetaMetrica
+          titulo="En Proceso"
+          valor={inProgressOrders}
+          icono={Wrench}
+          tono="neutro"
+          className="card-enter card-stagger-2"
+        />
+        <TarjetaMetrica
+          titulo="Completadas"
+          valor={workOrders.filter(o => o.status === 'completada').length}
+          icono={CheckCircle}
+          tono="ok"
+          className="card-enter card-stagger-3"
+        />
+        <TarjetaMetrica
+          titulo="Críticas"
+          valor={workOrders.filter(o => o.priority === 'critica' && o.status !== 'completada').length}
+          icono={AlertTriangle}
+          tono="alerta"
+          className="card-enter card-stagger-4"
+        />
       </div>
 
       {/* Estado de Mantenimiento Preventivo por Unidad */}
@@ -576,9 +553,7 @@ const MaintenancePage = () => {
       <Card className="bg-white section-enter section-stagger-1">
         <CardContent className="p-0 overflow-x-auto">
           {loading ? (
-            <div className="flex items-center justify-center h-64">
-              <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
-            </div>
+            <EsqueletoTabla />
           ) : filteredOrders.length === 0 ? (
             /* Una orden de trabajo cuelga de un vehiculo: sin flota cargada,
                el formulario abre con el selector vacio. La guia manda primero

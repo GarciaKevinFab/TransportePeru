@@ -43,6 +43,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import EstadoVacio from '../components/EstadoVacio';
+import TarjetaMetrica from '../components/TarjetaMetrica';
 
 // Detracción SPOT (transporte de carga): 4% del importe de la operación
 // cuando supera S/ 400. El cliente deposita en el Banco de la Nación.
@@ -407,36 +408,30 @@ const DetraccionesPage = () => {
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="bg-white border-l-4 border-l-yellow-500" data-testid="stat-pendientes">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Pendientes</p>
-              <Clock className="w-4 h-4 text-yellow-600" />
-            </div>
-            <p className="font-heading text-3xl font-bold text-yellow-600 mt-1">{pendingCount}</p>
-            <p className="text-sm text-grafito-500">{soles(pendingAmount)}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-white border-l-4 border-l-green-500" data-testid="stat-depositadas">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Depositadas</p>
-              <CheckCircle2 className="w-4 h-4 text-green-600" />
-            </div>
-            <p className="font-heading text-3xl font-bold text-green-600 mt-1">{depositedCount}</p>
-            <p className="text-sm text-grafito-500">{soles(depositedAmount)}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-white border-l-4 border-l-marca-500" data-testid="stat-total">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Total del periodo</p>
-              <Coins className="w-4 h-4 text-marca-600" />
-            </div>
-            <p className="font-heading text-2xl font-bold text-marca-600 mt-1">{soles(totalAmount)}</p>
-            <p className="text-sm text-grafito-500">{totalCount} detracciones</p>
-          </CardContent>
-        </Card>
+        <TarjetaMetrica
+          titulo="Pendientes"
+          valor={pendingCount}
+          detalle={<>{soles(pendingAmount)}</>}
+          icono={Clock}
+          tono="aviso"
+          data-testid="stat-pendientes"
+        />
+        <TarjetaMetrica
+          titulo="Depositadas"
+          valor={depositedCount}
+          detalle={<>{soles(depositedAmount)}</>}
+          icono={CheckCircle2}
+          tono="ok"
+          data-testid="stat-depositadas"
+        />
+        <TarjetaMetrica
+          titulo="Total del periodo"
+          valor={soles(totalAmount)}
+          detalle={<>{totalCount} detracciones</>}
+          icono={Coins}
+          tono="marca"
+          data-testid="stat-total"
+        />
       </div>
 
       {/* Filtros */}

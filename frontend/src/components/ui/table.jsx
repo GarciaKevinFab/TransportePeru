@@ -2,8 +2,11 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
+/* El envoltorio es el que desplaza (.tabla-desplazable en index.css):
+   scroll horizontal con inercia y primera columna pegajosa. La pagina
+   entera nunca se mueve de lado por culpa de una tabla ancha. */
 const Table = React.forwardRef(({ className, ...props }, ref) => (
-  <div className="relative w-full overflow-auto">
+  <div className="tabla-desplazable">
     <table
       ref={ref}
       className={cn("w-full caption-bottom text-sm", className)}

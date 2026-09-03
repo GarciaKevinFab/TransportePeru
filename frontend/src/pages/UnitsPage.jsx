@@ -52,6 +52,8 @@ import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { unitsApi, vehiclesApi, usersApi } from '../services/api';
 import EstadoVacio from '../components/EstadoVacio';
+import EncabezadoPagina from '../components/EncabezadoPagina';
+import { EsqueletoTabla } from '../components/Esqueletos';
 
 // EPP de unidad por defecto (conos, botiquín, extintor, chalecos)
 const DEFAULT_EPP_ITEMS = [
@@ -80,7 +82,7 @@ const getUnitStatusBadge = (status) => {
   const map = {
     activa: { label: 'Activa', className: 'border-green-300 text-green-700 bg-green-50' },
     disponible: { label: 'Disponible', className: 'border-green-300 text-green-700 bg-green-50' },
-    en_viaje: { label: 'En Viaje', className: 'border-blue-300 text-blue-700 bg-blue-50' },
+    en_viaje: { label: 'En Viaje', className: 'border-grafito-300 text-grafito-700 bg-grafito-100' },
     inactiva: { label: 'Inactiva', className: 'border-grafito-300 text-grafito-600 bg-grafito-50' },
   };
   const cfg = map[status] || { label: status || 'Sin estado', className: 'border-grafito-300 text-grafito-600 bg-grafito-50' };
@@ -309,34 +311,26 @@ const UnitsPage = () => {
   return (
     <div className="space-y-6 page-fade-in" data-testid="units-page">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
-            Unidades
-          </h1>
-          <p className="text-grafito-500 mt-1">
-            Tracto + carreta + chofer + EPP de unidad
-          </p>
-        </div>
-        {isAdmin && (
-          <Button
-            className="btn-action btn-press btn-shine tap-scale rounded-lg"
-            onClick={openCreate}
-            data-testid="new-unit-btn"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Nueva Unidad
-          </Button>
-        )}
-      </div>
+      <EncabezadoPagina
+        titulo="Unidades"
+        subtitulo="Tracto + carreta + chofer + EPP de unidad"
+        acciones={isAdmin && (
+            <Button
+              className="btn-action btn-press btn-shine tap-scale rounded-lg"
+              onClick={openCreate}
+              data-testid="new-unit-btn"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Nueva Unidad
+            </Button>
+          )}
+      />
 
       {/* Table */}
       <Card className="bg-white section-enter section-stagger-1">
         <CardContent className="p-0 overflow-x-auto">
           {loading ? (
-            <div className="flex items-center justify-center h-64">
-              <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
-            </div>
+            <EsqueletoTabla />
           ) : units.length === 0 ? (
             /* Vacio con guia: una unidad se arma sobre un tracto. Sin tractos
                en el catalogo, el dialogo de creacion abre con un selector

@@ -44,6 +44,9 @@ import {
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import EstadoVacio from '../components/EstadoVacio';
+import EncabezadoPagina from '../components/EncabezadoPagina';
+import { EsqueletoPagina } from '../components/Esqueletos';
+import TarjetaMetrica from '../components/TarjetaMetrica';
 
 const BillingPage = () => {
   const { user } = useAuth();
@@ -257,7 +260,7 @@ const BillingPage = () => {
     const map = {
       borrador: { label: 'Borrador', color: 'bg-grafito-100 text-grafito-700' },
       emitida: { label: 'Emitida', color: 'bg-green-100 text-green-700' },
-      pagada: { label: 'Pagada', color: 'bg-blue-100 text-blue-700' },
+      pagada: { label: 'Pagada', color: 'bg-grafito-200 text-grafito-800' },
       anulada: { label: 'Anulada', color: 'bg-red-100 text-red-700' },
       error: { label: 'Error', color: 'bg-red-100 text-red-700' },
     };
@@ -297,31 +300,23 @@ const BillingPage = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
-      </div>
+      <EsqueletoPagina />
     );
   }
 
   return (
     <div className="space-y-6 page-fade-in">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
-            Facturación y Guías
-          </h1>
-          <p className="text-grafito-500 mt-1">
-            Guías de transportista y facturas electrónicas (SUNAT)
-          </p>
-        </div>
-        <div className="flex gap-2">
+      <EncabezadoPagina
+        titulo="Facturación y Guías"
+        subtitulo="Guías de transportista y facturas electrónicas (SUNAT)"
+        acciones={(
           <Button variant="outline" className="btn-press" onClick={() => setShowConfigDialog(true)}>
             <Settings className="w-4 h-4 mr-2" />
             Config SUNAT
           </Button>
-        </div>
-      </div>
+        )}
+      />
 
       {/* SUNAT Status */}
       {!sunatConfig.ruc && (
@@ -341,28 +336,26 @@ const BillingPage = () => {
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-white border-l-4 border-l-blue-500 card-enter card-stagger-1">
-          <CardContent className="py-4">
-            <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Guías</p>
-            <p className="font-heading text-3xl font-bold text-blue-600 mt-1">{guias.length}</p>
-            <p className="text-xs text-grafito-400">{guiasEmitidas} emitidas</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-white border-l-4 border-l-green-500 card-enter card-stagger-2">
-          <CardContent className="py-4">
-            <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Facturas</p>
-            <p className="font-heading text-3xl font-bold text-green-600 mt-1">{facturas.length}</p>
-            <p className="text-xs text-grafito-400">{facturasEmitidas} emitidas</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-white border-l-4 border-l-marca-500 col-span-2 card-enter card-stagger-3">
-          <CardContent className="py-4">
-            <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Total Facturado</p>
-            <p className="font-heading text-3xl font-bold text-marca-600 mt-1">
-              S/ {totalFacturado.toFixed(2)}
-            </p>
-          </CardContent>
-        </Card>
+        <TarjetaMetrica
+          titulo="Guías"
+          valor={guias.length}
+          detalle={<>{guiasEmitidas} emitidas</>}
+          tono="neutro"
+          className="card-enter card-stagger-1"
+        />
+        <TarjetaMetrica
+          titulo="Facturas"
+          valor={facturas.length}
+          detalle={<>{facturasEmitidas} emitidas</>}
+          tono="ok"
+          className="card-enter card-stagger-2"
+        />
+        <TarjetaMetrica
+          titulo="Total Facturado"
+          valor={<>S/ {totalFacturado.toFixed(2)}</>}
+          tono="marca"
+          className="card-enter card-stagger-3"
+        />
       </div>
 
       {/* Tabs */}
@@ -577,7 +570,7 @@ const BillingPage = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="input-label font-bold text-blue-700">Remitente</Label>
+                <Label className="input-label font-bold text-grafito-700">Remitente</Label>
                 <Input placeholder="RUC" value={guiaForm.remitente_ruc} onChange={e => setGuiaForm({...guiaForm, remitente_ruc: e.target.value})} className="rounded-sm" />
                 <Input placeholder="Razón Social" value={guiaForm.remitente_razon_social} onChange={e => setGuiaForm({...guiaForm, remitente_razon_social: e.target.value})} className="rounded-sm" />
               </div>

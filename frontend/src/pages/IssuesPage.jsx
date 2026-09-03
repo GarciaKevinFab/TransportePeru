@@ -50,6 +50,9 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import EstadoVacio from '../components/EstadoVacio';
+import EncabezadoPagina from '../components/EncabezadoPagina';
+import { EsqueletoTabla } from '../components/Esqueletos';
+import TarjetaMetrica from '../components/TarjetaMetrica';
 
 const IssuesPage = () => {
   const [loading, setLoading] = useState(true);
@@ -101,7 +104,7 @@ const IssuesPage = () => {
 
   const statuses = [
     { value: 'abierto', label: 'Abierto', color: 'bg-yellow-100 text-yellow-700' },
-    { value: 'en_proceso', label: 'En Proceso', color: 'bg-blue-100 text-blue-700' },
+    { value: 'en_proceso', label: 'En Proceso', color: 'bg-grafito-200 text-grafito-800' },
     { value: 'cerrado', label: 'Cerrado', color: 'bg-green-100 text-green-700' },
   ];
 
@@ -247,70 +250,48 @@ const IssuesPage = () => {
   return (
     <div className="space-y-6 page-fade-in" data-testid="issues-page">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
-            Incidentes
-          </h1>
-          <p className="text-grafito-500 mt-1">
-            Gestión de incidentes, multas y siniestros
-          </p>
-        </div>
-        <Button className="btn-action btn-press" onClick={() => setShowCreateDialog(true)} data-testid="new-issue-btn">
-          <Plus className="w-4 h-4 mr-2" />
-          Nuevo Incidente
-        </Button>
-      </div>
+      <EncabezadoPagina
+        titulo="Incidentes"
+        subtitulo="Gestión de incidentes, multas y siniestros"
+        acciones={(
+          <>
+            <Button className="btn-action btn-press" onClick={() => setShowCreateDialog(true)} data-testid="new-issue-btn">
+              <Plus className="w-4 h-4 mr-2" />
+              Nuevo Incidente
+            </Button>
+          </>
+        )}
+      />
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-white border-l-4 border-l-yellow-500 card-enter card-stagger-1">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Abiertos</p>
-                <p className="font-heading text-3xl font-bold text-yellow-600 mt-1">{openIssues}</p>
-              </div>
-              <AlertTriangle className="w-8 h-8 text-yellow-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-white border-l-4 border-l-red-500 card-enter card-stagger-2">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Críticos</p>
-                <p className="font-heading text-3xl font-bold text-red-600 mt-1">{criticalIssues}</p>
-              </div>
-              <AlertCircle className="w-8 h-8 text-red-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-white border-l-4 border-l-green-500 card-enter card-stagger-3">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Resueltos</p>
-                <p className="font-heading text-3xl font-bold text-green-600 mt-1">
-                  {issues.filter(i => i.status === 'cerrado').length}
-                </p>
-              </div>
-              <CheckCircle className="w-8 h-8 text-green-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-white border-l-4 border-l-marca-500 card-enter card-stagger-4">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">Costo Total</p>
-                <p className="font-heading text-2xl font-bold text-marca-600 mt-1">
-                  S/ {totalCost.toLocaleString()}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <TarjetaMetrica
+          titulo="Abiertos"
+          valor={openIssues}
+          icono={AlertTriangle}
+          tono="aviso"
+          className="card-enter card-stagger-1"
+        />
+        <TarjetaMetrica
+          titulo="Críticos"
+          valor={criticalIssues}
+          icono={AlertCircle}
+          tono="alerta"
+          className="card-enter card-stagger-2"
+        />
+        <TarjetaMetrica
+          titulo="Resueltos"
+          valor={issues.filter(i => i.status === 'cerrado').length}
+          icono={CheckCircle}
+          tono="ok"
+          className="card-enter card-stagger-3"
+        />
+        <TarjetaMetrica
+          titulo="Costo Total"
+          valor={<>S/ {totalCost.toLocaleString()}</>}
+          tono="marca"
+          className="card-enter card-stagger-4"
+        />
       </div>
 
       {/* Filters */}
@@ -370,9 +351,7 @@ const IssuesPage = () => {
       <Card className="bg-white section-enter section-stagger-1">
         <CardContent className="p-0 overflow-x-auto">
           {loading ? (
-            <div className="flex items-center justify-center h-64">
-              <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
-            </div>
+            <EsqueletoTabla />
           ) : filteredIssues.length === 0 ? (
             /* Vacio con guia: si hay incidentes pero el filtro no casa, no se
                ofrece crear otro; si la lista total esta vacia, el vacio es la

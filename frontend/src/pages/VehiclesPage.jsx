@@ -26,11 +26,14 @@ import {
   Loader2,
   CircleDot,
   UserCheck,
+  Route,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { useVehicles } from '../hooks/useVehicles';
 import VehicleTable from '../components/vehicles/VehicleTable';
+import TarjetaMetrica from '../components/TarjetaMetrica';
+import EncabezadoPagina from '../components/EncabezadoPagina';
 import VehicleFormDialog from '../components/vehicles/VehicleFormDialog';
 import VehicleDetailDialog from '../components/vehicles/VehicleDetailDialog';
 import VehicleEquipmentDialog from '../components/vehicles/VehicleEquipmentDialog';
@@ -149,21 +152,16 @@ const VehiclesPage = () => {
 
   return (
     <div className="space-y-6 page-fade-in" data-testid="vehicles-page">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
-            Vehículos
-          </h1>
-          <p className="text-grafito-500 mt-1">
-            Gestión de tractos y carretas de la flota
-          </p>
-        </div>
-        <Button className="btn-action btn-press btn-shine tap-scale rounded-lg" onClick={() => setShowCreateDialog(true)} data-testid="new-vehicle-btn">
-          <Plus className="w-4 h-4 mr-2" />
-          Nuevo Vehículo
-        </Button>
-      </div>
+      <EncabezadoPagina
+        titulo="Vehículos"
+        subtitulo="Gestión de tractos y carretas de la flota"
+        acciones={isAdmin && (
+          <Button className="btn-action btn-press" onClick={() => setShowCreateDialog(true)} data-testid="new-vehicle-btn">
+            <Plus className="w-4 h-4 mr-2" />
+            Nuevo Vehículo
+          </Button>
+        )}
+      />
 
       {/* Filters */}
       <Card className="bg-white section-enter">
@@ -229,40 +227,25 @@ const VehiclesPage = () => {
         onDelete={handleOpenDelete}
       />
 
-      {/* Stats - bento */}
-      <div className="bento-grid">
+      {/* Resumen de la flota. Los tonos dicen que significa el numero: la
+          marca para el conteo de tractos (la flota), verde para lo que esta
+          listo, grafito para el resto. En viaje NO es una alerta ni una
+          informacion: es un estado, y va en grafito. */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
         {[
-          { value: vehicles.filter((v) => v.vehicle_type === 'tracto').length, label: 'Tractos', icon: Truck, color: 'var(--brand-color)' },
-          { value: vehicles.filter((v) => v.vehicle_type === 'carreta').length, label: 'Carretas', icon: CircleDot, color: '#55514c' },
-          { value: vehicles.filter((v) => v.status === 'disponible').length, label: 'Disponibles', icon: UserCheck, color: '#16a34a' },
-          { value: vehicles.filter((v) => v.status === 'en_viaje').length, label: 'En Viaje', icon: Truck, color: '#2563eb' },
+          { value: vehicles.filter((v) => v.vehicle_type === 'tracto').length, label: 'Tractos', icon: Truck, tono: 'marca' },
+          { value: vehicles.filter((v) => v.vehicle_type === 'carreta').length, label: 'Carretas', icon: CircleDot, tono: 'neutro' },
+          { value: vehicles.filter((v) => v.status === 'disponible').length, label: 'Disponibles', icon: UserCheck, tono: 'ok' },
+          { value: vehicles.filter((v) => v.status === 'en_viaje').length, label: 'En Viaje', icon: Route, tono: 'neutro' },
         ].map((stat, idx) => (
-          <div
+          <TarjetaMetrica
             key={stat.label}
-            className={`metric-tile card-3d card-enter card-stagger-${idx + 1}`}
-            style={{ borderLeftColor: stat.color }}
-          >
-            <stat.icon
-              className="metric-watermark"
-              style={{ width: '110px', height: '110px', color: stat.color }}
-              aria-hidden
-            />
-            <div className="relative flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="metric-label">{stat.label}</p>
-                <p className="metric-value number-flip mt-1" style={{ color: stat.color }}>{stat.value}</p>
-              </div>
-              <div
-                className="flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center icon-3d"
-                style={{
-                  backgroundImage: `linear-gradient(135deg, color-mix(in srgb, ${stat.color} 18%, #ffffff) 0%, color-mix(in srgb, ${stat.color} 8%, #ffffff) 100%)`,
-                  color: stat.color,
-                }}
-              >
-                <stat.icon className="w-5 h-5" />
-              </div>
-            </div>
-          </div>
+            titulo={stat.label}
+            valor={stat.value}
+            icono={stat.icon}
+            tono={stat.tono}
+            className={`card-enter card-stagger-${idx + 1}`}
+          />
         ))}
       </div>
 

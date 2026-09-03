@@ -16,7 +16,7 @@ const ACTION_LEGEND = {
   A: { label: 'Ajuste', color: 'bg-purple-100 text-purple-800' },
   C: { label: 'Cambio', color: 'bg-red-100 text-red-800' },
   E: { label: 'Engrase', color: 'bg-yellow-100 text-yellow-800' },
-  I: { label: 'Inspección', color: 'bg-blue-100 text-blue-800' },
+  I: { label: 'Inspección', color: 'bg-grafito-200 text-grafito-800' },
   L: { label: 'Limpieza', color: 'bg-green-100 text-green-800' },
 };
 
@@ -172,8 +172,7 @@ const MaintenancePlansPanel = ({ vehicles = [] }) => {
           {plans.map((plan, idx) => (
             <Card
               key={plan.id}
-              className={`bg-white border-l-4 card-enter card-stagger-${(idx % 4) + 1} hover:shadow-md transition-shadow`}
-              style={{ borderLeftColor: 'var(--brand-color)' }}
+              className={`bg-white card-enter card-stagger-${(idx % 4) + 1}`}
             >
               <CardContent className="p-5">
                 <div className="flex items-start justify-between mb-3">

@@ -26,6 +26,7 @@ import {
 import { toast } from 'sonner';
 import SignatureCanvas from 'react-signature-canvas';
 import { useOffline } from '../hooks/useOffline';
+import { EsqueletoPagina } from '../components/Esqueletos';
 
 // Checklist por defecto cuando el tenant todavia no tiene plantilla propia.
 // Vive a nivel de modulo (y no dentro del componente) porque fetchData lo lee:
@@ -293,9 +294,7 @@ const ChecklistWizardPage = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
-      </div>
+      <EsqueletoPagina />
     );
   }
 
@@ -393,8 +392,8 @@ const ChecklistWizardPage = () => {
                     placeholder={tracto?.odometer?.toString() || '0'}
                   />
                 </div>
-                <div className="p-4 bg-blue-50 rounded-sm">
-                  <p className="text-xs uppercase text-blue-700 font-bold flex items-center gap-1">
+                <div className="p-4 bg-grafito-100 rounded-sm">
+                  <p className="text-xs uppercase text-grafito-700 font-bold flex items-center gap-1">
                     <MapPin className="w-4 h-4" />
                     Ubicación
                   </p>
@@ -403,7 +402,7 @@ const ChecklistWizardPage = () => {
                       {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
                     </p>
                   ) : (
-                    <p className="text-sm text-blue-600 mt-1">Obteniendo ubicación...</p>
+                    <p className="text-sm text-grafito-600 mt-1">Obteniendo ubicación...</p>
                   )}
                 </div>
               </div>
@@ -439,7 +438,7 @@ const ChecklistWizardPage = () => {
                   {items.map((resp) => (
                     <div 
                       key={resp.index}
-                      className={`p-3 rounded-sm border-l-4 ${
+                      className={`p-3 rounded-lg border ${
                         resp.status === 'ok' ? 'bg-green-50 border-green-500' :
                         resp.status === 'observado' ? 'bg-yellow-50 border-yellow-500' :
                         resp.status === 'critico' ? 'bg-red-50 border-red-500' :

@@ -42,6 +42,8 @@ import {
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import EstadoVacio from '../components/EstadoVacio';
+import { EsqueletoTabla } from '../components/Esqueletos';
+import TarjetaMetrica from '../components/TarjetaMetrica';
 
 const today = () => new Date().toISOString().substring(0, 10);
 
@@ -92,7 +94,7 @@ const TireLifecyclePage = () => {
 
   const tireStatuses = [
     { value: 'nuevo', label: 'Nuevo', color: 'bg-green-100 text-green-700' },
-    { value: 'en_uso', label: 'En Uso', color: 'bg-blue-100 text-blue-700' },
+    { value: 'en_uso', label: 'En Uso', color: 'bg-grafito-200 text-grafito-800' },
     { value: 'almacen', label: 'En Almacén', color: 'bg-grafito-100 text-grafito-700' },
     { value: 'reencauche', label: 'Reencauche', color: 'bg-yellow-100 text-yellow-700' },
     { value: 'reparacion', label: 'En Reparación', color: 'bg-marca-100 text-marca-700' },
@@ -342,9 +344,7 @@ const TireLifecyclePage = () => {
           <Card className="bg-white section-enter">
             <CardContent className="p-0 overflow-x-auto">
               {loading ? (
-                <div className="flex items-center justify-center h-64">
-                  <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
-                </div>
+                <EsqueletoTabla />
               ) : filteredTires.length === 0 ? (
                 // Dos vacios distintos, y el codigo ya sabe cual es cual sin
                 // pedir nada mas al servidor: si `tires` viene vacio no hay
@@ -452,55 +452,24 @@ const TireLifecyclePage = () => {
         <TabsContent value="scrap-pile" className="mt-4 space-y-4">
           {/* Analysis summary */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="bg-white border-l-4 border-l-red-500">
-              <CardContent className="py-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">
-                      Total Descartadas
-                    </p>
-                    <p className="font-heading text-3xl font-bold text-red-600 mt-1">
-                      {scrapItems.length}
-                    </p>
-                  </div>
-                  <Layers className="w-8 h-8 text-red-500" />
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-white border-l-4 border-l-grafito-500">
-              <CardContent className="py-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">
-                      Km Promedio
-                    </p>
-                    <p className="font-heading text-3xl font-bold text-grafito-700 mt-1">
-                      {scrapAvgKm != null
-                        ? Number(scrapAvgKm).toLocaleString()
-                        : '-'}
-                    </p>
-                  </div>
-                  <Gauge className="w-8 h-8 text-grafito-500" />
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-white border-l-4 border-l-marca-500">
-              <CardContent className="py-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs uppercase tracking-widest text-grafito-500 font-bold">
-                      Motivos Distintos
-                    </p>
-                    <p className="font-heading text-3xl font-bold text-marca-600 mt-1">
-                      {scrapByReason
-                        ? (renderGroup(scrapByReason) || []).length
-                        : '-'}
-                    </p>
-                  </div>
-                  <CircleDot className="w-8 h-8 text-marca-500" />
-                </div>
-              </CardContent>
-            </Card>
+            <TarjetaMetrica
+              titulo="Total Descartadas"
+              valor={scrapItems.length}
+              icono={Layers}
+              tono="alerta"
+            />
+            <TarjetaMetrica
+              titulo="Km Promedio"
+              valor={scrapAvgKm != null ? Number(scrapAvgKm).toLocaleString() : '-'}
+              icono={Gauge}
+              tono="neutro"
+            />
+            <TarjetaMetrica
+              titulo="Motivos Distintos"
+              valor={scrapByReason ? (renderGroup(scrapByReason) || []).length : '-'}
+              icono={CircleDot}
+              tono="marca"
+            />
           </div>
 
           {/* Grouping cards */}

@@ -54,10 +54,12 @@ import {
 } from '../components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
+import EncabezadoPagina from '../components/EncabezadoPagina';
+import { EsqueletoTabla } from '../components/Esqueletos';
 
 const ROLES = [
   { value: 'admin', label: 'Administrador', icon: Shield, color: 'bg-purple-100 text-purple-800' },
-  { value: 'operaciones', label: 'Operaciones', icon: User, color: 'bg-blue-100 text-blue-800' },
+  { value: 'operaciones', label: 'Operaciones', icon: User, color: 'bg-grafito-200 text-grafito-800' },
   { value: 'flota', label: 'Flota', icon: Truck, color: 'bg-green-100 text-green-800' },
   { value: 'mantenimiento', label: 'Mantenimiento', icon: User, color: 'bg-yellow-100 text-yellow-800' },
   { value: 'almacen', label: 'Almacén', icon: User, color: 'bg-marca-100 text-marca-800' },
@@ -359,20 +361,18 @@ const UsersPage = () => {
   return (
     <div className="space-y-6 page-fade-in" data-testid="users-page">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-grafito-900">
-            Usuarios
-          </h1>
-          <p className="text-grafito-500 mt-1">
-            Gestión de usuarios y permisos del sistema
-          </p>
-        </div>
-        <Button className="btn-action btn-press" onClick={() => setShowCreateDialog(true)} data-testid="new-user-btn">
-          <Plus className="w-4 h-4 mr-2" />
-          Nuevo Usuario
-        </Button>
-      </div>
+      <EncabezadoPagina
+        titulo="Usuarios"
+        subtitulo="Gestión de usuarios y permisos del sistema"
+        acciones={(
+          <>
+            <Button className="btn-action btn-press" onClick={() => setShowCreateDialog(true)} data-testid="new-user-btn">
+              <Plus className="w-4 h-4 mr-2" />
+              Nuevo Usuario
+            </Button>
+          </>
+        )}
+      />
 
       {/* Filters */}
       <Card className="bg-white section-enter card-3d shadow-card-hover">
@@ -409,9 +409,7 @@ const UsersPage = () => {
       <Card className="bg-white section-enter section-stagger-1">
         <CardContent className="p-0 overflow-x-auto">
           {loading ? (
-            <div className="flex items-center justify-center h-64">
-              <Loader2 className="w-8 h-8 animate-spin text-marca-500" />
-            </div>
+            <EsqueletoTabla />
           ) : filteredUsers.length === 0 ? (
             users.length > 0 ? (
               <EstadoVacio

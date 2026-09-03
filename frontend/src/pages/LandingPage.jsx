@@ -42,19 +42,16 @@ const PRODUCTO = PROVEEDOR.producto;
 
 const PASOS = [
   {
-    n: '01',
     titulo: 'Operación',
     icono: RouteIcon,
     texto: 'Viajes, viáticos, combustible y caja. La liquidación de flete sale con lo que ya cargaron el chofer y el taller, en vez de rearmarse en una hoja de cálculo a fin de mes.',
   },
   {
-    n: '02',
     titulo: 'Flota',
     icono: Wrench,
     texto: 'Vehículos, unidades, llantas e inventario. Cada llanta lleva su historial: montaje, rotación, inspecciones con profundidad, reencauche y baja, con su costo por kilómetro.',
   },
   {
-    n: '03',
     titulo: 'Cumplimiento',
     icono: ShieldCheck,
     texto: 'Documentos con sus vencimientos, incidentes, guías de transportista y facturas electronicas para SUNAT, y detracciones. Un documento vencido bloquea la salida antes de que sea una multa.',
@@ -131,6 +128,34 @@ const PLANES = [
   },
 ];
 
+/* Movimiento de la pagina. Un solo momento autoral -la captura del panel en
+   perspectiva- y dos gestos discretos: el hero entra en tres pasos
+   escalonados (eyebrow+titular, parrafo, botones) y los bloques que se
+   revelan lo hacen con 12 px y 500 ms, una sola vez. Con movimiento
+   reducido todo se queda en opacidad. */
+const ESTILOS = `
+  @keyframes hero-entra {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: none; }
+  }
+  .hero-entra {
+    animation: hero-entra 650ms cubic-bezier(.16, 1, .3, 1) both;
+    animation-delay: calc(var(--paso, 0) * 90ms);
+  }
+  .revelado {
+    transition: opacity 500ms cubic-bezier(.16, 1, .3, 1), transform 500ms cubic-bezier(.16, 1, .3, 1);
+  }
+  .revelado-espera { opacity: 0; transform: translateY(12px); }
+  .cta { transition: background-color 160ms cubic-bezier(.16, 1, .3, 1), border-color 160ms cubic-bezier(.16, 1, .3, 1), color 160ms cubic-bezier(.16, 1, .3, 1), transform 160ms cubic-bezier(.16, 1, .3, 1); }
+  .cta:active { transform: scale(.97); }
+  @media (prefers-reduced-motion: reduce) {
+    @keyframes hero-entra { from { opacity: 0; } to { opacity: 1; } }
+    .revelado { transition-property: opacity; }
+    .revelado-espera { transform: none; }
+    .cta:active { transform: none; }
+  }
+`;
+
 const Seccion = ({ id, children, className = '' }) => (
   <section id={id} className={`px-6 py-24 md:py-36 ${className}`}>
     <div className="mx-auto w-full max-w-6xl">{children}</div>
@@ -193,7 +218,7 @@ const Cabecera = () => {
         <div className="flex items-center gap-2">
           <Link
             to="/registro"
-            className="inline-flex items-center gap-2 rounded-full bg-marca-500 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-marca-400 sm:px-5"
+            className="cta inline-flex min-h-11 items-center gap-2 rounded-full bg-marca-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-marca-400 sm:px-5"
           >
             Empezar <ArrowRight className="hidden h-4 w-4 sm:block" />
           </Link>
@@ -239,40 +264,51 @@ const LandingPage = () => (
   <div className="min-h-screen bg-grafito-950 text-grafito-100 antialiased">
     <Cabecera />
 
-    <Seccion className="pt-20 md:pt-28">
-      <Etiqueta>Gestión de flota para transportistas del Perú</Etiqueta>
+    <style>{ESTILOS}</style>
 
-      <h1 className="font-heading max-w-4xl text-5xl font-black leading-[1.04] tracking-[-0.03em] md:text-[5rem] md:leading-[1.02] md:tracking-[-0.035em]">
-        Tu flota ya genera los datos.
-        <span className="block text-grafito-400">El problema es que viven</span>
-        <span className="block">en seis cuadernos distintos.</span>
-      </h1>
+    {/* En el telefono el titular baja un punto de escala y no fuerza saltos:
+        los <br> de escritorio dejaban "viven" sola en una linea. Con
+        text-balance el navegador reparte las lineas; a partir de md vuelven
+        los tres versos, que a 5 rem si caben. Todo el hero -titular, parrafo
+        y los dos botones- entra en un viewport de 844 px. */}
+    <Seccion className="pt-12 pb-16 sm:pt-16 md:pt-28 md:pb-36">
+      <div className="hero-entra" style={{ '--paso': 0 }}>
+        <Etiqueta>Gestión de flota para transportistas del Perú</Etiqueta>
 
-      <p className="mt-8 max-w-2xl text-lg leading-relaxed text-grafito-400">
+        <h1 className="font-heading max-w-4xl text-balance text-[2.5rem] font-black leading-[1.04] tracking-[-0.03em] sm:text-5xl md:text-[5rem] md:leading-[1.02] md:tracking-[-0.035em]">
+          Tu flota ya genera los datos.{' '}
+          <span className="text-grafito-400 md:block">El problema es que viven</span>{' '}
+          <span className="md:block">en seis cuadernos distintos.</span>
+        </h1>
+      </div>
+
+      <p className="hero-entra mt-6 max-w-2xl text-base leading-relaxed text-grafito-400 sm:mt-8 sm:text-lg" style={{ '--paso': 1 }}>
         Viajes, combustible, llantas, mantenimiento y documentos en un solo
         sitio. El chofer carga desde el celular, la liquidación sale sola y el
         SOAT vencido te avisa antes de que lo pare la policía.
       </p>
 
-      <div className="mt-10 flex flex-wrap items-center gap-4">
-        <Link
-          to="/registro"
-          className="inline-flex items-center gap-2 rounded-full bg-marca-500 px-7 py-3.5 font-bold text-white transition hover:bg-marca-400"
-        >
-          Empezar gratis <ArrowRight className="h-4 w-4" />
-        </Link>
-        <a
-          href="#como-funciona"
-          className="inline-flex items-center rounded-full border border-white/15 px-7 py-3.5 font-bold text-white transition hover:bg-white/5"
-        >
-          Ver cómo funciona
-        </a>
-      </div>
+      <div className="hero-entra" style={{ '--paso': 2 }}>
+        <div className="mt-8 flex flex-wrap items-center gap-3 sm:mt-10 sm:gap-4">
+          <Link
+            to="/registro"
+            className="cta inline-flex min-h-12 items-center gap-2 rounded-full bg-marca-500 px-7 py-3.5 font-bold text-white hover:bg-marca-400"
+          >
+            Empezar gratis <ArrowRight className="h-4 w-4" />
+          </Link>
+          <a
+            href="#como-funciona"
+            className="cta inline-flex min-h-12 items-center rounded-full border border-white/15 px-7 py-3.5 font-bold text-white hover:bg-white/5"
+          >
+            Ver cómo funciona
+          </a>
+        </div>
 
-      <p className="mt-6 flex items-center gap-2 text-sm text-grafito-400">
-        <span className="h-1.5 w-1.5 rounded-full bg-marca-500" />
-        14 días de prueba. Sin tarjeta.
-      </p>
+        <p className="mt-5 flex items-center gap-2 text-sm text-grafito-400 sm:mt-6">
+          <span className="h-1.5 w-1.5 rounded-full bg-marca-500" />
+          14 días de prueba. Sin tarjeta.
+        </p>
+      </div>
     </Seccion>
 
     {/* El producto, visto.
@@ -363,10 +399,7 @@ const LandingPage = () => (
 
     <Seccion className="border-t border-white/5">
       <div className="rounded-3xl border border-white/10 bg-white/[0.02] p-8 md:p-14">
-        <p className="font-mono text-xs uppercase tracking-[0.2em] text-marca-400">
-          En producción, no en demostración
-        </p>
-        <p className="font-heading mt-5 max-w-2xl text-2xl font-bold leading-snug tracking-tight md:text-3xl">
+        <p className="font-heading max-w-2xl text-2xl font-bold leading-snug tracking-tight md:text-3xl">
           Una transportista peruana mueve su flota con CargoXprez desde marzo de 2026.
         </p>
         <dl className="mt-10 grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-4">
@@ -400,17 +433,12 @@ const LandingPage = () => (
       </p>
 
       <div className="mt-14 grid gap-10 md:grid-cols-3">
-        {PASOS.map(({ n, titulo, texto, icono: Icono }) => (
-          <div key={n}>
-            <div className="mb-5 flex items-center gap-3">
-              {/* El rojo de marca puro a 12 px sobre el grafito da 3,9:1 y estos
-                  numeros son informacion, no adorno: van en el tono claro de la
-                  escala, que es el mismo rojo con luz suficiente para leerse. */}
-              <span className="text-xs font-bold tracking-[0.2em] text-marca-400">{n}</span>
-              <span className="h-px flex-1 bg-white/10" />
-              <Icono className="h-5 w-5 text-marca-500" />
-            </div>
-            <h3 className="font-heading text-xl font-bold tracking-tight">{titulo}</h3>
+        {PASOS.map(({ titulo, texto, icono: Icono }) => (
+          <div key={titulo}>
+            <span className="grid h-11 w-11 place-items-center rounded-xl bg-marca-500/10">
+              <Icono className="h-5 w-5 text-marca-400" />
+            </span>
+            <h3 className="font-heading mt-5 text-xl font-bold tracking-tight">{titulo}</h3>
             <p className="mt-3 leading-relaxed text-grafito-400">{texto}</p>
           </div>
         ))}
@@ -498,7 +526,7 @@ const LandingPage = () => (
 
             <Link
               to={p.ruta}
-              className={`mt-8 inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 font-bold transition ${
+              className={`cta mt-8 inline-flex min-h-12 items-center justify-center gap-2 rounded-full px-6 py-3 font-bold ${
                 p.destacado
                   ? 'bg-marca-500 text-white hover:bg-marca-400'
                   : 'border border-white/15 text-white hover:bg-white/5'
@@ -531,7 +559,7 @@ const LandingPage = () => (
         </p>
         <Link
           to="/registro"
-          className="mt-9 inline-flex items-center gap-2 rounded-full bg-marca-500 px-8 py-4 font-bold text-white transition hover:bg-marca-400"
+          className="cta mt-9 inline-flex min-h-12 items-center gap-2 rounded-full bg-marca-500 px-8 py-4 font-bold text-white hover:bg-marca-400"
         >
           Empezar gratis <ArrowRight className="h-4 w-4" />
         </Link>
@@ -545,8 +573,8 @@ const LandingPage = () => (
         llego hasta abajo sin decidirse. */}
     <footer className="border-t border-white/5 px-6 pb-24 pt-14">
       <div className="mx-auto w-full max-w-6xl">
-        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
-          <div>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-10 lg:grid-cols-4">
+          <div className="col-span-2 lg:col-span-1">
             <div className="flex items-center gap-2.5">
               <span className="grid h-9 w-9 place-items-center rounded-lg bg-marca-500">
                 <IconoCamion className="h-5 w-5 text-white" />

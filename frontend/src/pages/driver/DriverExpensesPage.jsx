@@ -298,32 +298,32 @@ const DriverExpensesPage = () => {
       {/* Budget Summary */}
       {dailyBudget > 0 && (
         <div className="grid grid-cols-2 gap-3">
-          <Card className="border-l-4 border-l-green-500">
+          <Card>
             <CardContent className="py-3">
               <p className="text-[10px] uppercase tracking-widest text-grafito-500 font-bold">Viático/Día</p>
-              <p className="text-xl font-bold text-green-600">S/ {dailyBudget.toFixed(2)}</p>
+              <p className="font-heading text-xl font-bold num text-green-700">S/ {dailyBudget.toFixed(2)}</p>
               <p className="text-[10px] text-grafito-400">{totalDays} días / S/ {totalBudget.toFixed(0)} total</p>
             </CardContent>
           </Card>
-          <Card className={`border-l-4 ${todayRemaining >= 0 ? 'border-l-blue-500' : 'border-l-red-500'}`}>
+          <Card className={todayRemaining >= 0 ? '' : 'border-red-300'}>
             <CardContent className="py-3">
               <p className="text-[10px] uppercase tracking-widest text-grafito-500 font-bold">Saldo Hoy</p>
-              <p className={`text-xl font-bold ${todayRemaining >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+              <p className={`font-heading text-xl font-bold num ${todayRemaining >= 0 ? 'text-grafito-900' : 'text-red-600'}`}>
                 S/ {todayRemaining.toFixed(2)}
               </p>
               <p className="text-[10px] text-grafito-400">Gastado hoy: S/ {todayExpenses.toFixed(2)}</p>
             </CardContent>
           </Card>
-          <Card className="border-l-4 border-l-indigo-500">
+          <Card>
             <CardContent className="py-3">
               <p className="text-[10px] uppercase tracking-widest text-grafito-500 font-bold">Total Gastado</p>
-              <p className="text-xl font-bold text-indigo-600">S/ {totalExpenses.toFixed(2)}</p>
+              <p className="font-heading text-xl font-bold num text-grafito-900">S/ {totalExpenses.toFixed(2)}</p>
             </CardContent>
           </Card>
-          <Card className={`border-l-4 ${remaining >= 0 ? 'border-l-emerald-500' : 'border-l-red-500'}`}>
+          <Card className={remaining >= 0 ? '' : 'border-red-300'}>
             <CardContent className="py-3">
               <p className="text-[10px] uppercase tracking-widest text-grafito-500 font-bold">Saldo Total</p>
-              <p className={`text-xl font-bold ${remaining >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+              <p className={`font-heading text-xl font-bold num ${remaining >= 0 ? 'text-green-700' : 'text-red-600'}`}>
                 S/ {remaining.toFixed(2)}
               </p>
             </CardContent>
@@ -489,16 +489,16 @@ const DriverExpensesPage = () => {
                   </Button>
                   <Button
                     variant="outline"
-                    className="h-24 flex-col gap-2 border-dashed border-2 hover:border-blue-400 hover:bg-blue-50"
+                    className="h-24 flex-col gap-2 border-dashed border-2 hover:border-grafito-400 hover:bg-grafito-100"
                     onClick={handleFileSelect}
                   >
-                    <Upload className="w-8 h-8 text-blue-500" />
+                    <Upload className="w-8 h-8 text-grafito-500" />
                     <span className="text-xs font-medium">Subir Archivo</span>
                   </Button>
                 </div>
               )}
               {scanning && (
-                <p className="text-xs text-blue-700 flex items-center gap-1">
+                <p className="text-xs text-grafito-700 flex items-center gap-1">
                   <Loader2 className="w-3 h-3 animate-spin" /> Escaneando comprobante...
                 </p>
               )}

@@ -33,13 +33,26 @@ const sinObserver = () => typeof IntersectionObserver === 'undefined';
  *
  * Una sola vez y sin volver a esconderse al salir: el efecto "desaparece al
  * subir" convierte la lectura en un juego de escondite.
+ *
+ * EL ESTADO POR DEFECTO ES VISIBLE. El elemento nace sin clase de ocultacion;
+ * es el efecto (ya montado, con observador disponible y sin reduced-motion)
+ * el que pone `revelado-espera` y la quita al entrar en pantalla. Si algo
+ * falla por el camino, el contenido se ve. Discreto: opacidad + 12 px en
+ * 500 ms con la curva de salida del sistema (.revelado, en LandingPage).
  */
 export const Revelado = ({ children, retraso = 0, className = '' }) => {
   const ref = useRef(null);
-  const [visto, setVisto] = useState(() => sinMovimiento() || sinObserver());
+  const [estado, setEstado] = useState('visible'); // 'visible' | 'espera'
 
   useEffect(() => {
-    if (visto || !ref.current) return undefined;
+    const el = ref.current;
+    if (!el || sinMovimiento() || sinObserver()) return undefined;
+    // Si ya esta en pantalla o por encima al montar, no hay nada que revelar.
+    const r = el.getBoundingClientRect();
+    const alto = window.innerHeight || 0;
+    if (r.top < alto * 0.9) return undefined;
+
+    setEstado('espera');
     const io = new IntersectionObserver(
       ([e]) => {
         // Entra... O YA QUEDO POR ENCIMA.
@@ -51,7 +64,7 @@ export const Revelado = ({ children, retraso = 0, className = '' }) => {
         // bloque se queda invisible PARA SIEMPRE, aunque el lector pase por
         // encima.
         if (e.isIntersecting || e.boundingClientRect.top <= 0) {
-          setVisto(true);
+          setEstado('visible');
           io.disconnect();
         }
       },
@@ -59,19 +72,15 @@ export const Revelado = ({ children, retraso = 0, className = '' }) => {
       // transicion ya este corriendo cuando el ojo llega.
       { rootMargin: '0px 0px -10% 0px', threshold: 0.1 }
     );
-    io.observe(ref.current);
+    io.observe(el);
     return () => io.disconnect();
-  }, [visto]);
+  }, []);
 
   return (
     <div
       ref={ref}
-      className={className}
-      style={{
-        opacity: visto ? 1 : 0,
-        transform: visto ? 'none' : 'translateY(26px)',
-        transition: `opacity .7s cubic-bezier(.16,1,.3,1) ${retraso}ms, transform .7s cubic-bezier(.16,1,.3,1) ${retraso}ms`,
-      }}
+      className={`revelado ${estado === 'espera' ? 'revelado-espera' : ''} ${className}`}
+      style={{ transitionDelay: `${retraso}ms` }}
     >
       {children}
     </div>
