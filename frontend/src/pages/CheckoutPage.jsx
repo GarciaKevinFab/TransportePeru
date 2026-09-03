@@ -238,7 +238,9 @@ const CheckoutPage = () => {
                     </span>
                   </div>
                   <p className="mt-2 text-xs text-grafito-400">
-                    Precio en soles. Incluye IGV. Se renueva cada mes y puedes cancelar cuando quieras.
+                    Precio en soles. Incluye IGV. Es un pago único por mes: no guardamos tu
+                    tarjeta ni queda ningún cobro programado, y te avisamos por correo antes
+                    de que venza.
                   </p>
                 </div>
                 <p className="mt-5 text-xs text-grafito-400">
