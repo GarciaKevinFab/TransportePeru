@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { instalarCache, limpiarCache } from './cache';
 
 // Vacio = mismo origen, que es como se sirve en produccion: el backend publica
 // la SPA y la API bajo el mismo dominio, asi que basta con pedir /api.
@@ -18,7 +19,18 @@ const api = axios.create({
 // Helpers to set/clear the auth token on the shared `api` instance.
 // This is the single source of truth for the Authorization header — the
 // AuthContext must use these instead of touching the global `axios` object.
+//
+// Las dos vacian ademas el cache de lecturas. Es el unico sitio por el que
+// pasan TODOS los cambios de sesion -- login, alta, entrada de chofer con PIN,
+// logout y la renovacion del token --, asi que enganchar aqui evita repetirlo
+// en AuthContext y, sobre todo, evita el olvido: sin esto, el cambio de turno
+// en una oficina dejaria al siguiente usuario viendo los viajes y la caja del
+// anterior, que siguen en memoria. En la renovacion del token el vaciado no
+// hace falta, pero cuesta unas relecturas cada varias horas y no merece la
+// pena distinguir el caso a cambio de arriesgarse a filtrar datos entre
+// sesiones.
 export const setAuthToken = (token) => {
+  limpiarCache();
   if (token) {
     api.defaults.headers.common.Authorization = `Bearer ${token}`;
   } else {
@@ -27,6 +39,7 @@ export const setAuthToken = (token) => {
 };
 
 export const clearAuthToken = () => {
+  limpiarCache();
   delete api.defaults.headers.common.Authorization;
 };
 
@@ -130,6 +143,16 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// Cache de lecturas. Va DESPUES de los interceptores de arriba a proposito:
+// axios ejecuta los de peticion en orden inverso al registro, asi que este
+// corre primero y decide si hace falta viajar, y el que pone la cabecera
+// Authorization corre despues sobre el mismo objeto de configuracion.
+//
+// Convive con la renovacion del token: los errores no se guardan, de modo que
+// el `api(originalRequest)` de mas arriba vuelve a salir a la red de verdad en
+// lugar de releer el 401 de memoria. Ver services/cache.js.
+instalarCache(api);
 
 // Auth API
 export const authApi = {
