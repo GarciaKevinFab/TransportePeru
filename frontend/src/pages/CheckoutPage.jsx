@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 import { PROVEEDOR } from '../config/proveedor';
+import ComprobanteImpreso from '../components/ComprobanteImpreso';
 import { Lock, ShieldCheck, ArrowLeft, Loader2, CheckCircle, CreditCard, Clock } from 'lucide-react';
 import LogoMarca from '../components/LogoMarca';
 
@@ -365,8 +366,13 @@ const CheckoutPage = () => {
 
               {pasarela === 'pagado' && (
                 <>
-                  <p className="mt-4 leading-relaxed text-grafito-400">
-                    Tu plan quedó activo y te enviamos el comprobante a{' '}
+                  {/* El comprobante en pantalla no sustituye al que va por
+                      correo: sustituye a la espera. Quien acaba de pagar
+                      quiere ver AHORA el numero de pedido y el importe, no
+                      irse al buzon a comprobar que le cobraron lo que creia. */}
+                  <ComprobanteImpreso orden={orden} />
+                  <p className="mt-6 leading-relaxed text-grafito-400">
+                    Tu plan quedó activo y también te enviamos el comprobante a{' '}
                     <strong className="text-grafito-200">{datos.email.trim()}</strong>.
                   </p>
                   <Link
