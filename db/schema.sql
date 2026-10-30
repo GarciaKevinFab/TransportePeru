@@ -56,9 +56,7 @@ create type user_role as enum ('superadmin', 'owner', 'admin', 'operaciones', 'f
 create type vehicle_type as enum ('tracto', 'carreta');
 create type vehicle_status as enum ('disponible', 'en_viaje', 'en_mantenimiento', 'fuera_servicio');
 create type document_status as enum ('vigente', 'por_vencer', 'vencido', 'pendiente', 'aprobado', 'observado', 'rechazado');
--- checklist_pendiente: lo pone start_checklist y lo deja submit_checklist
--- cuando el checklist da critico. Sin el, ese UPDATE falla (ver migracion 007).
-create type trip_status as enum ('programado', 'en_curso', 'completado', 'cancelado', 'checklist_pendiente');
+create type trip_status as enum ('programado', 'en_curso', 'completado', 'cancelado');
 create type tire_status as enum ('nuevo', 'en_uso', 'reencauche', 'baja', 'almacen');
 create type checklist_result as enum ('pending', 'ok', 'observado', 'critico');
 create type work_order_status as enum ('abierta', 'en_proceso', 'completada', 'cancelada');
@@ -66,14 +64,7 @@ create type work_order_priority as enum ('baja', 'normal', 'alta', 'critica');
 create type issue_type as enum ('incidente', 'multa', 'siniestro', 'checklist_critico', 'llanta_critica', 'otro');
 create type issue_severity as enum ('baja', 'media', 'alta', 'critica');
 create type issue_status as enum ('abierto', 'en_proceso', 'cerrado'); -- antes: str libre en Issue.status
--- balanza: el pesaje en balanza de la ruta. La app del chofer ya lo ofrece
--- como categoria propia; sin el valor, ese gasto no se puede guardar (ver 008).
--- Va DESPUES de 'otros', aunque quede feo, porque asi es como lo dejo el
--- `alter type ... add value` de la 008 en las bases que ya existian: un valor
--- nuevo se agrega al final. Ponerlo antes aca haria que una instalacion nueva
--- tuviera otro enumsortorder que produccion, y un ORDER BY sobre la columna
--- ordenaria distinto en cada entorno.
-create type expense_category as enum ('alimentacion', 'hospedaje', 'movilidad', 'peajes', 'parqueo', 'combustible', 'otros', 'balanza');
+create type expense_category as enum ('alimentacion', 'hospedaje', 'movilidad', 'peajes', 'parqueo', 'combustible', 'otros');
 create type settlement_status as enum ('pendiente', 'en_revision', 'aprobado', 'cerrado');
 create type stock_move_type as enum ('entrada', 'salida', 'ajuste', 'consumo_ot');
 create type block_rule as enum ('bloquea_asignacion', 'bloquea_inicio', 'solo_alerta');
@@ -93,29 +84,13 @@ create type notification_type as enum ('info', 'warning', 'alert', 'success'); -
 create table companies (
   id uuid primary key default gen_random_uuid(),
   name text not null,
-  -- Subdominio de la empresa (ver migracion 016): <slug>.sisac.pe. NO es la
-  -- frontera de seguridad -esa sigue siendo el company_id del token mas RLS-;
-  -- es como se ELIGE la empresa antes de tener token, y lo que acota la
-  -- busqueda del login para que no barra el sistema entero.
-  slug text not null
-    constraint companies_slug_formato check (
-      slug ~ '^[a-z0-9][a-z0-9-]*[a-z0-9]$'
-      and slug !~ '--'          -- posiciones 3-4 reservadas para punycode (xn--)
-      and length(slug) between 2 and 30
-    ),
   ruc text not null,
   address text,
   phone text,
   email text,
   logo_url text,
-  brand_color text not null default '#e00000',
-  -- Suscripcion (ver migracion 015). El plan es texto libre: los niveles y sus
-  -- precios son catalogo comercial, no esquema.
-  plan text not null default 'trial',
-  subscription_status text not null default 'trial', -- trial|activa|vencida|cancelada
-  trial_ends_at timestamptz, -- NULL = sin vencimiento
+  brand_color text not null default '#f97316',
   config jsonb not null default '{}'::jsonb, -- freeform (detraccion_rate, tire_critical_depth, etc.)
-  sunat_config jsonb not null default '{}'::jsonb, -- token y URL de la API de facturacion electronica
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -137,8 +112,7 @@ create table users (
   license_expiry timestamptz,
   phone text,
   whatsapp_number text, -- E.164, único global (el bot de WhatsApp resuelve por este campo sin JWT)
-  epp jsonb not null default '{}'::jsonb,
-  push_subscription jsonb, -- suscripcion Web Push del navegador de este usuario -- {"casco": {"assigned":true,"date":"...","condition":"bueno","size":"M"}, ...}
+  epp jsonb not null default '{}'::jsonb, -- {"casco": {"assigned":true,"date":"...","condition":"bueno","size":"M"}, ...}
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   created_by uuid references users(id)
@@ -146,22 +120,6 @@ create table users (
 -- Parcial: varios choferes de la misma empresa comparten email='' (login por
 -- DNI+PIN, no todos usan correo) - un único estricto sobre (company_id,email)
 -- rechazaría esos duplicados legítimos.
-create unique index companies_slug_idx on companies(slug);
-
--- Codigos de un solo uso para recuperar la contrasena (ver migracion 017).
--- Se guarda el SHA-256 del codigo, nunca el codigo: quien lea esta tabla no
--- puede construir con ella ningun enlace valido.
-create table if not exists password_reset_tokens (
-  id           uuid primary key default gen_random_uuid(),
-  user_id      uuid not null references users(id) on delete cascade,
-  token_hash   text not null unique,
-  expira_en    timestamptz not null,
-  usado_en     timestamptz,
-  ip_solicitud text,
-  created_at   timestamptz not null default now()
-);
-create index if not exists prt_user_idx on password_reset_tokens (user_id);
-create index if not exists prt_expira_idx on password_reset_tokens (expira_en);
 create unique index users_company_email_idx on users(company_id, email) where email is not null and email <> '';
 create index users_dni_idx on users(dni);
 create unique index users_whatsapp_number_idx on users(whatsapp_number) where whatsapp_number is not null;
@@ -189,10 +147,6 @@ create table vehicles (
   photo_url text,
   proveedor_id uuid, -- FK -> proveedores, agregada después de crear esa tabla (ver ALTER al final del bloque Liquidación)
   viatico_fijo double precision,
-  -- Los escribe complete_work_order al cerrar una OT y los lee
-  -- check_maintenance_due para saber cuando toca el proximo servicio
-  last_maintenance_km int,
-  last_maintenance_date timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   created_by uuid references users(id)
@@ -250,12 +204,6 @@ create table tires (
   status tire_status not null default 'nuevo',
   life_number int not null default 1, -- VN=1, R1=2, R2=3...
   initial_depth double precision, -- baseline mm de la vida actual
-  last_depth double precision, -- minima de la ultima inspeccion (ver migracion 013)
-  band_brand text, -- marca y modelo de la banda del reencauche
-  band_model text,
-  scrap_reason text, -- motivo, fecha y odometro de la baja
-  scrap_date timestamptz,
-  scrap_odometer int,
   current_vehicle_id uuid references vehicles(id),
   current_position text,
   total_km int not null default 0,
@@ -304,7 +252,6 @@ create table tire_life_events (
   cost double precision not null default 0,
   supplier text,
   notes text,
-  odometer int, -- odometro al momento del evento (ver migracion 013)
   event_date timestamptz not null default now(),
   created_by uuid references users(id)
 );
@@ -445,10 +392,6 @@ create table trips (
   checklist_approved boolean not null default false,
   total_advance double precision not null default 0,
   total_expenses double precision not null default 0,
-  -- Los escribe el flujo de checklist y liquidacion. Sin FK: checklists y
-  -- settlements siguen en Mongo (ver migracion 007)
-  checklist_result text,
-  settlement_id uuid,
   settlement_status text not null default 'pending', -- inconsistente con SettlementStatus (usa "pending" en inglés) - limpiar en la migración
   viatico_budget double precision,
   viatico_days int,
@@ -805,7 +748,6 @@ create table facturas (
   pdf_url text,
   status factura_status not null default 'borrador',
   created_at timestamptz not null default now(),
-  updated_at timestamptz, -- lo escribe /facturas/{id}/emit
   created_by uuid references users(id)
 );
 
@@ -840,7 +782,6 @@ create table guias_transportista (
   pdf_url text,
   status guia_transportista_status not null default 'borrador',
   created_at timestamptz not null default now(),
-  updated_at timestamptz, -- lo escribe /guias/{id}/emit
   created_by uuid references users(id)
 );
 
@@ -862,11 +803,7 @@ create table detracciones (
   deposit_date text,
   status detraccion_status not null default 'pendiente',
   notes text,
-  -- DELETE /detracciones/{id} es soft-delete: anula y deja la trazabilidad
-  anulada_at timestamptz,
-  anulada_by uuid,
   created_at timestamptz not null default now(),
-  updated_at timestamptz,
   created_by uuid references users(id)
 );
 
@@ -890,13 +827,7 @@ create table cash_movements (
   supplier text,
   receipt_url text,
   notes text,
-  -- DELETE /cashbox/movements/{id} es soft-delete: el movimiento se marca y
-  -- toda consulta de caja filtra por `deleted` para no descuadrar el saldo
-  deleted boolean not null default false,
-  deleted_at timestamptz,
-  deleted_by uuid,
   created_at timestamptz not null default now(),
-  updated_at timestamptz,
   created_by uuid references users(id)
 );
 

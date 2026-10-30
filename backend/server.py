@@ -10,6 +10,7 @@ import db_pg
 import tenant_host
 import correo
 import plantillas_correo
+import limites
 
 import os
 import logging
@@ -11295,6 +11296,19 @@ _tenant_regex = (
     if tenant_host.DOMINIO_BASE
     else None
 )
+
+# Techo de peticiones por IP para TODA la API. Los @limiter.limit de slowapi
+# cubren siete endpoints; esto pone el suelo de los otros 198 y hace que los
+# que se anadan manana nazcan protegidos. Ver backend/limites.py.
+#
+# EL ORDEN CON CORS NO ES INDIFERENTE
+#
+#   Starlette monta el ULTIMO middleware anadido como el mas EXTERNO. Este va
+#   antes que CORS en el codigo, o sea que CORS queda por fuera y el 429 sale
+#   con sus cabeceras puestas. Al reves, el navegador recibiria la respuesta
+#   sin cabeceras CORS y la descartaria: el usuario veria un error de red sin
+#   explicacion en lugar de "demasiadas peticiones, reintenta en N segundos".
+app.add_middleware(limites.LimitePeticiones)
 
 # Nunca allow_origins=["*"] junto con allow_credentials=True
 app.add_middleware(
