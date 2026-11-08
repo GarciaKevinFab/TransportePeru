@@ -40,7 +40,6 @@ import CashboxPage from './pages/CashboxPage';
 import LiquidacionFletePage from './pages/LiquidacionFletePage';
 import LiquidacionFleteDetailPage from './pages/LiquidacionFleteDetailPage';
 import OfflineIndicator from './components/OfflineIndicator';
-import { WhatsAppFlotante } from './components/ContactoVentas';
 import { TITULOS } from './config/seo';
 import { usePush } from './hooks/usePush';
 // Driver Mobile App Pages
@@ -579,7 +578,6 @@ function App() {
           <TenantProvider>
             <AppRoutes />
             <TituloPorRuta />
-            <WhatsAppFlotante />
             <PushRegistrar />
             <Toaster />
             <OfflineIndicator />

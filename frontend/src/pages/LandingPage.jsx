@@ -6,8 +6,7 @@ import IconoCamion from '../components/IconoCamion';
 import { ComparativaPlanes, Preguntas } from '../components/landing/Comparativa';
 import Testimonio from '../components/landing/Testimonio';
 import { Revelado, Cifra, CapturaTilt } from '../components/landing/animaciones';
-import { BotonWhatsApp, BloqueConfianza, MENSAJES } from '../components/ContactoVentas';
-import { useWhatsAppVentas, enlaceWhatsApp } from '../hooks/useWhatsAppVentas';
+import { ComoSeContrata } from '../components/ContactoVentas';
 import {
   Route as RouteIcon, Fuel, Wrench, CircleDot, FileText,
   ShieldCheck, Smartphone, MessageCircle, ScanLine, Building2,
@@ -115,7 +114,6 @@ const PLANES = [
     // esta el resumen del pedido y el boton de pago (Mercado Pago).
     cta: 'Elegir Pro',
     ruta: '/comprar?plan=pro',
-    whatsapp: MENSAJES.pro,
     destacado: true,
   },
   {
@@ -126,28 +124,10 @@ const PLANES = [
     para: 'Para varias sedes o más de una razón social.',
     incluye: ['Todo lo del plan Pro', 'Varias empresas en una cuenta', 'Integraciones a medida', 'Soporte dedicado'],
     cta: 'Hablemos',
-    // Se cotiza: "Hablemos" lleva a hablar con alguien (WhatsApp, o el correo
-    // si no hay numero configurado), no al alta de una cuenta gratis.
-    contacto: MENSAJES.empresa,
+    ruta: '/registro',
     destacado: false,
   },
 ];
-
-/* El boton de cada plan. Empresa no se compra en linea: abre una conversacion. */
-const CtaPlan = ({ plan, className, children }) => {
-  const numero = useWhatsAppVentas();
-  if (!plan.contacto) {
-    return <Link to={plan.ruta} className={className}>{children}</Link>;
-  }
-  const href = numero
-    ? enlaceWhatsApp(numero, plan.contacto)
-    : `mailto:${PROVEEDOR.email}?subject=${encodeURIComponent('Plan Empresa de CargoXprez')}&body=${encodeURIComponent(plan.contacto)}`;
-  return (
-    <a href={href} className={className} {...(numero ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>
-      {children}
-    </a>
-  );
-};
 
 /* Movimiento de la pagina. Un solo momento autoral -la captura del panel en
    perspectiva- y dos gestos discretos: el hero entra en tres pasos
@@ -329,15 +309,6 @@ const LandingPage = () => (
           <span className="h-1.5 w-1.5 rounded-full bg-marca-500" />
           14 días de prueba. Sin tarjeta.
         </p>
-        {/* Para quien prefiere preguntarle a una persona antes de crear nada.
-            Sin numero configurado no se pinta. */}
-        <BotonWhatsApp
-          mensaje={MENSAJES.general}
-          testId="landing-whatsapp-hero"
-          className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-grafito-300 transition hover:text-white"
-        >
-          ¿Prefieres hablar con una persona? Escríbenos por WhatsApp
-        </BotonWhatsApp>
       </div>
     </Seccion>
 
@@ -554,35 +525,23 @@ const LandingPage = () => (
               ))}
             </ul>
 
-            {/* mt-auto: los botones quedan alineados al pie de cada tarjeta. */}
-            <div className="mt-auto pt-8">
-              <CtaPlan
-                plan={p}
-                className={`cta flex min-h-12 items-center justify-center gap-2 rounded-full px-6 py-3 font-bold ${
-                  p.destacado
-                    ? 'bg-marca-500 text-white hover:bg-marca-400'
-                    : 'border border-white/15 text-white hover:bg-white/5'
-                }`}
-              >
-                {p.cta} <ArrowRight className="h-4 w-4" />
-              </CtaPlan>
-              {p.whatsapp && (
-                <BotonWhatsApp
-                  mensaje={p.whatsapp}
-                  testId="landing-whatsapp-pro"
-                  className="mt-3 flex min-h-11 items-center justify-center gap-2 text-sm font-semibold text-grafito-300 transition hover:text-white"
-                >
-                  O escríbenos por WhatsApp
-                </BotonWhatsApp>
-              )}
-            </div>
+            <Link
+              to={p.ruta}
+              className={`cta mt-8 inline-flex min-h-12 items-center justify-center gap-2 rounded-full px-6 py-3 font-bold ${
+                p.destacado
+                  ? 'bg-marca-500 text-white hover:bg-marca-400'
+                  : 'border border-white/15 text-white hover:bg-white/5'
+              }`}
+            >
+              {p.cta} <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
         ))}
       </div>
 
-      {/* Junto a los precios, que es donde se decide: quien vende, que
-          comprobante da y como pagar si la empresa no paga con tarjeta. */}
-      <BloqueConfianza className="mt-6" />
+      {/* Junto a los precios: lo que la administracion pregunta antes de
+          contratar, en el orden en que compra. */}
+      <ComoSeContrata className="mt-6" />
 
       <ComparativaPlanes />
     </Seccion>
@@ -603,15 +562,12 @@ const LandingPage = () => (
           Se configura en una tarde: cargas tus unidades, tus choferes y tus
           rutas, y empiezas a operar.
         </p>
-        <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-          <Link
-            to="/registro"
-            className="cta inline-flex min-h-12 items-center gap-2 rounded-full bg-marca-500 px-8 py-4 font-bold text-white hover:bg-marca-400"
-          >
-            Empezar gratis <ArrowRight className="h-4 w-4" />
-          </Link>
-          <BotonWhatsApp mensaje={MENSAJES.general} testId="landing-whatsapp-final" />
-        </div>
+        <Link
+          to="/registro"
+          className="cta mt-9 inline-flex min-h-12 items-center gap-2 rounded-full bg-marca-500 px-8 py-4 font-bold text-white hover:bg-marca-400"
+        >
+          Empezar gratis <ArrowRight className="h-4 w-4" />
+        </Link>
         <p className="mt-5 text-sm text-grafito-400">14 días de prueba. Sin tarjeta.</p>
       </div>
     </Seccion>

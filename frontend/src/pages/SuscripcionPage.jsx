@@ -8,7 +8,6 @@ import ComprobanteImpreso from '../components/ComprobanteImpreso';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
-import { BotonWhatsApp, MENSAJES } from '../components/ContactoVentas';
 
 /**
  * La suscripcion de la empresa: estado, cobros, comprobantes y cancelacion.
@@ -172,15 +171,6 @@ const SuscripcionPage = () => {
               </Button>
             )}
           </div>
-          {/* Hablar con una persona: dudas del cobro, o pagar con orden de
-              compra o transferencia. Sin numero configurado no se pinta. */}
-          <BotonWhatsApp
-            mensaje={MENSAJES.suscripcion}
-            testId="suscripcion-whatsapp"
-            className="inline-flex items-center gap-2 text-sm font-semibold text-grafito-600 hover:text-grafito-900 hover:underline"
-          >
-            ¿Tu empresa paga con orden de compra o transferencia, o tienes dudas? Escríbenos por WhatsApp
-          </BotonWhatsApp>
         </CardContent>
       </Card>
 

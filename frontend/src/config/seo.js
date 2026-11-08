@@ -15,6 +15,3 @@ export const TITULOS = {
   '/terminos': 'Términos del servicio | CargoXprez',
   '/reclamaciones': 'Libro de Reclamaciones | CargoXprez',
 };
-
-/** Rutas donde se ofrece hablar con ventas (boton flotante de WhatsApp). */
-export const RUTAS_DE_VENTA = ['/', '/comprar', '/registro', '/privacidad', '/terminos', '/reclamaciones'];
