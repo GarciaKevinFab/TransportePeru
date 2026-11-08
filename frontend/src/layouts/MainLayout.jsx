@@ -31,6 +31,8 @@ import {
   Link2,
   Sun,
   Moon,
+  CreditCard,
+  FileCheck,
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import {
@@ -89,6 +91,8 @@ const menuGroups = [
       { path: '/companies', icon: Building2, label: 'Empresas', roles: ['superadmin', 'owner'] },
       { path: '/users', icon: Users, label: 'Usuarios', roles: ['superadmin', 'owner', 'admin'] },
       { path: '/settings', icon: Settings, label: 'Configuración', roles: ['superadmin', 'owner', 'admin'] },
+      { path: '/suscripcion', icon: CreditCard, label: 'Suscripción', roles: ['owner', 'admin'] },
+      { path: '/admin/comprobantes', icon: FileCheck, label: 'Comprobantes', roles: ['superadmin'] },
     ],
   },
 ];

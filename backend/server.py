@@ -11,6 +11,7 @@ import tenant_host
 import correo
 import plantillas_correo
 import limites
+import suscripciones
 
 import os
 import logging
@@ -25,6 +26,7 @@ from enum import Enum
 import re
 import secrets
 import asyncio
+import hashlib
 
 def ip_del_cliente(request) -> str:
     """La IP real de quien pide, no la del tunel.
@@ -1144,8 +1146,19 @@ async def _exigir_host_de_la_empresa(request: Request, user: dict):
 _METODOS_DE_LECTURA = {"GET", "HEAD", "OPTIONS"}
 
 
+# Rutas que se pueden usar aunque la empresa no este al dia. Cortar el acceso a
+# la pagina de pago es dispararse en el pie: el cliente que quiere pagar no
+# podria. Ver suscripcion_api.py.
+_RUTAS_SIN_CORTE = ("/api/suscripcion",)
+
+
 async def _exigir_suscripcion_al_dia(request: Request, user: dict):
     """402 cuando la empresa dejo de estar al dia Y la peticion escribe.
+
+    "Al dia" lo decide suscripciones.estado_efectivo, que es la unica
+    definicion: la prueba vencida corta como siempre; un plan pagado y vencido
+    tiene suscripciones.DIAS_GRACIA dias de gracia antes de cortar; una
+    cancelacion conserva el acceso hasta el fin del periodo pagado.
 
     FALLA ABIERTO a proposito. Solo corta ante un vencimiento comprobado; ante
     cualquier otra cosa -empresa que no aparece, columna sin valor- deja pasar.
@@ -1156,34 +1169,35 @@ async def _exigir_suscripcion_al_dia(request: Request, user: dict):
         return  # gestiona las empresas: no puede quedar fuera por una de ellas
     if request.method in _METODOS_DE_LECTURA:
         return
+    if request.url.path.startswith(_RUTAS_SIN_CORTE):
+        return
     company_id = user.get("company_id")
     if not company_id:
         return
 
     async with db_pg.tx_global("comprobar la suscripcion de la empresa") as conn:
         fila = await conn.fetchrow(
-            "select subscription_status, trial_ends_at from companies where id = $1",
+            "select subscription_status, trial_ends_at, subscription_ends_at "
+            "  from companies where id = $1",
             db_pg.as_uuid(company_id),
         )
     if not fila:
         return
 
-    estado = fila["subscription_status"]
-    fin = fila["trial_ends_at"]
-    if estado in ("vencida", "cancelada"):
-        vencida = True
-    elif estado == "trial" and fin is not None:
-        vencida = fin < datetime.now(timezone.utc)
-    else:
-        vencida = False
+    efectivo = suscripciones.estado_efectivo(
+        fila["subscription_status"], fila["trial_ends_at"], fila["subscription_ends_at"])
+    if suscripciones.puede_escribir(efectivo):
+        return
 
-    if vencida:
-        raise HTTPException(
-            status_code=402,
-            detail="La prueba gratuita termino. Activa un plan para seguir "
+    if efectivo == "prueba_vencida":
+        detalle = ("La prueba gratuita termino. Activa un plan para seguir "
                    "registrando informacion; tus datos siguen disponibles "
-                   "para consulta.",
-        )
+                   "para consulta.")
+    else:
+        detalle = ("Tu suscripcion no esta al dia. Renuevala desde Suscripcion "
+                   "para seguir registrando informacion; tus datos siguen "
+                   "disponibles para consulta.")
+    raise HTTPException(status_code=402, detail=detalle)
 
 def _slug_pedido(valor: str) -> str:
     """Valida un slug elegido a mano y traduce el motivo a un 400 legible.
@@ -3184,6 +3198,13 @@ async def update_company(company_id: str, request: dict = Body(...), current_use
             status_code=400,
             detail="La direccion web de la empresa no se puede cambiar todavia",
         )
+
+    # El plan y el estado de la suscripcion los mueven el cobro y el
+    # superadmin, nunca el propio cliente: con PUT /companies un admin podia
+    # escribirse subscription_status='activa' y dejar de pagar.
+    if current_user["role"] != "superadmin":
+        for campo in ("plan", "subscription_status", "trial_ends_at"):
+            request.pop(campo, None)
 
     request.pop("id", None)
     request["updated_at"] = datetime.now(timezone.utc)
@@ -10674,12 +10695,12 @@ async def delete_cash_movement(
     return {"message": "Movimiento de caja eliminado"}
 
 # ============================================================================
-# Checkout de planes: el pedido que Izipay necesita ver
+# Checkout de planes: el pedido anonimo
 # ============================================================================
-# La pasarela valida el comercio mirando la web: sin carrito, checkout o boton
-# de pago no activan la integracion. /comprar (frontend) arma el resumen del
-# pedido y este endpoint lo registra al pulsar "Pagar". Cuando Izipay active
-# el comercio, su widget cobrara contra la orden que ya quedo aqui.
+# /comprar (frontend) arma el resumen del pedido. Con sesion y Mercado Pago
+# disponible, el boton lleva a la suscripcion (/api/suscripcion/mercadopago).
+# Sin una de las dos cosas -modo simulado, o alguien que todavia no tiene
+# cuenta- este endpoint registra el pedido como hasta ahora, sin cobrar nada.
 #
 # Publico y sin token, como /auth/signup: comprar es lo primero que hace
 # alguien que todavia no tiene cuenta.
@@ -10743,54 +10764,25 @@ async def crear_orden_checkout(request: Request, datos: OrdenCheckoutRequest):
 
 
 # ---------------------------------------------------------------------------
-# Cobro con Izipay
+# Cobro: Mercado Pago Suscripciones (ver mercadopago.py y suscripcion_api.py)
 # ---------------------------------------------------------------------------
-# Izipay opera en Peru sobre la plataforma micuentaweb (Lyra). El flujo tiene
-# tres pasos y cada uno vive en un sitio distinto a proposito:
-#
-#   1. El navegador pide un formToken para SU pedido   -> POST .../pago
-#   2. Izipay pinta el formulario de tarjeta con ese token. Los datos de la
-#      tarjeta NO pasan por este servidor ni una sola vez: van del navegador a
-#      Izipay. Por eso no hay nada que cumplir de PCI mas alla de no estorbar.
-#   3. Izipay avisa del resultado por su webhook       -> POST .../ipn
-#
-# El paso 3 es el que manda. El navegador tambien ve el resultado, pero un
-# navegador se cierra, pierde la red o miente: el estado 'pagado' SOLO lo
-# escribe el webhook, y solo despues de comprobar su firma.
-#
-# Sin credenciales configuradas, esto responde 503 con un mensaje que la web
-# sabe leer, y el checkout sigue funcionando como hoy -pedido registrado y
-# aviso de que el cobro todavia no esta activo-.
-import hmac
-import hashlib
-import json as _json
-import httpx
-
-IZIPAY_ENDPOINT = os.environ.get("IZIPAY_ENDPOINT", "https://api.micuentaweb.pe").rstrip("/")
-IZIPAY_USERNAME = os.environ.get("IZIPAY_USERNAME", "").strip()      # numero de tienda
-IZIPAY_PASSWORD = os.environ.get("IZIPAY_PASSWORD", "").strip()      # clave de la API REST
-IZIPAY_PUBLIC_KEY = os.environ.get("IZIPAY_PUBLIC_KEY", "").strip()  # se incrusta en la pagina
-IZIPAY_HMAC_KEY = os.environ.get("IZIPAY_HMAC_KEY", "").strip()      # firma lo que vuelve por el navegador
-
-
-def izipay_configurado() -> bool:
-    """Hay credenciales para cobrar de verdad."""
-    return bool(IZIPAY_USERNAME and IZIPAY_PASSWORD and IZIPAY_PUBLIC_KEY)
+# Aqui vivia la integracion con Izipay (formToken + IPN), que nunca llego a
+# cobrar: Izipay rechazo el comercio. Se retiro entera para que no quede una
+# segunda ruta de cobro a medio hacer. El pedido anonimo de /checkout/ordenes
+# se conserva: es lo que hace el checkout mientras Mercado Pago esta en modo
+# `simulado`, o para quien todavia no tiene cuenta.
+import mercadopago  # noqa: E402
 
 
 @api_router.get("/checkout/config")
 async def config_checkout():
-    """Lo que el navegador necesita saber antes de pintar el paso de pago.
+    """Lo que el checkout necesita saber antes de pintar el boton de pago.
 
-    Publico, y sin secretos: la clave publica de Izipay se incrusta en la
-    pagina por diseno. `izipay_activo` es lo que decide si el checkout muestra
-    el formulario de tarjeta o el aviso de "todavia no esta activo".
+    Publico y sin secretos. `mercadopago_publico` es si CUALQUIERA puede pagar
+    (modo produccion). En modo prueba sale False aqui y la cuenta lo descubre
+    en /api/suscripcion, que conoce su correo.
     """
-    return {
-        "izipay_activo": izipay_configurado(),
-        "public_key": IZIPAY_PUBLIC_KEY,
-        "endpoint": IZIPAY_ENDPOINT,
-    }
+    return {"mercadopago_publico": mercadopago.modo() == "produccion"}
 
 
 @api_router.get("/checkout/ordenes/{orden_id}")
@@ -10822,161 +10814,6 @@ async def _buscar_orden(orden_id: str) -> dict:
     if not orden:
         raise HTTPException(status_code=404, detail="Pedido no encontrado")
     return orden
-
-
-@api_router.post("/checkout/ordenes/{orden_id}/pago")
-@limiter.limit("20/hour")
-async def iniciar_pago_izipay(request: Request, orden_id: str):
-    """Pide a Izipay el formToken con el que el navegador pinta la tarjeta."""
-    if not izipay_configurado():
-        raise HTTPException(
-            status_code=503,
-            detail="El pago con tarjeta aún no está activo. Tu pedido quedó "
-                   "registrado y te escribiremos para completarlo.",
-        )
-    orden = await _buscar_orden(orden_id)
-    if orden["estado"] == "pagado":
-        raise HTTPException(status_code=409, detail="Este pedido ya está pagado")
-
-    # Izipay cobra en la unidad mas pequena de la moneda: S/ 199.00 son 19900.
-    # El monto sale de la BASE, no del navegador: es el precio que se fijo al
-    # crear el pedido, y nadie por el camino puede cambiarlo.
-    cuerpo = {
-        "amount": int(round(float(orden["monto"]) * 100)),
-        "currency": orden["moneda"],
-        # El correlativo es lo que devolvera el webhook para reencontrar esta
-        # fila. Con prefijo para que en el panel de Izipay se distinga de los
-        # pedidos de cualquier otro sistema de la casa.
-        "orderId": "FP-%s" % orden["numero"],
-        "customer": {
-            "email": orden["email"],
-            "billingDetails": {"legalName": orden["razon_social"]},
-        },
-    }
-    try:
-        async with httpx.AsyncClient(timeout=20) as cliente:
-            r = await cliente.post(
-                f"{IZIPAY_ENDPOINT}/api-payment/V4/Charge/CreatePayment",
-                json=cuerpo,
-                auth=(IZIPAY_USERNAME, IZIPAY_PASSWORD),
-            )
-        respuesta = r.json()
-    except Exception as e:
-        # No se filtra el detalle al navegador: puede llevar dentro parte de la
-        # peticion, credenciales incluidas.
-        logger.error("izipay: fallo al pedir el formToken del pedido %s: %s", orden["numero"], e)
-        raise HTTPException(status_code=502, detail="No se pudo iniciar el pago. Inténtalo de nuevo.")
-
-    if respuesta.get("status") != "SUCCESS":
-        logger.error("izipay: CreatePayment respondio %s para el pedido %s",
-                     respuesta.get("answer"), orden["numero"])
-        raise HTTPException(status_code=502, detail="No se pudo iniciar el pago. Inténtalo de nuevo.")
-
-    return {
-        "form_token": (respuesta.get("answer") or {}).get("formToken"),
-        "public_key": IZIPAY_PUBLIC_KEY,
-        "endpoint": IZIPAY_ENDPOINT,
-    }
-
-
-async def _activar_plan_por_correo(conn, orden: dict):
-    """Enlaza el pago con la empresa del comprador y le activa el plan.
-
-    Se busca por el correo del dueno porque es lo unico que hay: el checkout es
-    publico y se puede pagar ANTES de tener cuenta. Que no haya coincidencia no
-    es un error -es alguien que se registrara despues-, asi que el pedido queda
-    pagado y sin empresa, y se concilia a mano. Lo que no puede pasar es
-    perder el pago por eso.
-    """
-    fila = await conn.fetchrow(
-        "select company_id from users where lower(email) = $1 and role = 'owner' limit 1",
-        (orden.get("email") or "").lower(),
-    )
-    if not fila or not fila["company_id"]:
-        logger.info("izipay: pedido %s pagado sin empresa que enlazar (correo no registrado)",
-                    orden["numero"])
-        return None
-    cid = fila["company_id"]
-    await conn.execute(
-        "update companies set plan = $1, subscription_status = 'activa' where id = $2",
-        orden["plan"], cid,
-    )
-    await conn.execute(
-        "update checkout_orders set company_id = $1 where id = $2",
-        cid, db_pg.as_uuid(orden["id"]),
-    )
-    logger.info("izipay: pedido %s activo el plan %s", orden["numero"], orden["plan"])
-    return str(cid)
-
-
-@api_router.post("/checkout/izipay/ipn")
-async def izipay_ipn(request: Request):
-    """Webhook de Izipay. El unico sitio donde un pedido pasa a 'pagado'.
-
-    Sin limite de peticiones a proposito: los reintentos son parte del
-    protocolo -Izipay reintenta hasta que respondamos 200- y limitar esto seria
-    perder avisos de cobro. Lo que protege no es un contador, es la firma.
-    """
-    form = await request.form()
-    kr_answer = form.get("kr-answer")
-    kr_hash = form.get("kr-hash")
-    kr_hash_key = form.get("kr-hash-key") or "password"
-    if not kr_answer or not kr_hash:
-        raise HTTPException(status_code=400, detail="Falta la firma")
-
-    # Quien firma decide con que clave: el servidor de Izipay firma con la
-    # clave de la API REST; lo que vuelve por el navegador va firmado con la
-    # HMAC, que es publica-ish y por eso NO sirve para dar por bueno un cobro.
-    clave = IZIPAY_PASSWORD if kr_hash_key == "password" else IZIPAY_HMAC_KEY
-    if not clave:
-        raise HTTPException(status_code=503, detail="Pasarela no configurada")
-    calculado = hmac.new(clave.encode(), kr_answer.encode(), hashlib.sha256).hexdigest()
-    # compare_digest y no ==: comparar firmas con salida temprana revela, por el
-    # tiempo de respuesta, cuanto de la firma era correcta.
-    if not hmac.compare_digest(calculado, kr_hash):
-        logger.warning("izipay: firma invalida en el webhook")
-        raise HTTPException(status_code=401, detail="Firma inválida")
-
-    datos = _json.loads(kr_answer)
-    order_id = ((datos.get("orderDetails") or {}).get("orderId") or "")
-    coincide = re.match(r"^FP-(\d+)$", order_id)
-    if not coincide:
-        # 200 y no error: si se responde error, Izipay reintenta para siempre
-        # un aviso que nunca vamos a poder atender.
-        logger.warning("izipay: webhook con orderId desconocido %r", order_id)
-        return {"received": True}
-
-    numero = int(coincide.group(1))
-    transacciones = datos.get("transactions") or []
-    tx_id = (transacciones[0] or {}).get("uuid") if transacciones else None
-    pagado = datos.get("orderStatus") == "PAID"
-
-    async with db_pg.tx_global("webhook de izipay: conciliar un cobro (sin sesion)") as conn:
-        fila = await conn.fetchrow("select * from checkout_orders where numero = $1", numero)
-        orden = db_pg.to_api(fila)
-        if not orden:
-            logger.warning("izipay: webhook para el pedido %s, que no existe", numero)
-            return {"received": True}
-        # Reintento de un aviso ya procesado: se responde 200 y se sale. Sin
-        # esto, un reintento volveria a activar el plan y a reescribir la fecha
-        # de pago con la de hoy.
-        if orden["estado"] == "pagado":
-            return {"received": True}
-
-        await conn.execute(
-            "update checkout_orders set estado = $1, transaccion_id = $2, "
-            "pagado_en = $3, respuesta_pasarela = $4::jsonb where id = $5",
-            "pagado" if pagado else "rechazado",
-            tx_id,
-            datetime.now(timezone.utc) if pagado else None,
-            kr_answer,
-            db_pg.as_uuid(orden["id"]),
-        )
-        if pagado:
-            await _activar_plan_por_correo(conn, orden)
-
-    logger.info("izipay: pedido %s -> %s", numero, "pagado" if pagado else "rechazado")
-    return {"received": True}
 
 
 # ---------------------------------------------------------------------------
@@ -11177,6 +11014,29 @@ app.include_router(whatsapp_router)
 # viene a arreglar.
 from checkout_sin_js import router as checkout_sin_js_router
 app.include_router(checkout_sin_js_router)
+
+# Mercado Pago: el webhook (fuera de /api, exento del techo de peticiones) y
+# las rutas de la suscripcion y del panel de comprobantes.
+from webhooks_mercadopago import router as webhook_mp_router  # noqa: E402
+import suscripcion_api  # noqa: E402
+import comprobantes  # noqa: E402
+
+app.include_router(webhook_mp_router)
+
+
+async def _solo_superadmin(current_user: dict = Depends(get_current_user)):
+    """El dueno de la plataforma. require_roles() no sirve: deja pasar a
+    cualquiera de los roles que se le pasen, y aqui no hay ninguno mas."""
+    if current_user.get("role") != "superadmin":
+        raise HTTPException(status_code=403, detail="No autorizado")
+    return current_user
+
+
+app.include_router(suscripcion_api.crear_router(
+    usuario_dep=get_current_user,
+    gestor_dep=require_roles("owner", "admin"),
+    superadmin_dep=_solo_superadmin,
+))
 
 # Serve uploaded files
 from fastapi.staticfiles import StaticFiles
@@ -11443,6 +11303,30 @@ async def start_scheduler():
         logger.info("Scheduler de mantenimiento/alertas iniciado")
     except Exception as e:
         logger.error(f"No se pudo iniciar el scheduler: {e}")
+
+async def _avisos_de_comprobantes_loop():
+    """Cada 10 minutos: correo al dueno por cada cobro sin comprobante.
+
+    comprobantes.avisar decide a quien avisar (cobros nuevos, y recordatorio a
+    las 24 h de los que sigan pendientes). Aqui solo se le da cuerda.
+    """
+    await asyncio.sleep(60)
+    while True:
+        try:
+            enviados = await comprobantes.avisar()
+            if enviados:
+                logger.info("Avisos de comprobantes enviados: %s", enviados)
+        except Exception as e:
+            logger.error(f"Error avisando de comprobantes pendientes: {e}")
+        await asyncio.sleep(comprobantes.AVISAR_CADA_SEGUNDOS)
+
+
+@app.on_event("startup")
+async def start_avisos_de_comprobantes():
+    if os.environ.get("DISABLE_SCHEDULER", "").lower() in ("1", "true", "yes"):
+        return
+    asyncio.create_task(_avisos_de_comprobantes_loop())
+
 
 @app.on_event("shutdown")
 async def shutdown_db_client():

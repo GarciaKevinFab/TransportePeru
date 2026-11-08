@@ -219,17 +219,26 @@ export const TerminosPage = () => (
         <strong>Pro</strong>, hasta 20; <strong>Empresa</strong> se acuerda según el caso.
       </li>
       <li>
-        Los planes se cobran por adelantado. Si dejas de pagar, la cuenta pasa a
-        solo lectura antes de suspenderse: no vas a perder tus datos por un
+        Los planes se cobran por adelantado. El plan Pro es una{' '}
+        <strong>suscripción mensual con Mercado Pago</strong>: se cobra sola cada
+        mes hasta que la cancelas desde tu cuenta, en Suscripción.
+      </li>
+      <li>
+        Si un cobro no pasa, tienes <strong>7 días de gracia</strong> con la cuenta
+        funcionando. Después pasa a solo lectura: no vas a perder tus datos por un
         retraso.
+      </li>
+      <li>
+        Emitimos boleta o factura electrónica por cada cobro, con los datos que
+        indiques al suscribirte, y la descargas desde tu cuenta.
       </li>
       <li>Los precios pueden cambiar avisando con 30 días de antelación.</li>
     </ul>
 
     {/* Devoluciones. Vender en linea en Peru obliga a publicar las condiciones
         de reversion del pago ANTES de cobrar -es informacion relevante segun la
-        Ley 29571- y la pasarela (Izipay) revisa que la web la tenga antes de
-        activar el comercio. Sin esto no hay cobro con tarjeta.
+        Ley 29571- y la pasarela revisa que la web la tenga antes de activar el
+        comercio. Sin esto no hay cobro con tarjeta.
 
         El texto describe lo que el negocio hace de verdad: 14 dias de prueba
         sin tarjeta, cobro mensual por adelantado, y ningun prorrateo. Prometer

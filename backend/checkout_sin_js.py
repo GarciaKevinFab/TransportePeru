@@ -29,23 +29,35 @@ QUE HACE ESTE MODULO
   `createRoot().render()` reemplaza los hijos del contenedor y React toma el
   control como hasta ahora: la experiencia con JS no cambia en nada.
 
-LO QUE ESTA PAGINA **NO** HACE, Y POR QUE NO ES UN ENGANO
+COMO COBRA, Y CUANDO NO
 
-  No captura la tarjeta. No puede: los datos de tarjeta se teclean en un
-  iframe de micuentaweb (Lyra), que es lo que mantiene al comercio fuera del
-  alcance de PCI, y ese formulario es JavaScript por diseno de la pasarela.
+  Con Mercado Pago activo (ver mercadopago.py) el formulario pide ademas el
+  correo y la contrasena de la cuenta: la suscripcion es de una EMPRESA, y sin
+  sesion -esta pagina no tiene JavaScript con el que leer el token- la unica
+  forma de saber de cual es comprobar sus credenciales. Con ellas se crea la
+  suscripcion y el navegador va al `init_point` de Mercado Pago con un 303: un
+  redirect simple, que funciona sin JavaScript. La tarjeta se teclea alli, no
+  aqui.
 
-  Por eso el boton dice "Continuar al pago" y no "Pagar ahora": registra el
-  pedido y lo dice claro. Pintar un boton que aparente cobrar sin cobrar seria
-  enganar justo a quien viene a comprobar que el checkout es real.
+  En modo `simulado` (o en `prueba` para un correo que no es de prueba) la
+  pagina hace lo de siempre: registra el pedido y lo dice claro, sin cobrar.
+
+  Pedir una contrasena en una pagina publica abre un sitio donde probarlas:
+  por eso este POST lleva su propio limite por IP, mas estricto que el login.
 """
 import html
 import logging
+import time
+from collections import defaultdict, deque
 from pathlib import Path
 
-from fastapi import APIRouter, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse
+import bcrypt
 
+from fastapi import APIRouter, Form, HTTPException, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
+
+import comprobantes
+import mercadopago
 import planes
 import proveedor
 
@@ -156,12 +168,44 @@ def _formulario(plan: str, descripcion: str, importe: dict,
                 error: str = "", valores: dict | None = None) -> str:
     v = valores or {}
     aviso = f'<div class="mal">{_e(error)}</div>' if error else ""
+    con_mp = mercadopago.activo()
+    elegido = (v.get("comprobante") or "boleta")
+    if con_mp:
+        pasarela = "pago con Mercado Pago"
+        nota_precio = ("Precio en soles, con IGV incluido. Es una suscripción "
+                       "mensual: Mercado Pago la cobra cada mes y la cancelas "
+                       "cuando quieras desde tu cuenta.")
+        cuenta = f"""
+    <h2 style="margin-top:22px">Tu cuenta CargoXprez</h2>
+    <p class="nota" style="margin:0 0 12px">La suscripción es de tu empresa: entra con el
+       correo y la contraseña de tu cuenta. ¿Aún no tienes? <a href="/registro">Créala
+       gratis</a> (14 días de prueba) y vuelve aquí.</p>
+    <label>Contraseña de tu cuenta
+      <input type="password" name="password" autocomplete="current-password"></label>
+    <h2 style="margin-top:22px">Comprobante</h2>
+    <label>Boleta o factura
+      <select name="comprobante" style="display:block;width:100%;margin-top:6px;padding:11px 12px;border:1px solid #cbd5e1;border-radius:7px;font:inherit">
+        <option value="boleta"{' selected' if elegido != 'factura' else ''}>Boleta</option>
+        <option value="factura"{' selected' if elegido == 'factura' else ''}>Factura</option>
+      </select></label>
+    <label>DNI o RUC (factura: RUC obligatorio)
+      <input type="text" name="documento" inputmode="numeric" value="{_e(v.get('documento'))}"></label>"""
+        pie_boton = ("Te llevamos al sitio de <strong>Mercado Pago</strong> para dejar "
+                     f"tu tarjeta. {_e(proveedor.PRODUCTO)} nunca ve ni guarda sus datos.")
+    else:
+        pasarela = "pedido en línea"
+        nota_precio = ("Precio en soles, con IGV incluido. El pago en línea todavía "
+                       "no está activo: registramos tu pedido y te escribimos para "
+                       "completarlo. No se hace ningún cargo. ¿Solo quieres probar? "
+                       "El plan Gratis no pide tarjeta.")
+        cuenta = ""
+        pie_boton = "Registramos tu pedido. No se hace ningún cargo."
     return f"""
 {ESTILOS}
 <div class="cnj">
   <p><a href="/#planes">&larr; Volver a los planes</a></p>
   <h1>Finalizar compra</h1>
-  <p class="sub">{_e(proveedor.PRODUCTO)} · pago procesado por Izipay</p>
+  <p class="sub">{_e(proveedor.PRODUCTO)} · {pasarela}</p>
   {aviso}
 
   <div class="caja">
@@ -171,10 +215,7 @@ def _formulario(plan: str, descripcion: str, importe: dict,
     <div class="fila"><span>Valor de venta</span><span>S/ {importe['base']:.2f}</span></div>
     <div class="fila"><span>IGV (18%)</span><span>S/ {importe['igv']:.2f}</span></div>
     <div class="fila total"><span>Total al mes</span><span>S/ {importe['total']:.2f}</span></div>
-    <p class="nota">Precio en soles, con IGV incluido. Es un pago único por mes:
-       no guardamos tu tarjeta ni queda ningún cobro programado, y te avisamos
-       por correo antes de que venza. ¿Solo quieres probar? El plan Gratis no
-       pide tarjeta.</p>
+    <p class="nota">{nota_precio}</p>
   </div>
 
   <form class="caja" method="post" action="/comprar">
@@ -188,13 +229,52 @@ def _formulario(plan: str, descripcion: str, importe: dict,
       <input type="tel" name="telefono" value="{_e(v.get('telefono'))}"></label>
     <label>Correo *
       <input type="email" name="email" required value="{_e(v.get('email'))}"></label>
+    {cuenta}
     <button type="submit">Continuar al pago · S/ {importe['total']:.2f}</button>
-    <p class="nota">El cobro con tarjeta lo procesa <strong>Izipay</strong> sobre
-       conexión cifrada. Tus datos de tarjeta viajan directos a la pasarela:
-       {_e(proveedor.PRODUCTO)} nunca los ve ni los guarda.</p>
+    <p class="nota">{pie_boton}</p>
   </form>
   {_pie_proveedor()}
 </div>"""
+
+
+# Intentos con contrasena por IP: (instantes). Un solo proceso uvicorn, igual
+# que limites.py, asi que en memoria es exacto. Mas estricto que el login
+# (10/minuto): aqui no hay motivo para teclear la clave mas de unas pocas veces.
+_INTENTOS_CLAVE = defaultdict(deque)
+INTENTOS_MAXIMOS = 10
+VENTANA_SEGUNDOS = 15 * 60
+
+
+def _clave_permitida(ip: str) -> bool:
+    ahora = time.monotonic()
+    marcas = _INTENTOS_CLAVE[ip]
+    while marcas and marcas[0] <= ahora - VENTANA_SEGUNDOS:
+        marcas.popleft()
+    if len(marcas) >= INTENTOS_MAXIMOS:
+        return False
+    marcas.append(ahora)
+    return True
+
+
+async def _cuenta_que_paga(correo: str, clave: str) -> dict | None:
+    """El usuario que gestiona la empresa, si correo y contrasena son suyos."""
+    import db_pg
+
+    async with db_pg.tx_global("checkout sin js: resolver la cuenta antes de conocer la empresa") as conn:
+        fila = await conn.fetchrow(
+            "select id, company_id, email, role::text as role, password_hash, is_active "
+            "  from users where lower(email) = $1", correo)
+    if not fila or not fila["password_hash"] or not fila["is_active"]:
+        return None
+    try:
+        if not bcrypt.checkpw(clave.encode("utf-8"), fila["password_hash"].encode("utf-8")):
+            return None
+    except ValueError:
+        return None
+    if fila["role"] not in ("owner", "admin"):
+        return None
+    return {"id": str(fila["id"]), "company_id": str(fila["company_id"]),
+            "email": fila["email"], "role": fila["role"]}
 
 
 @router.get("/comprar", response_class=HTMLResponse)
@@ -223,6 +303,9 @@ async def comprar_enviar(
     email: str = Form(""),
     ruc: str = Form(""),
     telefono: str = Form(""),
+    password: str = Form(""),
+    comprobante: str = Form("boleta"),
+    documento: str = Form(""),
 ):
     """Registra el pedido de verdad, con las mismas reglas que la API.
 
@@ -236,7 +319,8 @@ async def comprar_enviar(
     correo = (email or "").strip().lower()
     doc = (ruc or "").strip()
     tel = (telefono or "").strip()
-    valores = {"razon_social": razon, "ruc": doc, "telefono": tel, "email": correo}
+    valores = {"razon_social": razon, "ruc": doc, "telefono": tel, "email": correo,
+               "comprobante": comprobante, "documento": documento}
 
     def con_error(msg: str, plan_valido: str = "pro"):
         descripcion, monto = planes.PRECIOS_CHECKOUT[plan_valido]
@@ -256,6 +340,48 @@ async def comprar_enviar(
         return con_error("El RUC debe tener 11 dígitos.", plan)
 
     descripcion, monto = planes.PRECIOS_CHECKOUT[plan]
+
+    # ─── Con Mercado Pago: suscripcion de la empresa ─────
+    if mercadopago.activo() and password:
+        ip = request.headers.get("cf-connecting-ip") or (request.client.host if request.client else "?")
+        if not _clave_permitida(ip):
+            return con_error("Demasiados intentos. Vuelve a intentarlo en unos minutos.", plan)
+        facturacion, motivo = comprobantes.validar(comprobante, documento)
+        if motivo:
+            return con_error(motivo, plan)
+        usuario = await _cuenta_que_paga(correo, password)
+        if not usuario:
+            # Mismo mensaje para correo inexistente, clave mala o rol sin
+            # permiso: no se confirma que una cuenta exista.
+            return con_error("Correo o contraseña incorrectos, o tu usuario no "
+                             "administra la empresa.", plan)
+        if not mercadopago.disponible_para(usuario["email"]):
+            return con_error("El pago automático todavía no está disponible.", plan)
+        import suscripciones
+        import suscripcion_api
+        estado = await suscripciones.estado_de(usuario["company_id"])
+        if estado and estado["mp_preapproval_id"]:
+            return con_error("Tu empresa ya tiene un cobro automático activo.", plan)
+        try:
+            await comprobantes.guardar_datos(usuario, facturacion, razon)
+        except Exception:  # noqa: BLE001
+            log.exception("checkout sin js: no se guardaron los datos de facturacion")
+        volver_a = (f"{suscripcion_api.origen_publico(request.headers.get('host'))}"
+                    f"{suscripcion_api.RUTA_CLIENTE}?aviso=confirmando")
+        try:
+            suscripcion = await mercadopago.crear_preapproval(
+                usuario["company_id"], usuario["email"], plan, descripcion, monto, volver_a)
+        except mercadopago.ErrorMercadoPago as e:
+            log.error("checkout sin js: Mercado Pago no creo la suscripcion: %s", e)
+            return con_error("No pudimos abrir el pago. No se te cobró nada: vuelve "
+                             "a intentarlo en un momento.", plan)
+        return RedirectResponse(suscripcion["init_point"], status_code=303)
+
+    if mercadopago.modo() == "produccion":
+        return con_error("Para suscribirte escribe la contraseña de tu cuenta "
+                         "CargoXprez. ¿No tienes cuenta? Créala gratis en /registro.", plan)
+
+    # ─── Sin Mercado Pago: el pedido de siempre, sin cobro ───
     async with db_pg.tx_global("registrar una orden de checkout (sin javascript)") as conn:
         fila = await conn.fetchrow(
             "insert into checkout_orders "
@@ -281,13 +407,9 @@ async def comprar_enviar(
   </div>
   <div class="caja">
     <h2>Qué sigue</h2>
-    <p style="margin:0 0 10px">Te escribimos a <strong>{_e(correo)}</strong> con el
-       enlace para pagar con tarjeta.</p>
-    <p class="nota">El formulario de tarjeta lo sirve Izipay y necesita
-       JavaScript: es un iframe suyo, y es justo lo que mantiene tus datos de
-       tarjeta fuera de nuestros servidores. Si prefieres pagar ahora mismo,
-       abre <a href="/comprar?plan={_e(plan)}">esta página</a> con JavaScript
-       activado.</p>
+    <p style="margin:0 0 10px">Te escribimos a <strong>{_e(correo)}</strong> para
+       completar el pago y activar tu plan.</p>
+    <p class="nota">No se ha realizado ningún cargo.</p>
   </div>
   {_pie_proveedor()}
 </div>""")
