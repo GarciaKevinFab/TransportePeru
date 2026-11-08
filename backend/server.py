@@ -11106,6 +11106,9 @@ def _politica_de_cache(ruta: Path) -> str:
     return f"public, max-age={_UN_DIA}, stale-while-revalidate={_UN_DIA * 7}"
 
 
+import seo_rutas  # noqa: E402
+from fastapi.responses import HTMLResponse  # noqa: E402
+
 if FRONTEND_BUILD.exists():
     app.mount("/static", StaticFiles(directory=str(FRONTEND_BUILD / "static")), name="react-static")
 
@@ -11120,9 +11123,11 @@ if FRONTEND_BUILD.exists():
                 str(file_path),
                 headers={"Cache-Control": _politica_de_cache(file_path)},
             )
+        # El index.html sale con el titulo, la descripcion y el canonical de
+        # SU ruta (ver seo_rutas.py), no con los de la portada para todas.
         indice = FRONTEND_BUILD / "index.html"
-        return FileResponse(
-            str(indice),
+        return HTMLResponse(
+            seo_rutas.personalizar(indice.read_text(encoding="utf-8"), full_path),
             headers={"Cache-Control": _politica_de_cache(indice)},
         )
 

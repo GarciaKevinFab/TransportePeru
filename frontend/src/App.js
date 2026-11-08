@@ -1,5 +1,5 @@
-import React, { Suspense, lazy } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import React, { Suspense, lazy, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { TenantProvider, useTenant } from './context/TenantContext';
@@ -40,6 +40,7 @@ import CashboxPage from './pages/CashboxPage';
 import LiquidacionFletePage from './pages/LiquidacionFletePage';
 import LiquidacionFleteDetailPage from './pages/LiquidacionFleteDetailPage';
 import OfflineIndicator from './components/OfflineIndicator';
+import { TITULOS } from './config/seo';
 import { usePush } from './hooks/usePush';
 // Driver Mobile App Pages
 import DriverLoginPage from './pages/driver/DriverLoginPage';
@@ -152,6 +153,20 @@ const AltaSoloEnLaMarca = () => {
   const { tenant, loading } = useTenant();
   if (loading) return <SuspenseFallback />;
   return tenant ? <Navigate to="/login" replace /> : <SignupPage />;
+};
+
+// El titulo de la pestana al navegar dentro de la SPA. El de la primera carga
+// lo pone el servidor (backend/seo_rutas.py); al cambiar de ruta sin recargar,
+// la pestana se quedaba con el de la pagina por la que se entro. En el
+// subdominio de un cliente manda TenantContext (el nombre de su empresa).
+const TituloPorRuta = () => {
+  const { pathname } = useLocation();
+  const { tenant } = useTenant();
+  useEffect(() => {
+    const titulo = TITULOS[pathname.replace(/\/+$/, '') || '/'];
+    if (titulo && !tenant) document.title = titulo;
+  }, [pathname, tenant]);
+  return null;
 };
 
 function AppRoutes() {
@@ -562,6 +577,7 @@ function App() {
               necesita el router. */}
           <TenantProvider>
             <AppRoutes />
+            <TituloPorRuta />
             <PushRegistrar />
             <Toaster />
             <OfflineIndicator />

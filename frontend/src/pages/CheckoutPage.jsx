@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { PROVEEDOR } from '../config/proveedor';
 import { Lock, ShieldCheck, ArrowLeft, Loader2, CreditCard, Clock, LogIn } from 'lucide-react';
 import LogoMarca from '../components/LogoMarca';
+import { Preguntas, PREGUNTAS_COMPRA } from '../components/landing/Comparativa';
 
 /**
  * Checkout publico del plan Pro: resumen del pedido y boton de pago.
@@ -394,6 +395,15 @@ const CheckoutPage = () => {
                 {via === 'pedido' && formularioPedido}
               </section>
             </div>
+
+            {/* Las dudas de quien esta a punto de pagar, respondidas aqui mismo
+                en vez de mandarlo a preguntar: las mismas de la portada. */}
+            <section aria-labelledby="preguntas-compra" className="mt-12">
+              <h2 id="preguntas-compra" className="font-heading text-xl font-bold tracking-tight">
+                Antes de pagar
+              </h2>
+              <Preguntas items={PREGUNTAS_COMPRA} />
+            </section>
           </>
         ) : (
           <div className="mx-auto max-w-xl" data-testid="checkout-orden-ok">

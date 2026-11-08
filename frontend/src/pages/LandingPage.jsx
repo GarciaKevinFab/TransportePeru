@@ -6,6 +6,7 @@ import IconoCamion from '../components/IconoCamion';
 import { ComparativaPlanes, Preguntas } from '../components/landing/Comparativa';
 import Testimonio from '../components/landing/Testimonio';
 import { Revelado, Cifra, CapturaTilt } from '../components/landing/animaciones';
+import { ComoSeContrata } from '../components/ComoSeContrata';
 import {
   Route as RouteIcon, Fuel, Wrench, CircleDot, FileText,
   ShieldCheck, Smartphone, MessageCircle, ScanLine, Building2,
@@ -537,6 +538,10 @@ const LandingPage = () => (
           </div>
         ))}
       </div>
+
+      {/* Junto a los precios: lo que la administracion pregunta antes de
+          contratar, en el orden en que compra. */}
+      <ComoSeContrata className="mt-6" />
 
       <ComparativaPlanes />
     </Seccion>

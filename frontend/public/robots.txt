@@ -1,0 +1,10 @@
+# CargoXprez - https://cargoxprez.sisac.pe
+# La API y los archivos subidos no son paginas: no hay nada que rastrear ahi.
+# Las pantallas internas (panel, viajes, llantas...) piden sesion y el
+# servidor las marca con noindex.
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /uploads/
+
+Sitemap: https://cargoxprez.sisac.pe/sitemap.xml
