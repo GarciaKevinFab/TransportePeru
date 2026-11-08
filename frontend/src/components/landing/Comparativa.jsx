@@ -114,7 +114,9 @@ const PREGUNTAS_PRODUCTO = [
  *     (LIMITE_VEHICULOS en server.py no incluye 'trial').
  *   - Prueba vencida sin pago = `prueba_vencida`: se lee pero no se escribe
  *     (_exigir_suscripcion_al_dia). NO pasa sola al plan Gratis.
- *   - El pago es la suscripcion de Mercado Pago: la tarjeta se deja en su sitio.
+ *   - El pago es en el sitio de Mercado Pago: pago adelantado de 1, 3, 6 o 12
+ *     meses (Checkout Pro: Yape, PagoEfectivo o tarjeta) o la suscripcion
+ *     mensual con tarjeta (planes.py, suscripcion_api.py).
  *   - Factura: con RUC, comprobantes.guardar_datos completa la razon social
  *     con el padron de SUNAT; el PDF se descarga desde /suscripcion.
  *   - Cancelar: POST /api/suscripcion/cancelar; acceso hasta fin del periodo.
@@ -134,7 +136,7 @@ export const PREGUNTAS_COMPRA = [
   },
   {
     p: '¿Cómo pago?',
-    r: 'Con tarjeta, en línea, desde tu cuenta de dueño o administrador. El pago se hace en el sitio de Mercado Pago: tu tarjeta no pasa por CargoXprez. Es una suscripción mensual que se cobra sola cada mes.',
+    r: 'Paga con Yape, desde tu banca móvil (BCP, BBVA y otros) o con tarjeta, en línea y desde tu cuenta de dueño o administrador. Eliges 1, 3, 6 o 12 meses por adelantado, a S/ 199 por mes y sin recargo, o la suscripción mensual con tarjeta, que se cobra sola. El pago se hace en el sitio de Mercado Pago: tus datos de pago no pasan por CargoXprez. Yape acepta hasta S/ 2.000 por pago, así que los 12 meses (S/ 2.388) se pagan desde la banca móvil o con tarjeta.',
   },
   {
     p: '¿Me dan factura con mi RUC?',

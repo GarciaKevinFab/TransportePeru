@@ -11020,6 +11020,7 @@ app.include_router(checkout_sin_js_router)
 from webhooks_mercadopago import router as webhook_mp_router  # noqa: E402
 import suscripcion_api  # noqa: E402
 import comprobantes  # noqa: E402
+import recordatorios  # noqa: E402
 
 app.include_router(webhook_mp_router)
 
@@ -11331,6 +11332,30 @@ async def start_avisos_de_comprobantes():
     if os.environ.get("DISABLE_SCHEDULER", "").lower() in ("1", "true", "yes"):
         return
     asyncio.create_task(_avisos_de_comprobantes_loop())
+
+
+async def _recordatorios_de_renovacion_loop():
+    """Cada hora: aviso a 7 y a 1 dia a quien pago por adelantado.
+
+    recordatorios.recordar decide a quien (y no repite un aviso: lo guarda en
+    recordatorios_renovacion). Aqui solo se le da cuerda.
+    """
+    await asyncio.sleep(90)
+    while True:
+        try:
+            enviados = await recordatorios.recordar()
+            if enviados:
+                logger.info("Recordatorios de renovacion enviados: %s", enviados)
+        except Exception as e:
+            logger.error(f"Error enviando recordatorios de renovacion: {e}")
+        await asyncio.sleep(recordatorios.RECORDAR_CADA_SEGUNDOS)
+
+
+@app.on_event("startup")
+async def start_recordatorios_de_renovacion():
+    if os.environ.get("DISABLE_SCHEDULER", "").lower() in ("1", "true", "yes"):
+        return
+    asyncio.create_task(_recordatorios_de_renovacion_loop())
 
 
 @app.on_event("shutdown")

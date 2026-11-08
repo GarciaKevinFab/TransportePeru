@@ -9,6 +9,15 @@ Estados guardados en companies.subscription_status y como se pasa de uno a otro:
     vencida    -> suspendida  pasaron los DIAS_GRACIA
     activa     -> suspendida  MAX_INTENTOS cobros rechazados seguidos
     cualquiera -> cancelada   la empresa cancela (conserva hasta subscription_ends_at)
+    cualquiera -> activa      pago adelantado aprobado (1, 3, 6 o 12 meses)
+
+EL PAGO ADELANTADO NO TRAE ESTADOS NUEVOS
+
+  Es un cobro aprobado como cualquier otro: extiende `subscription_ends_at`
+  desde lo que quedaba (o desde hoy) y deja la empresa `activa`. Al acabarse
+  lo pagado sin renovar, pasa lo mismo que con la tarjeta: `vencida` con su
+  gracia y despues `suspendida`, que deja la cuenta en solo consulta. Nada
+  se borra.
 
 `vencida` no se escribe casi nunca: es lo que resulta de leer `activa` con una
 fecha pasada. `estado_efectivo` es la unica definicion de las dos cosas, y la
@@ -216,28 +225,73 @@ async def aplicar_pago_mp(company_id: str, plan: str, pago_id: str, monto,
     return "aplicado"
 
 
+async def aplicar_pago_adelantado(company_id: str, plan: str, pago_id: str, monto,
+                                  meses: int, pago: dict | None = None) -> str:
+    """Asienta un pago adelantado aprobado. 'aplicado', 'repetido' o 'sin_fila'.
+
+    `pago_id` es el id del pago de Checkout Pro: va en mp_payment_id (el indice
+    unico que da la idempotencia) y en mp_cobro_id (por donde llega una
+    devolucion). Extiende `meses` meses de calendario desde lo que quedaba
+    pagado, o desde hoy si ya vencio: hasta = max(ahora, hasta_actual) + meses.
+    Lo que quedaba de la prueba tambien se respeta, igual que con la tarjeta.
+    """
+    cuerpo = _para_jsonb(pago)
+    async with db_pg.tx_global("webhook mercado pago: asentar un pago adelantado") as conn:
+        cid = await conn.fetchval(
+            "select id from companies where id = $1 for update", db_pg.as_uuid(company_id))
+        if not cid:
+            return "sin_fila"
+        nuevo = await conn.fetchval(
+            "insert into pagos_suscripcion "
+            "  (company_id, plan, monto, moneda, estado, metodo, origen, meses, "
+            "   mp_payment_id, mp_cobro_id, respuesta, confirmado_en) "
+            "values ($1, $2, $3, 'PEN', 'pagado', 'mercadopago', 'adelantado', $4, "
+            "        $5, $5, $6::jsonb, now()) "
+            "on conflict (mp_payment_id) where mp_payment_id is not null do nothing "
+            "returning id",
+            cid, plan, monto, meses, pago_id, cuerpo)
+        if not nuevo:
+            return "repetido"
+        await conn.execute(
+            "update companies set plan = $2, subscription_status = 'activa', "
+            "  mp_intentos_fallidos = 0, "
+            "  subscription_ends_at = greatest(coalesce(subscription_ends_at, "
+            "      case when subscription_status = 'trial' then trial_ends_at end, now()), now()) "
+            "      + make_interval(months => $3), "
+            "  updated_at = now() "
+            "where id = $1",
+            cid, plan, meses)
+    log.info("Pago adelantado %s (%s meses) aplicado a la empresa %s", pago_id, meses, company_id)
+    return "aplicado"
+
+
 async def devolver_pago_mp(cobro_id: str) -> str:
     """Deshace un cobro devuelto. 'devuelto' o 'sin_efecto'.
 
     `cobro_id` es el id del pago, no el de la factura. El estado `devuelto` hace
-    que un aviso repetido no quite el periodo dos veces.
+    que un aviso repetido no quite el periodo dos veces. Se quita lo que ese
+    pago concedio: 30 dias el de la tarjeta, sus meses el adelantado.
     """
     async with db_pg.tx_global("webhook mercado pago: deshacer un cobro devuelto") as conn:
         fila = await conn.fetchrow(
             "update pagos_suscripcion set estado = 'devuelto', confirmado_en = now() "
             " where metodo = 'mercadopago' and estado = 'pagado' and mp_cobro_id = $1 "
-            "returning company_id",
+            "returning company_id, origen, meses",
             cobro_id)
         if not fila:
             return "sin_efecto"
+        if fila["origen"] == "adelantado":
+            quitar = ("make_interval(months => $2)", fila["meses"])
+        else:
+            quitar = ("make_interval(days => $2)", DIAS_POR_PERIODO["mensual"])
         # Nunca antes de hoy: la empresa pasa a vencida (con su gracia), no a
         # una fecha pasada que le quitaria tambien esos dias.
         await conn.execute(
             "update companies set subscription_ends_at = "
-            "   greatest(subscription_ends_at - make_interval(days => $2), now()), "
+            f"   greatest(subscription_ends_at - {quitar[0]}, now()), "
             "   updated_at = now() "
             " where id = $1 and subscription_ends_at is not null",
-            fila["company_id"], DIAS_POR_PERIODO["mensual"])
+            fila["company_id"], quitar[1])
     log.info("Cobro %s de Mercado Pago devuelto: se quita su periodo a la empresa %s",
              cobro_id, fila["company_id"])
     return "devuelto"

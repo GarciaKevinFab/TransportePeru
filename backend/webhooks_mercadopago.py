@@ -29,6 +29,19 @@ LOS DOS IDS
   `subscription_authorized_payment` trae el id de la factura (mp_payment_id).
   `payment` trae el id del cobro (mp_cobro_id), que es por donde llegan las
   devoluciones.
+
+EL PAGO ADELANTADO LLEGA POR `payment`
+
+  Un pago unico de Checkout Pro (Yape, PagoEfectivo o tarjeta) no tiene
+  factura: su referencia termina en `adelantado-<meses>` y el aviso es
+  `payment`. Se relee el pago y:
+
+    approved              se compara el importe con planes.py y se suman los
+                          meses (una sola vez por id de pago).
+    pending / in_process  el cliente tiene un codigo de PagoEfectivo por
+                          pagar: no se concede nada todavia.
+    rejected / cancelled  nada.
+    refunded / charged_back  se quitan esos meses.
 """
 import logging
 
@@ -64,7 +77,7 @@ async def _duplicada(preapproval_id: str, company_id: str) -> None:
 async def _suscripcion(data_id: str) -> JSONResponse:
     pre = await mercadopago.leer_preapproval(data_id)
     ref = mercadopago.leer_referencia(pre.get("external_reference"))
-    if not ref:
+    if not ref or ref["adelantado"]:
         log.info("Suscripcion %s no es de CargoXprez", data_id)
         return _ok(aplicado=False, motivo="referencia ajena")
 
@@ -91,7 +104,7 @@ async def _pago(data_id: str) -> JSONResponse:
 
     pre = await mercadopago.leer_preapproval(preapproval_id)
     ref = mercadopago.leer_referencia(pre.get("external_reference"))
-    if not ref:
+    if not ref or ref["adelantado"]:
         return _ok(aplicado=False, motivo="referencia ajena")
     if ref["plan"] not in planes.PRECIOS_CHECKOUT:
         log.error("Factura %s con un plan que no se vende (%s): conciliar a mano.",
@@ -130,16 +143,43 @@ async def _pago(data_id: str) -> JSONResponse:
     return _ok(aplicado=resultado == "aplicado", resultado=resultado)
 
 
+async def _adelantado(data_id: str, cobro: dict, ref: dict) -> JSONResponse:
+    """Un pago unico aprobado: si cuadra con el catalogo, se suman sus meses."""
+    meses = ref["meses"]
+    esperado = planes.total_adelantado(ref["plan"], meses)
+    monto = mercadopago.importe(cobro.get("transaction_amount"))
+    moneda = cobro.get("currency_id")
+    if (esperado is None or monto is None or moneda != mercadopago.MONEDA
+            or monto != mercadopago.importe(esperado)):
+        # Registrado en el log y sin activar: alguien cambio el importe, o el
+        # catalogo cambio entre crear la preferencia y pagarla. Se concilia a mano.
+        log.error("Pago adelantado %s de %s %s para %s meses del plan %s (empresa %s): "
+                  "el catalogo dice %s. No se aplica; conciliar a mano.",
+                  data_id, moneda, monto, meses, ref["plan"], ref["company_id"], esperado)
+        return _ok(aplicado=False, motivo="importe no coincide")
+    resultado = await suscripciones.aplicar_pago_adelantado(
+        ref["company_id"], ref["plan"], str(data_id), monto, meses, cobro)
+    if resultado == "sin_fila":
+        log.error("Pago adelantado %s aprobado y la empresa %s no existe: hay un pago "
+                  "sin aplicar.", data_id, ref["company_id"])
+    return _ok(aplicado=resultado == "aplicado", resultado=resultado)
+
+
 async def _cobro(data_id: str) -> JSONResponse:
-    """Solo interesan las devoluciones: lo demas ya lo dice la factura."""
+    """Un cobro: el pago adelantado se asienta aqui; de la tarjeta, solo devoluciones."""
     cobro = await mercadopago.leer_pago(data_id)
     estado = cobro.get("status")
-    if estado not in DEVUELTOS:
-        return _ok(aplicado=False, estado=estado)
-    if not mercadopago.leer_referencia(cobro.get("external_reference")):
+    ref = mercadopago.leer_referencia(cobro.get("external_reference"))
+    if not ref:
         return _ok(aplicado=False, motivo="referencia ajena")
-    resultado = await suscripciones.devolver_pago_mp(str(data_id))
-    return _ok(aplicado=resultado == "devuelto", resultado=resultado)
+    if estado in DEVUELTOS:
+        resultado = await suscripciones.devolver_pago_mp(str(data_id))
+        return _ok(aplicado=resultado == "devuelto", resultado=resultado)
+    if ref["adelantado"] and estado == "approved":
+        return await _adelantado(data_id, cobro, ref)
+    # pending / in_process (codigo de pago generado), rejected, cancelled, y los
+    # cobros de la tarjeta, que se asientan por su factura.
+    return _ok(aplicado=False, estado=estado)
 
 
 @router.post(RUTA)

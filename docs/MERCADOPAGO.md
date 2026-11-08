@@ -1,8 +1,15 @@
 # Mercado Pago en CargoXprez
 
-Suscripción mensual del plan Pro (S/ 199, IGV incluido) cobrada con Mercado
-Pago Suscripciones, y comprobantes (boleta o factura) emitidos a mano en
-BSNegocios y entregados al cliente desde su cuenta.
+Dos formas de pagar el plan Pro (S/ 199 al mes, IGV incluido), las dos en el
+sitio de Mercado Pago, y comprobantes (boleta o factura) emitidos a mano en
+BSNegocios y entregados al cliente desde su cuenta:
+
+- **Suscripción mensual con tarjeta** (Mercado Pago Suscripciones,
+  `/preapproval`): se cobra sola cada mes.
+- **Pago adelantado** de 1, 3, 6 o 12 meses (Checkout Pro,
+  `/checkout/preferences`): con Yape, desde la banca móvil (PagoEfectivo: BCP,
+  BBVA y otros, o agente) o con tarjeta. No se cobra solo: se avisa por correo
+  antes de que venza. Ver la sección *Pago adelantado* más abajo.
 
 Es la misma cuenta de Mercado Pago que LicitaPro (SOLUCIONES INFORMÁTICAS MDD
 S.A.C., RUC 20490042068), pero con **su propia aplicación**: credenciales,
@@ -27,7 +34,8 @@ y lo que no empieza por `cargoxprez|` se ignora.
    - `subscription_authorized_payment`: cada cobro mensual. Aprobado → +30 días
      sobre el vencimiento vigente (o sobre lo que quedaba de prueba) y estado
      `activa`. Rechazado → se cuenta; a los 4 seguidos, `suspendida`.
-   - `payment`: solo para devoluciones (resta los 30 días de ese cobro, una vez).
+   - `payment`: las devoluciones (resta los 30 días de ese cobro, una vez) y el
+     pago adelantado (ver *Pago adelantado*).
    El aviso repetido no hace nada (índice único sobre el id de la factura).
 5. Cada cobro aprobado queda en `pagos_suscripcion` con el comprobante
    `pendiente`. A `COMPROBANTES_AVISO_EMAIL` le llega un correo con los datos
@@ -162,6 +170,132 @@ En `produccion`, `/comprar` sin sesión pide el correo y la contraseña del due�
 o admin de la empresa (la suscripción es de una empresa existente); sin JS
 también funciona (`checkout_sin_js.py`), con límite de 10 intentos por IP cada
 15 minutos.
+
+## Pago adelantado (Yape, banca móvil o tarjeta)
+
+Yape y PagoEfectivo solo existen en pagos únicos (Checkout Pro), no en
+`/preapproval`. Por eso el pago adelantado es una preferencia aparte.
+
+### Cómo funciona
+
+1. En `/comprar` (con sesión de dueño o admin) el cliente elige **1, 3, 6 o 12
+   meses** y boleta o factura. Los totales los manda el servidor
+   (`planes.opciones_adelantado`): **199 × meses, sin descuento**: S/ 199,
+   S/ 597, S/ 1.194 y S/ 2.388. Los 12 meses pasan el tope de Yape (S/ 2.000 por
+   pago): la pantalla lo dice y Mercado Pago no muestra Yape en ese pago.
+2. `POST /api/suscripcion/adelantado` recibe **solo** plan y meses, calcula el
+   total con `planes.total_adelantado` y crea la preferencia:
+   - un ítem, `unit_price` = total del catálogo, `currency_id: PEN`, `quantity: 1`;
+   - `external_reference`: `cargoxprez|<empresa>|pro|adelantado-<meses>`;
+   - `payer.email` = el correo del usuario; `back_urls` a
+     `https://<su-subdominio>/suscripcion?pago=aprobado|pendiente|error`;
+     `auto_return: approved`;
+   - `notification_url`: `$CARGOXPREZ_URL_PUBLICA/webhooks/mercadopago?source_news=webhooks`;
+   - `payment_methods.installments: 1` (no se excluye ningún medio);
+   - `date_of_expiration`: 3 días (plazo para pagar el código de PagoEfectivo;
+     lo que se pague después lo devuelve Mercado Pago solo);
+   - `statement_descriptor: CARGOXPREZ`.
+3. Si la empresa ya tiene **cobro automático con tarjeta**, responde 409 ("Ya
+   tienes cobro automático con tarjeta. Cancélalo primero si prefieres pagar por
+   adelantado.") y la pantalla no ofrece el pago adelantado.
+4. El aviso llega como `payment`. Con la firma válida se relee
+   `GET /v1/payments/{id}`:
+   - `approved` y referencia `adelantado-N`: se comparan `transaction_amount` y
+     `currency_id` con el catálogo (`PEN`, 199 × N). Si cuadran:
+     `subscription_ends_at = max(ahora, vencimiento actual) + N meses` (lo que
+     quedaba de prueba también se respeta), estado `activa`, y el pago queda en
+     `pagos_suscripcion` con `origen = 'adelantado'`, `meses = N` y el
+     comprobante `pendiente` (llega el correo de siempre a
+     `COMPROBANTES_AVISO_EMAIL`). Idempotente por el id del pago.
+   - Importe o moneda distintos: `log.error` ("conciliar a mano") y **no** se activa.
+   - `pending` / `in_process` (el cliente tiene un código de PagoEfectivo por
+     pagar): nada. La pantalla de vuelta dice "Te llegó el código de pago".
+     Cuando lo paga, Mercado Pago avisa del mismo pago ya `approved`.
+   - `rejected` / `cancelled`: nada.
+   - `refunded` / `charged_back`: se quitan esos N meses, una sola vez.
+   - Mercado Pago caído: 503, para que reintente.
+5. Al vencer sin renovar, la máquina de estados de siempre: `vencida` (7 días
+   de gracia) y después `suspendida`, que deja la cuenta **en solo consulta**
+   (no se borra nada). No hay estados nuevos.
+
+### Recordatorio de renovación
+
+`backend/recordatorios.py`. A **7 días** y a **1 día** del vencimiento, correo a
+los owner/admin de las empresas **sin suscripción con tarjeta viva** y cuyo
+**último pago confirmado fue adelantado**. Lleva un enlace a
+`https://<su-subdominio>/suscripcion` (no una preferencia pregenerada).
+
+- Lo programa el propio backend: un bucle asyncio que arranca con la app
+  (`start_recordatorios_de_renovacion` en `server.py`, junto al de avisos de
+  comprobantes), corre a los 90 s del arranque y luego **cada hora**
+  (`RECORDAR_CADA_SEGUNDOS = 3600`). No hace falta cron. `DISABLE_SCHEDULER=1`
+  lo apaga, igual que a los demás.
+- No repite: cada aviso enviado es una fila de `recordatorios_renovacion`
+  (empresa, vencimiento, días). Si el correo no sale, se borra la fila y se
+  reintenta en la pasada siguiente. Si la empresa paga otro periodo, la fecha
+  cambia y los dos avisos del periodo nuevo salen una vez cada uno.
+- Si el backend estuvo apagado justo a los 7 días, el aviso sale al volver con
+  los días que de verdad faltan.
+
+### Desplegar
+
+La migración **022** va **antes** que el backend nuevo (el backend viejo
+funciona igual con ella: dos columnas con valor por defecto y una tabla nueva).
+
+```bash
+scp -i ~/.ssh/hostinger_vps_ed25519 db/migrations/022_pago_adelantado.sql \
+    root@2.24.115.75:/opt/transporteperu/db/migrations/
+ssh -i ~/.ssh/hostinger_vps_ed25519 root@2.24.115.75 \
+  "docker exec -i transporteperu-postgres sh -c 'psql -v ON_ERROR_STOP=1 -U \$POSTGRES_USER -d \$POSTGRES_DB' \
+   < /opt/transporteperu/db/migrations/022_pago_adelantado.sql"
+```
+
+Comprobar:
+
+```sql
+select column_name from information_schema.columns
+ where table_name = 'pagos_suscripcion' and column_name in ('origen', 'meses');
+select to_regclass('public.recordatorios_renovacion');
+select policyname from pg_policies where tablename = 'recordatorios_renovacion';
+```
+
+Después, `bash scripts/deploy-app.sh` como siempre. **No hay variables nuevas**:
+usa `MERCADOPAGO_MODO`, el token, la clave del webhook,
+`CARGOXPREZ_URL_PUBLICA` y el SMTP que ya están. El evento **Pagos**
+(`payment`) del webhook ya está activo (lo usan las devoluciones); con
+`notification_url` en la preferencia, los avisos llegan a la misma ruta y con la
+misma clave. Comprobar en los logs que el bucle no falle:
+`docker logs transporteperu-backend 2>&1 | grep -i recordatorio`.
+
+Si al crear la preferencia Mercado Pago respondiera 401/403, habilitar
+**Checkout Pro** en la aplicación de CargoXprez (Tus integraciones → la app →
+producto) y reintentar; el token no cambia.
+
+### Probar
+
+Con `MERCADOPAGO_MODO=prueba` y tu correo en `MERCADOPAGO_CORREOS_PRUEBA`
+(dinero real, como la suscripción):
+
+1. `/comprar` con la cuenta owner de una empresa de prueba → **1 mes** → boleta
+   → **Pagar S/ 199,00 con Mercado Pago** → pagar con **Yape**. Al volver
+   (`?pago=aprobado`) la pantalla pasa a **Activa** y "Pagado hasta" suma un mes.
+   En la tabla de cobros figura "1 mes por adelantado".
+2. Otro pago de 1 mes eligiendo **PagoEfectivo / banca móvil**: al volver
+   (`?pago=pendiente`) dice "Te llegó el código de pago" y no cambia nada. Pagar
+   el código desde la banca móvil: al acreditarse llega el aviso y suma el mes.
+3. Elegir **12 meses**: debe salir la línea de que Yape no aparece (tope S/ 2.000).
+   No hace falta pagarlo.
+4. Devolver el pago del paso 1 desde el panel de Mercado Pago: el aviso
+   `payment` resta ese mes.
+5. Recordatorio: con la empresa de prueba pagada por adelantado, en la base
+   `update companies set subscription_ends_at = now() + interval '6 days' where slug = '<slug>';`.
+   En menos de una hora llega "Tu plan de CargoXprez vence en 5 días" (o 6) al
+   owner, y no se repite. Con `interval '20 hours'` llega el de "vence hoy".
+
+En el repositorio: `backend/tests/test_pago_adelantado.py` (catálogo,
+referencia, cuerpo de la preferencia, sin llaves en el repo; sin base de datos)
+y las pruebas `test_adelantado_*` y `test_recordatorio_*` de
+`backend/tests/test_suscripcion_mercadopago.py` (contra Postgres, en CI).
 
 ## Apagar
 

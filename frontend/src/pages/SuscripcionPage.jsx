@@ -12,10 +12,12 @@ import { Badge } from '../components/ui/badge';
 /**
  * La suscripcion de la empresa: estado, cobros, comprobantes y cancelacion.
  *
- * Mercado Pago devuelve aqui al cliente (back_url con ?aviso=confirmando).
- * Volver NO prueba nada: el plan lo activa el webhook firmado. Por eso esta
- * pantalla pregunta al backend unas cuantas veces hasta ver el cobro, y si no
- * llega lo dice tal cual: "lo estamos confirmando".
+ * Mercado Pago devuelve aqui al cliente: ?aviso=confirmando (suscripcion con
+ * tarjeta) o ?pago=aprobado|pendiente|error (pago adelantado). Volver NO
+ * prueba nada: el plan lo activa el webhook firmado. Por eso esta pantalla
+ * pregunta al backend unas cuantas veces hasta ver el cobro, y si no llega lo
+ * dice tal cual: "lo estamos confirmando". `pendiente` es que el cliente eligio
+ * banca movil o agente y tiene un codigo de pago por pagar.
  */
 
 const ETIQUETAS = {
@@ -30,11 +32,17 @@ const ETIQUETAS = {
 
 const ESTADO_PAGO = { pagado: 'Pagado', fallido: 'Rechazado', devuelto: 'Devuelto' };
 
+const concepto = (p) =>
+  p.origen === 'adelantado'
+    ? `${p.meses} ${p.meses === 1 ? 'mes' : 'meses'} por adelantado`
+    : 'Mensual con tarjeta';
+
 const fecha = (iso) => (iso ? new Date(iso).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
 
 const SuscripcionPage = () => {
   const [params, setParams] = useSearchParams();
-  const confirmando = params.get('aviso') === 'confirmando';
+  const vuelta = params.get('pago'); // aprobado | pendiente | error (pago adelantado)
+  const confirmando = params.get('aviso') === 'confirmando' || vuelta === 'aprobado';
   const [datos, setDatos] = useState(null);
   const [esperando, setEsperando] = useState(confirmando);
   const [cancelando, setCancelando] = useState(false);
@@ -112,6 +120,29 @@ const SuscripcionPage = () => {
     <div className="space-y-6 page-fade-in" data-testid="suscripcion-page">
       <EncabezadoPagina titulo="Suscripción" subtitulo="Tu plan, tus cobros y tus comprobantes" />
 
+      {vuelta === 'pendiente' && (
+        <Card className="bg-white" data-testid="pago-pendiente">
+          <CardContent className="py-5 text-grafito-700">
+            <p className="font-bold text-grafito-900">Te llegó el código de pago.</p>
+            <p className="mt-1 text-sm">
+              Págalo desde tu banca móvil (BCP, BBVA y otros) o en un agente antes de que venza: tienes 3 días.
+              Cuando se acredite, tu plan se activa solo y te llega un correo de Mercado Pago. No hace falta volver a pagar.
+            </p>
+            <button type="button" className="mt-3 text-sm text-grafito-500 underline" onClick={() => setParams({})}>Cerrar</button>
+          </CardContent>
+        </Card>
+      )}
+
+      {vuelta === 'error' && (
+        <Card className="bg-white" data-testid="pago-error">
+          <CardContent className="py-5 text-grafito-700">
+            <p className="font-bold text-red-700">El pago no se completó.</p>
+            <p className="mt-1 text-sm">No se te cobró nada. Puedes intentarlo otra vez con Yape, desde tu banca móvil o con tarjeta.</p>
+            <button type="button" className="mt-3 text-sm text-grafito-500 underline" onClick={() => setParams({})}>Cerrar</button>
+          </CardContent>
+        </Card>
+      )}
+
       {confirmando && (
         <Card className="bg-white">
           <CardContent className="py-5">
@@ -123,12 +154,12 @@ const SuscripcionPage = () => {
             ) : ultimoPagado ? (
               <div className="text-center">
                 <p className="font-bold text-green-700">Pago confirmado. Tu plan está activo.</p>
-                <ComprobanteImpreso orden={{ numero: ultimoPagado.numero, monto: ultimoPagado.monto, descripcion: plan?.descripcion || 'Plan Pro (mensual)' }} />
+                <ComprobanteImpreso orden={{ numero: ultimoPagado.numero, monto: ultimoPagado.monto, descripcion: ultimoPagado.origen === 'adelantado' ? `Plan Pro · ${concepto(ultimoPagado)}` : plan?.descripcion || 'Plan Pro (mensual)' }} />
                 <button type="button" className="mt-3 text-sm text-grafito-500 underline" onClick={() => setParams({})}>Cerrar</button>
               </div>
             ) : (
               <p className="text-grafito-700">
-                Todavía no recibimos la confirmación de Mercado Pago. Si dejaste tu tarjeta, el plan se activará
+                Todavía no recibimos la confirmación de Mercado Pago. Si ya pagaste, el plan se activará
                 solo en unos minutos; no hace falta volver a pagar.
               </p>
             )}
@@ -148,19 +179,27 @@ const SuscripcionPage = () => {
             {datos.vence && <p>Pagado hasta el <strong>{fecha(datos.vence)}</strong>.</p>}
             {datos.efectivo === 'vencida' && (
               <p className="text-amber-700">
-                El último cobro no pasó. Tienes {datos.dias_gracia} días de gracia desde el vencimiento; Mercado Pago lo reintenta solo.
+                {datos.cobro_automatico
+                  ? `El último cobro no pasó. Tienes ${datos.dias_gracia} días de gracia desde el vencimiento; Mercado Pago lo reintenta solo.`
+                  : `Lo pagado ya venció. Tienes ${datos.dias_gracia} días de gracia desde el vencimiento para renovar; después la cuenta queda en solo consulta.`}
               </p>
             )}
             {!datos.puede_escribir && (
               <p className="text-red-700">La cuenta está en solo lectura. Activa el plan para volver a registrar información.</p>
             )}
           </div>
+          {puedeContratar && datos.mercadopago_disponible && (
+            <p className="text-sm text-grafito-600">
+              Paga con Yape, desde tu banca móvil (BCP, BBVA y otros) o con tarjeta: 1, 3, 6 o 12 meses por adelantado,
+              o mensual con cobro automático. Te avisamos por correo antes de que venza.
+            </p>
+          )}
           <div className="flex flex-wrap gap-3">
             {puedeContratar && plan && (
               <Button asChild className="btn-action">
                 <Link to={`/comprar?plan=${plan.codigo}`} data-testid="suscribirme-btn">
                   <CreditCard className="mr-2 h-4 w-4" />
-                  {datos.mercadopago_disponible ? `Suscribirme · S/ ${Number(plan.monto).toFixed(2)} al mes` : 'Ver planes'}
+                  {datos.mercadopago_disponible ? (datos.vence ? 'Renovar o pagar más meses' : 'Pagar mi plan') : 'Ver planes'}
                 </Link>
               </Button>
             )}
@@ -186,6 +225,7 @@ const SuscripcionPage = () => {
                   <tr>
                     <th className="py-2 pr-4">N°</th>
                     <th className="py-2 pr-4">Fecha</th>
+                    <th className="py-2 pr-4">Concepto</th>
                     <th className="py-2 pr-4">Monto</th>
                     <th className="py-2 pr-4">Estado</th>
                     <th className="py-2">Comprobante</th>
@@ -196,6 +236,7 @@ const SuscripcionPage = () => {
                     <tr key={p.id} className="border-t border-grafito-100">
                       <td className="py-2 pr-4 tabular-nums">{p.numero}</td>
                       <td className="py-2 pr-4">{fecha(p.confirmado_en || p.created_at)}</td>
+                      <td className="py-2 pr-4">{concepto(p)}</td>
                       <td className="py-2 pr-4 tabular-nums">S/ {Number(p.monto).toFixed(2)}</td>
                       <td className="py-2 pr-4">{ESTADO_PAGO[p.estado] || p.estado}</td>
                       <td className="py-2">
@@ -220,7 +261,7 @@ const SuscripcionPage = () => {
           {datos.facturacion && (
             <p className="mt-4 text-xs text-grafito-500">
               Emitimos {datos.facturacion.tipo} {datos.facturacion.documento ? `a ${datos.facturacion.documento}` : 'sin documento'}
-              {datos.facturacion.nombre ? ` · ${datos.facturacion.nombre}` : ''}. Lo cambias al volver a suscribirte.
+              {datos.facturacion.nombre ? ` · ${datos.facturacion.nombre}` : ''}. Lo cambias en tu próximo pago.
             </p>
           )}
         </CardContent>
