@@ -22,7 +22,7 @@
 - Prueba de 14 días sin tarjeta y sin límite de vehículos.
 - Se paga en línea, en el sitio de Mercado Pago, desde la cuenta del dueño o administrador: con Yape, desde la banca móvil (BCP, BBVA y otros) o con tarjeta. Se pueden pagar 1, 3, 6 o 12 meses por adelantado (S/ 199 por mes, sin recargo; Yape acepta hasta S/ 2.000 por pago) o la suscripción mensual con tarjeta, que se cobra sola y se cancela desde la cuenta, sin contrato.
 - Se emite boleta o factura por cada cobro; con RUC, la razón social se completa con el padrón de SUNAT.
-- Si la prueba termina sin pago, la cuenta queda en solo consulta: los datos no se borran, pero para registrar algo nuevo hay que activar un plan.
+- Si la prueba termina sin pago (o un plan pagado vence y no se renueva en 7 días), la cuenta pasa al plan Gratis: sigue operando con hasta 3 vehículos activos, sin las funciones del plan Pro (SUNAT, detracciones, bot de WhatsApp, lectura automática de facturas y reportes). No se borra nada. Con más de 3 vehículos activos se puede consultar todo, y para registrar algo nuevo hay que dejar solo 3 activos (los demás, fuera de servicio) o activar el plan Pro.
 
 ## Páginas
 

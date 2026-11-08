@@ -44,6 +44,7 @@ import {
 } from '../components/ui/dropdown-menu';
 import { ScrollArea } from '../components/ui/scroll-area';
 import NotificationsPopover from '../components/NotificationsPopover';
+import AvisoPlanGratis from '../components/AvisoPlanGratis';
 
 // Menú principal organizado por secciones lógicas.
 // Los roles por ítem se mantienen para respetar la visibilidad existente.
@@ -492,6 +493,7 @@ const MainLayout = ({ children }) => {
             </button>
           </div>
         )}
+        <AvisoPlanGratis />
         <main className="flex-1 p-3 sm:p-4 md:p-6 pb-20 sm:pb-20 md:pb-24 overflow-auto page-fade-in">
           {children}
         </main>

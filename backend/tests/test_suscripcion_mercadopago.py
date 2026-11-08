@@ -232,6 +232,7 @@ def escenario(cuerpo):
             for cid in creadas:
                 await admin.execute("delete from pagos_suscripcion where company_id = $1", uuid.UUID(cid))
                 await admin.execute("delete from datos_facturacion where company_id = $1", uuid.UUID(cid))
+                await admin.execute("delete from vehicles where company_id = $1", uuid.UUID(cid))
                 await admin.execute("delete from users where company_id = $1", uuid.UUID(cid))
                 await admin.execute("delete from companies where id = $1", uuid.UUID(cid))
             await admin.close()
@@ -1061,7 +1062,7 @@ def test_recordatorio_a_7_y_a_1_dia_sin_repetir(mp, monkeypatch):
         assert len(mios(dueno)) == 1, enviados
         asunto, texto = mios(dueno)[0][1], mios(dueno)[0][2]
         assert asunto == "Tu plan de CargoXprez vence en 6 días"
-        assert "/suscripcion" in texto and "Yape" in texto and "solo consulta" in texto
+        assert "/suscripcion" in texto and "Yape" in texto and "plan Gratis" in texto
         # Quien paga con tarjeta no necesita aviso: se cobra solo.
         assert not mios(con_tarjeta)
 
@@ -1110,4 +1111,278 @@ def test_recordatorio_que_no_sale_se_reintenta(mp, monkeypatch):
         await recordatorios.recordar()
         await recordatorios.recordar()
         assert enviados.count(dueno["email"]) == 1
+    escenario(cuerpo)
+
+
+# ─── Plan Gratis: sin pago vigente la empresa sigue, con hasta 3 vehiculos ───
+#
+# El corte vive en server.py (_exigir_suscripcion_al_dia y
+# _exigir_cupo_de_vehiculos). Se importa server dentro de cada prueba y se le
+# pasa una Request de Starlette armada a mano: asi se prueba la funcion real
+# sin levantar uvicorn ni el login.
+
+def _server():
+    import server
+    return server
+
+
+def _peticion(metodo, ruta, cuerpo=None):
+    from starlette.requests import Request
+
+    crudo = json.dumps(cuerpo).encode() if cuerpo is not None else b""
+    enviado = {"listo": False}
+
+    async def recibir():
+        if enviado["listo"]:
+            return {"type": "http.disconnect"}
+        enviado["listo"] = True
+        return {"type": "http.request", "body": crudo, "more_body": False}
+
+    return Request({"type": "http", "method": metodo, "path": ruta, "raw_path": ruta.encode(),
+                    "query_string": b"", "headers": [(b"content-type", b"application/json")]},
+                   recibir)
+
+
+async def _corta(usuario, metodo, ruta, cuerpo=None):
+    """None si deja pasar; el detalle del 402 si corta."""
+    from fastapi import HTTPException
+    try:
+        await _server()._exigir_suscripcion_al_dia(_peticion(metodo, ruta, cuerpo), usuario)
+    except HTTPException as e:
+        assert e.status_code == 402
+        return e.detail
+    return None
+
+
+async def _vehiculos(admin, cid, cuantos, estado="disponible"):
+    ids = []
+    for i in range(cuantos):
+        ids.append(await admin.fetchval(
+            "insert into vehicles (company_id, plate, vehicle_type, status) "
+            "values ($1, $2, 'tracto', $3::vehicle_status) returning id",
+            uuid.UUID(cid), f"G{uuid.uuid4().hex[:5].upper()}", estado))
+    return ids
+
+
+async def _sin_vehiculos(admin, cid):
+    await admin.execute("delete from vehicles where company_id = $1", uuid.UUID(cid))
+
+
+def test_prueba_vencida_pasa_al_plan_gratis_y_sigue_operando(mp):
+    async def cuerpo(admin, empresa):
+        dueno = await empresa(trial_en_dias=-1)
+        try:
+            await _vehiculos(admin, dueno["company_id"], 2)
+            plan = await suscripciones.plan_de(dueno["company_id"])
+            assert (plan["efectivo"], plan["plan_efectivo"], plan["gratis"], plan["activos"],
+                    plan["excedido"]) == ("prueba_vencida", "gratis", True, 2, False)
+            # Antes: 402 en toda escritura. Ahora sigue trabajando.
+            assert await _corta(dueno, "POST", "/api/trips") is None
+            assert await _corta(dueno, "POST", "/api/tires") is None
+            assert await _corta(dueno, "POST", "/api/documents") is None
+            # Lo del plan Pro no, pero lo ya registrado se consulta.
+            for ruta in ("/api/guias", "/api/facturas", "/api/detracciones", "/api/fuel/ocr",
+                         "/api/whatsapp/pendientes/x/asignar"):
+                assert "plan Pro" in await _corta(dueno, "POST", ruta), ruta
+            assert "plan Pro" in await _corta(dueno, "PUT", "/api/config/sunat")
+            assert await _corta(dueno, "GET", "/api/guias") is None
+            assert "plan Pro" in await _corta(dueno, "GET", "/api/reports/cost-per-km")
+            assert await _corta(dueno, "GET", "/api/reports/documents-expiring") is None
+            # La fila no se toca: Gratis es lo que resulta de leer el estado.
+            fila = await _empresa(admin, dueno["company_id"])
+            assert (fila["plan"], fila["subscription_status"]) == ("trial", "trial")
+            # El aviso de la barra lo puede pedir cualquier rol.
+            async with _cliente(_app({"d": dueno})) as c:
+                r = await c.get("/api/suscripcion/plan", headers={"x-usuario": "d"})
+                assert r.status_code == 200 and r.json()["gratis"] is True
+                r = await c.get("/api/suscripcion", headers={"x-usuario": "d"})
+                assert r.json()["plan_efectivo"] == "gratis"
+        finally:
+            await _sin_vehiculos(admin, dueno["company_id"])
+    escenario(cuerpo)
+
+
+def test_pago_vencido_tras_la_gracia_pasa_a_gratis_y_en_gracia_no(mp):
+    async def cuerpo(admin, empresa):
+        en_gracia = await empresa(estado="activa", trial_en_dias=None, vence_en_dias=-3)
+        sin_gracia = await empresa(estado="activa", trial_en_dias=None, vence_en_dias=-9)
+        al_dia = await empresa(estado="activa", trial_en_dias=None, vence_en_dias=20)
+        try:
+            for quien in (en_gracia, sin_gracia, al_dia):
+                await _vehiculos(admin, quien["company_id"], 5)
+            assert not (await suscripciones.plan_de(en_gracia["company_id"]))["gratis"]
+            assert not (await suscripciones.plan_de(al_dia["company_id"]))["gratis"]
+            gratis = await suscripciones.plan_de(sin_gracia["company_id"])
+            assert gratis["gratis"] and gratis["excedido"] and gratis["activos"] == 5
+            # En gracia y al dia, el plan Pro entero (5 vehiculos, SUNAT).
+            assert await _corta(en_gracia, "POST", "/api/trips") is None
+            assert await _corta(al_dia, "POST", "/api/guias") is None
+            assert await _corta(sin_gracia, "POST", "/api/trips") is not None
+        finally:
+            for quien in (en_gracia, sin_gracia, al_dia):
+                await _sin_vehiculos(admin, quien["company_id"])
+    escenario(cuerpo)
+
+
+def test_con_mas_de_3_vehiculos_se_consulta_todo_y_se_libera_cupo(mp):
+    async def cuerpo(admin, empresa):
+        dueno = await empresa(trial_en_dias=-1)
+        try:
+            ids = await _vehiculos(admin, dueno["company_id"], 5)
+            await _vehiculos(admin, dueno["company_id"], 2, estado="fuera_servicio")
+            # Leer, siempre. Escribir, no: el detalle dice que hacer.
+            assert await _corta(dueno, "GET", "/api/trips") is None
+            assert await _corta(dueno, "GET", "/api/vehicles") is None
+            detalle = await _corta(dueno, "POST", "/api/trips")
+            assert "hasta 3 vehiculos activos" in detalle and "tienes 5" in detalle
+            assert "Fuera de servicio" in detalle and "plan Pro" in detalle
+            # Lo que libera cupo si pasa: fuera de servicio, eliminar, la sesion y el pago.
+            ruta = f"/api/vehicles/{ids[0]}"
+            assert await _corta(dueno, "PUT", ruta, {"status": "fuera_servicio"}) is None
+            assert await _corta(dueno, "PUT", ruta, {"status": "disponible"}) is not None
+            assert await _corta(dueno, "PUT", ruta, {"plate": "OTRA"}) is not None
+            assert await _corta(dueno, "DELETE", ruta) is None
+            assert await _corta(dueno, "POST", "/api/suscripcion/adelantado") is None
+            assert await _corta(dueno, "POST", "/api/auth/change-password") is None
+            # Con 3 activos vuelve a operar. Nada se borro.
+            await admin.execute("update vehicles set status = 'fuera_servicio' "
+                                " where id = any($1::uuid[])", ids[:2])
+            assert await _corta(dueno, "POST", "/api/trips") is None
+            assert await admin.fetchval("select count(*) from vehicles where company_id = $1",
+                                        uuid.UUID(dueno["company_id"])) == 7
+        finally:
+            await _sin_vehiculos(admin, dueno["company_id"])
+    escenario(cuerpo)
+
+
+def test_el_tope_de_3_para_agregar_vehiculos(mp):
+    from fastapi import HTTPException
+
+    async def cuerpo(admin, empresa):
+        dueno = await empresa(trial_en_dias=-1)
+        prueba = await empresa(trial_en_dias=5)
+        try:
+            srv = _server()
+            await _vehiculos(admin, dueno["company_id"], 2)
+            await _vehiculos(admin, dueno["company_id"], 4, estado="fuera_servicio")
+            await srv._exigir_cupo_de_vehiculos(dueno)       # 2 activos: entra el tercero
+            await _vehiculos(admin, dueno["company_id"], 1)
+            with pytest.raises(HTTPException) as e:
+                await srv._exigir_cupo_de_vehiculos(dueno)   # 3 activos: el cuarto no
+            assert e.value.status_code == 403 and "plan Gratis" in e.value.detail
+            # La prueba no tiene tope.
+            await _vehiculos(admin, prueba["company_id"], 25)
+            await srv._exigir_cupo_de_vehiculos(prueba)
+        finally:
+            await _sin_vehiculos(admin, dueno["company_id"])
+            await _sin_vehiculos(admin, prueba["company_id"])
+    escenario(cuerpo)
+
+
+def test_un_pago_saca_de_gratis(mp):
+    async def cuerpo(admin, empresa):
+        dueno = await empresa(trial_en_dias=-1)
+        try:
+            await _vehiculos(admin, dueno["company_id"], 6)
+            assert (await suscripciones.plan_de(dueno["company_id"]))["excedido"]
+            async with _cliente(_app({"d": dueno})) as c:
+                pref = await _preferencia(c, mp, "d", 1)
+                await _aviso(c, "payment", mp.pagar(pref))
+            plan = await suscripciones.plan_de(dueno["company_id"])
+            assert (plan["plan_efectivo"], plan["gratis"]) == ("pro", False)
+            assert await _corta(dueno, "POST", "/api/trips") is None
+            assert await _corta(dueno, "POST", "/api/guias") is None
+        finally:
+            await _sin_vehiculos(admin, dueno["company_id"])
+    escenario(cuerpo)
+
+
+def test_el_bot_de_whatsapp_no_atiende_en_gratis(mp, monkeypatch):
+    import whatsapp_bot
+
+    async def cuerpo(admin, empresa):
+        dueno = await empresa(trial_en_dias=-1)
+        respuestas = []
+
+        async def chofer(wa_id):
+            return {"id": dueno["id"], "company_id": dueno["company_id"]}
+
+        async def enviar(wa_id, texto):
+            respuestas.append(texto)
+
+        async def no_deberia(*a, **k):
+            raise AssertionError("en Gratis el bot no busca viajes")
+        monkeypatch.setattr(whatsapp_bot, "resolve_driver", chofer)
+        monkeypatch.setattr(whatsapp_bot, "send_whatsapp_text", enviar)
+        monkeypatch.setattr(whatsapp_bot, "find_active_trips_for_driver", no_deberia)
+        await whatsapp_bot._process_message({"from": "51999000111", "type": "image",
+                                             "image": {"id": "m1"}})
+        assert respuestas and "plan Pro" in respuestas[0]
+        await admin.execute("delete from whatsapp_events where wa_id = '51999000111'")
+    escenario(cuerpo)
+
+
+# ─── Compra sin JavaScript: tambien el pago adelantado ───
+
+def _checkout_sin_js_app(monkeypatch):
+    from fastapi import FastAPI
+    from fastapi.responses import HTMLResponse
+
+    import checkout_sin_js
+    checkout_sin_js._INTENTOS_CLAVE.clear()
+    # En CI no hay build de React: la pagina de error se sirve sin el cascaron.
+    monkeypatch.setattr(checkout_sin_js, "_envolver", lambda interior: HTMLResponse(interior))
+    app = FastAPI()
+    app.include_router(checkout_sin_js.router)
+    return app
+
+
+async def _con_clave(admin, usuario):
+    import bcrypt
+    clave = secrets.token_urlsafe(12)
+    await admin.execute("update users set password_hash = $1 where id = $2",
+                        bcrypt.hashpw(clave.encode(), bcrypt.gensalt(4)).decode(),
+                        uuid.UUID(usuario["id"]))
+    return clave
+
+
+def test_checkout_sin_js_paga_por_adelantado_con_el_total_del_servidor(mp, monkeypatch):
+    async def cuerpo(admin, empresa):
+        dueno = await empresa()
+        clave = await _con_clave(admin, dueno)
+        async with _cliente(_checkout_sin_js_app(monkeypatch)) as c:
+            for meses, total in ((1, 199.0), (12, 2388.0)):
+                r = await c.post("/comprar", data={
+                    "plan": "pro", "razon_social": "Mi empresa", "email": dueno["email"],
+                    "password": clave, "comprobante": "boleta", "documento": "",
+                    "pago": f"adelantado-{meses}", "monto": "1", "total": "1"})
+                assert r.status_code == 303, r.text
+                assert r.headers["location"].startswith(INIT_POINT_PREFERENCIA)
+                pref = mp.preferencias[r.headers["location"].split("=")[-1]]
+                assert pref["items"][0]["unit_price"] == total
+                assert pref["external_reference"] == (
+                    f"cargoxprez|{dueno['company_id']}|pro|adelantado-{meses}")
+            # Un periodo que no se vende no abre nada.
+            antes = len(mp.preferencias)
+            r = await c.post("/comprar", data={
+                "plan": "pro", "razon_social": "Mi empresa", "email": dueno["email"],
+                "password": clave, "pago": "adelantado-2"})
+            assert r.status_code == 200 and "1, 3, 6 o 12 meses" in r.text
+            assert len(mp.preferencias) == antes
+    escenario(cuerpo)
+
+
+def test_checkout_sin_js_no_ofrece_adelantado_con_tarjeta_activa(mp, monkeypatch):
+    async def cuerpo(admin, empresa):
+        dueno = await empresa()
+        clave = await _con_clave(admin, dueno)
+        await admin.execute("update companies set mp_preapproval_id = $2 where id = $1",
+                            uuid.UUID(dueno["company_id"]), "pre-" + uuid.uuid4().hex)
+        async with _cliente(_checkout_sin_js_app(monkeypatch)) as c:
+            mp.llamadas.clear()
+            r = await c.post("/comprar", data={
+                "plan": "pro", "razon_social": "Mi empresa", "email": dueno["email"],
+                "password": clave, "pago": "adelantado-3"})
+        assert r.status_code == 200 and "cancélalo primero" in r.text.lower()
+        assert not [x for x in mp.llamadas if x[0] == "POST"]
     escenario(cuerpo)

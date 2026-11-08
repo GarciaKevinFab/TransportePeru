@@ -112,8 +112,10 @@ const PREGUNTAS_PRODUCTO = [
  *
  *   - La prueba es `trial`, sin tarjeta y sin limite de vehiculos
  *     (LIMITE_VEHICULOS en server.py no incluye 'trial').
- *   - Prueba vencida sin pago = `prueba_vencida`: se lee pero no se escribe
- *     (_exigir_suscripcion_al_dia). NO pasa sola al plan Gratis.
+ *   - Prueba vencida sin pago (o plan vencido tras la gracia) = plan Gratis
+ *     (suscripciones.plan_efectivo): sigue operando con hasta 3 vehiculos
+ *     activos; con mas, se consulta todo y para registrar hay que dejar 3
+ *     activos o pagar (_exigir_suscripcion_al_dia).
  *   - El pago es en el sitio de Mercado Pago: pago adelantado de 1, 3, 6 o 12
  *     meses (Checkout Pro: Yape, PagoEfectivo o tarjeta) o la suscripcion
  *     mensual con tarjeta (planes.py, suscripcion_api.py).
@@ -132,7 +134,7 @@ export const PREGUNTAS_COMPRA = [
   },
   {
     p: '¿Qué pasa al terminar los 14 días, y con mis vehículos?',
-    r: 'Eliges tu plan y pagas en línea. Si no eliges ninguno, no se te cobra nada: la cuenta queda en solo consulta. Tus vehículos, viajes, llantas y documentos siguen ahí y los puedes ver, pero para registrar algo nuevo tienes que activar un plan.',
+    r: 'Si no eliges un plan, no se te cobra nada: la cuenta pasa al plan Gratis y sigues trabajando con hasta 3 vehículos activos, con viajes, liquidaciones, llantas, mantenimiento, documentos y la app del chofer. No se borra nada. Si tienes más de 3, puedes consultar todo, pero para registrar algo nuevo dejas solo 3 activos (marcas los demás como Fuera de servicio) o activas el plan Pro. Lo mismo pasa si un plan pagado vence y no lo renuevas en 7 días.',
   },
   {
     p: '¿Cómo pago?',
@@ -144,11 +146,11 @@ export const PREGUNTAS_COMPRA = [
   },
   {
     p: '¿Puedo cancelar?',
-    r: 'Sí, cuando quieras y sin contrato, desde Suscripción en tu cuenta. Se detiene el cobro automático y mantienes el acceso hasta el fin del mes ya pagado.',
+    r: 'Sí, cuando quieras y sin contrato, desde Suscripción en tu cuenta. Se detiene el cobro automático, mantienes el plan Pro hasta el fin del mes ya pagado y después la cuenta pasa al plan Gratis.',
   },
   {
     p: '¿Mis datos se borran si no pago o si cancelo?',
-    r: 'No. Ni al terminar la prueba ni al vencer un plan se borra nada: la cuenta queda en solo consulta. Si das de baja el servicio, tienes un plazo para exportar tu información antes de que se elimine.',
+    r: 'No. Ni al terminar la prueba ni al vencer un plan se borra nada: la cuenta pasa al plan Gratis y todo lo que cargaste sigue ahí. Si das de baja el servicio, tienes un plazo para exportar tu información antes de que se elimine.',
   },
 ];
 

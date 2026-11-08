@@ -24,12 +24,19 @@ def _leer(ruta):
         return f.read()
 
 
-def test_prueba_vencida_es_solo_consulta_y_no_plan_gratis():
-    """'Si no eliges plan, tus datos se quedan ... solo consulta'."""
-    assert suscripciones.puede_escribir("prueba_vencida") is False
-    # Leer sigue permitido: el corte solo mira metodos de escritura.
+def test_prueba_vencida_pasa_al_plan_gratis_con_3_vehiculos():
+    """'Si no eliges plan, sigues en el plan Gratis ... hasta 3 vehiculos activos'."""
+    assert suscripciones.plan_efectivo("trial", "prueba_vencida") == "gratis"
+    assert suscripciones.plan_efectivo("pro", "suspendida") == "gratis"
+    assert suscripciones.plan_efectivo("trial", "trial") == "trial"
+    assert suscripciones.plan_efectivo("pro", "vencida") == "pro"  # en gracia
     fuente = _leer(os.path.join(BACKEND, "server.py"))
-    assert "if request.method in _METODOS_DE_LECTURA:" in fuente
+    mapa = re.search(r"LIMITE_VEHICULOS = (\{[^}]*\})", fuente).group(1)
+    assert '"gratis": %d' % suscripciones.TOPE_GRATIS in mapa
+    assert suscripciones.TOPE_GRATIS == 3
+    texto = _leer(BLOQUE)
+    assert "plan Gratis" in texto and "hasta 3 vehículos activos" in texto
+    assert "solo consulta" not in texto
 
 
 def test_la_prueba_no_tiene_limite_de_vehiculos():
@@ -54,8 +61,14 @@ def test_con_ruc_se_completa_la_razon_social_del_padron():
 def test_sin_procesos_manuales_en_el_bloque():
     """Ni demo agendada ni cotizacion a mano: la compra es autoservicio."""
     texto = _leer(BLOQUE).lower()
-    for palabra in ("demo", "cotización", "orden de compra", "transferencia", "yape", "whatsapp"):
+    for palabra in ("demo", "cotización", "orden de compra", "transferencia", "whatsapp"):
         assert palabra not in texto, palabra
+
+
+def test_el_bloque_dice_como_se_paga():
+    """Yape, banca movil y tarjeta son los medios de Checkout Pro (pago adelantado)."""
+    assert "Paga con Yape, desde tu banca móvil o con tarjeta" in _leer(BLOQUE)
+    assert "/checkout/preferences" in _leer(os.path.join(BACKEND, "mercadopago.py"))
 
 
 def _preguntas_compra():
@@ -71,12 +84,24 @@ def test_las_preguntas_de_compra_cubren_las_dudas_de_quien_paga():
         assert tema in preguntas, tema
 
 
-def test_la_faq_no_promete_el_plan_gratis_al_terminar_la_prueba():
-    """El codigo deja la cuenta en solo consulta; antes la FAQ decia que pasaba
-    al plan Gratis, y eso no lo hace nada."""
+def test_la_faq_dice_que_al_terminar_la_prueba_pasa_al_plan_gratis():
+    """Lo que hace suscripciones.plan_efectivo: sin pago vigente, plan Gratis
+    con hasta 3 vehiculos activos; con mas, Fuera de servicio o plan Pro."""
+    vistas = 0
     for pregunta, respuesta in _preguntas_compra().items():
         if "14 días" in pregunta:
-            assert "solo consulta" in respuesta
-            assert "Gratis" not in respuesta
+            vistas += 1
+            for frase in ("plan Gratis", "hasta 3 vehículos activos", "No se borra nada",
+                          "Fuera de servicio", "plan Pro", "7 días"):
+                assert frase in respuesta, frase
+            assert "solo consulta" not in respuesta
+    assert vistas == 1
+    assert suscripciones.DIAS_GRACIA == 7
     todas = _leer(os.path.join(RAIZ, "frontend", "src", "components", "landing", "Comparativa.jsx"))
-    assert "pasa al plan Gratis" not in todas
+    assert "solo consulta" not in todas
+    # Y lo mismo para los buscadores y los asistentes.
+    llms = _leer(os.path.join(RAIZ, "frontend", "public", "llms.txt"))
+    assert "pasa al plan Gratis" in llms and "hasta 3 vehículos activos" in llms
+    assert "solo consulta" not in llms
+    index = _leer(os.path.join(RAIZ, "frontend", "public", "index.html"))
+    assert "solo consulta" not in index

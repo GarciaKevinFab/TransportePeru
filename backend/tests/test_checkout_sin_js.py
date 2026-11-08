@@ -158,3 +158,33 @@ def test_lo_que_escribe_el_cliente_se_escapa():
         error=veneno, valores={"razon_social": veneno, "email": veneno})
     assert "<script>alert(1)</script>" not in html
     assert "&lt;script&gt;" in html
+
+
+def test_con_mercado_pago_ofrece_el_pago_adelantado(monkeypatch):
+    """Sin JavaScript tambien se paga 1, 3, 6 o 12 meses con Yape, banca movil o
+    tarjeta; los totales salen del catalogo del servidor."""
+    import mercadopago
+    monkeypatch.setattr(mercadopago, "activo", lambda: True)
+    descripcion, monto = planes.PRECIOS_CHECKOUT["pro"]
+    html = checkout_sin_js._formulario("pro", descripcion, planes.desglose(monto))
+    assert 'name="pago"' in html
+    assert checkout_sin_js.COMO_SE_PAGA in html
+    assert checkout_sin_js.COMO_SE_PAGA.startswith("Paga con Yape, desde tu banca móvil")
+    valores = re.findall(r'<option value="(adelantado-\d+|mensual)"', html)
+    assert valores == ["adelantado-1", "adelantado-3", "adelantado-6", "adelantado-12", "mensual"]
+    assert '<option value="adelantado-1" selected>' in html
+    for o in planes.opciones_adelantado("pro"):
+        assert checkout_sin_js._soles(o["total"]) in html
+    linea_12 = re.search(r'<option value="adelantado-12">[^<]*', html).group(0)
+    assert "sin Yape" in linea_12
+    # Lo elegido se conserva al repintar con error.
+    html = checkout_sin_js._formulario("pro", descripcion, planes.desglose(monto),
+                                       error="x", valores={"pago": "mensual"})
+    assert '<option value="mensual" selected>' in html
+
+
+def test_sin_mercado_pago_no_hay_desplegable_de_pago(monkeypatch):
+    import mercadopago
+    monkeypatch.setattr(mercadopago, "activo", lambda: False)
+    descripcion, monto = planes.PRECIOS_CHECKOUT["pro"]
+    assert 'name="pago"' not in checkout_sin_js._formulario("pro", descripcion, planes.desglose(monto))

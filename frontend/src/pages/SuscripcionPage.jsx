@@ -22,12 +22,12 @@ import { Badge } from '../components/ui/badge';
 
 const ETIQUETAS = {
   trial: { texto: 'Prueba gratuita', color: 'bg-blue-100 text-blue-800' },
-  prueba_vencida: { texto: 'Prueba terminada', color: 'bg-red-100 text-red-800' },
+  prueba_vencida: { texto: 'Prueba terminada: plan Gratis', color: 'bg-amber-100 text-amber-800' },
   activa: { texto: 'Activa', color: 'bg-green-100 text-green-800' },
   vencida: { texto: 'Pago pendiente (en gracia)', color: 'bg-amber-100 text-amber-800' },
-  suspendida: { texto: 'Suspendida (solo lectura)', color: 'bg-red-100 text-red-800' },
+  suspendida: { texto: 'Sin pago vigente: plan Gratis', color: 'bg-amber-100 text-amber-800' },
   cancelada: { texto: 'Cancelada (activa hasta el vencimiento)', color: 'bg-grafito-100 text-grafito-800' },
-  cancelada_vencida: { texto: 'Cancelada', color: 'bg-grafito-100 text-grafito-800' },
+  cancelada_vencida: { texto: 'Cancelada: plan Gratis', color: 'bg-grafito-100 text-grafito-800' },
 };
 
 const ESTADO_PAGO = { pagado: 'Pagado', fallido: 'Rechazado', devuelto: 'Devuelto' };
@@ -170,7 +170,7 @@ const SuscripcionPage = () => {
       <Card className="bg-white">
         <CardContent className="space-y-4 py-6">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="text-lg font-bold text-grafito-900">Plan {datos.plan}</span>
+            <span className="text-lg font-bold text-grafito-900">Plan {datos.plan_efectivo || datos.plan}</span>
             <Badge className={etiqueta.color}>{etiqueta.texto}</Badge>
             {datos.cobro_automatico && <Badge className="bg-green-50 text-green-700">Cobro automático con Mercado Pago</Badge>}
           </div>
@@ -181,11 +181,14 @@ const SuscripcionPage = () => {
               <p className="text-amber-700">
                 {datos.cobro_automatico
                   ? `El último cobro no pasó. Tienes ${datos.dias_gracia} días de gracia desde el vencimiento; Mercado Pago lo reintenta solo.`
-                  : `Lo pagado ya venció. Tienes ${datos.dias_gracia} días de gracia desde el vencimiento para renovar; después la cuenta queda en solo consulta.`}
+                  : `Lo pagado ya venció. Tienes ${datos.dias_gracia} días de gracia desde el vencimiento para renovar; después la cuenta pasa al plan Gratis, con hasta 3 vehículos activos.`}
               </p>
             )}
             {!datos.puede_escribir && (
-              <p className="text-red-700">La cuenta está en solo lectura. Activa el plan para volver a registrar información.</p>
+              <p className="text-amber-700">
+                Tu empresa está en el plan Gratis: sigues trabajando con hasta 3 vehículos activos, sin las funciones del plan Pro.
+                No se borró nada. Activa el plan Pro para volver a tenerlo todo.
+              </p>
             )}
           </div>
           {puedeContratar && datos.mercadopago_disponible && (
