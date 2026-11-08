@@ -3,7 +3,7 @@ import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import api, { suscripcionApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { PROVEEDOR } from '../config/proveedor';
-import { Lock, ShieldCheck, ArrowLeft, Loader2, CreditCard, Clock, LogIn } from 'lucide-react';
+import { Lock, ShieldCheck, ArrowLeft, Loader2, CreditCard, Clock, LogIn, Smartphone } from 'lucide-react';
 import LogoMarca from '../components/LogoMarca';
 import { Preguntas, PREGUNTAS_COMPRA } from '../components/landing/Comparativa';
 
@@ -12,10 +12,16 @@ import { Preguntas, PREGUNTAS_COMPRA } from '../components/landing/Comparativa';
  *
  * COMO SE PAGA
  *
- *   Con Mercado Pago Suscripciones. La suscripcion es de una EMPRESA, asi que
- *   para pagar hace falta sesion de su dueno o administrador. El backend crea
- *   la suscripcion y devuelve el `init_point`; el navegador se va a Mercado
- *   Pago, donde se teclea la tarjeta. Nada de la tarjeta pasa por aqui.
+ *   Dos formas, las dos en el sitio de Mercado Pago. La cuenta es de una
+ *   EMPRESA, asi que hace falta sesion de su dueno o administrador.
+ *
+ *   - Por adelantado (1, 3, 6 o 12 meses): un pago unico de Checkout Pro, con
+ *     Yape, banca movil (PagoEfectivo) o tarjeta. No se cobra solo.
+ *   - Mensual con tarjeta: la suscripcion de siempre, que se cobra sola.
+ *
+ *   El backend crea el pago y devuelve el `init_point`; el navegador se va a
+ *   Mercado Pago. Nada de la tarjeta pasa por aqui. Los periodos y sus totales
+ *   llegan del servidor (GET /api/suscripcion): aqui no se calcula ningun precio.
  *
  *   Lo que se ve al volver NO es lo que decide si esta pagado: eso lo escribe
  *   el webhook firmado. La pagina /suscripcion pregunta hasta que llega.
@@ -44,6 +50,12 @@ const PLANES_COMPRABLES = {
 
 const GESTORES = ['owner', 'admin'];
 
+const COMO_SE_PAGA = 'Paga con Yape, desde tu banca móvil (BCP, BBVA y otros) o con tarjeta';
+
+const soles = (n) =>
+  `S/ ${Number(n).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const nMeses = (m) => `${m} ${m === 1 ? 'mes' : 'meses'}`;
+
 const Campo = ({ etiqueta, children }) => (
   <div>
     <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-grafito-400">
@@ -68,6 +80,12 @@ const CheckoutPage = () => {
   const [error, setError] = useState(null);
   const [enviando, setEnviando] = useState(false);
   const [orden, setOrden] = useState(null);
+  // Pago adelantado: periodos y totales, tal como los manda el servidor.
+  const [opciones, setOpciones] = useState([]);
+  const [topeYape, setTopeYape] = useState(2000);
+  const [cobroAutomatico, setCobroAutomatico] = useState(false);
+  const [modo, setModo] = useState('adelantado'); // 'adelantado' | 'tarjeta'
+  const [meses, setMeses] = useState(1);
 
   const esGestor = isAuthenticated && GESTORES.includes(user?.role);
 
@@ -86,6 +104,10 @@ const CheckoutPage = () => {
               nombre: data.facturacion.nombre || '',
             });
           }
+          const delPlan = (data.planes || []).find((p) => p.codigo === planKey) || (data.planes || [])[0];
+          setOpciones(delPlan?.adelantado || []);
+          if (data.tope_yape) setTopeYape(data.tope_yape);
+          setCobroAutomatico(Boolean(data.cobro_automatico));
           setVia(data.mercadopago_disponible ? 'mercadopago' : 'pedido');
           return;
         }
@@ -97,7 +119,7 @@ const CheckoutPage = () => {
       }
     })();
     return () => { vivo = false; };
-  }, [loading, esGestor]);
+  }, [loading, esGestor, planKey]);
 
   // El plan Gratis no se compra: se empieza. Y "Empresa" se cotiza a medida.
   if (planKey === 'gratis') return <Navigate to="/registro" replace />;
@@ -105,6 +127,8 @@ const CheckoutPage = () => {
   const codigoPlan = planKey in PLANES_COMPRABLES ? planKey : 'pro';
 
   const set = (campo) => (e) => setDatos((d) => ({ ...d, [campo]: e.target.value }));
+  const opcion = opciones.find((o) => o.meses === meses);
+  const adelantado = via === 'mercadopago' && !cobroAutomatico && modo === 'adelantado' && Boolean(opcion);
 
   const pagarConMercadoPago = async (e) => {
     e.preventDefault();
@@ -116,12 +140,16 @@ const CheckoutPage = () => {
     setError(null);
     setEnviando(true);
     try {
-      const { data } = await suscripcionApi.suscribirse({
+      const pedido = {
         plan: codigoPlan,
         comprobante: factura.comprobante,
         documento: doc,
         nombre: factura.nombre.trim(),
-      });
+      };
+      // Solo plan y meses: el total lo pone el servidor.
+      const { data } = adelantado
+        ? await suscripcionApi.pagarAdelantado({ ...pedido, meses })
+        : await suscripcionApi.suscribirse(pedido);
       // A Mercado Pago. No se vuelve atras con el historial: el retorno llega
       // por back_url a /suscripcion.
       window.location.assign(data.init_point);
@@ -181,8 +209,73 @@ const CheckoutPage = () => {
     </p>
   );
 
-  const formularioMercadoPago = (
+  const bloqueadoPorTarjeta = (
+    <div className="mt-5 space-y-4" data-testid="checkout-con-tarjeta">
+      <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm leading-relaxed text-amber-200">
+        Ya tienes cobro automático con tarjeta: tu plan se paga solo cada mes. Cancélalo primero si
+        prefieres pagar por adelantado.
+      </p>
+      <Link
+        to="/suscripcion"
+        className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/15 px-6 py-3 font-bold text-white transition hover:bg-white/5"
+      >
+        Ver mi suscripción
+      </Link>
+      {pieProveedor}
+    </div>
+  );
+
+  const claseOpcion = (elegido) =>
+    `rounded-lg border transition ${
+      elegido
+        ? 'border-marca-500 bg-marca-500/10 text-white'
+        : 'border-white/10 bg-white/5 text-grafito-400 hover:text-grafito-200'
+    }`;
+
+  const elegirPeriodo = (
+    <Campo etiqueta="¿Cuánto quieres pagar?">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup" aria-label="Periodo a pagar">
+        {opciones.map((o) => {
+          const elegido = modo === 'adelantado' && meses === o.meses;
+          return (
+            <button
+              key={o.meses}
+              type="button"
+              role="radio"
+              aria-checked={elegido}
+              onClick={() => { setModo('adelantado'); setMeses(o.meses); }}
+              className={`${claseOpcion(elegido)} px-3 py-3 text-left`}
+              data-testid={`checkout-meses-${o.meses}`}
+            >
+              <span className="block text-sm font-bold">{nMeses(o.meses)}</span>
+              <span className="block text-xs tabular-nums">{soles(o.total)}</span>
+            </button>
+          );
+        })}
+      </div>
+      {adelantado && !opcion.yape && (
+        <p className="mt-2 text-xs leading-relaxed text-amber-300" data-testid="checkout-aviso-yape">
+          Con {soles(opcion.total)} Yape no aparece: su tope es {soles(topeYape)} por pago. Paga desde tu
+          banca móvil o con tarjeta, o elige un periodo más corto.
+        </p>
+      )}
+      <button
+        type="button"
+        role="radio"
+        aria-checked={modo === 'tarjeta'}
+        onClick={() => setModo('tarjeta')}
+        className={`${claseOpcion(modo === 'tarjeta')} mt-2 w-full px-4 py-3 text-left text-sm`}
+        data-testid="checkout-modo-tarjeta"
+      >
+        <span className="font-bold">Mensual con tarjeta</span>
+        <span className="block text-xs">{soles(plan.precio)} al mes: se cobra solo y cancelas cuando quieras</span>
+      </button>
+    </Campo>
+  );
+
+  const formularioMercadoPago = cobroAutomatico ? bloqueadoPorTarjeta : (
     <form onSubmit={pagarConMercadoPago} className="mt-5 space-y-4" noValidate>
+      {opciones.length > 0 && elegirPeriodo}
       <Campo etiqueta="Comprobante">
         <div className="grid grid-cols-2 gap-2" role="radiogroup">
           {['boleta', 'factura'].map((tipo) => (
@@ -229,12 +322,22 @@ const CheckoutPage = () => {
         className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-marca-500 px-6 py-3.5 font-bold text-white transition hover:bg-marca-400 disabled:opacity-60"
         data-testid="checkout-pagar-btn"
       >
-        {enviando ? <Loader2 className="h-5 w-5 animate-spin" /> : <CreditCard className="h-5 w-5" />}
-        Pagar con Mercado Pago · S/ {plan.precio.toFixed(2)}
+        {enviando ? (
+          <Loader2 className="h-5 w-5 animate-spin" />
+        ) : adelantado ? (
+          <Smartphone className="h-5 w-5" />
+        ) : (
+          <CreditCard className="h-5 w-5" />
+        )}
+        {adelantado
+          ? `Pagar ${soles(opcion.total)} con Mercado Pago`
+          : `Pagar con Mercado Pago · ${soles(plan.precio)} al mes`}
       </button>
       <p className="flex items-center justify-center gap-1.5 text-center text-xs text-grafito-400">
         <ShieldCheck className="h-4 w-4 shrink-0 text-grafito-400" />
-        Dejas tu tarjeta en el sitio de Mercado Pago. Se cobra cada mes y cancelas cuando quieras desde tu cuenta.
+        {adelantado
+          ? 'Pagas en el sitio de Mercado Pago. Desde la banca móvil o en un agente recibes un código de pago: tienes 3 días para pagarlo.'
+          : 'Dejas tu tarjeta en el sitio de Mercado Pago. Se cobra cada mes y cancelas cuando quieras desde tu cuenta.'}
       </p>
       {pieProveedor}
     </form>
@@ -356,19 +459,24 @@ const CheckoutPage = () => {
                     <p className="mt-1 text-sm leading-relaxed text-grafito-400">{plan.detalle}</p>
                   </div>
                   <p className="font-heading whitespace-nowrap text-lg font-bold">
-                    S/ {plan.precio.toFixed(2)}
+                    {soles(plan.precio)} <span className="text-xs font-normal text-grafito-400">al mes</span>
                   </p>
                 </div>
                 <div className="mt-6 border-t border-white/10 pt-4">
                   <div className="flex items-baseline justify-between">
-                    <span className="font-bold">Total {plan.periodo}</span>
-                    <span className="font-heading text-2xl font-black tracking-tight">
-                      S/ {plan.precio.toFixed(2)}
+                    <span className="font-bold">{adelantado ? `Total por ${nMeses(meses)}` : `Total ${plan.periodo}`}</span>
+                    <span className="font-heading text-2xl font-black tracking-tight" data-testid="checkout-total">
+                      {soles(adelantado ? opcion.total : plan.precio)}
                     </span>
                   </div>
                   <p className="mt-2 text-xs text-grafito-400">
-                    Precio en soles. Incluye IGV. Suscripción mensual: se cobra cada mes y
-                    la cancelas cuando quieras. Emitimos boleta o factura por cada cobro.
+                    {adelantado
+                      ? `Precio en soles. Incluye IGV. Pago único de ${nMeses(meses)} a ${soles(plan.precio)} al mes, sin recargo: no se cobra solo. Te avisamos por correo 7 días y 1 día antes de que venza. Emitimos boleta o factura.`
+                      : 'Precio en soles. Incluye IGV. Suscripción mensual: se cobra cada mes y la cancelas cuando quieras. Emitimos boleta o factura por cada cobro.'}
+                  </p>
+                  <p className="mt-3 flex items-start gap-1.5 text-xs font-bold text-grafito-200" data-testid="checkout-como-se-paga">
+                    <Smartphone className="h-4 w-4 shrink-0 text-marca-400" />
+                    {COMO_SE_PAGA}.
                   </p>
                 </div>
                 <p className="mt-5 text-xs text-grafito-400">

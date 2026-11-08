@@ -47,6 +47,14 @@ LO QUE SE VIO EN LA API REAL (LicitaPro, noviembre de 2026)
   - Con el primer cobro rechazado, Mercado Pago cancela la suscripcion al
     momento: reintentar es volver a pulsar Pagar, que crea otra.
 
+PAGO ADELANTADO (CHECKOUT PRO)
+
+  Yape y PagoEfectivo (banca movil BCP, BBVA y otros, o agente) solo existen
+  en pagos unicos, no en /preapproval. Para eso se crea una preferencia de
+  Checkout Pro de 1, 3, 6 o 12 meses; la referencia termina en
+  `adelantado-<meses>` y el aviso llega como `payment`. Importe y meses salen
+  de planes.py; el webhook relee el pago y lo compara con ese mismo catalogo.
+
 DEVOLUCIONES
 
   Llegan por el aviso `payment` (en el panel, "Pagos"). Una devolucion total
@@ -57,6 +65,7 @@ import hashlib
 import hmac
 import logging
 import os
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from urllib.parse import urlsplit
 
@@ -68,8 +77,16 @@ API = "https://api.mercadopago.com"
 MONEDA = "PEN"
 CANCELADO = "cancelled"
 ESTADOS_CANCELADOS = ("cancelled", "canceled")
-#: Meses por periodo. CargoXprez solo vende el mensual.
+#: Meses por periodo de la suscripcion con tarjeta. Solo se vende el mensual.
 MESES = {"mensual": 1}
+#: Periodo de un pago adelantado: `adelantado-<meses>`.
+_ADELANTADO = "adelantado-"
+#: Meses que se venden por adelantado (lo mismo que planes.MESES_ADELANTADO).
+MESES_ADELANTADO = (1, 3, 6, 12)
+#: Dias para pagar un codigo de PagoEfectivo antes de que venza.
+DIAS_PARA_PAGAR = 3
+#: Lo que sale en el extracto de la tarjeta (corto, sin tildes).
+DESCRIPTOR = "CARGOXPREZ"
 #: Hosts admitidos para mandar al cliente a pagar.
 HOSTS_PAGO = ("www.mercadopago.com.pe", "sandbox.mercadopago.com.pe")
 _PREFIJO_REFERENCIA = "cargoxprez"
@@ -129,6 +146,21 @@ def referencia(company_id: str, plan: str, periodo: str = "mensual") -> str:
     return f"{_PREFIJO_REFERENCIA}|{company_id}|{plan}|{periodo}"
 
 
+def periodo_adelantado(meses: int) -> str:
+    return f"{_ADELANTADO}{int(meses)}"
+
+
+def _meses_de(periodo: str) -> int | None:
+    """Meses de un periodo valido, o None. 'mensual' -> 1, 'adelantado-6' -> 6."""
+    if periodo in MESES:
+        return MESES[periodo]
+    if periodo.startswith(_ADELANTADO):
+        resto = periodo[len(_ADELANTADO):]
+        if resto.isdigit() and int(resto) in MESES_ADELANTADO and resto == str(int(resto)):
+            return int(resto)
+    return None
+
+
 def leer_referencia(texto: str | None) -> dict | None:
     """Empresa, plan y periodo de una referencia, o None si no es de CargoXprez.
 
@@ -145,9 +177,11 @@ def leer_referencia(texto: str | None) -> dict | None:
         company_id = str(uuid.UUID(partes[1]))
     except ValueError:
         return None
-    if partes[3] not in MESES or not partes[2]:
+    meses = _meses_de(partes[3])
+    if meses is None or not partes[2]:
         return None
-    return {"company_id": company_id, "plan": partes[2], "periodo": partes[3]}
+    return {"company_id": company_id, "plan": partes[2], "periodo": partes[3],
+            "meses": meses, "adelantado": partes[3].startswith(_ADELANTADO)}
 
 
 # ─── La API ──────────────────────────────────────────────
@@ -189,6 +223,52 @@ async def crear_preapproval(company_id: str, correo: str, plan: str, nombre_plan
         },
         "back_url": volver_a,
         "status": "pending",
+    })
+    enlace = respuesta.get("init_point") or ""
+    if urlsplit(enlace).hostname not in HOSTS_PAGO:
+        raise ErrorMercadoPago(f"init_point en un host inesperado: "
+                               f"{urlsplit(enlace).hostname}")
+    return respuesta
+
+
+def _vence_en(dias: int) -> str:
+    """Fecha ISO 8601 con milisegundos y zona de Lima, como la pide la API."""
+    lima = timezone(timedelta(hours=-5))
+    momento = datetime.now(lima) + timedelta(days=dias)
+    return momento.strftime("%Y-%m-%dT%H:%M:%S.000-05:00")
+
+
+async def crear_preferencia(company_id: str, correo: str, plan: str, nombre_plan: str,
+                            meses: int, total, volver_a: str, avisar_a: str) -> dict:
+    """Crea el pago unico de Checkout Pro. Cobra el `init_point`, no esto.
+
+    `total` llega ya calculado del catalogo (planes.total_adelantado). No se
+    excluye ningun medio: Yape y PagoEfectivo tienen que aparecer. Una cuota:
+    no se financia una suscripcion. `date_of_expiration` es el plazo para pagar
+    un codigo de PagoEfectivo; un pago que llegue despues lo devuelve Mercado
+    Pago solo.
+    """
+    titulo = f"CargoXprez - {nombre_plan} - {meses} {'mes' if meses == 1 else 'meses'}"
+    respuesta = await _pedir("POST", "/checkout/preferences", {
+        "items": [{
+            "id": f"{plan}-{meses}m",
+            "title": titulo,
+            "quantity": 1,
+            "currency_id": MONEDA,
+            "unit_price": float(total),
+        }],
+        "payer": {"email": correo},
+        "external_reference": referencia(company_id, plan, periodo_adelantado(meses)),
+        # La pagina de vuelta dice que paso: aprobado, codigo de pago por
+        # pagar, o no se pudo. Solo es un texto: el plan lo da el webhook.
+        "back_urls": {"success": f"{volver_a}?pago=aprobado",
+                      "pending": f"{volver_a}?pago=pendiente",
+                      "failure": f"{volver_a}?pago=error"},
+        "auto_return": "approved",
+        "notification_url": avisar_a,
+        "statement_descriptor": DESCRIPTOR,
+        "payment_methods": {"installments": 1},
+        "date_of_expiration": _vence_en(DIAS_PARA_PAGAR),
     })
     enlace = respuesta.get("init_point") or ""
     if urlsplit(enlace).hostname not in HOSTS_PAGO:

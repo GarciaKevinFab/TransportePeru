@@ -20,6 +20,35 @@ EL PRECIO VIVE EN EL SERVIDOR
 # codigo -> (descripcion que se factura, monto en soles)
 PRECIOS_CHECKOUT = {"pro": ("Plan Pro (mensual)", 199.00)}
 
+# Pago adelantado (Checkout Pro: Yape, banca movil o tarjeta). Meses que se
+# venden y el tope de Yape. CargoXprez solo tiene el precio mensual: N meses
+# cuestan N veces ese precio, sin descuento.
+MESES_ADELANTADO = (1, 3, 6, 12)
+TOPE_YAPE = 2000.00
+
+
+def total_adelantado(plan: str, meses: int) -> float | None:
+    """Lo que cuesta pagar `meses` del plan por adelantado, o None si no se vende.
+
+    Es la UNICA fuente del importe: la preferencia de Mercado Pago se crea con
+    esto y el webhook compara el pago contra esto mismo.
+    """
+    if plan not in PRECIOS_CHECKOUT or meses not in MESES_ADELANTADO:
+        return None
+    return round(PRECIOS_CHECKOUT[plan][1] * meses, 2)
+
+
+def opciones_adelantado(plan: str) -> list[dict]:
+    """Los periodos que se ofrecen en pantalla, con su total y si entra Yape."""
+    opciones = []
+    for meses in MESES_ADELANTADO:
+        total = total_adelantado(plan, meses)
+        if total is None:
+            continue
+        opciones.append({"meses": meses, "total": total, "yape": total <= TOPE_YAPE,
+                         "desglose": desglose(total)})
+    return opciones
+
 # Los precios publicados YA incluyen IGV, asi que el desglose se calcula hacia
 # atras. Se muestra porque un resumen de pedido peruano sin base imponible ni
 # IGV a la vista no es un resumen de nada, y porque es lo primero que mira

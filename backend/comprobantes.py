@@ -113,7 +113,7 @@ async def pagos_de(usuario: dict, limite: int = 24) -> list[dict]:
         filas = await conn.fetch(
             "select id, numero, plan, monto, moneda, estado, metodo, confirmado_en, "
             "       created_at, comp_estado, comp_tipo, comp_serie, comp_numero, "
-            "       comp_emitido_en, comp_pdf is not null as tiene_pdf "
+            "       comp_emitido_en, comp_pdf is not null as tiene_pdf, origen, meses "
             "  from pagos_suscripcion where company_id = $1 "
             " order by created_at desc limit $2",
             db_pg.as_uuid(usuario["company_id"]), limite)
@@ -144,6 +144,7 @@ _COLUMNAS = """ps.id, ps.numero, ps.plan, ps.monto, ps.estado, ps.metodo,
                ps.comp_estado, ps.comp_tipo, ps.comp_documento, ps.comp_nombre,
                ps.comp_direccion, ps.comp_serie, ps.comp_numero,
                ps.comp_pdf is not null as tiene_pdf, ps.comp_nota, ps.comp_emitido_en,
+               ps.origen, ps.meses,
                c.id as company_id, c.name as empresa, c.email as empresa_email,
                (select u.email from users u where u.company_id = c.id
                   and u.role = 'owner' order by u.created_at limit 1) as email"""
@@ -255,6 +256,16 @@ async def no_aplica(pago_id: str, nota: str) -> str | None:
 
 # ─── Avisos al dueno ─────────────────────────────────────
 
+def concepto(p: dict) -> str:
+    """Lo que se vendio, para el comprobante: el mes de la suscripcion o los
+    meses pagados por adelantado."""
+    if p.get("origen") == "adelantado":
+        meses = int(p.get("meses") or 1)
+        return (f"CargoXprez plan {p['plan']}: {meses} {'mes' if meses == 1 else 'meses'} "
+                f"pagados por adelantado")
+    return f"Suscripción CargoXprez plan {p['plan']} (mensual)"
+
+
 def _filas(p: dict) -> list[tuple[str, str]]:
     partes = desglose(p["monto"])
     tipo = "Factura" if p["comp_tipo"] == "factura" else "Boleta"
@@ -267,7 +278,7 @@ def _filas(p: dict) -> list[tuple[str, str]]:
         ("Cliente", p["comp_nombre"] or p["empresa"]),
         ("Dirección", p["comp_direccion"] or "—"),
         ("Correo", p["email"] or "—"),
-        ("Concepto", f"Suscripción CargoXprez plan {p['plan']} (mensual)"),
+        ("Concepto", concepto(p)),
         ("Valor de venta", f"S/ {partes['base']:.2f}"),
         ("IGV 18%", f"S/ {partes['igv']:.2f}"),
         ("Total", f"S/ {partes['total']:.2f}"),

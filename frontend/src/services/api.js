@@ -180,6 +180,8 @@ export const suscripcionApi = {
   // hasta que llega el aviso, y una respuesta guardada diria siempre lo mismo.
   get: () => api.get('/suscripcion', { sinCache: true }),
   suscribirse: (datos) => api.post('/suscripcion/mercadopago', datos),
+  // Pago unico de 1, 3, 6 o 12 meses (Yape, banca movil o tarjeta). Solo plan y meses.
+  pagarAdelantado: (datos) => api.post('/suscripcion/adelantado', datos),
   cancelar: () => api.post('/suscripcion/cancelar'),
   // Blob y no un enlace: el PDF va detras del token, que vive en localStorage
   // y un <a href> no lo manda.

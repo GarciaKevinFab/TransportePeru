@@ -107,7 +107,8 @@ def test_sin_clave_ninguna_firma_vale(monkeypatch, mp_activo):
 def test_referencia_ida_y_vuelta():
     ref = mercadopago.referencia(EMPRESA, "pro")
     assert mercadopago.leer_referencia(ref) == {
-        "company_id": EMPRESA, "plan": "pro", "periodo": "mensual"}
+        "company_id": EMPRESA, "plan": "pro", "periodo": "mensual",
+        "meses": 1, "adelantado": False}
 
 
 @pytest.mark.parametrize("texto", [

@@ -45,6 +45,7 @@ import suscripciones  # noqa: E402
 ADMIN_URL = os.environ.get("POSTGRES_ADMIN_URL", "")
 CLAVE = "clave-webhook-de-prueba"
 INIT_POINT = "https://www.mercadopago.com.pe/subscriptions/checkout?preapproval_id="
+INIT_POINT_PREFERENCIA = "https://www.mercadopago.com.pe/checkout/v1/redirect?pref_id="
 PDF = b"%PDF-1.4\n% comprobante de prueba\n%%EOF\n"
 
 
@@ -79,6 +80,7 @@ class MercadoPagoFalso:
         self.preapprovals: dict[str, dict] = {}
         self.facturas: dict[str, dict] = {}
         self.cobros: dict[str, dict] = {}
+        self.preferencias: dict[str, dict] = {}
         self.llamadas: list[tuple] = []
         self.caida = False
 
@@ -87,6 +89,11 @@ class MercadoPagoFalso:
         if self.caida:
             raise mercadopago.ErrorMercadoPago(f"{metodo} {ruta}: ConnectError")
         partes = ruta.strip("/").split("/")
+        if metodo == "POST" and ruta == "/checkout/preferences":
+            pref = f"pref-{uuid.uuid4().hex[:12]}"
+            self.preferencias[pref] = {**cuerpo, "id": pref,
+                                       "init_point": INIT_POINT_PREFERENCIA + pref}
+            return dict(self.preferencias[pref])
         if metodo == "POST" and ruta == "/preapproval":
             pid = uuid.uuid4().hex
             self.preapprovals[pid] = {**cuerpo, "id": pid, "status": "pending",
@@ -126,6 +133,18 @@ class MercadoPagoFalso:
         self.cobros[cobro] = {"id": int(cobro), "status": estado,
                               "external_reference": pre["external_reference"]}
         return fid, cobro
+
+    def pagar(self, pref, estado="approved", monto=None, moneda="PEN"):
+        """El cliente paga la preferencia (Yape, PagoEfectivo o tarjeta)."""
+        cobro = str(8000000000 + len(self.cobros))
+        item = self.preferencias[pref]["items"][0]
+        self.cobros[cobro] = {
+            "id": int(cobro), "status": estado, "currency_id": moneda,
+            "transaction_amount": monto if monto is not None else item["unit_price"],
+            "external_reference": self.preferencias[pref]["external_reference"],
+            "payment_method_id": "yape",
+        }
+        return cobro
 
 
 @pytest.fixture
@@ -772,4 +791,323 @@ def test_json_de_respuesta_de_mercado_pago_se_guarda(mp):
             fid = await _pago_aprobado(c, mp, "a")
         crudo = await admin.fetchval("select respuesta::text from pagos_suscripcion where mp_payment_id = $1", fid)
         assert json.loads(crudo)["preapproval_id"]
+    escenario(cuerpo)
+
+
+# ─── Pago adelantado (Checkout Pro: Yape, PagoEfectivo o tarjeta) ─────
+
+async def _adelantado(cliente, usuario, meses=3, **extra):
+    return await cliente.post("/api/suscripcion/adelantado", headers={"x-usuario": usuario},
+                              json={"plan": "pro", "meses": meses, "comprobante": "boleta",
+                                    "documento": "", **extra})
+
+
+async def _preferencia(cliente, mp, usuario, meses=3):
+    r = await _adelantado(cliente, usuario, meses)
+    assert r.status_code == 200, r.text
+    return r.json()["init_point"].split("=")[-1]
+
+
+async def _mas_meses(admin, desde, meses):
+    """Lo que calcula Postgres: meses de calendario, no 30 dias."""
+    return await admin.fetchval("select $1::timestamptz + make_interval(months => $2)", desde, meses)
+
+
+def test_adelantado_cobra_el_total_del_catalogo_y_no_el_del_navegador(mp):
+    async def cuerpo(admin, empresa):
+        dueno = await empresa()
+        async with _cliente(_app({"d": dueno})) as c:
+            for meses, total in ((1, 199.0), (3, 597.0), (6, 1194.0), (12, 2388.0)):
+                # Todo lo que el navegador pudiera inventar se ignora.
+                r = await _adelantado(c, "d", meses, total=1, monto=1, unit_price=1, precio=1)
+                assert r.status_code == 200, r.text
+                assert r.json()["total"] == total
+                pref = mp.preferencias[r.json()["init_point"].split("=")[-1]]
+                assert len(pref["items"]) == 1
+                item = pref["items"][0]
+                assert (item["unit_price"], item["quantity"], item["currency_id"]) == (total, 1, "PEN")
+                assert pref["external_reference"] == f"cargoxprez|{dueno['company_id']}|pro|adelantado-{meses}"
+                assert pref["payer"]["email"] == dueno["email"]
+                assert pref["payment_methods"] == {"installments": 1}
+                assert pref["auto_return"] == "approved"
+                assert pref["notification_url"].endswith("/webhooks/mercadopago?source_news=webhooks")
+                assert pref["back_urls"]["pending"].endswith("/suscripcion?pago=pendiente")
+            r = await c.get("/api/suscripcion", headers={"x-usuario": "d"})
+            opciones = r.json()["planes"][0]["adelantado"]
+            assert [(o["meses"], o["total"], o["yape"]) for o in opciones] == [
+                (1, 199.0, True), (3, 597.0, True), (6, 1194.0, True), (12, 2388.0, False)]
+            # Periodos que no se venden.
+            for malo in (0, 2, 24, "3; drop", None):
+                r = await _adelantado(c, "d", malo)
+                assert r.status_code == 400, malo
+        # Crear la preferencia no concede nada.
+        fila = await _empresa(admin, dueno["company_id"])
+        assert fila["subscription_status"] == "trial"
+    escenario(cuerpo)
+
+
+def test_adelantado_no_se_ofrece_con_cobro_automatico_activo(mp):
+    async def cuerpo(admin, empresa):
+        dueno = await empresa()
+        await admin.execute("update companies set mp_preapproval_id = $2 where id = $1",
+                            uuid.UUID(dueno["company_id"]), "pre-" + uuid.uuid4().hex)
+        async with _cliente(_app({"d": dueno})) as c:
+            mp.llamadas.clear()
+            r = await _adelantado(c, "d", 3)
+        assert r.status_code == 409
+        assert "cancélalo primero" in r.json()["detail"].lower()
+        assert mp.llamadas == []
+    escenario(cuerpo)
+
+
+def test_adelantado_aprobado_extiende_y_pide_el_comprobante(mp):
+    async def cuerpo(admin, empresa):
+        dueno = await empresa(estado="activa", trial_en_dias=None, vence_en_dias=10)
+        antes = (await _empresa(admin, dueno["company_id"]))["subscription_ends_at"]
+        async with _cliente(_app({"d": dueno})) as c:
+            pref = await _preferencia(c, mp, "d", 3)
+            cobro = mp.pagar(pref)
+            r = await _aviso(c, "payment", cobro)
+        assert r.status_code == 200 and r.json()["resultado"] == "aplicado", r.text
+        fila = await _empresa(admin, dueno["company_id"])
+        # hasta = max(ahora, hasta_actual) + 3 meses: los 10 dias que quedaban se suman.
+        assert fila["subscription_ends_at"] == await _mas_meses(admin, antes, 3)
+        assert (fila["plan"], fila["subscription_status"]) == ("pro", "activa")
+        pago = await admin.fetchrow("select * from pagos_suscripcion where mp_payment_id = $1", cobro)
+        assert (pago["estado"], float(pago["monto"]), pago["origen"], pago["meses"],
+                pago["mp_cobro_id"], pago["comp_estado"]) == (
+            "pagado", 597.0, "adelantado", 3, cobro, "pendiente")
+        respuesta = pago["respuesta"]
+        if isinstance(respuesta, str):
+            respuesta = json.loads(respuesta)
+        assert respuesta["payment_method_id"] == "yape"
+    escenario(cuerpo)
+
+
+def test_adelantado_vencido_cuenta_desde_hoy(mp):
+    async def cuerpo(admin, empresa):
+        dueno = await empresa(estado="activa", trial_en_dias=None, vence_en_dias=-30)
+        async with _cliente(_app({"d": dueno})) as c:
+            pref = await _preferencia(c, mp, "d", 1)
+            antes = await admin.fetchval("select now()")
+            await _aviso(c, "payment", mp.pagar(pref))
+        fila = await _empresa(admin, dueno["company_id"])
+        desde_hoy = await _mas_meses(admin, antes, 1)
+        assert timedelta(0) <= fila["subscription_ends_at"] - desde_hoy < timedelta(minutes=1)
+        assert suscripciones.estado_efectivo(fila["subscription_status"], None,
+                                             fila["subscription_ends_at"]) == "activa"
+    escenario(cuerpo)
+
+
+def test_adelantado_repetido_no_suma_dos_veces(mp):
+    async def cuerpo(admin, empresa):
+        dueno = await empresa(trial_en_dias=5)
+        async with _cliente(_app({"d": dueno})) as c:
+            pref = await _preferencia(c, mp, "d", 6)
+            cobro = mp.pagar(pref)
+            r1 = await _aviso(c, "payment", cobro)
+            vence = (await _empresa(admin, dueno["company_id"]))["subscription_ends_at"]
+            r2 = await _aviso(c, "payment", cobro, firma=_firma(cobro, request_id="req-2"))
+        assert (r1.json()["resultado"], r2.json()["resultado"]) == ("aplicado", "repetido")
+        assert (await _empresa(admin, dueno["company_id"]))["subscription_ends_at"] == vence
+        n = await admin.fetchval("select count(*) from pagos_suscripcion where company_id = $1",
+                                 uuid.UUID(dueno["company_id"]))
+        assert n == 1
+    escenario(cuerpo)
+
+
+def test_adelantado_con_otro_importe_no_activa(mp):
+    async def cuerpo(admin, empresa):
+        dueno = await empresa()
+        async with _cliente(_app({"d": dueno})) as c:
+            pref = await _preferencia(c, mp, "d", 12)
+            menos = mp.pagar(pref, monto=199.0)            # 12 meses al precio de 1
+            dolares = mp.pagar(pref, moneda="USD")          # mismo numero, otra moneda
+            r1 = await _aviso(c, "payment", menos)
+            r2 = await _aviso(c, "payment", dolares)
+        assert r1.json()["motivo"] == r2.json()["motivo"] == "importe no coincide"
+        fila = await _empresa(admin, dueno["company_id"])
+        assert fila["subscription_status"] == "trial" and fila["subscription_ends_at"] is None
+        assert not await admin.fetchval("select count(*) from pagos_suscripcion where company_id = $1",
+                                        uuid.UUID(dueno["company_id"]))
+    escenario(cuerpo)
+
+
+def test_adelantado_pendiente_o_rechazado_no_activa(mp):
+    async def cuerpo(admin, empresa):
+        dueno = await empresa()
+        async with _cliente(_app({"d": dueno})) as c:
+            pref = await _preferencia(c, mp, "d", 3)
+            for estado in ("pending", "in_process", "rejected", "cancelled"):
+                r = await _aviso(c, "payment", mp.pagar(pref, estado=estado))
+                assert r.status_code == 200 and r.json()["aplicado"] is False, estado
+        fila = await _empresa(admin, dueno["company_id"])
+        assert fila["subscription_status"] == "trial" and fila["subscription_ends_at"] is None
+    escenario(cuerpo)
+
+
+def test_codigo_de_pago_pagado_despues_activa(mp):
+    """El codigo de PagoEfectivo pagado despues llega como el mismo pago, ya aprobado."""
+    async def cuerpo(admin, empresa):
+        dueno = await empresa()
+        async with _cliente(_app({"d": dueno})) as c:
+            pref = await _preferencia(c, mp, "d", 1)
+            cobro = mp.pagar(pref, estado="pending")
+            assert (await _aviso(c, "payment", cobro)).json()["aplicado"] is False
+            mp.cobros[cobro]["status"] = "approved"
+            r = await _aviso(c, "payment", cobro, firma=_firma(cobro, request_id="req-2"))
+        assert r.json()["resultado"] == "aplicado"
+    escenario(cuerpo)
+
+
+def test_adelantado_devuelto_quita_sus_meses(mp):
+    async def cuerpo(admin, empresa):
+        dueno = await empresa(estado="activa", trial_en_dias=None, vence_en_dias=40)
+        async with _cliente(_app({"d": dueno})) as c:
+            pref = await _preferencia(c, mp, "d", 3)
+            cobro = mp.pagar(pref)
+            await _aviso(c, "payment", cobro)
+            vence = (await _empresa(admin, dueno["company_id"]))["subscription_ends_at"]
+            mp.cobros[cobro]["status"] = "refunded"
+            r1 = await _aviso(c, "payment", cobro, firma=_firma(cobro, request_id="req-2"))
+            r2 = await _aviso(c, "payment", cobro, firma=_firma(cobro, request_id="req-3"))
+        assert (r1.json()["resultado"], r2.json()["resultado"]) == ("devuelto", "sin_efecto")
+        despues = (await _empresa(admin, dueno["company_id"]))["subscription_ends_at"]
+        assert despues == await admin.fetchval(
+            "select $1::timestamptz - make_interval(months => 3)", vence)
+        pago = await admin.fetchrow("select estado, comp_estado from pagos_suscripcion "
+                                    "where mp_payment_id = $1", cobro)
+        assert (pago["estado"], pago["comp_estado"]) == ("devuelto", "no_aplica")
+    escenario(cuerpo)
+
+
+def test_adelantado_firma_mala_401_y_mercado_pago_caido_503(mp):
+    async def cuerpo(admin, empresa):
+        dueno = await empresa()
+        async with _cliente(_app({"d": dueno})) as c:
+            pref = await _preferencia(c, mp, "d", 3)
+            cobro = mp.pagar(pref)
+            mp.llamadas.clear()
+            r = await _aviso(c, "payment", cobro, firma=_firma("otro-id"))
+            assert r.status_code == 401 and mp.llamadas == []
+            mp.caida = True
+            r = await _aviso(c, "payment", cobro)
+            assert r.status_code == 503
+            mp.caida = False
+            r = await _aviso(c, "payment", cobro)
+            assert r.json()["resultado"] == "aplicado"
+    escenario(cuerpo)
+
+
+def test_cobro_de_la_tarjeta_no_se_confunde_con_un_adelantado(mp):
+    """El cobro mensual tambien avisa como `payment`: no suma nada por ahi."""
+    async def cuerpo(admin, empresa):
+        dueno = await empresa(trial_en_dias=5)
+        async with _cliente(_app({"d": dueno})) as c:
+            pid = await _alta(c, mp, "d")
+            mp.autorizar(pid)
+            fid, cobro = mp.facturar(pid)
+            await _aviso(c, "subscription_authorized_payment", fid)
+            vence = (await _empresa(admin, dueno["company_id"]))["subscription_ends_at"]
+            r = await _aviso(c, "payment", cobro)
+        assert r.json()["aplicado"] is False
+        assert (await _empresa(admin, dueno["company_id"]))["subscription_ends_at"] == vence
+        pagos = await admin.fetch("select origen, meses from pagos_suscripcion where company_id = $1",
+                                  uuid.UUID(dueno["company_id"]))
+        assert [(p["origen"], p["meses"]) for p in pagos] == [("suscripcion", 1)]
+    escenario(cuerpo)
+
+
+# ─── Recordatorio de renovacion ──────────────────────────
+
+def test_recordatorio_a_7_y_a_1_dia_sin_repetir(mp, monkeypatch):
+    import correo
+    import recordatorios
+
+    enviados = []
+
+    async def enviar(destino, asunto, texto, html=""):
+        enviados.append((destino, asunto, texto))
+        return True
+    monkeypatch.setattr(correo, "enviar", enviar)
+
+    async def cuerpo(admin, empresa):
+        dueno = await empresa(estado="activa", trial_en_dias=None, vence_en_dias=20)
+        con_tarjeta = await empresa(estado="activa", trial_en_dias=None, vence_en_dias=20)
+        async with _cliente(_app({"d": dueno, "t": con_tarjeta})) as c:
+            await _aviso(c, "payment", mp.pagar(await _preferencia(c, mp, "d", 1)))
+            pid = await _alta(c, mp, "t")
+            mp.autorizar(pid)
+            await _aviso(c, "subscription_preapproval", pid)
+            fid, _ = mp.facturar(pid)
+            await _aviso(c, "subscription_authorized_payment", fid)
+
+        def mios(quien):
+            return [e for e in enviados if e[0] == quien["email"]]
+
+        async def vence_en(quien, intervalo):
+            return await admin.fetchval(
+                "update companies set subscription_ends_at = now() + $2::interval "
+                "where id = $1 returning subscription_ends_at",
+                uuid.UUID(quien["company_id"]), intervalo)
+
+        # Faltan semanas: nada.
+        await recordatorios.recordar()
+        assert not mios(dueno)
+
+        await vence_en(dueno, timedelta(days=6, hours=20))
+        await vence_en(con_tarjeta, timedelta(days=6, hours=20))
+        await recordatorios.recordar()
+        assert len(mios(dueno)) == 1, enviados
+        asunto, texto = mios(dueno)[0][1], mios(dueno)[0][2]
+        assert asunto == "Tu plan de CargoXprez vence en 6 días"
+        assert "/suscripcion" in texto and "Yape" in texto and "solo consulta" in texto
+        # Quien paga con tarjeta no necesita aviso: se cobra solo.
+        assert not mios(con_tarjeta)
+
+        await recordatorios.recordar()
+        assert len(mios(dueno)) == 1                         # el de 7 dias, una sola vez
+
+        # Pasan los dias sin pagar: el mismo vencimiento, ya a menos de un dia.
+        # (now() no se puede mover: se acercan juntas la fecha y su aviso ya enviado.)
+        nuevo = await vence_en(dueno, timedelta(hours=20))
+        await admin.execute("update recordatorios_renovacion set vence = $2 where company_id = $1",
+                            uuid.UUID(dueno["company_id"]), nuevo)
+        await recordatorios.recordar()
+        assert len(mios(dueno)) == 2
+        assert mios(dueno)[1][1] == "Tu plan de CargoXprez vence hoy"
+        await recordatorios.recordar()
+        assert len(mios(dueno)) == 2                         # el de 1 dia, una sola vez
+        dias = await admin.fetch("select dias from recordatorios_renovacion where company_id = $1 "
+                                 "order by dias", uuid.UUID(dueno["company_id"]))
+        assert [d["dias"] for d in dias] == [1, 7]
+    escenario(cuerpo)
+
+
+def test_recordatorio_que_no_sale_se_reintenta(mp, monkeypatch):
+    import correo
+    import recordatorios
+
+    salen = {"ok": False}
+    enviados = []
+
+    async def enviar(destino, asunto, texto, html=""):
+        if salen["ok"]:
+            enviados.append(destino)
+        return salen["ok"]
+    monkeypatch.setattr(correo, "enviar", enviar)
+
+    async def cuerpo(admin, empresa):
+        dueno = await empresa(estado="activa", trial_en_dias=None, vence_en_dias=20)
+        async with _cliente(_app({"d": dueno})) as c:
+            await _aviso(c, "payment", mp.pagar(await _preferencia(c, mp, "d", 1)))
+        await admin.execute("update companies set subscription_ends_at = now() + interval '3 days' "
+                            "where id = $1", uuid.UUID(dueno["company_id"]))
+        await recordatorios.recordar()
+        assert not await admin.fetchval("select count(*) from recordatorios_renovacion "
+                                        "where company_id = $1", uuid.UUID(dueno["company_id"]))
+        salen["ok"] = True
+        await recordatorios.recordar()
+        await recordatorios.recordar()
+        assert enviados.count(dueno["email"]) == 1
     escenario(cuerpo)
