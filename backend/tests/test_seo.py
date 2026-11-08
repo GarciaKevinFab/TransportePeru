@@ -12,7 +12,7 @@ QUE PROTEGE
   3. Que el titulo que pone el servidor y el que pone la SPA al navegar sean
      el mismo (seo_rutas.py y frontend/src/config/seo.js).
   4. Que sitemap.xml solo liste paginas publicas reales.
-  5. Que ningun numero de WhatsApp quede escrito en el frontend.
+  5. Que no quede ningun enlace de WhatsApp de ventas (wa.me) en el sitio.
 
 Nada de esto necesita base de datos.
 """
@@ -172,18 +172,22 @@ def test_robots_apunta_al_sitemap():
     assert re.search(r"^Disallow: /$", robots, re.M) is None
 
 
-# ─── 5. Ningun numero de WhatsApp en el codigo ───────────
+# ─── 5. Sin WhatsApp de ventas ───────────────────────────
 
-def test_no_hay_numeros_de_whatsapp_escritos_en_el_frontend():
-    """El numero sale de WHATSAPP_VENTAS via /api/config/publica, nunca del codigo."""
-    patron = re.compile(r"wa\.me/\+?\d|api\.whatsapp\.com/send\?phone=\d")
+def test_no_queda_ningun_enlace_de_whatsapp_de_ventas():
+    """La compra es autoservicio: ni wa.me ni un endpoint que sirva un numero.
+
+    El bot de documentos (whatsapp_bot.py) es otra cosa: recibe mensajes por
+    la API de Meta y no publica ningun enlace.
+    """
+    patron = re.compile(r"wa\.me|api\.whatsapp\.com/send|WHATSAPP_VENTAS|config/publica")
     culpables = []
-    for base, _, ficheros in os.walk(SRC):
-        for nombre in ficheros:
-            if nombre.endswith((".js", ".jsx")):
-                if patron.search(_leer(base, nombre)):
-                    culpables.append(nombre)
-    for nombre in ("index.html", "llms.txt"):
-        if patron.search(_leer(PUBLIC, nombre)):
-            culpables.append(nombre)
+    for raiz, extensiones in ((SRC, (".js", ".jsx")), (PUBLIC, (".html", ".txt", ".xml", ".json")),
+                              (os.path.join(RAIZ, "backend"), (".py", ".example"))):
+        for base, carpetas, ficheros in os.walk(raiz):
+            carpetas[:] = [c for c in carpetas if c not in ("tests", "node_modules", "__pycache__")]
+            for nombre in ficheros:
+                if nombre.endswith(extensiones) or nombre == ".env.example":
+                    if patron.search(_leer(base, nombre)):
+                        culpables.append(os.path.join(base, nombre))
     assert not culpables, culpables

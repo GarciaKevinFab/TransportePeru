@@ -19,8 +19,10 @@
 - Gratis: S/ 0, hasta 3 vehículos.
 - Pro: S/ 199 al mes, hasta 20 vehículos. Suscripción mensual con Mercado Pago; se cancela cuando se quiera.
 - Empresa: a medida, sin límite de vehículos y con varias empresas en una cuenta.
-- Prueba de 14 días sin tarjeta. Se emite boleta o factura por cada cobro.
-- Empresas que pagan con orden de compra o transferencia: escribir a soporte@sisac.pe para pedir una cotización.
+- Prueba de 14 días sin tarjeta y sin límite de vehículos.
+- El pago es con tarjeta, en línea, en el sitio de Mercado Pago, desde la cuenta del dueño o administrador. Se cancela desde la cuenta, sin contrato.
+- Se emite boleta o factura por cada cobro; con RUC, la razón social se completa con el padrón de SUNAT.
+- Si la prueba termina sin pago, la cuenta queda en solo consulta: los datos no se borran, pero para registrar algo nuevo hay que activar un plan.
 
 ## Páginas
 

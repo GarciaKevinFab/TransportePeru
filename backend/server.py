@@ -11023,10 +11023,6 @@ import comprobantes  # noqa: E402
 
 app.include_router(webhook_mp_router)
 
-# Configuracion publica (WhatsApp de ventas). Antes del catch-all de la SPA.
-from config_publica import router as config_publica_router  # noqa: E402
-app.include_router(config_publica_router)
-
 
 async def _solo_superadmin(current_user: dict = Depends(get_current_user)):
     """El dueno de la plataforma. require_roles() no sirve: deja pasar a

@@ -79,7 +79,7 @@ export const ComparativaPlanes = () => (
   </div>
 );
 
-const PREGUNTAS = [
+const PREGUNTAS_PRODUCTO = [
   {
     p: '¿Los datos de mi empresa son míos?',
     r: 'Sí. Lo que cargas sigue siendo de tu empresa: puedes exportarlo mientras la cuenta esté activa y puedes pedir que lo eliminemos. No lo usamos para nada que no sea prestarte el servicio, no lo vendemos y no lo cruzamos con el de otras empresas.',
@@ -97,10 +97,6 @@ const PREGUNTAS = [
     r: 'Sí, en los planes Pro y Empresa: guías de transportista y facturas electrónicas, más el control de detracciones. Necesitas tu certificado digital y tus credenciales de SUNAT.',
   },
   {
-    p: '¿Qué pasa cuando terminan los 14 días?',
-    r: 'Eliges plan. Si no eliges ninguno, la cuenta pasa al plan Gratis con hasta 3 vehículos: no pierdes nada de lo que cargaste ni se te cobra sin avisar. No pedimos tarjeta para probar.',
-  },
-  {
     p: '¿Mis choferes tienen que aprender a usarlo?',
     r: 'Poco. Entran con su DNI y un PIN de seis dígitos, y la app solo les muestra lo suyo. Si prefieres, también pueden mandar la foto de una factura por WhatsApp y entra al sistema sin instalar nada.',
   },
@@ -110,9 +106,57 @@ const PREGUNTAS = [
   },
 ];
 
-export const Preguntas = () => (
+/*
+ * Las dudas de la compra. Van tambien junto al checkout. Cada respuesta esta
+ * comprobada contra el codigo (ver backend/tests/test_como_se_contrata.py):
+ *
+ *   - La prueba es `trial`, sin tarjeta y sin limite de vehiculos
+ *     (LIMITE_VEHICULOS en server.py no incluye 'trial').
+ *   - Prueba vencida sin pago = `prueba_vencida`: se lee pero no se escribe
+ *     (_exigir_suscripcion_al_dia). NO pasa sola al plan Gratis.
+ *   - El pago es la suscripcion de Mercado Pago: la tarjeta se deja en su sitio.
+ *   - Factura: con RUC, comprobantes.guardar_datos completa la razon social
+ *     con el padron de SUNAT; el PDF se descarga desde /suscripcion.
+ *   - Cancelar: POST /api/suscripcion/cancelar; acceso hasta fin del periodo.
+ *   - Nada se borra solo: borrar una empresa es DELETE /companies, manual.
+ *
+ * Sin comillas simples dentro de los textos: index.html repite estas
+ * preguntas en el FAQPage y la prueba que los compara las lee con una regex.
+ */
+export const PREGUNTAS_COMPRA = [
+  {
+    p: '¿Necesito tarjeta para probar?',
+    r: 'No. Creas la cuenta de tu empresa y tienes 14 días con todo el sistema y sin límite de vehículos. No te pedimos tarjeta ni ningún dato de pago para empezar.',
+  },
+  {
+    p: '¿Qué pasa al terminar los 14 días, y con mis vehículos?',
+    r: 'Eliges tu plan y pagas en línea. Si no eliges ninguno, no se te cobra nada: la cuenta queda en solo consulta. Tus vehículos, viajes, llantas y documentos siguen ahí y los puedes ver, pero para registrar algo nuevo tienes que activar un plan.',
+  },
+  {
+    p: '¿Cómo pago?',
+    r: 'Con tarjeta, en línea, desde tu cuenta de dueño o administrador. El pago se hace en el sitio de Mercado Pago: tu tarjeta no pasa por CargoXprez. Es una suscripción mensual que se cobra sola cada mes.',
+  },
+  {
+    p: '¿Me dan factura con mi RUC?',
+    r: 'Sí. Al pagar eliges boleta o factura. Para factura escribes tu RUC y completamos la razón social con el padrón de SUNAT. Emitimos un comprobante por cada cobro y lo encuentras en Suscripción, en tu cuenta.',
+  },
+  {
+    p: '¿Puedo cancelar?',
+    r: 'Sí, cuando quieras y sin contrato, desde Suscripción en tu cuenta. Se detiene el cobro automático y mantienes el acceso hasta el fin del mes ya pagado.',
+  },
+  {
+    p: '¿Mis datos se borran si no pago o si cancelo?',
+    r: 'No. Ni al terminar la prueba ni al vencer un plan se borra nada: la cuenta queda en solo consulta. Si das de baja el servicio, tienes un plazo para exportar tu información antes de que se elimine.',
+  },
+];
+
+/* En la portada van todas: primero las del producto, luego las de la compra.
+   El FAQPage de index.html sigue este mismo orden. */
+const PREGUNTAS = [...PREGUNTAS_PRODUCTO, ...PREGUNTAS_COMPRA];
+
+export const Preguntas = ({ items = PREGUNTAS }) => (
   <div className="mt-10 max-w-3xl divide-y divide-white/5 border-y border-white/5">
-    {PREGUNTAS.map(({ p, r }) => (
+    {items.map(({ p, r }) => (
       // <details> nativo: se abre sin JavaScript, funciona con teclado por
       // defecto y un buscador lo indexa. Un acordeón con estado propio solo
       // añadiría formas de romperlo.

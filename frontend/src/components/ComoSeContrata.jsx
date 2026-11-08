@@ -1,7 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, MessageCircle } from 'lucide-react';
-import { useWhatsAppVentas, enlaceWhatsApp } from '../hooks/useWhatsAppVentas';
+import { ArrowRight } from 'lucide-react';
 import { PROVEEDOR } from '../config/proveedor';
 
 /**
@@ -45,27 +44,6 @@ const PASOS = [
   },
 ];
 
-/**
- * "¿Dudas? Escríbenos por WhatsApp", pequeno. Solo si el backend tiene
- * WHATSAPP_VENTAS: sin numero no se pinta nada.
- */
-export const DudasWhatsApp = ({ mensaje, className = '' }) => {
-  const numero = useWhatsAppVentas();
-  if (!numero) return null;
-  return (
-    <a
-      href={enlaceWhatsApp(numero, mensaje)}
-      target="_blank"
-      rel="noopener noreferrer"
-      data-testid="dudas-whatsapp"
-      className={`inline-flex min-h-11 items-center gap-1.5 text-sm text-grafito-400 transition hover:text-white ${className}`}
-    >
-      <MessageCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
-      ¿Dudas? Escríbenos por WhatsApp
-    </a>
-  );
-};
-
 /** El bloque junto a los precios. CTA principal: empezar gratis. */
 export const ComoSeContrata = ({ className = '' }) => (
   <section
@@ -96,7 +74,12 @@ export const ComoSeContrata = ({ className = '' }) => (
       >
         Empieza gratis <ArrowRight className="h-4 w-4" />
       </Link>
-      <DudasWhatsApp mensaje="Hola, tengo una consulta sobre los planes de CargoXprez." />
+      <a
+        href="#preguntas"
+        className="inline-flex min-h-11 items-center text-sm text-grafito-400 underline-offset-2 transition hover:text-white hover:underline"
+      >
+        ¿Más dudas? Mira las preguntas frecuentes
+      </a>
     </div>
     <p className="mt-6 text-xs text-grafito-600">
       Te vende y te factura {PROVEEDOR.razonSocial}, RUC {PROVEEDOR.ruc}.

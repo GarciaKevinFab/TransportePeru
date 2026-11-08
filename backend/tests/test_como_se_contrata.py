@@ -1,6 +1,6 @@
 """El bloque "Cómo se contrata" de la portada promete cosas: que sigan siendo ciertas.
 
-Cada frase de frontend/src/components/ContactoVentas.jsx describe un
+Cada frase de frontend/src/components/ComoSeContrata.jsx describe un
 comportamiento del backend. Si el backend cambia y el texto no, la portada
 miente a quien esta decidiendo si paga. Aqui se ata cada promesa a su codigo.
 
@@ -16,7 +16,7 @@ import suscripciones  # noqa: E402
 
 BACKEND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RAIZ = os.path.dirname(BACKEND)
-BLOQUE = os.path.join(RAIZ, "frontend", "src", "components", "ContactoVentas.jsx")
+BLOQUE = os.path.join(RAIZ, "frontend", "src", "components", "ComoSeContrata.jsx")
 
 
 def _leer(ruta):
@@ -54,5 +54,29 @@ def test_con_ruc_se_completa_la_razon_social_del_padron():
 def test_sin_procesos_manuales_en_el_bloque():
     """Ni demo agendada ni cotizacion a mano: la compra es autoservicio."""
     texto = _leer(BLOQUE).lower()
-    for palabra in ("demo", "cotización", "orden de compra", "transferencia", "yape"):
+    for palabra in ("demo", "cotización", "orden de compra", "transferencia", "yape", "whatsapp"):
         assert palabra not in texto, palabra
+
+
+def _preguntas_compra():
+    fuente = _leer(os.path.join(RAIZ, "frontend", "src", "components", "landing", "Comparativa.jsx"))
+    bloque = fuente[fuente.index("PREGUNTAS_COMPRA = ["):]
+    bloque = bloque[:bloque.index("];")]
+    return dict(re.findall(r"p: '([^']*)',\s*r: '([^']*)'", bloque))
+
+
+def test_las_preguntas_de_compra_cubren_las_dudas_de_quien_paga():
+    preguntas = " ".join(_preguntas_compra()).lower()
+    for tema in ("tarjeta", "14 días", "pago", "factura", "cancelar", "datos"):
+        assert tema in preguntas, tema
+
+
+def test_la_faq_no_promete_el_plan_gratis_al_terminar_la_prueba():
+    """El codigo deja la cuenta en solo consulta; antes la FAQ decia que pasaba
+    al plan Gratis, y eso no lo hace nada."""
+    for pregunta, respuesta in _preguntas_compra().items():
+        if "14 días" in pregunta:
+            assert "solo consulta" in respuesta
+            assert "Gratis" not in respuesta
+    todas = _leer(os.path.join(RAIZ, "frontend", "src", "components", "landing", "Comparativa.jsx"))
+    assert "pasa al plan Gratis" not in todas

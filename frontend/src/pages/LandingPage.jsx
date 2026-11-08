@@ -6,7 +6,7 @@ import IconoCamion from '../components/IconoCamion';
 import { ComparativaPlanes, Preguntas } from '../components/landing/Comparativa';
 import Testimonio from '../components/landing/Testimonio';
 import { Revelado, Cifra, CapturaTilt } from '../components/landing/animaciones';
-import { ComoSeContrata } from '../components/ContactoVentas';
+import { ComoSeContrata } from '../components/ComoSeContrata';
 import {
   Route as RouteIcon, Fuel, Wrench, CircleDot, FileText,
   ShieldCheck, Smartphone, MessageCircle, ScanLine, Building2,
