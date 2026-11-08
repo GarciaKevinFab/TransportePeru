@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { PROVEEDOR } from '../config/proveedor';
 import { Lock, ShieldCheck, ArrowLeft, Loader2, CreditCard, Clock, LogIn } from 'lucide-react';
 import LogoMarca from '../components/LogoMarca';
+import { BotonWhatsApp, BloqueConfianza, MENSAJES } from '../components/ContactoVentas';
 
 /**
  * Checkout publico del plan Pro: resumen del pedido y boton de pago.
@@ -377,6 +378,13 @@ const CheckoutPage = () => {
                   </Link>{' '}
                   no pide tarjeta.
                 </p>
+                <BotonWhatsApp
+                  mensaje={MENSAJES.compra}
+                  testId="checkout-whatsapp"
+                  className="mt-5 flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-white/10 px-4 py-2.5 text-sm font-bold text-grafito-200 transition hover:bg-white/5"
+                >
+                  ¿Dudas antes de pagar? Escríbenos por WhatsApp
+                </BotonWhatsApp>
               </section>
 
               <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-7">
@@ -394,6 +402,10 @@ const CheckoutPage = () => {
                 {via === 'pedido' && formularioPedido}
               </section>
             </div>
+
+            {/* Para quien no paga con tarjeta o quiere hablar antes: solo
+                contacto. El pago en linea sigue siendo el de arriba. */}
+            <BloqueConfianza className="mt-6" />
           </>
         ) : (
           <div className="mx-auto max-w-xl" data-testid="checkout-orden-ok">

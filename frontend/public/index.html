@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="es">
+<html lang="es-PE">
 
 <head>
     <meta charset="utf-8" />
@@ -14,7 +14,28 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://us-assets.i.posthog.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https: http: ws: wss:; frame-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
     <meta name="referrer" content="no-referrer" />
     <meta name="theme-color" content="#e00000" />
-    <meta name="description" content="CargoXprez - Sistema de gestión de flota para empresas de transporte" />
+    <!-- SEO. Esto es lo que ve un buscador: la SPA pinta el resto con
+         JavaScript. El servidor (backend/seo_rutas.py) reescribe el titulo,
+         la descripcion, el canonical y sus copias OG/Twitter para cada ruta
+         publica, y pone noindex en las demas: si cambias el formato de estas
+         etiquetas, cambia tambien las expresiones de alli (hay prueba). -->
+    <meta name="description" content="Controla viajes, combustible, llantas, mantenimiento y documentos de tu flota de transporte de carga en Perú. Guías y facturas para SUNAT. Prueba gratis 14 días, sin tarjeta." />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://cargoxprez.sisac.pe/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="CargoXprez" />
+    <meta property="og:locale" content="es_PE" />
+    <meta property="og:title" content="Software de gestión de flota para transporte de carga | CargoXprez" />
+    <meta property="og:description" content="Controla viajes, combustible, llantas, mantenimiento y documentos de tu flota de transporte de carga en Perú. Guías y facturas para SUNAT. Prueba gratis 14 días, sin tarjeta." />
+    <meta property="og:url" content="https://cargoxprez.sisac.pe/" />
+    <meta property="og:image" content="https://cargoxprez.sisac.pe/og-cargoxprez.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Panel de CargoXprez con vehículos disponibles, viajes activos, alertas y documentos por vencer" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Software de gestión de flota para transporte de carga | CargoXprez" />
+    <meta name="twitter:description" content="Controla viajes, combustible, llantas, mantenimiento y documentos de tu flota de transporte de carga en Perú. Guías y facturas para SUNAT. Prueba gratis 14 días, sin tarjeta." />
+    <meta name="twitter:image" content="https://cargoxprez.sisac.pe/og-cargoxprez.jpg" />
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="CargoXprez">
@@ -37,10 +58,338 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@600&family=DM+Sans:wght@400;500;600;700&display=swap"
         rel="stylesheet" />
-    <!-- Titulo por defecto: el del producto. En el subdominio de un cliente lo
+    <!-- Titulo por defecto: el de la portada. En el subdominio de un cliente lo
          sustituye TenantContext con el nombre de su empresa en cuanto responde
          /api/tenant; esto es lo que se ve el instante anterior. -->
-    <title>CargoXprez | Gestión de Flota</title>
+    <title>Software de gestión de flota para transporte de carga | CargoXprez</title>
+    <!-- Datos estructurados. Los precios son los de backend/planes.py y los
+         datos de la empresa los de config/proveedor.js: tests/test_seo.py
+         comprueba que coincidan. Sin resenas ni valoraciones: no hay ninguna
+         publicada que citar. El FAQPage repite las preguntas visibles de la
+         portada (components/landing/Comparativa.jsx) y el servidor lo quita en
+         las demas rutas. -->
+    <script type="application/ld+json" id="ld-organizacion">
+
+{
+
+  "@context": "https://schema.org",
+
+  "@graph": [
+
+    {
+
+      "@type": "Organization",
+
+      "@id": "https://cargoxprez.sisac.pe/#organizacion",
+
+      "name": "SOLUCIONES INFORMÁTICAS MDD S.A.C.",
+
+      "legalName": "SOLUCIONES INFORMÁTICAS MDD S.A.C.",
+
+      "taxID": "20490042068",
+
+      "url": "https://sisac.pe",
+
+      "email": "soporte@sisac.pe",
+
+      "address": {
+
+        "@type": "PostalAddress",
+
+        "streetAddress": "Av. Madre de Dios N° 1087, Dpto. 201, A.H. Huerto Familiar",
+
+        "addressLocality": "Tambopata",
+
+        "addressRegion": "Madre de Dios",
+
+        "addressCountry": "PE"
+
+      },
+
+      "brand": {
+
+        "@type": "Brand",
+
+        "name": "CargoXprez"
+
+      }
+
+    },
+
+    {
+
+      "@type": "WebSite",
+
+      "@id": "https://cargoxprez.sisac.pe/#sitio",
+
+      "url": "https://cargoxprez.sisac.pe/",
+
+      "name": "CargoXprez",
+
+      "inLanguage": "es-PE",
+
+      "publisher": {
+
+        "@id": "https://cargoxprez.sisac.pe/#organizacion"
+
+      }
+
+    },
+
+    {
+
+      "@type": "SoftwareApplication",
+
+      "@id": "https://cargoxprez.sisac.pe/#software",
+
+      "name": "CargoXprez",
+
+      "url": "https://cargoxprez.sisac.pe/",
+
+      "applicationCategory": "BusinessApplication",
+
+      "applicationSubCategory": "Gestión de flota",
+
+      "operatingSystem": "Web (navegador de computadora o celular)",
+
+      "inLanguage": "es-PE",
+
+      "areaServed": {
+
+        "@type": "Country",
+
+        "name": "Perú"
+
+      },
+
+      "description": "Software de gestión de flota para empresas de transporte de carga del Perú: viajes y liquidación de flete, combustible, llantas, mantenimiento, documentos con vencimiento, guías de transportista y facturas para SUNAT, y detracciones.",
+
+      "featureList": [
+
+        "Viajes, viáticos y liquidación de flete",
+
+        "Control de combustible por unidad",
+
+        "Control de llantas: esquema por eje, inspecciones, rotación, reencauche y costo por kilómetro",
+
+        "Mantenimiento preventivo y órdenes de trabajo",
+
+        "Documentos con alertas de vencimiento",
+
+        "Guías de transportista y facturas electrónicas para SUNAT",
+
+        "Detracciones",
+
+        "App del chofer con modo sin señal",
+
+        "Bot de WhatsApp para enviar documentos"
+
+      ],
+
+      "screenshot": "https://cargoxprez.sisac.pe/capturas/panel.webp",
+
+      "publisher": {
+
+        "@id": "https://cargoxprez.sisac.pe/#organizacion"
+
+      },
+
+      "offers": [
+
+        {
+
+          "@type": "Offer",
+
+          "name": "Plan Gratis",
+
+          "description": "Hasta 3 vehículos",
+
+          "price": "0",
+
+          "priceCurrency": "PEN",
+
+          "url": "https://cargoxprez.sisac.pe/registro"
+
+        },
+
+        {
+
+          "@type": "Offer",
+
+          "name": "Plan Pro",
+
+          "description": "Hasta 20 vehículos. Suscripción mensual, precio con IGV incluido.",
+
+          "price": "199.00",
+
+          "priceCurrency": "PEN",
+
+          "url": "https://cargoxprez.sisac.pe/comprar?plan=pro",
+
+          "priceSpecification": {
+
+            "@type": "UnitPriceSpecification",
+
+            "price": "199.00",
+
+            "priceCurrency": "PEN",
+
+            "unitCode": "MON",
+
+            "referenceQuantity": {
+
+              "@type": "QuantitativeValue",
+
+              "value": 1,
+
+              "unitCode": "MON"
+
+            },
+
+            "valueAddedTaxIncluded": true
+
+          }
+
+        }
+
+      ]
+
+    }
+
+  ]
+
+}
+
+    </script>
+
+    <script type="application/ld+json" id="ld-faq">
+
+{
+
+  "@context": "https://schema.org",
+
+  "@type": "FAQPage",
+
+  "mainEntity": [
+
+    {
+
+      "@type": "Question",
+
+      "name": "¿Los datos de mi empresa son míos?",
+
+      "acceptedAnswer": {
+
+        "@type": "Answer",
+
+        "text": "Sí. Lo que cargas sigue siendo de tu empresa: puedes exportarlo mientras la cuenta esté activa y puedes pedir que lo eliminemos. No lo usamos para nada que no sea prestarte el servicio, no lo vendemos y no lo cruzamos con el de otras empresas."
+
+      }
+
+    },
+
+    {
+
+      "@type": "Question",
+
+      "name": "¿Otra transportista puede ver lo mío?",
+
+      "acceptedAnswer": {
+
+        "@type": "Answer",
+
+        "text": "No, y no depende de que el programa se acuerde de filtrar: la separación la impone la base de datos. Una consulta sin empresa devuelve cero filas, no las de otro cliente."
+
+      }
+
+    },
+
+    {
+
+      "@type": "Question",
+
+      "name": "¿Funciona sin señal en carretera?",
+
+      "acceptedAnswer": {
+
+        "@type": "Answer",
+
+        "text": "La app del chofer sí. El checklist, los gastos, los incidentes y las fotos se guardan en el celular y suben solos cuando vuelve la cobertura. El panel de oficina necesita internet."
+
+      }
+
+    },
+
+    {
+
+      "@type": "Question",
+
+      "name": "¿Emite comprobantes para SUNAT?",
+
+      "acceptedAnswer": {
+
+        "@type": "Answer",
+
+        "text": "Sí, en los planes Pro y Empresa: guías de transportista y facturas electrónicas, más el control de detracciones. Necesitas tu certificado digital y tus credenciales de SUNAT."
+
+      }
+
+    },
+
+    {
+
+      "@type": "Question",
+
+      "name": "¿Qué pasa cuando terminan los 14 días?",
+
+      "acceptedAnswer": {
+
+        "@type": "Answer",
+
+        "text": "Eliges plan. Si no eliges ninguno, la cuenta pasa al plan Gratis con hasta 3 vehículos: no pierdes nada de lo que cargaste ni se te cobra sin avisar. No pedimos tarjeta para probar."
+
+      }
+
+    },
+
+    {
+
+      "@type": "Question",
+
+      "name": "¿Mis choferes tienen que aprender a usarlo?",
+
+      "acceptedAnswer": {
+
+        "@type": "Answer",
+
+        "text": "Poco. Entran con su DNI y un PIN de seis dígitos, y la app solo les muestra lo suyo. Si prefieres, también pueden mandar la foto de una factura por WhatsApp y entra al sistema sin instalar nada."
+
+      }
+
+    },
+
+    {
+
+      "@type": "Question",
+
+      "name": "¿Cuánto tardo en tenerlo funcionando?",
+
+      "acceptedAnswer": {
+
+        "@type": "Answer",
+
+        "text": "Una tarde. Cargas tus unidades, tus choferes y tus rutas, y ya puedes registrar el primer viaje. Los vencimientos de documentos se cargan una vez y avisan solos desde entonces."
+
+      }
+
+    }
+
+  ]
+
+}
+
+    </script>
+
     <script>
         window.addEventListener(
             "error",
@@ -61,7 +410,22 @@
 </head>
 
 <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <noscript>
+        <h1>CargoXprez: software de gestión de flota para transporte de carga en Perú</h1>
+        <p>CargoXprez reúne en un solo sistema los viajes y la liquidación de flete,
+        el combustible, el control de llantas (esquema por eje, inspecciones,
+        rotación, reencauche y costo por kilómetro), el mantenimiento, los documentos
+        con alertas de vencimiento, las guías de transportista y facturas para SUNAT
+        y las detracciones. El chofer carga desde el celular, incluso sin señal.</p>
+        <p>Planes: Gratis, hasta 3 vehículos. Pro, S/ 199 al mes con IGV, hasta 20
+        vehículos. Empresa, a medida. Emitimos boleta o factura electrónica.</p>
+        <p><a href="/comprar?plan=pro">Contratar el plan Pro</a> ·
+        <a href="/terminos">Términos</a> · <a href="/privacidad">Privacidad</a> ·
+        <a href="/reclamaciones">Libro de Reclamaciones</a> ·
+        <a href="mailto:soporte@sisac.pe">soporte@sisac.pe</a></p>
+        <p>SOLUCIONES INFORMÁTICAS MDD S.A.C. — RUC 20490042068.</p>
+        <p>Para usar el sistema necesitas activar JavaScript en tu navegador.</p>
+    </noscript>
     <div id="root"></div>
 <!-- ==========================================================================
      Distintivo de constructor - "hecho por"

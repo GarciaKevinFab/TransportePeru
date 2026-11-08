@@ -60,6 +60,7 @@ import comprobantes
 import mercadopago
 import planes
 import proveedor
+import seo_rutas
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -94,6 +95,7 @@ def _envolver(interior: str) -> HTMLResponse | None:
         log.warning("checkout sin js: no encontre %s en index.html; la pagina "
                     "se serviria sin el contenido del servidor", ANCLA_ROOT)
         return None
+    cascaron = seo_rutas.personalizar(cascaron, "comprar")
     pagina = cascaron.replace(ANCLA_ROOT, f'<div id="root">{interior}</div>', 1)
     # Sin cache: el precio y los datos del proveedor cambian por configuracion,
     # y una copia guardada en un intermediario los congelaria.

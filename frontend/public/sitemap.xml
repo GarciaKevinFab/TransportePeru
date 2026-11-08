@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Solo las paginas publicas reales (las mismas de backend/seo_rutas.py, salvo
+     /login). Las del panel piden sesion y no van aqui. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://cargoxprez.sisac.pe/</loc>
+    <lastmod>2026-11-07</lastmod>
+  </url>
+  <url>
+    <loc>https://cargoxprez.sisac.pe/comprar</loc>
+    <lastmod>2026-11-07</lastmod>
+  </url>
+  <url>
+    <loc>https://cargoxprez.sisac.pe/registro</loc>
+    <lastmod>2026-11-07</lastmod>
+  </url>
+  <url>
+    <loc>https://cargoxprez.sisac.pe/privacidad</loc>
+    <lastmod>2026-11-07</lastmod>
+  </url>
+  <url>
+    <loc>https://cargoxprez.sisac.pe/terminos</loc>
+    <lastmod>2026-11-07</lastmod>
+  </url>
+  <url>
+    <loc>https://cargoxprez.sisac.pe/reclamaciones</loc>
+    <lastmod>2026-11-07</lastmod>
+  </url>
+</urlset>

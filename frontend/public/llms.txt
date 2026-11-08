@@ -1,0 +1,37 @@
+# CargoXprez
+
+> CargoXprez es un software de gestión de flota en la web para empresas de transporte de carga del Perú. Reúne viajes y liquidación de flete, combustible, llantas, mantenimiento, documentos con vencimiento, guías de transportista y facturas para SUNAT, y detracciones. Lo presta SOLUCIONES INFORMÁTICAS MDD S.A.C. (RUC 20490042068).
+
+## Qué hace
+
+- Viajes, viáticos, caja y liquidación de flete con lo que ya cargaron el chofer y el taller.
+- Combustible: vales, cargas y consumo por unidad.
+- Llantas: esquema por eje, inspecciones con profundidad, rotación, alineación, reencauche, baja y costo por kilómetro.
+- Mantenimiento: órdenes de trabajo, planes preventivos e indisponibilidad.
+- Documentos (SOAT, revisión técnica, licencias y otros) con alertas de vencimiento; un documento vencido bloquea la salida.
+- SUNAT: guías de transportista, facturas electrónicas y detracciones (planes Pro y Empresa; requiere certificado digital y credenciales de SUNAT de la empresa).
+- App del chofer en el celular: checklist, gastos, incidentes y fotos, también sin señal (se sube al volver la cobertura).
+- Bot de WhatsApp: el chofer envía la foto de una factura y entra al sistema; la lectura automática extrae monto, RUC y fecha.
+- Los datos de cada empresa están separados en la base de datos (Row Level Security).
+
+## Planes y precios (en soles, con IGV)
+
+- Gratis: S/ 0, hasta 3 vehículos.
+- Pro: S/ 199 al mes, hasta 20 vehículos. Suscripción mensual con Mercado Pago; se cancela cuando se quiera.
+- Empresa: a medida, sin límite de vehículos y con varias empresas en una cuenta.
+- Prueba de 14 días sin tarjeta. Se emite boleta o factura por cada cobro.
+- Empresas que pagan con orden de compra o transferencia: escribir a soporte@sisac.pe para pedir una cotización.
+
+## Páginas
+
+- [Portada, planes y preguntas frecuentes](https://cargoxprez.sisac.pe/)
+- [Contratar el plan Pro](https://cargoxprez.sisac.pe/comprar?plan=pro)
+- [Crear cuenta gratis](https://cargoxprez.sisac.pe/registro)
+- [Términos del servicio](https://cargoxprez.sisac.pe/terminos)
+- [Política de privacidad](https://cargoxprez.sisac.pe/privacidad)
+- [Libro de Reclamaciones](https://cargoxprez.sisac.pe/reclamaciones)
+
+## Contacto
+
+- Correo: soporte@sisac.pe
+- Empresa: SOLUCIONES INFORMÁTICAS MDD S.A.C., RUC 20490042068, Tambopata, Madre de Dios, Perú.
