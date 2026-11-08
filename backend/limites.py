@@ -108,7 +108,13 @@ REGLAS = [
 PREFIJOS = ("/api",)
 
 # Rutas exentas de todo limite.
-EXENTAS = ("/api/health",)
+#
+#   /webhooks/  Los avisos de Mercado Pago. Hoy ya quedan fuera porque no
+#               cuelgan de /api, pero se nombran aqui para que siga siendo asi
+#               el dia que alguien amplie PREFIJOS: Mercado Pago avisa desde
+#               pocas IP, reintenta en rafagas, y un 429 es un cobro que no se
+#               registra. Lo que protege al webhook es su firma, no un contador.
+EXENTAS = ("/api/health", "/webhooks/")
 
 
 class LimitePeticiones:

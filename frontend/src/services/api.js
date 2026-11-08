@@ -173,6 +173,27 @@ export const authApi = {
     }),
 };
 
+// Suscripcion de la empresa (Mercado Pago) y sus comprobantes.
+// El monto no viaja desde aqui: el servidor lo saca de backend/planes.py.
+export const suscripcionApi = {
+  // Sin cache: tras volver de Mercado Pago se pregunta varias veces seguidas
+  // hasta que llega el aviso, y una respuesta guardada diria siempre lo mismo.
+  get: () => api.get('/suscripcion', { sinCache: true }),
+  suscribirse: (datos) => api.post('/suscripcion/mercadopago', datos),
+  cancelar: () => api.post('/suscripcion/cancelar'),
+  // Blob y no un enlace: el PDF va detras del token, que vive en localStorage
+  // y un <a href> no lo manda.
+  comprobante: (pagoId) => api.get(`/suscripcion/pagos/${pagoId}/comprobante`, { responseType: 'blob' }),
+};
+
+// Panel del dueno de la plataforma: comprobantes emitidos a mano en BSNegocios.
+export const comprobantesAdminApi = {
+  listar: () => api.get('/admin/comprobantes', { sinCache: true }),
+  registrar: (pagoId, formData) =>
+    api.post(`/admin/comprobantes/${pagoId}`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  noAplica: (pagoId, nota) => api.post(`/admin/comprobantes/${pagoId}/no-aplica`, { nota }),
+};
+
 // Users API
 export const usersApi = {
   getAll: (params) => api.get('/users', { params }),

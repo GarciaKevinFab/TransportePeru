@@ -10,6 +10,8 @@ import LoginPage from './pages/LoginPage';
 import LandingPage from './pages/LandingPage';
 import SignupPage from './pages/SignupPage';
 import CheckoutPage from './pages/CheckoutPage';
+import SuscripcionPage from './pages/SuscripcionPage';
+import AdminComprobantesPage from './pages/AdminComprobantesPage';
 import { OlvidePage, RestablecerPage } from './pages/RecuperarPage';
 import CambiarPasswordPage from './pages/CambiarPasswordPage';
 import { PrivacidadPage, TerminosPage } from './pages/LegalPage';
@@ -454,6 +456,30 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={['superadmin', 'owner']}>
             <CompaniesPage />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Suscripcion de la empresa. Mercado Pago devuelve aqui al cliente
+          (back_url). Vive dentro de la app y no en /comprar porque la sesion
+          esta en el subdominio de cada empresa. */}
+      <Route
+        path="/suscripcion"
+        element={
+          <ProtectedRoute allowedRoles={['owner', 'admin']}>
+            <SuscripcionPage />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Comprobantes emitidos a mano: solo el dueno de la plataforma. La
+          pagina comprueba el rol ademas, porque ProtectedRoute deja pasar al
+          superadmin a todo pero aqui no hay ningun otro rol que deba entrar. */}
+      <Route
+        path="/admin/comprobantes"
+        element={
+          <ProtectedRoute allowedRoles={['superadmin']}>
+            <AdminComprobantesPage />
           </ProtectedRoute>
         }
       />

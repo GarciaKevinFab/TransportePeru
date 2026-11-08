@@ -110,7 +110,7 @@ const PLANES = [
     para: 'Para la flota que ya factura todos los días.',
     incluye: ['Todo lo del plan Gratis', 'SUNAT: guías y facturas', 'Detracciones', 'Bot de WhatsApp', 'Lectura de facturas', 'Reportes y costo por kilómetro'],
     // Al checkout, no al registro: quien elige Pro viene a COMPRAR, y ahi
-    // esta el resumen del pedido y el boton de pago (Izipay).
+    // esta el resumen del pedido y el boton de pago (Mercado Pago).
     cta: 'Elegir Pro',
     ruta: '/comprar?plan=pro',
     destacado: true,
