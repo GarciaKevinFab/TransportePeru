@@ -44,9 +44,10 @@ y lo que no empieza por `cargoxprez|` se ignora.
    (`/admin/comprobantes`): serie, número, fecha y PDF. El cliente lo descarga
    desde su pantalla de Suscripción.
 
-Estados: `trial` → `activa` → `vencida` (7 días de gracia, se sigue
-escribiendo) → `suspendida` (solo lectura). `cancelada` conserva el acceso hasta
-el fin del periodo pagado. La prueba vencida corta como hasta ahora, sin gracia.
+Estados: `trial` → `activa` → `vencida` (7 días de gracia, plan Pro entero) →
+`suspendida`. `cancelada` conserva el plan Pro hasta el fin del periodo pagado.
+Sin pago vigente (prueba vencida, `suspendida`, cancelación vencida) la empresa
+**pasa al plan Gratis**, no a solo consulta: ver "Plan Gratis" más abajo.
 
 Cancelar desde la cuenta cancela primero en Mercado Pago; si Mercado Pago no
 responde, no se marca nada y el cliente ve el error (no puede quedar "cancelada"
@@ -171,6 +172,14 @@ o admin de la empresa (la suscripción es de una empresa existente); sin JS
 también funciona (`checkout_sin_js.py`), con límite de 10 intentos por IP cada
 15 minutos.
 
+El formulario sin JS ofrece lo mismo que el de React: un desplegable **Periodo**
+(`name="pago"`) con 1, 3, 6 o 12 meses por adelantado (Yape, banca móvil o
+tarjeta; los 12 meses marcados "sin Yape") y la suscripción mensual con tarjeta.
+El adelantado llama a `suscripcion_api.abrir_pago_adelantado`, la misma función
+que `POST /api/suscripcion/adelantado`: total del catálogo, mismas validaciones
+y el mismo bloqueo si ya hay cobro automático con tarjeta. Sin el campo `pago`
+se entiende `mensual`, como antes.
+
 ## Pago adelantado (Yape, banca móvil o tarjeta)
 
 Yape y PagoEfectivo solo existen en pagos únicos (Checkout Pro), no en
@@ -215,7 +224,7 @@ Yape y PagoEfectivo solo existen en pagos únicos (Checkout Pro), no en
    - `refunded` / `charged_back`: se quitan esos N meses, una sola vez.
    - Mercado Pago caído: 503, para que reintente.
 5. Al vencer sin renovar, la máquina de estados de siempre: `vencida` (7 días
-   de gracia) y después `suspendida`, que deja la cuenta **en solo consulta**
+   de gracia) y después `suspendida`, que deja la cuenta **en el plan Gratis**
    (no se borra nada). No hay estados nuevos.
 
 ### Recordatorio de renovación
@@ -296,6 +305,49 @@ En el repositorio: `backend/tests/test_pago_adelantado.py` (catálogo,
 referencia, cuerpo de la preferencia, sin llaves en el repo; sin base de datos)
 y las pruebas `test_adelantado_*` y `test_recordatorio_*` de
 `backend/tests/test_suscripcion_mercadopago.py` (contra Postgres, en CI).
+
+## Plan Gratis (sin pago vigente)
+
+Ninguna empresa queda en "solo consulta" por no pagar. Sin pago vigente
+(`prueba_vencida`, `suspendida` o `cancelada_vencida`, según
+`suscripciones.estado_efectivo`), `suscripciones.plan_efectivo` devuelve
+`gratis`. Se calcula al leer: **no se escribe nada en la base** y no hace falta
+migración. Al desplegar, las empresas que hoy estaban en solo consulta pasan
+solas al plan Gratis. Un pago (adelantado o suscripción) deja `activa` con
+vencimiento futuro y la saca de Gratis como siempre.
+
+Lo que hace `_exigir_suscripcion_al_dia` (server.py) en Gratis:
+
+- Se usa lo que la landing anuncia para Gratis: viajes, viáticos y liquidación,
+  llantas, mantenimiento e inventario, documentos y alertas, app del chofer.
+- Lo del plan Pro responde 402: guías y facturas SUNAT, detracciones,
+  configuración SUNAT, lectura automática de facturas (`/api/fuel/ocr`), el bot
+  de WhatsApp (además el bot contesta que es del plan Pro) y los reportes
+  `/api/reports/trips|fuel|maintenance|cost-per-km`. Lo ya registrado se lee.
+- Tope de **3 vehículos activos** (`suscripciones.TOPE_GRATIS`). Activo = todo
+  estado distinto de `fuera_servicio`. Agregar el cuarto responde 403.
+- Con **más de 3 activos** se consulta todo, y toda escritura responde 402 con
+  la regla, salvo lo que libera cupo (marcar un vehículo **Fuera de servicio**
+  con `PUT /api/vehicles/{id}` o eliminarlo), la sesión (`/api/auth/`) y el
+  pago (`/api/suscripcion`). Nada se borra ni se oculta.
+- La app muestra un aviso arriba de cada pantalla (`AvisoPlanGratis.jsx`,
+  datos de `GET /api/suscripcion/plan`) con el botón "Activar el plan Pro" a
+  `/comprar?plan=pro`.
+
+Para contar las empresas que pasan a Gratis al desplegar:
+
+```sql
+select count(*) from companies
+ where (subscription_status = 'trial' and trial_ends_at < now())
+    or (subscription_status in ('activa', 'vencida') and subscription_ends_at < now() - interval '7 days')
+    or (subscription_status = 'vencida' and subscription_ends_at is null)
+    or subscription_status = 'suspendida'
+    or (subscription_status = 'cancelada' and (subscription_ends_at is null or subscription_ends_at < now()));
+```
+
+Pruebas: `test_prueba_vencida_pasa_al_plan_gratis_*`, `test_con_mas_de_3_*`,
+`test_el_tope_de_3_*`, `test_un_pago_saca_de_gratis` y
+`test_checkout_sin_js_*adelantado*` en `backend/tests/test_suscripcion_mercadopago.py`.
 
 ## Apagar
 

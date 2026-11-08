@@ -262,6 +262,16 @@ async def _process_message(message: dict) -> None:
     company_id = driver["company_id"]
     driver_id = driver["id"]
 
+    # El bot es del plan Pro. Una empresa en el plan Gratis (prueba vencida o
+    # pago vencido) no lo usa: el chofer registra el gasto desde su app.
+    import suscripciones
+    plan = await suscripciones.plan_de(company_id)
+    if plan and plan["gratis"]:
+        await send_whatsapp_text(
+            wa_id, "El envío de documentos por WhatsApp es del plan Pro y tu empresa está "
+                   "en el plan Gratis. Registra el gasto desde la app de CargoXprez.")
+        return
+
     # Respuesta de texto a una selección de viaje pendiente
     if msg_type == "text":
         # A esta altura el chofer ya esta resuelto, o sea que hay empresa y la

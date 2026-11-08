@@ -179,6 +179,8 @@ export const suscripcionApi = {
   // Sin cache: tras volver de Mercado Pago se pregunta varias veces seguidas
   // hasta que llega el aviso, y una respuesta guardada diria siempre lo mismo.
   get: () => api.get('/suscripcion', { sinCache: true }),
+  // Plan vigente para el aviso de la barra: cualquier rol de la empresa.
+  plan: () => api.get('/suscripcion/plan', { sinCache: true }),
   suscribirse: (datos) => api.post('/suscripcion/mercadopago', datos),
   // Pago unico de 1, 3, 6 o 12 meses (Yape, banca movil o tarjeta). Solo plan y meses.
   pagarAdelantado: (datos) => api.post('/suscripcion/adelantado', datos),

@@ -1,6 +1,7 @@
 """Las rutas de la suscripcion: la cuenta del cliente y el panel del dueno.
 
     GET  /api/suscripcion                          estado, cobros y comprobantes
+    GET  /api/suscripcion/plan                     plan vigente (Gratis o no) y vehiculos activos
     POST /api/suscripcion/mercadopago              alta: devuelve el init_point
     POST /api/suscripcion/adelantado               pago unico de 1/3/6/12 meses
                                                    (Yape, banca movil o tarjeta)
@@ -95,14 +96,85 @@ def _vista_estado(e: dict) -> dict:
         "trial_ends_at": e["trial_ends_at"].isoformat() if e["trial_ends_at"] else None,
         "vence": e["subscription_ends_at"].isoformat() if e["subscription_ends_at"] else None,
         "cobro_automatico": bool(e["mp_preapproval_id"]),
+        "plan_efectivo": e.get("plan_efectivo") or e["plan"],
         "dias_gracia": suscripciones.DIAS_GRACIA,
     }
+
+
+class NoSePuedePagar(Exception):
+    """El pago adelantado no se abre. `http` y `detalle` van tal cual al cliente."""
+
+    def __init__(self, http: int, detalle: str):
+        super().__init__(detalle)
+        self.http = http
+        self.detalle = detalle
+
+
+def meses_pedidos(valor) -> int:
+    try:
+        return int(str(valor).strip())
+    except (TypeError, ValueError):
+        return 0
+
+
+async def abrir_pago_adelantado(usuario: dict, plan, meses, comprobante, documento,
+                                nombre: str, host: str | None) -> dict:
+    """Crea la preferencia de 1, 3, 6 o 12 meses y devuelve su init_point.
+
+    La usan los dos checkouts (la API de React y checkout_sin_js.py): el total
+    sale de planes.total_adelantado y nada mas; con cobro automatico con
+    tarjeta activo no se abre (409). Levanta NoSePuedePagar con el motivo.
+    """
+    plan = str(plan or "pro").strip().lower()
+    meses = meses_pedidos(meses)
+    total = planes.total_adelantado(plan, meses)
+    if total is None:
+        raise NoSePuedePagar(400, "Elige 1, 3, 6 o 12 meses de un plan disponible")
+    facturacion, motivo = comprobantes.validar(comprobante, documento)
+    if motivo:
+        raise NoSePuedePagar(400, motivo)
+    correo = (usuario.get("email") or "").strip()
+    if not correo:
+        raise NoSePuedePagar(400, "Tu usuario no tiene correo")
+    if not mercadopago.disponible_para(correo):
+        raise NoSePuedePagar(503, "El pago en línea todavía no está disponible.")
+
+    estado = await suscripciones.estado_de(usuario["company_id"])
+    if estado and estado["mp_preapproval_id"]:
+        raise NoSePuedePagar(409, AVISO_CON_TARJETA)
+
+    try:
+        await comprobantes.guardar_datos(usuario, facturacion, nombre)
+    except Exception:  # noqa: BLE001
+        log.exception("No se guardaron los datos de facturacion de la empresa %s",
+                      usuario["company_id"])
+
+    descripcion = planes.PRECIOS_CHECKOUT[plan][0].split(" (")[0]
+    volver_a = f"{origen_publico(host)}{RUTA_CLIENTE}"
+    try:
+        preferencia = await mercadopago.crear_preferencia(
+            str(usuario["company_id"]), correo, plan, descripcion, meses, total,
+            volver_a, url_del_webhook())
+    except mercadopago.ErrorMercadoPago as e:
+        log.error("Mercado Pago no creo el pago adelantado de la empresa %s: %s",
+                  usuario["company_id"], e)
+        raise NoSePuedePagar(502, "No pudimos abrir el pago. No se te cobró nada: "
+                                  "vuelve a intentarlo en un momento.")
+    return {"init_point": preferencia["init_point"], "meses": meses, "total": total}
 
 
 def crear_router(usuario_dep, gestor_dep, superadmin_dep) -> APIRouter:
     router = APIRouter()
 
     # ─── La cuenta del cliente ───────────────────────────
+
+    @router.get("/api/suscripcion/plan")
+    async def ver_plan(usuario: dict = Depends(usuario_dep)):
+        """El plan vigente, para el aviso de la barra (cualquier rol de la empresa)."""
+        plan = await suscripciones.plan_de(usuario["company_id"])
+        if not plan:
+            raise HTTPException(status_code=404, detail="Empresa no encontrada")
+        return plan
 
     @router.get("/api/suscripcion")
     async def ver_suscripcion(usuario: dict = Depends(gestor_dep)):
@@ -177,46 +249,13 @@ def crear_router(usuario_dep, gestor_dep, superadmin_dep) -> APIRouter:
         """Pago unico de Checkout Pro. El navegador manda plan y meses, nada mas."""
         if usuario.get("role") == "superadmin":
             raise HTTPException(status_code=403, detail="El pago lo hace el cliente desde su cuenta")
-        plan = str(datos.get("plan") or "pro").strip().lower()
         try:
-            meses = int(datos.get("meses"))
-        except (TypeError, ValueError):
-            meses = 0
-        total = planes.total_adelantado(plan, meses)
-        if total is None:
-            raise HTTPException(status_code=400, detail="Elige 1, 3, 6 o 12 meses de un plan disponible")
-        facturacion, motivo = comprobantes.validar(datos.get("comprobante"), datos.get("documento"))
-        if motivo:
-            raise HTTPException(status_code=400, detail=motivo)
-        correo = (usuario.get("email") or "").strip()
-        if not correo:
-            raise HTTPException(status_code=400, detail="Tu usuario no tiene correo")
-        if not mercadopago.disponible_para(correo):
-            raise HTTPException(status_code=503, detail="El pago en línea todavía no está disponible.")
-
-        estado = await suscripciones.estado_de(usuario["company_id"])
-        if estado and estado["mp_preapproval_id"]:
-            raise HTTPException(status_code=409, detail=AVISO_CON_TARJETA)
-
-        try:
-            await comprobantes.guardar_datos(usuario, facturacion, str(datos.get("nombre") or ""))
-        except Exception:  # noqa: BLE001
-            log.exception("No se guardaron los datos de facturacion de la empresa %s",
-                          usuario["company_id"])
-
-        descripcion = planes.PRECIOS_CHECKOUT[plan][0].split(" (")[0]
-        volver_a = f"{origen_publico(request.headers.get('host'))}{RUTA_CLIENTE}"
-        try:
-            preferencia = await mercadopago.crear_preferencia(
-                str(usuario["company_id"]), correo, plan, descripcion, meses, total,
-                volver_a, url_del_webhook())
-        except mercadopago.ErrorMercadoPago as e:
-            log.error("Mercado Pago no creo el pago adelantado de la empresa %s: %s",
-                      usuario["company_id"], e)
-            raise HTTPException(status_code=502, detail=(
-                "No pudimos abrir el pago. No se te cobró nada: vuelve a intentarlo "
-                "en un momento."))
-        return {"init_point": preferencia["init_point"], "meses": meses, "total": total}
+            return await abrir_pago_adelantado(
+                usuario, datos.get("plan"), datos.get("meses"), datos.get("comprobante"),
+                datos.get("documento"), str(datos.get("nombre") or ""),
+                request.headers.get("host"))
+        except NoSePuedePagar as e:
+            raise HTTPException(status_code=e.http, detail=e.detalle)
 
     @router.post("/api/suscripcion/cancelar")
     async def cancelar(usuario: dict = Depends(gestor_dep)):

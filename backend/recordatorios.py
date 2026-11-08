@@ -2,8 +2,8 @@
 
 Quien paga con la tarjeta no necesita aviso: Mercado Pago cobra solo cada mes.
 Quien pago 1, 3, 6 o 12 meses con Yape o desde su banca movil, si: nada se
-cobra solo, y sin aviso la cuenta pasaria a solo consulta sin que nadie se
-entere. Por eso se le escribe al dueno a 7 dias y a 1 dia del vencimiento.
+cobra solo, y sin aviso la cuenta pasaria al plan Gratis (hasta 3 vehiculos
+activos, sin lo del plan Pro) sin que nadie se entere. Por eso se le escribe al dueno a 7 dias y a 1 dia del vencimiento.
 
 A QUIEN
 
@@ -128,11 +128,10 @@ async def recordar() -> int:
             titulo=f"Tu plan de CargoXprez vence {cuando}",
             preencabezado="Renueva con Yape, desde tu banca móvil o con tarjeta",
             intro=[f"Lo que pagaste por adelantado para {c['name']} se acaba {cuando}. "
-                   "Para seguir registrando viajes, vehículos y documentos sin cortes, "
-                   "paga el siguiente periodo.",
+                   "Para seguir con el plan Pro sin cortes, paga el siguiente periodo.",
                    "Paga con Yape, desde tu banca móvil (BCP, BBVA y otros) o con "
-                   "tarjeta. Si no renuevas, la cuenta queda en solo consulta: no se "
-                   "borra nada."],
+                   "tarjeta. Si no renuevas, a los 7 días la cuenta pasa al plan "
+                   "Gratis, con hasta 3 vehículos activos: no se borra nada."],
             filas=[("Empresa", c["name"]),
                    ("Pagado hasta", vence.strftime("%d/%m/%Y"))],
             boton={"texto": "Renovar mi plan", "url": _enlace(c["slug"])},

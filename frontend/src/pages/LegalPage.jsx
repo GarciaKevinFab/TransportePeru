@@ -225,8 +225,8 @@ export const TerminosPage = () => (
       </li>
       <li>
         Si un cobro no pasa, tienes <strong>7 días de gracia</strong> con la cuenta
-        funcionando. Después pasa a solo lectura: no vas a perder tus datos por un
-        retraso.
+        funcionando. Después pasa al plan Gratis (hasta 3 vehículos activos, sin
+        las funciones del plan Pro): no vas a perder tus datos por un retraso.
       </li>
       <li>
         Emitimos boleta o factura electrónica por cada cobro, con los datos que

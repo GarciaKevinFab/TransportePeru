@@ -3,7 +3,7 @@
 Estados guardados en companies.subscription_status y como se pasa de uno a otro:
 
     trial      -> activa      primer cobro aprobado
-    trial      -> (bloqueo)   se acabaron los dias de prueba sin pagar
+    trial      -> (Gratis)    se acabaron los dias de prueba sin pagar
     activa     -> vencida     paso subscription_ends_at sin cobro nuevo
     vencida    -> activa      cobro aprobado (Mercado Pago reintenta solo)
     vencida    -> suspendida  pasaron los DIAS_GRACIA
@@ -16,8 +16,25 @@ EL PAGO ADELANTADO NO TRAE ESTADOS NUEVOS
   Es un cobro aprobado como cualquier otro: extiende `subscription_ends_at`
   desde lo que quedaba (o desde hoy) y deja la empresa `activa`. Al acabarse
   lo pagado sin renovar, pasa lo mismo que con la tarjeta: `vencida` con su
-  gracia y despues `suspendida`, que deja la cuenta en solo consulta. Nada
+  gracia y despues `suspendida`, que pasa la cuenta al plan Gratis. Nada
   se borra.
+
+SIN PAGO VIGENTE, PLAN GRATIS (NO SOLO CONSULTA)
+
+  `prueba_vencida`, `suspendida` y `cancelada_vencida` ya no dejan la cuenta en
+  solo consulta: la dejan en el plan Gratis (`plan_efectivo`), que sigue
+  operando con hasta TOPE_GRATIS vehiculos activos (los que no estan "fuera de
+  servicio") y sin las funciones del plan Pro (SUNAT, detracciones, bot de
+  WhatsApp, lectura automatica de facturas y reportes). No se escribe nada en
+  companies: es lo que resulta de leer el estado con las fechas, igual que
+  `vencida`. Por eso no hizo falta migracion, y un pago (adelantado o con
+  tarjeta) la saca de Gratis por el mismo camino de siempre: estado `activa`
+  con fecha por delante.
+
+  Con mas de TOPE_GRATIS vehiculos activos no se borra ni se oculta nada: se
+  consulta todo, y para registrar algo nuevo hay que dejar solo 3 activos
+  (marcar los demas "fuera de servicio" o eliminarlos) o pagar. El corte lo
+  aplica server.py (`_exigir_suscripcion_al_dia`).
 
 `vencida` no se escribe casi nunca: es lo que resulta de leer `activa` con una
 fecha pasada. `estado_efectivo` es la unica definicion de las dos cosas, y la
@@ -27,14 +44,14 @@ POR QUE GRACIA Y NO CORTE INMEDIATO
 
   Una tarjeta rebota por mil motivos (limite, vencimiento, el banco), y
   cortarle el servicio a quien si quiere pagar es la forma mas cara de perder
-  un cliente. Durante la gracia se sigue escribiendo; despues, el corte que ya
-  existia: se lee pero no se escribe.
+  un cliente. Durante la gracia se sigue escribiendo con el plan pagado;
+  despues, el plan Gratis.
 
 LA PRUEBA NO TIENE GRACIA, Y ES A PROPOSITO
 
-  En LicitaPro la prueba vencida tambien recibe los 7 dias. Aqui no: el corte
-  de la prueba ya existia antes de cobrar (`_exigir_suscripcion_al_dia`) y
-  esta tarea lo respeta. La gracia es para quien ya pago una vez.
+  En LicitaPro la prueba vencida tambien recibe los 7 dias. Aqui no: al dia
+  siguiente de la prueba la cuenta ya esta en el plan Gratis. La gracia es para
+  quien ya pago una vez.
 
 LAS EMPRESAS QUE YA ESTABAN
 
@@ -117,12 +134,29 @@ def estado_efectivo(estado: str | None, trial_ends_at=None, vence=None,
 
 
 def puede_escribir(efectivo: str) -> bool:
-    """Si un estado ya resuelto deja registrar informacion.
+    """Si un estado ya resuelto esta AL DIA con el plan que eligio.
 
     `cancelada` con fecha por delante sigue dentro: cancelar promete conservar
-    el acceso hasta el fin del periodo pagado. Lo desconocido pasa.
+    el acceso hasta el fin del periodo pagado. Lo desconocido pasa. Lo que no
+    esta al dia no queda en solo consulta: pasa al plan Gratis (ver
+    `plan_efectivo`), que tiene sus propios limites.
     """
-    return efectivo not in ("prueba_vencida", "suspendida", "cancelada_vencida")
+    return efectivo not in CAEN_A_GRATIS
+
+
+#: Estados sin pago vigente: la empresa sigue, pero en el plan Gratis.
+CAEN_A_GRATIS = ("prueba_vencida", "suspendida", "cancelada_vencida")
+#: Vehiculos activos (no "fuera de servicio") que admite el plan Gratis.
+TOPE_GRATIS = 3
+#: El estado de vehiculo que no cuenta como activo.
+VEHICULO_INACTIVO = "fuera_servicio"
+
+
+def plan_efectivo(plan: str | None, efectivo: str) -> str:
+    """El plan que de verdad aplica hoy: el guardado, o 'gratis' si no hay pago vigente."""
+    if efectivo in CAEN_A_GRATIS:
+        return "gratis"
+    return (plan or "").strip().lower()
 
 
 # ─── Consultas ───────────────────────────────────────────
@@ -139,7 +173,32 @@ async def estado_de(company_id: str) -> dict | None:
     d = dict(fila)
     d["efectivo"] = estado_efectivo(d["subscription_status"], d["trial_ends_at"],
                                     d["subscription_ends_at"])
+    d["plan_efectivo"] = plan_efectivo(d["plan"], d["efectivo"])
     return d
+
+
+async def plan_de(company_id: str) -> dict | None:
+    """Plan vigente y vehiculos activos de una empresa. Para el aviso en pantalla
+    y para el bot de WhatsApp; el corte de server.py hace la misma cuenta en su
+    propia consulta."""
+    async with db_pg.tx_global("suscripcion: plan vigente de una empresa") as conn:
+        fila = await conn.fetchrow(
+            "select c.plan, c.subscription_status, c.trial_ends_at, c.subscription_ends_at, "
+            "       (select count(*) from vehicles v where v.company_id = c.id "
+            "          and v.status::text <> $2) as activos "
+            "  from companies c where c.id = $1",
+            db_pg.as_uuid(company_id), VEHICULO_INACTIVO)
+    if not fila:
+        return None
+    efectivo = estado_efectivo(fila["subscription_status"], fila["trial_ends_at"],
+                               fila["subscription_ends_at"])
+    plan = plan_efectivo(fila["plan"], efectivo)
+    gratis = plan == "gratis"
+    return {
+        "plan": fila["plan"], "plan_efectivo": plan, "efectivo": efectivo,
+        "gratis": gratis, "activos": int(fila["activos"]), "tope_gratis": TOPE_GRATIS,
+        "excedido": gratis and int(fila["activos"]) > TOPE_GRATIS,
+    }
 
 
 # ─── Lo que mueve el webhook ─────────────────────────────

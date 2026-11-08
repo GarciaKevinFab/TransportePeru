@@ -124,24 +124,38 @@ LIMITE_VEHICULOS = {"gratis": 3, "pro": 20}
 
 
 async def _exigir_cupo_de_vehiculos(current_user: dict):
-    """403 cuando la empresa ya llego al tope de su plan."""
+    """403 cuando la empresa ya llego al tope de su plan.
+
+    El plan es el VIGENTE (suscripciones.plan_efectivo): una prueba vencida o un
+    pago vencido tras la gracia cuentan como 'gratis'. En Gratis cuentan los
+    vehiculos activos (no "fuera de servicio"); en Pro, todos, como siempre.
+    """
     async with db_pg.tx(current_user) as conn:
         fila = await conn.fetchrow(
-            "select c.plan, count(v.id) as usados "
+            "select c.plan, c.subscription_status, c.trial_ends_at, c.subscription_ends_at, "
+            "       count(v.id) as usados, "
+            "       count(v.id) filter (where v.status::text <> $2) as activos "
             "  from companies c left join vehicles v on v.company_id = c.id "
-            " where c.id = $1 group by c.plan",
-            db_pg.as_uuid(current_user["company_id"]),
+            " where c.id = $1 "
+            " group by c.plan, c.subscription_status, c.trial_ends_at, c.subscription_ends_at",
+            db_pg.as_uuid(current_user["company_id"]), suscripciones.VEHICULO_INACTIVO,
         )
     if not fila:
         return
-    tope = LIMITE_VEHICULOS.get(fila["plan"])
-    if tope is not None and fila["usados"] >= tope:
-        raise HTTPException(
-            status_code=403,
-            detail=("El plan %s admite hasta %d vehiculos y ya tienes %d. "
-                    "Cambia de plan para agregar mas."
-                    % (fila["plan"], tope, fila["usados"])),
-        )
+    efectivo = suscripciones.estado_efectivo(
+        fila["subscription_status"], fila["trial_ends_at"], fila["subscription_ends_at"])
+    plan = suscripciones.plan_efectivo(fila["plan"], efectivo)
+    tope = LIMITE_VEHICULOS.get(plan)
+    usados = fila["activos"] if plan == "gratis" else fila["usados"]
+    if tope is not None and usados >= tope:
+        if plan == "gratis":
+            detalle = ("El plan Gratis admite hasta %d vehiculos activos y ya tienes %d. "
+                       "Activa el plan Pro desde Suscripcion para agregar mas, o marca "
+                       "como Fuera de servicio uno que no uses." % (tope, usados))
+        else:
+            detalle = ("El plan %s admite hasta %d vehiculos y ya tienes %d. "
+                       "Cambia de plan para agregar mas." % (plan, tope, usados))
+        raise HTTPException(status_code=403, detail=detalle)
 
 USER_COLS = {
     "id": "uuid", "company_id": "uuid", "email": "text", "dni": "text",
@@ -1151,14 +1165,56 @@ _METODOS_DE_LECTURA = {"GET", "HEAD", "OPTIONS"}
 # podria. Ver suscripcion_api.py.
 _RUTAS_SIN_CORTE = ("/api/suscripcion",)
 
+# Lo que el plan Gratis NO trae (ver la tabla de planes de la landing): emitir
+# para SUNAT, detracciones, el bot de WhatsApp y la lectura automatica de
+# facturas. Lo ya registrado se sigue pudiendo CONSULTAR; crear o cambiar, no.
+_SOLO_PRO_ESCRITURA = ("/api/guias", "/api/facturas", "/api/detracciones",
+                       "/api/config/sunat", "/api/fuel/ocr", "/api/whatsapp/")
+# Los reportes del plan Pro (incluido el costo por kilometro). Los de
+# documentos por vencer, viaticos y la liquidacion del viaje son del Gratis.
+_SOLO_PRO_LECTURA = ("/api/reports/trips", "/api/reports/fuel",
+                     "/api/reports/maintenance", "/api/reports/cost-per-km")
+# Con mas vehiculos activos que los del Gratis, lo unico que se puede escribir
+# es lo que libera cupo, la sesion y el pago.
+_RUTAS_SIN_CORTE_GRATIS = ("/api/auth/",)
+_RE_VEHICULO = re.compile(r"^/api/vehicles/[^/]+$")
+
+_DETALLE_SOLO_PRO = (
+    "Esto es del plan Pro. Tu empresa esta en el plan Gratis: lo que ya "
+    "registraste se puede consultar. Activa el plan Pro desde Suscripcion "
+    "para usarlo.")
+
+
+async def _libera_cupo(request: Request) -> bool:
+    """Si la peticion deja menos vehiculos activos: eliminar uno, o marcarlo
+    fuera de servicio (PUT /vehicles/{id} con status=fuera_servicio)."""
+    if not _RE_VEHICULO.match(request.url.path):
+        return False
+    if request.method == "DELETE":
+        return True
+    if request.method != "PUT":
+        return False
+    try:
+        cuerpo = await request.json()
+    except Exception:  # noqa: BLE001
+        return False
+    return isinstance(cuerpo, dict) and cuerpo.get("status") == suscripciones.VEHICULO_INACTIVO
+
 
 async def _exigir_suscripcion_al_dia(request: Request, user: dict):
-    """402 cuando la empresa dejo de estar al dia Y la peticion escribe.
+    """402 cuando lo que pide la peticion no entra en el plan vigente.
 
-    "Al dia" lo decide suscripciones.estado_efectivo, que es la unica
-    definicion: la prueba vencida corta como siempre; un plan pagado y vencido
-    tiene suscripciones.DIAS_GRACIA dias de gracia antes de cortar; una
-    cancelacion conserva el acceso hasta el fin del periodo pagado.
+    El plan vigente lo deciden suscripciones.estado_efectivo y plan_efectivo,
+    que son la unica definicion: un plan pagado y vencido tiene
+    suscripciones.DIAS_GRACIA dias de gracia; una cancelacion conserva el
+    acceso hasta el fin del periodo pagado; sin pago vigente (prueba vencida,
+    gracia agotada, cancelacion vencida) la empresa pasa al plan GRATIS. Nunca
+    queda en solo consulta por no pagar. En Gratis:
+
+      - lo del plan Pro (_SOLO_PRO_*) no se usa; lo ya registrado se consulta;
+      - con mas de suscripciones.TOPE_GRATIS vehiculos activos se lee todo, y
+        para escribir hay que dejar solo esos activos (marcar los demas fuera
+        de servicio o eliminarlos) o pagar. No se borra ni se oculta nada.
 
     FALLA ABIERTO a proposito. Solo corta ante un vencimiento comprobado; ante
     cualquier otra cosa -empresa que no aparece, columna sin valor- deja pasar.
@@ -1167,9 +1223,11 @@ async def _exigir_suscripcion_al_dia(request: Request, user: dict):
     """
     if user.get("role") == "superadmin":
         return  # gestiona las empresas: no puede quedar fuera por una de ellas
-    if request.method in _METODOS_DE_LECTURA:
+    ruta = request.url.path
+    lee = request.method in _METODOS_DE_LECTURA
+    if lee and not ruta.startswith(_SOLO_PRO_LECTURA):
         return
-    if request.url.path.startswith(_RUTAS_SIN_CORTE):
+    if ruta.startswith(_RUTAS_SIN_CORTE):
         return
     company_id = user.get("company_id")
     if not company_id:
@@ -1177,27 +1235,34 @@ async def _exigir_suscripcion_al_dia(request: Request, user: dict):
 
     async with db_pg.tx_global("comprobar la suscripcion de la empresa") as conn:
         fila = await conn.fetchrow(
-            "select subscription_status, trial_ends_at, subscription_ends_at "
-            "  from companies where id = $1",
-            db_pg.as_uuid(company_id),
+            "select c.plan, c.subscription_status, c.trial_ends_at, c.subscription_ends_at, "
+            "       (select count(*) from vehicles v where v.company_id = c.id "
+            "          and v.status::text <> $2) as activos "
+            "  from companies c where c.id = $1",
+            db_pg.as_uuid(company_id), suscripciones.VEHICULO_INACTIVO,
         )
     if not fila:
         return
 
     efectivo = suscripciones.estado_efectivo(
         fila["subscription_status"], fila["trial_ends_at"], fila["subscription_ends_at"])
-    if suscripciones.puede_escribir(efectivo):
+    if suscripciones.plan_efectivo(fila["plan"], efectivo) != "gratis":
         return
 
-    if efectivo == "prueba_vencida":
-        detalle = ("La prueba gratuita termino. Activa un plan para seguir "
-                   "registrando informacion; tus datos siguen disponibles "
-                   "para consulta.")
-    else:
-        detalle = ("Tu suscripcion no esta al dia. Renuevala desde Suscripcion "
-                   "para seguir registrando informacion; tus datos siguen "
-                   "disponibles para consulta.")
-    raise HTTPException(status_code=402, detail=detalle)
+    if ruta.startswith(_SOLO_PRO_LECTURA) or (not lee and ruta.startswith(_SOLO_PRO_ESCRITURA)):
+        raise HTTPException(status_code=402, detail=_DETALLE_SOLO_PRO)
+    if lee:
+        return
+
+    activos = fila["activos"]
+    tope = suscripciones.TOPE_GRATIS
+    if activos > tope and not ruta.startswith(_RUTAS_SIN_CORTE_GRATIS) \
+            and not await _libera_cupo(request):
+        raise HTTPException(status_code=402, detail=(
+            "Tu empresa esta en el plan Gratis, que admite hasta %d vehiculos "
+            "activos, y tienes %d. Puedes consultar todo. Para registrar algo "
+            "nuevo, marca como Fuera de servicio los que no uses hasta dejar %d "
+            "activos, o activa el plan Pro desde Suscripcion." % (tope, activos, tope)))
 
 def _slug_pedido(valor: str) -> str:
     """Valida un slug elegido a mano y traduce el motivo a un 400 legible.

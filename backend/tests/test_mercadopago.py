@@ -279,3 +279,27 @@ def test_el_desglose_del_comprobante_es_el_del_checkout(total):
 ])
 def test_serie_y_numero(serie, numero, ok):
     assert (comprobantes.numero_valido(serie, numero) is not None) is ok
+
+
+# ─── Plan Gratis: lo que queda sin pago vigente ──────────
+
+@pytest.mark.parametrize("plan,efectivo,esperado", [
+    ("trial", "trial", "trial"),
+    ("trial", "prueba_vencida", "gratis"),
+    ("pro", "activa", "pro"),
+    ("pro", "vencida", "pro"),            # 7 dias de gracia con el plan entero
+    ("pro", "suspendida", "gratis"),
+    ("pro", "cancelada", "pro"),          # hasta el fin de lo pagado
+    ("pro", "cancelada_vencida", "gratis"),
+    ("PRO ", "activa", "pro"),
+    (None, "activa", ""),
+])
+def test_plan_efectivo(plan, efectivo, esperado):
+    assert suscripciones.plan_efectivo(plan, efectivo) == esperado
+    assert suscripciones.puede_escribir(efectivo) is (esperado != "gratis")
+
+
+def test_el_tope_gratis_y_lo_que_no_cuenta_como_activo():
+    assert suscripciones.TOPE_GRATIS == 3
+    assert suscripciones.VEHICULO_INACTIVO == "fuera_servicio"
+    assert set(suscripciones.CAEN_A_GRATIS) == {"prueba_vencida", "suspendida", "cancelada_vencida"}

@@ -17,8 +17,10 @@ import { PROVEEDOR } from '../config/proveedor';
  *     SUNAT (sunat_padron.py).
  *   - Cancelar: POST /api/suscripcion/cancelar desde /suscripcion; se conserva
  *     el acceso hasta el fin del periodo pagado (suscripciones.py).
- *   - Prueba vencida sin pago: `prueba_vencida` corta la ESCRITURA y deja leer
- *     (_exigir_suscripcion_al_dia en server.py). NO pasa sola al plan Gratis.
+ *   - Pago: Checkout Pro (Yape, PagoEfectivo o tarjeta) o la suscripcion con
+ *     tarjeta (suscripcion_api.py, mercadopago.py).
+ *   - Prueba vencida sin pago: pasa al plan Gratis (suscripciones.plan_efectivo)
+ *     con hasta 3 vehiculos activos; nada se borra (_exigir_suscripcion_al_dia).
  */
 
 const PASOS = [
@@ -28,7 +30,7 @@ const PASOS = [
   },
   {
     titulo: 'Al terminar eliges tu plan y pagas en línea',
-    texto: 'Desde tu cuenta, con el resumen del pedido y el total con IGV a la vista.',
+    texto: 'Paga con Yape, desde tu banca móvil o con tarjeta, desde tu cuenta y con el total con IGV a la vista.',
   },
   {
     titulo: 'Boleta o factura electrónica a tu RUC',
@@ -39,8 +41,8 @@ const PASOS = [
     texto: 'Se detiene el cobro automático y mantienes el acceso hasta el fin del mes ya pagado.',
   },
   {
-    titulo: 'Si no eliges plan, tus datos se quedan',
-    texto: 'La cuenta pasa a solo consulta: ves todo lo que cargaste, y para seguir registrando activas un plan.',
+    titulo: 'Si no eliges plan, sigues en el plan Gratis',
+    texto: 'Sin cobro: sigues trabajando con hasta 3 vehículos activos y no se borra nada de lo que cargaste.',
   },
 ];
 

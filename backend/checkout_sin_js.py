@@ -39,6 +39,12 @@ COMO COBRA, Y CUANDO NO
   redirect simple, que funciona sin JavaScript. La tarjeta se teclea alli, no
   aqui.
 
+  Tambien ofrece el PAGO ADELANTADO (1, 3, 6 o 12 meses con Yape, banca movil
+  o tarjeta): un desplegable elige entre esos periodos y la suscripcion
+  mensual con tarjeta. El adelantado no se calcula aqui: lo abre
+  suscripcion_api.abrir_pago_adelantado, la misma funcion que usa la API de
+  React (mismo total de planes.py, mismo bloqueo si ya hay cobro automatico).
+
   En modo `simulado` (o en `prueba` para un correo que no es de prueba) la
   pagina hace lo de siempre: registra el pedido y lo dice claro, sin cobrar.
 
@@ -166,6 +172,43 @@ def _pie_proveedor() -> str:
   </p>"""
 
 
+COMO_SE_PAGA = "Paga con Yape, desde tu banca móvil (BCP, BBVA y otros) o con tarjeta"
+_SELECT = ("display:block;width:100%;margin-top:6px;padding:11px 12px;"
+           "border:1px solid #cbd5e1;border-radius:7px;font:inherit")
+
+
+def _meses(m: int) -> str:
+    return f"{m} {'mes' if m == 1 else 'meses'}"
+
+
+def _soles(n: float) -> str:
+    return f"S/ {n:.2f}"
+
+
+def _elegir_pago(plan: str, elegido: str) -> str:
+    """El desplegable de forma de pago: los periodos adelantados y la tarjeta."""
+    opciones = []
+    for o in planes.opciones_adelantado(plan):
+        valor = f"adelantado-{o['meses']}"
+        sin_yape = "" if o["yape"] else " (sin Yape: pasa su tope)"
+        opciones.append(
+            f'<option value="{valor}"{" selected" if elegido == valor else ""}>'
+            f'{_meses(o["meses"])} por adelantado · {_soles(o["total"])}{sin_yape}</option>')
+    mensual = planes.PRECIOS_CHECKOUT[plan][1]
+    opciones.append(
+        f'<option value="mensual"{" selected" if elegido == "mensual" else ""}>'
+        f'Mensual con tarjeta · {_soles(mensual)} al mes, se cobra solo</option>')
+    tope = _soles(planes.TOPE_YAPE)
+    return f"""
+    <h2 style="margin-top:22px">Cómo pagas</h2>
+    <p class="nota" style="margin:0 0 12px"><strong>{_e(COMO_SE_PAGA)}.</strong> Por
+       adelantado pagas una sola vez y no se cobra solo: te avisamos por correo 7 días y
+       1 día antes de que venza. Yape acepta hasta {tope} por pago, así que los 12 meses
+       se pagan desde la banca móvil o con tarjeta.</p>
+    <label>Periodo
+      <select name="pago" style="{_SELECT}">{''.join(opciones)}</select></label>"""
+
+
 def _formulario(plan: str, descripcion: str, importe: dict,
                 error: str = "", valores: dict | None = None) -> str:
     v = valores or {}
@@ -174,10 +217,12 @@ def _formulario(plan: str, descripcion: str, importe: dict,
     elegido = (v.get("comprobante") or "boleta")
     if con_mp:
         pasarela = "pago con Mercado Pago"
-        nota_precio = ("Precio en soles, con IGV incluido. Es una suscripción "
-                       "mensual: Mercado Pago la cobra cada mes y la cancelas "
-                       "cuando quieras desde tu cuenta.")
+        nota_precio = ("Precio en soles, con IGV incluido. Pagas 1, 3, 6 o 12 meses "
+                       "por adelantado (sin recargo), o la suscripción mensual con "
+                       "tarjeta, que Mercado Pago cobra cada mes y cancelas cuando "
+                       "quieras desde tu cuenta.")
         cuenta = f"""
+    {_elegir_pago(plan, v.get("pago") or "adelantado-1")}
     <h2 style="margin-top:22px">Tu cuenta CargoXprez</h2>
     <p class="nota" style="margin:0 0 12px">La suscripción es de tu empresa: entra con el
        correo y la contraseña de tu cuenta. ¿Aún no tienes? <a href="/registro">Créala
@@ -192,8 +237,8 @@ def _formulario(plan: str, descripcion: str, importe: dict,
       </select></label>
     <label>DNI o RUC (factura: RUC obligatorio)
       <input type="text" name="documento" inputmode="numeric" value="{_e(v.get('documento'))}"></label>"""
-        pie_boton = ("Te llevamos al sitio de <strong>Mercado Pago</strong> para dejar "
-                     f"tu tarjeta. {_e(proveedor.PRODUCTO)} nunca ve ni guarda sus datos.")
+        pie_boton = ("Te llevamos al sitio de <strong>Mercado Pago</strong> para pagar. "
+                     f"{_e(proveedor.PRODUCTO)} nunca ve ni guarda tus datos de pago.")
     else:
         pasarela = "pedido en línea"
         nota_precio = ("Precio en soles, con IGV incluido. El pago en línea todavía "
@@ -232,7 +277,7 @@ def _formulario(plan: str, descripcion: str, importe: dict,
     <label>Correo *
       <input type="email" name="email" required value="{_e(v.get('email'))}"></label>
     {cuenta}
-    <button type="submit">Continuar al pago · S/ {importe['total']:.2f}</button>
+    <button type="submit">Continuar al pago{'' if con_mp else f" · S/ {importe['total']:.2f}"}</button>
     <p class="nota">{pie_boton}</p>
   </form>
   {_pie_proveedor()}
@@ -308,6 +353,7 @@ async def comprar_enviar(
     password: str = Form(""),
     comprobante: str = Form("boleta"),
     documento: str = Form(""),
+    pago: str = Form("mensual"),
 ):
     """Registra el pedido de verdad, con las mismas reglas que la API.
 
@@ -321,8 +367,9 @@ async def comprar_enviar(
     correo = (email or "").strip().lower()
     doc = (ruc or "").strip()
     tel = (telefono or "").strip()
+    pago = (pago or "mensual").strip().lower()
     valores = {"razon_social": razon, "ruc": doc, "telefono": tel, "email": correo,
-               "comprobante": comprobante, "documento": documento}
+               "comprobante": comprobante, "documento": documento, "pago": pago}
 
     def con_error(msg: str, plan_valido: str = "pro"):
         descripcion, monto = planes.PRECIOS_CHECKOUT[plan_valido]
@@ -361,9 +408,20 @@ async def comprar_enviar(
             return con_error("El pago automático todavía no está disponible.", plan)
         import suscripciones
         import suscripcion_api
+
+        if pago.startswith("adelantado-"):
+            # La misma funcion que la API de React: total del catalogo y bloqueo
+            # si ya hay cobro automatico con tarjeta.
+            try:
+                abierto = await suscripcion_api.abrir_pago_adelantado(
+                    usuario, plan, pago.split("-", 1)[1], comprobante, documento, razon,
+                    request.headers.get("host"))
+            except suscripcion_api.NoSePuedePagar as e:
+                return con_error(e.detalle, plan)
+            return RedirectResponse(abierto["init_point"], status_code=303)
         estado = await suscripciones.estado_de(usuario["company_id"])
         if estado and estado["mp_preapproval_id"]:
-            return con_error("Tu empresa ya tiene un cobro automático activo.", plan)
+            return con_error("Tu empresa ya tiene un cobro automático con tarjeta activo.", plan)
         try:
             await comprobantes.guardar_datos(usuario, facturacion, razon)
         except Exception:  # noqa: BLE001
