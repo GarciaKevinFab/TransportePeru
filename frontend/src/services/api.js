@@ -166,6 +166,7 @@ export const authApi = {
   // se puede entrar.
   olvide: (email) => api.post('/auth/olvide', { email }),
   restablecer: (token, password) => api.post('/auth/restablecer', { token, password }),
+  salir: () => api.post('/auth/salir'),
   cambiarPassword: (passwordActual, passwordNueva) =>
     api.post('/auth/cambiar-password', {
       password_actual: passwordActual,

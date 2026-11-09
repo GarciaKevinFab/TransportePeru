@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useQuitarPrerender } from '../lib/prerender';
 import IconoCamion from '../components/IconoCamion';
 import { Link, useNavigate } from 'react-router-dom';
 import PanelMarca from '../components/PanelMarca';
@@ -38,6 +39,7 @@ const Campo = ({ etiqueta, campo, valor, onChange, tipo = 'text', placeholder, .
 );
 
 const SignupPage = () => {
+  useQuitarPrerender();
   const { signup } = useAuth();
   const navigate = useNavigate();
 

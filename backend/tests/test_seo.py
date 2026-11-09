@@ -191,3 +191,68 @@ def test_no_queda_ningun_enlace_de_whatsapp_de_ventas():
                     if patron.search(_leer(base, nombre)):
                         culpables.append(os.path.join(base, nombre))
     assert not culpables, culpables
+
+
+# ─── Pagina servida con su texto (auditoria del 2026-11-09) ──────────────
+
+def _fuente_de_la_landing():
+    texto = (_leer(SRC, "pages", "LandingPage.jsx")
+             + _leer(SRC, "components", "landing", "Comparativa.jsx"))
+    return re.sub(r"\s+", " ", texto)
+
+
+def _textos_del_prerender():
+    textos = [seo_rutas.ETIQUETA, *seo_rutas.TITULAR, seo_rutas.PROPUESTA,
+              *seo_rutas.COMO_FUNCIONA, seo_rutas.TITULO_MODULOS,
+              seo_rutas.TITULO_DIFERENCIAS, *seo_rutas.TITULO_PLANES,
+              seo_rutas.TITULO_PREGUNTAS]
+    for grupo in (seo_rutas.PASOS, seo_rutas.MODULOS, seo_rutas.DIFERENCIAS):
+        for titulo, cuerpo in grupo:
+            textos += [titulo, cuerpo]
+    for nombre, para, incluye in seo_rutas.PLANES:
+        textos += [nombre, para, *incluye]
+    textos += [fila[0] for fila in seo_rutas.COMPARATIVA]
+    return textos
+
+
+@pytest.mark.parametrize("texto", _textos_del_prerender())
+def test_el_texto_del_servidor_es_el_de_la_landing_de_react(texto):
+    """Si alguien cambia la landing, el HTML del servidor no puede quedarse
+    diciendo otra cosa: seria contenido distinto para buscadores y personas."""
+    assert re.sub(r"\s+", " ", texto) in _fuente_de_la_landing(), texto
+
+
+def test_la_whitelist_de_rutas_es_la_de_app_js():
+    rutas = set(re.findall(r'path="([^"]+)"', _leer(SRC, "App.js"))) - {"*"}
+    assert rutas == set(seo_rutas.RUTAS_SPA)
+
+
+@pytest.mark.parametrize("ruta,es", [
+    ("/", True), ("/dashboard/", True), ("/vehicles/123/tires", True),
+    ("/comprar?plan=pro", True), ("/panel", False), ("/vehicles/1/2/tires", False),
+    ("/llms-full.txt", False), ("/.env", False),
+])
+def test_es_ruta_spa(ruta, es):
+    assert seo_rutas.es_ruta_spa(ruta) is es
+
+
+def test_security_txt_no_esta_por_vencer():
+    from datetime import datetime, timedelta, timezone
+    assert seo_rutas.SECURITY_TXT_EXPIRA - datetime.now(timezone.utc) > timedelta(days=30), (
+        "security.txt vence en menos de un mes: revisar el contacto y mover la fecha")
+    assert "Contact: mailto:soporte@sisac.pe" in seo_rutas.security_txt()
+
+
+def test_las_cifras_de_la_portada_salen_del_catalogo(index_html):
+    pagina = seo_rutas.con_contenido(index_html, "/")
+    _, monto = planes.PRECIOS_CHECKOUT["pro"]
+    assert seo_rutas._soles(monto) in pagina
+    assert f"Hasta {planes.LIMITE_VEHICULOS['gratis']} vehículos" in pagina
+    for pregunta, respuesta in seo_rutas.preguntas_frecuentes(index_html):
+        assert pregunta in pagina and respuesta in pagina
+
+
+def test_la_pagina_404_no_es_la_portada(index_html):
+    pagina = seo_rutas.no_encontrada(index_html, "/panel")
+    assert "noindex" in pagina
+    assert seo_rutas.PROPUESTA not in pagina

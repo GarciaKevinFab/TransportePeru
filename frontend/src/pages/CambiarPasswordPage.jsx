@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { authApi } from '../services/api';
+import { authApi, setAuthToken } from '../services/api';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -38,7 +38,14 @@ const CambiarPasswordPage = () => {
     setError(null);
     setGuardando(true);
     try {
-      await authApi.cambiarPassword(actual, nueva);
+      const r = await authApi.cambiarPassword(actual, nueva);
+      // Cambiar la clave cierra todas las sesiones (sube la version del
+      // token en el servidor); esta sigue con los tokens nuevos que devuelve.
+      if (r.data?.access_token) {
+        localStorage.setItem('access_token', r.data.access_token);
+        localStorage.setItem('refresh_token', r.data.refresh_token);
+        setAuthToken(r.data.access_token);
+      }
       // Se relee el usuario para que force_password_change baje a false y esta
       // pantalla se quite sola. Sin esto habria que recargar a mano.
       await refrescarUsuario();

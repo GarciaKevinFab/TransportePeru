@@ -132,6 +132,10 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const logout = useCallback(() => {
+    // La cookie con la que se ven las fotos y los PDF de /uploads es HttpOnly:
+    // solo la borra el servidor. Si falla (sin red), caduca sola en 12 h y
+    // ademas deja de valer en cuanto se cambia la contrasena.
+    authApi.salir().catch(() => {});
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     clearAuthToken();

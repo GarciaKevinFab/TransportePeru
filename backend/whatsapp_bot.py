@@ -197,7 +197,10 @@ async def verify_whatsapp_webhook(
 ):
     """Handshake de verificación de Meta. Debe responder el challenge en texto plano."""
     expected_token = srv.os.environ.get("WHATSAPP_VERIFY_TOKEN", "")
-    if hub_mode == "subscribe" and expected_token and hub_verify_token == expected_token:
+    # compare_digest y no ==: la comparacion normal corta en el primer
+    # caracter distinto, y el tiempo de respuesta delata cuantos acerto.
+    if (hub_mode == "subscribe" and expected_token
+            and hmac.compare_digest((hub_verify_token or "").encode(), expected_token.encode())):
         return PlainTextResponse(content=hub_challenge or "")
     raise HTTPException(status_code=403, detail="Verificación fallida")
 
@@ -366,7 +369,8 @@ async def _ingest_document(company_id: str, driver_id: str, trip_id: str, wa_id:
     pendiente_id = str(uuid.uuid4())
     ext = "pdf" if media["mime_type"] == "application/pdf" else "jpg"
     upload = await srv.save_uploaded_content(
-        media["bytes"], "whatsapp_pendiente", pendiente_id, media["mime_type"], ext
+        media["bytes"], "whatsapp_pendiente", pendiente_id, media["mime_type"], ext,
+        company_id=company_id,
     )
 
     async with db_pg.tx({"company_id": company_id}) as conn:

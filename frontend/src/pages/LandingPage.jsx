@@ -7,6 +7,7 @@ import { ComparativaPlanes, Preguntas } from '../components/landing/Comparativa'
 import Testimonio from '../components/landing/Testimonio';
 import { Revelado, Cifra, CapturaTilt } from '../components/landing/animaciones';
 import { ComoSeContrata } from '../components/ComoSeContrata';
+import { useQuitarPrerender } from '../lib/prerender';
 import {
   Route as RouteIcon, Fuel, Wrench, CircleDot, FileText,
   ShieldCheck, Smartphone, MessageCircle, ScanLine, Building2,
@@ -221,7 +222,7 @@ const Cabecera = () => {
             to="/registro"
             className="cta inline-flex min-h-11 items-center gap-2 rounded-full bg-marca-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-marca-400 sm:px-5"
           >
-            Empezar <ArrowRight className="hidden h-4 w-4 sm:block" />
+            Empezar gratis <ArrowRight className="hidden h-4 w-4 sm:block" aria-hidden="true" />
           </Link>
           <button
             type="button"
@@ -261,7 +262,11 @@ const Cabecera = () => {
   );
 };
 
-const LandingPage = () => (
+const LandingPage = () => {
+  // El texto que puso el servidor (seo_rutas.py) se quita cuando esta pagina
+  // ya esta pintada: asi no hay un instante en blanco entre uno y otra.
+  useQuitarPrerender();
+  return (
   <div className="min-h-screen bg-grafito-950 text-grafito-100 antialiased">
     <Cabecera />
 
@@ -671,6 +676,7 @@ const LandingPage = () => (
       </div>
     </footer>
   </div>
-);
+  );
+};
 
 export default LandingPage;

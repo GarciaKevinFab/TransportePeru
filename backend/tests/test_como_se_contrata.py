@@ -12,6 +12,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import planes  # noqa: E402
 import suscripciones  # noqa: E402
 
 BACKEND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -30,10 +31,10 @@ def test_prueba_vencida_pasa_al_plan_gratis_con_3_vehiculos():
     assert suscripciones.plan_efectivo("pro", "suspendida") == "gratis"
     assert suscripciones.plan_efectivo("trial", "trial") == "trial"
     assert suscripciones.plan_efectivo("pro", "vencida") == "pro"  # en gracia
-    fuente = _leer(os.path.join(BACKEND, "server.py"))
-    mapa = re.search(r"LIMITE_VEHICULOS = (\{[^}]*\})", fuente).group(1)
-    assert '"gratis": %d' % suscripciones.TOPE_GRATIS in mapa
-    assert suscripciones.TOPE_GRATIS == 3
+    # El tope vive en planes.py (lo leen el corte por plan y la portada que
+    # arma el servidor) y suscripciones.py lo toma de ahi.
+    assert planes.LIMITE_VEHICULOS["gratis"] == suscripciones.TOPE_GRATIS == 3
+    assert "from planes import DIAS_DE_PRUEBA, LIMITE_VEHICULOS" in _leer(os.path.join(BACKEND, "server.py"))
     texto = _leer(BLOQUE)
     assert "plan Gratis" in texto and "hasta 3 vehículos activos" in texto
     assert "solo consulta" not in texto
@@ -41,9 +42,7 @@ def test_prueba_vencida_pasa_al_plan_gratis_con_3_vehiculos():
 
 def test_la_prueba_no_tiene_limite_de_vehiculos():
     """'cargas tu flota completa, sin limite de vehiculos durante la prueba'."""
-    fuente = _leer(os.path.join(BACKEND, "server.py"))
-    mapa = re.search(r"LIMITE_VEHICULOS = (\{[^}]*\})", fuente).group(1)
-    assert "trial" not in mapa
+    assert "trial" not in planes.LIMITE_VEHICULOS
 
 
 def test_se_cancela_desde_la_cuenta():

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useQuitarPrerender } from '../lib/prerender';
 import { useAuth } from '../context/AuthContext';
 import { useTenant } from '../context/TenantContext';
 import PanelMarca from '../components/PanelMarca';
@@ -15,6 +16,7 @@ import { toast } from 'sonner';
 // con X-Install-Token, no desde la UI de login (evita exponer credenciales).
 
 const LoginPage = () => {
+  useQuitarPrerender();
   const { login, error } = useAuth();
   // En <empresa>.sisac.pe, la pantalla de acceso lleva el nombre de esa
   // empresa; en el host de la marca y en local, el del producto. Estaba

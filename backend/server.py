@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Query, Body, Request, Header
+from fastapi import FastAPI, APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Query, Body, Request, Header, Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -107,20 +107,10 @@ COMPANY_COLS = {
 # desde la interfaz y dejaria de identificarla.
 RUC_DE_LA_PLATAFORMA = "00000000000"
 
-# Dias de prueba de un alta nueva. La landing lo anuncia, asi que si cambia
-# aqui tiene que cambiar alli: es la misma promesa.
-DIAS_DE_PRUEBA = 14
-
-# Vehiculos que admite cada plan. La landing publica estas cifras, asi que
-# tienen que cumplirse: un limite anunciado y no aplicado es una cifra
-# decorativa, y el cliente lo descubre el dia que quiere pagar mas.
-#
-# Lo que NO esta en el mapa no tiene limite, y es intencionado: 'trial' -para
-# que se pueda probar con la flota entera, que es de lo que depende la venta- y
-# 'activa', que es como quedaron las empresas que ya operaban antes de que
-# existieran los planes. Ante un plan desconocido se deja pasar, por lo mismo
-# que el corte por suscripcion falla abierto.
-LIMITE_VEHICULOS = {"gratis": 3, "pro": 20}
+# Los dias de prueba y el tope de vehiculos de cada plan viven en planes.py:
+# los lee tambien la portada que arma el servidor (seo_rutas.py), y una cifra
+# publicada tiene que salir del mismo sitio que la que se aplica.
+from planes import DIAS_DE_PRUEBA, LIMITE_VEHICULOS  # noqa: E402
 
 
 async def _exigir_cupo_de_vehiculos(current_user: dict):
@@ -184,7 +174,20 @@ UPLOAD_DIR = ROOT_DIR / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 
 # Create the main app
-app = FastAPI(title="TransportePeru SaaS API", version="1.0.0")
+#
+# /docs, /redoc y /openapi.json quedan APAGADOS salvo que se pidan con
+# HABILITAR_DOCS=1 (desarrollo). En produccion eran un mapa publico de los 200
+# endpoints, con sus parametros y sus modelos, para quien quisiera buscar uno
+# mal protegido. El arranque del CI y del despliegue ya no los usa para saber
+# si el backend esta vivo: para eso esta /api/salud.
+HABILITAR_DOCS = os.environ.get("HABILITAR_DOCS", "").strip().lower() in ("1", "true", "yes")
+app = FastAPI(
+    title="TransportePeru SaaS API",
+    version="1.0.0",
+    docs_url="/docs" if HABILITAR_DOCS else None,
+    redoc_url="/redoc" if HABILITAR_DOCS else None,
+    openapi_url="/openapi.json" if HABILITAR_DOCS else None,
+)
 
 # Register rate limiter (no-op si slowapi no está instalado)
 if SLOWAPI_AVAILABLE:
@@ -1014,15 +1017,60 @@ def verify_password(password: str, hashed: str) -> bool:
 
 def create_access_token(data: dict) -> str:
     to_encode = data.copy()
+    to_encode.setdefault("tv", 0)
     expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire, "type": "access"})
     return jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 def create_refresh_token(data: dict) -> str:
     to_encode = data.copy()
+    to_encode.setdefault("tv", 0)
     expire = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
     to_encode.update({"exp": expire, "type": "refresh"})
     return jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+def _exigir_version_de_token(payload: dict, user: dict):
+    """401 si el token es de antes del ultimo cambio de contrasena.
+
+    users.token_version sube cada vez que se cambia o se restablece la clave
+    (migracion 023), y cada token lleva la version con la que se emitio (`tv`).
+    Sin esto, un refresh token robado seguia renovando sesiones los siete dias
+    de su vida aunque el dueno hubiera cambiado la contrasena justamente para
+    echar al intruso. Los tokens emitidos antes de este cambio no traen `tv` y
+    cuentan como version 0, que es la de todo usuario que nunca cambio la clave.
+    """
+    try:
+        del_token = int(payload.get("tv") or 0)
+    except (TypeError, ValueError):
+        del_token = -1
+    if del_token != int(user.get("token_version") or 0):
+        raise HTTPException(
+            status_code=401,
+            detail="La sesion se cerro porque cambio la contraseña. Vuelve a entrar.",
+        )
+
+# La cookie con la que el navegador pide /uploads (ver descargar_archivo).
+# HttpOnly: el JavaScript de la pagina no la lee, asi que un XSS no se la
+# lleva. Path=/uploads: no viaja con ninguna otra peticion, tampoco a la API.
+COOKIE_ARCHIVOS = "cx_archivos"
+VIDA_COOKIE_ARCHIVOS = timedelta(hours=12)
+
+
+def poner_cookie_de_archivos(response: Response, token_data: dict):
+    datos = {k: token_data[k] for k in ("user_id", "company_id", "role", "tv") if k in token_data}
+    datos.update({"type": "archivos",
+                  "exp": datetime.now(timezone.utc) + VIDA_COOKIE_ARCHIVOS})
+    response.set_cookie(
+        COOKIE_ARCHIVOS,
+        jwt.encode(datos, JWT_SECRET, algorithm=JWT_ALGORITHM),
+        max_age=int(VIDA_COOKIE_ARCHIVOS.total_seconds()),
+        path="/uploads",
+        httponly=True,
+        secure=os.environ.get("ENV", "development").lower() == "production",
+        samesite="lax",
+    )
+
 
 def decode_token(token: str) -> dict:
     try:
@@ -1056,6 +1104,7 @@ async def get_current_user(
     user = db_pg.to_api(fila)
     if not user.get("is_active"):
         raise HTTPException(status_code=401, detail="Usuario desactivado")
+    _exigir_version_de_token(payload, user)
     await _aplicar_empresa_del_token(payload, user)
     await _exigir_host_de_la_empresa(request, user)
     await _exigir_suscripcion_al_dia(request, user)
@@ -2366,7 +2415,7 @@ def _sql_tipos_documento_estandar(company_id: str):
 
 @api_router.post("/auth/signup", response_model=TokenResponse)
 @limiter.limit("5/hour")
-async def signup(request: Request, datos: SignupRequest):
+async def signup(request: Request, datos: SignupRequest, response: Response):
     """Alta de una transportista con prueba gratuita. Publico y sin token.
 
     Crea la empresa, su usuario dueno y sus tipos de documento en UNA
@@ -2428,10 +2477,14 @@ async def signup(request: Request, datos: SignupRequest):
         # `where email = $1` sin empresa y se queda con la primera fila: dos
         # usuarios con el mismo correo en empresas distintas dejarian a uno de
         # los dos sin poder entrar nunca.
+        #
+        # 400 y no 409: para quien llena el formulario es un dato que no se
+        # puede usar, igual que un RUC con nueve digitos, y el frontend lo
+        # muestra con el mismo aviso.
         if await conn.fetchval("select 1 from users where lower(email) = $1", email):
-            raise HTTPException(status_code=409, detail="Ese correo ya tiene una cuenta")
+            raise HTTPException(status_code=400, detail="Ese correo ya tiene una cuenta")
         if await conn.fetchval("select 1 from companies where ruc = $1", ruc):
-            raise HTTPException(status_code=409, detail="Ese RUC ya esta registrado")
+            raise HTTPException(status_code=400, detail="Ese RUC ya esta registrado")
         await conn.execute(sql_empresa, *val_empresa)
         await conn.execute(sql_owner, *val_owner)
         # Los tipos de documento, en esta misma transaccion. Antes solo los
@@ -2448,7 +2501,8 @@ async def signup(request: Request, datos: SignupRequest):
     # encontraria un 404 en la puerta de su propia empresa.
     tenant_host.invalidar_cache(fila_empresa["slug"])
 
-    payload = {"user_id": owner.id, "company_id": company.id, "role": UserRole.OWNER.value}
+    payload = {"user_id": owner.id, "company_id": company.id, "role": UserRole.OWNER.value, "tv": 0}
+    poner_cookie_de_archivos(response, payload)
     return TokenResponse(
         access_token=create_access_token(payload),
         refresh_token=create_refresh_token(payload),
@@ -2467,7 +2521,7 @@ async def signup(request: Request, datos: SignupRequest):
 
 @api_router.post("/auth/login", response_model=TokenResponse)
 @limiter.limit("10/minute")
-async def login(request: Request, login_data: LoginRequest):
+async def login(request: Request, login_data: LoginRequest, response: Response):
     user = None
 
     # HOY ESTO SIEMPRE ES None: no hay subdominio por empresa, todo el mundo
@@ -2600,12 +2654,14 @@ async def login(request: Request, login_data: LoginRequest):
     token_data = {
         "user_id": user["id"],
         "company_id": user["company_id"],
-        "role": user["role"]
+        "role": user["role"],
+        "tv": int(user.get("token_version") or 0),
     }
-    
+
     access_token = create_access_token(token_data)
     refresh_token = create_refresh_token(token_data)
-    
+    poner_cookie_de_archivos(response, token_data)
+
     # Return user info (without sensitive data)
     user_response = {
         "id": user["id"],
@@ -2753,9 +2809,12 @@ async def restablecer_password(request: Request, datos: RestablecerRequest):
             )
         # force_password_change se apaga: la contrasena la acaba de elegir su
         # dueno, obligarle a cambiarla otra vez seria absurdo.
+        # token_version + 1: las sesiones abiertas con la clave vieja (incluida
+        # la de quien la hubiera robado) dejan de valer.
         await conn.execute(
             "update users set password_hash = $1, force_password_change = false, "
-            "failed_attempts = 0, locked_until = null, updated_at = now() where id = $2",
+            "failed_attempts = 0, locked_until = null, token_version = token_version + 1, "
+            "updated_at = now() where id = $2",
             hash_password(nueva), fila["user_id"],
         )
     return {"message": "Contraseña actualizada. Ya puedes entrar."}
@@ -2764,6 +2823,7 @@ async def restablecer_password(request: Request, datos: RestablecerRequest):
 @api_router.post("/auth/cambiar-password")
 async def cambiar_mi_password(
     datos: CambiarPasswordRequest,
+    response: Response,
     current_user: dict = Depends(get_current_user),
 ):
     """Cambio de contrasena por el propio usuario, con la actual por delante.
@@ -2787,17 +2847,33 @@ async def cambiar_mi_password(
         raise HTTPException(status_code=400, detail="La nueva tiene que ser distinta de la actual")
 
     async with db_pg.tx(current_user) as conn:
-        await conn.execute(
+        version = await conn.fetchval(
             "update users set password_hash = $1, force_password_change = false, "
-            "updated_at = now() where id = $2 and company_id = $3",
+            "token_version = token_version + 1, updated_at = now() "
+            "where id = $2 and company_id = $3 returning token_version",
             hash_password(nueva), db_pg.as_uuid(current_user["id"]),
             db_pg.as_uuid(current_user["company_id"]),
         )
-    return {"message": "Contraseña actualizada"}
+    # Al subir la version caen TODAS las sesiones, tambien esta. Se le dan
+    # tokens nuevos a quien acaba de cambiarla para que no lo eche del sistema
+    # justo despues de hacer lo correcto; las demas sesiones (otro equipo, un
+    # token robado) quedan fuera.
+    token_data = {
+        "user_id": current_user["id"],
+        "company_id": current_user["company_id"],
+        "role": current_user["role"],
+        "tv": int(version or 0),
+    }
+    poner_cookie_de_archivos(response, token_data)
+    return {
+        "message": "Contraseña actualizada",
+        "access_token": create_access_token(token_data),
+        "refresh_token": create_refresh_token(token_data),
+    }
 
 
 @api_router.post("/auth/refresh", response_model=TokenResponse)
-async def refresh_token(request: RefreshRequest):
+async def refresh_token(request: RefreshRequest, response: Response):
     payload = decode_token(request.refresh_token)
     if payload.get("type") != "refresh":
         raise HTTPException(status_code=401, detail="Token inválido")
@@ -2809,6 +2885,7 @@ async def refresh_token(request: RefreshRequest):
     user = db_pg.to_api(fila)
     if not user or not user.get("is_active"):
         raise HTTPException(status_code=401, detail="Usuario no válido")
+    _exigir_version_de_token(payload, user)
 
     # Sin esto, el switch del superadmin se evaporaba a los 15 minutos: el
     # access token caduca, el frontend renueva en silencio, y token_data se
@@ -2820,12 +2897,14 @@ async def refresh_token(request: RefreshRequest):
     token_data = {
         "user_id": user["id"],
         "company_id": user["company_id"],
-        "role": user["role"]
+        "role": user["role"],
+        "tv": int(user.get("token_version") or 0),
     }
-    
+
     new_access_token = create_access_token(token_data)
     new_refresh_token = create_refresh_token(token_data)
-    
+    poner_cookie_de_archivos(response, token_data)
+
     user_response = {
         "id": user["id"],
         "company_id": user["company_id"],
@@ -2841,8 +2920,25 @@ async def refresh_token(request: RefreshRequest):
         user=user_response
     )
 
+@api_router.post("/auth/salir")
+async def salir(response: Response):
+    """Borra la cookie de /uploads al cerrar sesion. Los tokens viven en el
+    navegador (localStorage) y los borra el frontend; esta cookie es HttpOnly y
+    solo la puede borrar el servidor."""
+    response.delete_cookie(COOKIE_ARCHIVOS, path="/uploads")
+    return {"message": "Sesion cerrada"}
+
+
 @api_router.get("/auth/me")
-async def get_me(current_user: dict = Depends(get_current_user)):
+async def get_me(response: Response, current_user: dict = Depends(get_current_user)):
+    # Es lo primero que pide la SPA al abrirse con sesion: aqui se renueva la
+    # cookie con la que el navegador descarga las fotos y los PDF de /uploads.
+    poner_cookie_de_archivos(response, {
+        "user_id": current_user["id"],
+        "company_id": current_user["company_id"],
+        "role": current_user["role"],
+        "tv": int(current_user.get("token_version") or 0),
+    })
     # Strip sensitive fields before returning
     safe_user = {k: v for k, v in current_user.items() if k not in ("password_hash", "pin_hash", "_id")}
     return serialize_doc(safe_user)
@@ -2874,6 +2970,7 @@ async def get_current_company(current_user: dict = Depends(get_current_user)):
 async def switch_company(
     request: Request,
     company_id: str,
+    response: Response,
     current_user: dict = Depends(get_current_user),
 ):
     """Superadmin can switch to any company context to manage it"""
@@ -2926,10 +3023,12 @@ async def switch_company(
     token_data = {
         "user_id": current_user["id"],
         "company_id": company_id,
-        "role": "superadmin"
+        "role": "superadmin",
+        "tv": int(current_user.get("token_version") or 0),
     }
     access_token = create_access_token(token_data)
     refresh_token = create_refresh_token(token_data)
+    poner_cookie_de_archivos(response, token_data)
 
     return {
         "access_token": access_token,
@@ -2940,7 +3039,7 @@ async def switch_company(
 
 
 @api_router.post("/auth/salir-de-empresa")
-async def salir_de_empresa(current_user: dict = Depends(get_current_user)):
+async def salir_de_empresa(response: Response, current_user: dict = Depends(get_current_user)):
     """Devuelve al superadmin a su propia empresa.
 
     Existe como endpoint propio y no como "haz switch a tu empresa" porque el
@@ -2956,7 +3055,9 @@ async def salir_de_empresa(current_user: dict = Depends(get_current_user)):
         "user_id": current_user["id"],
         "company_id": propia,
         "role": "superadmin",
+        "tv": int(current_user.get("token_version") or 0),
     }
+    poner_cookie_de_archivos(response, token_data)
     return {
         "access_token": create_access_token(token_data),
         "refresh_token": create_refresh_token(token_data),
@@ -3147,8 +3248,8 @@ async def reset_user_password(
 
         await conn.execute(
             "update users set password_hash = $1, force_password_change = true, "
-            "failed_attempts = 0, locked_until = null, updated_at = now() "
-            "where id = $2 and company_id = $3",
+            "failed_attempts = 0, locked_until = null, token_version = token_version + 1, "
+            "updated_at = now() where id = $2 and company_id = $3",
             hash_password(nueva),
             db_pg.as_uuid(user_id),
             db_pg.as_uuid(current_user["company_id"]),
@@ -7814,9 +7915,28 @@ async def upload_file(
     
     with open(file_path, "wb") as buffer:
         buffer.write(file_content)
-    
+
     relative_url = f"/uploads/{entity_type}/{entity_id}/{filename}"
+    await registrar_archivo(relative_url, current_user["company_id"])
     return {"url": relative_url, "filename": filename, "storage": "local"}
+
+
+async def registrar_archivo(ruta: str, company_id: str | None):
+    """Apunta de que empresa es un archivo de /uploads (migracion 023).
+
+    Sin esta fila el archivo no se sirve a nadie: GET /uploads/... solo entrega
+    lo que esta apuntado a la empresa de la sesion.
+    """
+    if not company_id:
+        logger.warning("archivo sin empresa, no se podra descargar: %s", ruta)
+        return
+    async with db_pg.tx({"company_id": company_id}) as conn:
+        await conn.execute(
+            "insert into archivos_subidos (ruta, company_id) values ($1, $2) "
+            "on conflict (ruta) do nothing",
+            ruta, db_pg.as_uuid(company_id),
+        )
+
 
 async def save_uploaded_content(
     file_content: bytes,
@@ -7824,6 +7944,7 @@ async def save_uploaded_content(
     entity_id: str,
     content_type: str = "image/jpeg",
     ext: str = "jpg",
+    company_id: str | None = None,
 ) -> dict:
     """Guarda bytes ya decodificados en S3 (si hay credenciales) o disco local.
 
@@ -7868,6 +7989,7 @@ async def save_uploaded_content(
         buffer.write(file_content)
 
     relative_url = f"/uploads/{entity_type}/{entity_id}/{filename}"
+    await registrar_archivo(relative_url, company_id)
     return {"url": relative_url, "filename": filename, "storage": "local"}
 
 
@@ -7891,7 +8013,8 @@ async def upload_base64(request: dict = Body(...), current_user: dict = Depends(
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid base64 data")
 
-    return await save_uploaded_content(file_content, entity_type, entity_id, "image/jpeg", "jpg")
+    return await save_uploaded_content(file_content, entity_type, entity_id, "image/jpeg", "jpg",
+                                       company_id=current_user["company_id"])
 
 # ============== PUSH NOTIFICATIONS ==============
 @api_router.get("/notifications/vapid-public-key")
@@ -11139,10 +11262,83 @@ app.include_router(suscripcion_api.crear_router(
     superadmin_dep=_solo_superadmin,
 ))
 
-# Serve uploaded files
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
+from fastapi.responses import FileResponse, PlainTextResponse  # noqa: E402
+
+
+@app.get("/api/salud", include_in_schema=False)
+async def salud():
+    """Responde si el proceso esta vivo. Lo usan el CI y deploy-app.sh para
+    esperar al arranque (antes miraban /docs, que ya no existe en produccion)."""
+    return {"ok": True}
+
+
+async def _usuario_de_archivos(request: Request) -> dict:
+    """Quien pide un archivo de /uploads: por el Bearer o por la cookie.
+
+    Un <img src="/uploads/..."> no puede llevar la cabecera Authorization, asi
+    que el navegador se identifica con la cookie `cx_archivos` que dejan el
+    login, la renovacion del token y /auth/me (poner_cookie_de_archivos). Es un
+    JWT propio (type "archivos"): sirve SOLO para esto, no abre la API.
+
+    Las mismas comprobaciones que get_current_user: usuario activo, version de
+    token, empresa del switch del superadmin y host de la empresa.
+    """
+    auth = request.headers.get("authorization") or ""
+    if auth.lower().startswith("bearer "):
+        payload, tipo = decode_token(auth[7:].strip()), "access"
+    else:
+        cookie = request.cookies.get(COOKIE_ARCHIVOS)
+        if not cookie:
+            raise HTTPException(status_code=401, detail="Inicia sesion para ver este archivo")
+        payload, tipo = decode_token(cookie), "archivos"
+    if payload.get("type") != tipo:
+        raise HTTPException(status_code=401, detail="Token inválido")
+    async with db_pg.tx_global("archivos: resolver la identidad antes de conocer la empresa") as conn:
+        fila = await conn.fetchrow(
+            "select * from users where id = $1", db_pg.as_uuid(payload["user_id"]))
+    user = db_pg.to_api(fila)
+    if not user or not user.get("is_active"):
+        raise HTTPException(status_code=401, detail="Usuario no válido")
+    _exigir_version_de_token(payload, user)
+    await _aplicar_empresa_del_token(payload, user)
+    await _exigir_host_de_la_empresa(request, user)
+    return user
+
+
+@app.get("/uploads/{ruta:path}", include_in_schema=False)
+async def descargar_archivo(ruta: str, request: Request):
+    """Los archivos que sube cada empresa, solo para usuarios de esa empresa.
+
+    Antes era un StaticFiles sin autenticacion: un vale, una factura o la foto
+    de un DNI se descargaba con la URL y nada mas. Ahora:
+
+      - sin sesion, 401;
+      - con sesion de OTRA empresa, 404 (no se confirma que exista);
+      - el dueno sale de archivos_subidos, con RLS: aunque esta consulta
+        olvidara filtrar, la politica no dejaria ver la fila de otra empresa.
+    """
+    user = await _usuario_de_archivos(request)
+    url = "/uploads/" + ruta
+    destino = (UPLOAD_DIR / ruta).resolve()
+    if not destino.is_relative_to(UPLOAD_DIR.resolve()) or not destino.is_file():
+        raise HTTPException(status_code=404, detail="Archivo no encontrado")
+    async with db_pg.tx(user) as conn:
+        es_suyo = await conn.fetchval(
+            "select 1 from archivos_subidos where ruta = $1 and company_id = $2",
+            url, db_pg.as_uuid(user["company_id"]),
+        )
+    if not es_suyo:
+        raise HTTPException(status_code=404, detail="Archivo no encontrado")
+    # private: el navegador puede guardarlo un rato, un intermediario nunca.
+    return FileResponse(str(destino), headers={"Cache-Control": "private, max-age=300"})
+
+
+@app.get("/.well-known/security.txt", include_in_schema=False)
+async def security_txt():
+    """Contacto para reportar vulnerabilidades (RFC 9116)."""
+    return PlainTextResponse(seo_rutas.security_txt(),
+                             headers={"Cache-Control": "public, max-age=86400"})
 
 # Serve React frontend build
 # Tipos que la imagen base de Python no conoce y que esta app SI sirve.
@@ -11157,6 +11353,7 @@ app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 # arrastre un fichero moderno a public/: es mas barato que volver a perder una
 # tarde con el mismo sintoma.
 import mimetypes
+import seo_rutas  # noqa: E402
 for _tipo, _ext in [
     ("image/webp", ".webp"), ("image/avif", ".avif"), ("image/svg+xml", ".svg"),
     ("font/woff2", ".woff2"), ("font/woff", ".woff"), ("application/manifest+json", ".webmanifest"),
@@ -11207,15 +11404,16 @@ def _politica_de_cache(ruta: Path) -> str:
     return f"public, max-age={_UN_DIA}, stale-while-revalidate={_UN_DIA * 7}"
 
 
-import seo_rutas  # noqa: E402
 from fastapi.responses import HTMLResponse  # noqa: E402
 
 if FRONTEND_BUILD.exists():
     app.mount("/static", StaticFiles(directory=str(FRONTEND_BUILD / "static")), name="react-static")
 
-    @app.get("/{full_path:path}")
-    async def serve_react(full_path: str):
-        """Serve React SPA - all non-API routes return index.html"""
+    # HEAD tambien: monitores y algunos rastreadores preguntan asi si la pagina
+    # existe, y un 405 en la portada se lee como sitio roto.
+    @app.api_route("/{full_path:path}", methods=["GET", "HEAD"])
+    async def serve_react(full_path: str, request: Request):
+        """La SPA: ficheros del build, paginas publicas, pantallas y 404."""
         if full_path.startswith("api/") or full_path.startswith("uploads/"):
             raise HTTPException(status_code=404, detail="Not found")
         file_path = (FRONTEND_BUILD / full_path).resolve()
@@ -11226,13 +11424,27 @@ if FRONTEND_BUILD.exists():
                 str(file_path),
                 headers={"Cache-Control": _politica_de_cache(file_path)},
             )
-        # El index.html sale con el titulo, la descripcion y el canonical de
-        # SU ruta (ver seo_rutas.py), no con los de la portada para todas.
         indice = FRONTEND_BUILD / "index.html"
-        return HTMLResponse(
-            seo_rutas.personalizar(indice.read_text(encoding="utf-8"), full_path),
-            headers={"Cache-Control": _politica_de_cache(indice)},
-        )
+        html = indice.read_text(encoding="utf-8")
+        cache = {"Cache-Control": _politica_de_cache(indice)}
+
+        # Ni pagina publica, ni pantalla de la SPA: 404 de verdad. Antes era un
+        # 200 con la portada, y /panel o /llms-full.txt parecian existir. El
+        # cuerpo sigue siendo la SPA (con noindex y un aviso visible), para que
+        # quien escribio mal la direccion no se quede en una pagina en blanco.
+        if not seo_rutas.es_ruta_spa(full_path):
+            return HTMLResponse(seo_rutas.no_encontrada(html, full_path),
+                                status_code=404, headers=cache)
+
+        # En la direccion de una empresa la raiz no es la landing (la SPA la
+        # manda al login): ahi solo se ajustan los metadatos.
+        if tenant_host.slug_desde_host(request.headers.get("host")):
+            return HTMLResponse(seo_rutas.personalizar(html, full_path), headers=cache)
+
+        # El index.html sale con el titulo, la descripcion y el canonical de
+        # SU ruta y, en las paginas publicas, con su contenido dentro del root
+        # (ver seo_rutas.py): lo que lee un rastreador que no ejecuta JS.
+        return HTMLResponse(seo_rutas.con_contenido(html, full_path), headers=cache)
 
 # CORS
 _env = os.environ.get("ENV", "development").lower()
@@ -11278,9 +11490,43 @@ _tenant_regex = (
 #   explicacion en lugar de "demasiadas peticiones, reintenta en N segundos".
 app.add_middleware(limites.LimitePeticiones)
 
+class CORSEstricto(CORSMiddleware):
+    """El CORSMiddleware de Starlette, sin regalar cabeceras a cualquier origen.
+
+    Starlette pone `Access-Control-Allow-Credentials: true` en TODA respuesta
+    que traiga Origin, sea o no un origen permitido (va en sus simple_headers),
+    y lo mismo en el 400 de un preflight rechazado. No abre nada por si solo
+    -sin Allow-Origin el navegador no entrega la respuesta-, pero es una
+    cabecera que afirma algo falso y que los escaneres marcan con razon.
+
+    Aqui, a un origen no permitido no se le contesta ninguna cabecera CORS:
+    solo `Vary: Origin`, para que una cache no sirva a otro origen la respuesta
+    de este.
+    """
+
+    def preflight_response(self, request_headers):
+        respuesta = super().preflight_response(request_headers)
+        if not self.is_allowed_origin(origin=request_headers["origin"]):
+            for nombre in list(respuesta.headers.keys()):
+                if nombre.lower().startswith("access-control-"):
+                    del respuesta.headers[nombre]
+        return respuesta
+
+    async def send(self, message, send, request_headers):
+        origen = request_headers.get("origin")
+        if (message["type"] == "http.response.start" and origen is not None
+                and not self.is_allowed_origin(origin=origen)):
+            from starlette.datastructures import MutableHeaders
+            cabeceras = MutableHeaders(scope=message)
+            cabeceras["Vary"] = ", ".join([*cabeceras.getlist("Vary"), "Origin"])
+            await send(message)
+            return
+        await super().send(message, send, request_headers)
+
+
 # Nunca allow_origins=["*"] junto con allow_credentials=True
 app.add_middleware(
-    CORSMiddleware,
+    CORSEstricto,
     allow_credentials=True,
     allow_origins=_cors_origins,
     allow_origin_regex=_tenant_regex,
@@ -11291,12 +11537,41 @@ app.add_middleware(
 # Cabeceras de seguridad en todas las respuestas (defensa en profundidad).
 # El token sigue siendo bearer en localStorage (compatible con el deploy
 # cross-origin frontend/backend); estas cabeceras reducen la superficie XSS/clickjacking.
+# La CSP del <meta> de index.html, mas lo que un <meta> no puede decir:
+# frame-ancestors (nadie nos mete en un iframe). tests/test_seguridad_http.py
+# comprueba que las dos digan lo mismo. Como cabecera vale tambien para lo que
+# no es index.html: el checkout sin JS, las paginas de error, los JSON.
+CSP = (
+    "default-src 'self'; script-src 'self' 'unsafe-inline' https://us-assets.i.posthog.com "
+    "https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' "
+    "https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; "
+    "img-src 'self' data: blob: https:; connect-src 'self' https: http: ws: wss:; "
+    "frame-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; "
+    "form-action 'self'; frame-ancestors 'none'"
+)
+# Lo que la app usa de verdad: la ubicacion (checklist, incidentes) y la camara
+# (fotos de vales). Todo lo demas, apagado.
+PERMISSIONS_POLICY = (
+    "camera=(self), geolocation=(self), microphone=(), payment=(), usb=(), "
+    "serial=(), bluetooth=(), magnetometer=(), gyroscope=(), accelerometer=()"
+)
+
+
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
+    # Un ano y subdominios: todo *.sisac.pe va por HTTPS detras de Cloudflare.
+    # Sin preload a proposito: entrar en la lista de los navegadores es una
+    # decision que no se deshace en semanas.
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Permissions-Policy"] = PERMISSIONS_POLICY
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+    # La documentacion interactiva (solo en desarrollo) carga Swagger de un CDN.
+    if not request.url.path.startswith(("/docs", "/redoc")):
+        response.headers["Content-Security-Policy"] = CSP
 
     # `no-store` por defecto: ninguna respuesta de la API debe quedarse
     # guardada en un disco intermedio.

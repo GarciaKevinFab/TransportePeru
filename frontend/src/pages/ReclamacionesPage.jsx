@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useQuitarPrerender } from '../lib/prerender';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
 import { PROVEEDOR } from '../config/proveedor';
@@ -71,6 +72,7 @@ const ESTADO_INICIAL = {
 };
 
 const ReclamacionesPage = () => {
+  useQuitarPrerender();
   const [datos, setDatos] = useState(ESTADO_INICIAL);
   const [error, setError] = useState(null);
   const [enviando, setEnviando] = useState(false);

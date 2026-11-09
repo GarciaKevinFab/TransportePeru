@@ -827,7 +827,8 @@ async def attach_documento(
         # La subida va DENTRO de la transacción a propósito: si falla, no se
         # guarda una URL que apunte a un archivo que nunca se escribió.
         result = await srv.save_uploaded_content(
-            file_content, "liquidacion_linea", linea_id, content_type, ext
+            file_content, "liquidacion_linea", linea_id, content_type, ext,
+            company_id=company_id,
         )
 
         # `field` sale de DOCUMENTO_KINDS (código), no del request, y además

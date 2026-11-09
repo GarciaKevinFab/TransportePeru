@@ -7,7 +7,7 @@
 // CACHE-FIRST para todo lo que no sea navegacion, asi que a quien ya
 // visito la web se le seguia sirviendo el favicon viejo para siempre.
 // Subir el nombre es lo unico que dispara la limpieza del activate.
-const CACHE_NAME = 'cargoxprez-v3';
+const CACHE_NAME = 'cargoxprez-v4'; // v4: deja de guardar /uploads
 const OFFLINE_URL = '/offline.html';
 
 // Lo minimo para que la aplicacion abra sin red. NO va aqui ningun /static/js:
@@ -81,6 +81,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   
+  // Los archivos de cada empresa (/uploads) piden sesion y son privados: ni
+  // se guardan en la cache del service worker (quedarian legibles en ese
+  // equipo despues de cerrar sesion) ni se sirven desde ella.
+  if (new URL(event.request.url).pathname.startsWith('/uploads/')) {
+    return;
+  }
+
   // For navigation requests, try network first
   if (event.request.mode === 'navigate') {
     event.respondWith(

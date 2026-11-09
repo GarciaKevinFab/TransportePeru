@@ -1,4 +1,5 @@
 import React from 'react';
+import { useQuitarPrerender } from '../lib/prerender';
 import { Link } from 'react-router-dom';
 import { PROVEEDOR, MARCA } from '../config/proveedor';
 import { ArrowLeft } from 'lucide-react';
@@ -24,7 +25,9 @@ import LogoMarca from '../components/LogoMarca';
 
 const ACTUALIZADO = '31 de agosto de 2026';
 
-const Marco = ({ titulo, children }) => (
+const Marco = ({ titulo, children }) => {
+  useQuitarPrerender();
+  return (
   <div className="min-h-screen bg-grafito-950 text-grafito-100">
     <header className="border-b border-white/5">
       <div className="mx-auto flex w-full max-w-3xl items-center justify-between px-6 py-4">
@@ -75,7 +78,8 @@ const Marco = ({ titulo, children }) => (
       </footer>
     </main>
   </div>
-);
+  );
+};
 
 export const PrivacidadPage = () => (
   <Marco titulo="Política de privacidad">
