@@ -2991,6 +2991,7 @@ async def get_user(user_id: str, current_user: dict = Depends(get_current_user))
 
 @api_router.post("/users")
 async def create_user(request: CreateUserRequest, current_user: dict = Depends(require_roles("owner", "admin"))):
+    _exigir_rol_asignable(current_user["role"], request.role)
     
     # Check if email/dni already exists within same company
     user = User(
@@ -3031,6 +3032,24 @@ async def create_user(request: CreateUserRequest, current_user: dict = Depends(r
         await conn.execute(sql, *values)
     return {"id": user.id, "message": "Usuario creado exitosamente"}
 
+# Campos de la cuenta que solo puede tocar quien administra la empresa. Si los
+# pudiera mandar el propio usuario, un chofer se pondria "role": "superadmin"
+# o se desbloquearia solo tras fallar la clave.
+CAMPOS_DE_ADMINISTRACION = (
+    "role", "is_active", "failed_attempts", "locked_until",
+    "force_password_change", "created_by",
+)
+
+
+def _exigir_rol_asignable(rol_de_quien_asigna: str, rol_nuevo) -> None:
+    """Nadie crea superadmins por la API, y solo un owner crea otro owner."""
+    rol = getattr(rol_nuevo, "value", rol_nuevo)
+    if rol == "superadmin":
+        raise HTTPException(status_code=403, detail="Ese rol no se puede asignar")
+    if rol == "owner" and rol_de_quien_asigna not in ("owner", "superadmin"):
+        raise HTTPException(status_code=403, detail="Solo el dueno puede asignar el rol de dueno")
+
+
 @api_router.put("/users/{user_id}")
 async def update_user(user_id: str, request: dict = Body(...), current_user: dict = Depends(get_current_user)):
     if current_user["role"] not in ["owner", "admin"] and current_user["id"] != user_id:
@@ -3041,17 +3060,29 @@ async def update_user(user_id: str, request: dict = Body(...), current_user: dic
     request.pop("pin_hash", None)
     request.pop("id", None)
     request.pop("company_id", None)
+
+    administra = current_user["role"] in ["owner", "admin"]
+    if not administra:
+        for campo in CAMPOS_DE_ADMINISTRACION:
+            request.pop(campo, None)
+    elif "role" in request:
+        _exigir_rol_asignable(current_user["role"], request["role"])
     
     request["updated_at"] = datetime.now(timezone.utc)
     request["id"] = user_id
     request["company_id"] = current_user["company_id"]
 
     async with db_pg.tx(current_user) as conn:
-        if not await conn.fetchval(
-            "select 1 from users where id = $1 and company_id = $2",
+        rol_actual = await conn.fetchval(
+            "select role::text from users where id = $1 and company_id = $2",
             db_pg.as_uuid(user_id), db_pg.as_uuid(current_user["company_id"]),
-        ):
+        )
+        if rol_actual is None:
             raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        # Un admin no puede degradar, bloquear ni reactivar al dueno.
+        if (rol_actual in ("owner", "superadmin") and current_user["role"] != "owner"
+                and any(c in request for c in CAMPOS_DE_ADMINISTRACION)):
+            raise HTTPException(status_code=403, detail="No autorizado")
         # USER_COLS hace de lista blanca: lo que venga en el body y no sea una
         # columna declarada se ignora, igual que antes lo ignoraba el modelo.
         sql, values = db_pg.build_update("users", USER_COLS, request, ["id", "company_id"])
@@ -3180,7 +3211,7 @@ async def delete_user(user_id: str, current_user: dict = Depends(require_roles("
 @api_router.get("/companies/{company_id}")
 async def get_company(company_id: str, current_user: dict = Depends(get_current_user)):
     """Get company details"""
-    if current_user["role"] != "owner" and current_user["company_id"] != company_id:
+    if current_user["role"] != "superadmin" and current_user["company_id"] != company_id:
         raise HTTPException(status_code=403, detail="No autorizado")
     
     company = await _empresa_pg(company_id)
@@ -3292,6 +3323,10 @@ async def update_company(company_id: str, request: dict = Body(...), current_use
 @api_router.delete("/companies/{company_id}")
 async def delete_company(company_id: str, current_user: dict = Depends(require_roles("superadmin", "owner"))):
     """Delete company and all its data (superadmin/owner only)"""
+    # El owner solo borra la SUYA. db_pg.tx fija el contexto RLS con la empresa
+    # del URL, asi que RLS no frena esto: el filtro tiene que estar aqui.
+    if current_user["role"] != "superadmin" and current_user["company_id"] != company_id:
+        raise HTTPException(status_code=403, detail="No autorizado")
     
     # En Postgres hay que quitar TODA fila que apunte a la empresa antes que la
     # empresa misma: el corte 004 devolvio las FKs y ahora la base las exige.
@@ -11183,8 +11218,10 @@ if FRONTEND_BUILD.exists():
         """Serve React SPA - all non-API routes return index.html"""
         if full_path.startswith("api/") or full_path.startswith("uploads/"):
             raise HTTPException(status_code=404, detail="Not found")
-        file_path = FRONTEND_BUILD / full_path
-        if full_path and file_path.exists() and file_path.is_file():
+        file_path = (FRONTEND_BUILD / full_path).resolve()
+        # Nunca fuera del build: con "..", la ruta llegaria a backend/.env.
+        dentro = file_path.is_relative_to(FRONTEND_BUILD.resolve())
+        if full_path and dentro and file_path.exists() and file_path.is_file():
             return FileResponse(
                 str(file_path),
                 headers={"Cache-Control": _politica_de_cache(file_path)},
