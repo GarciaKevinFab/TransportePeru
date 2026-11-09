@@ -50,6 +50,12 @@ const LogoMarca = ({ className = 'h-12 w-auto', contorno = true }) => (
   <img
     src="/cargoxprez.png"
     alt={PROVEEDOR.producto}
+    /* Las medidas reales del PNG: sin ellas el navegador no reserva el hueco
+       y el logo empuja la cabecera al cargar. El tamano visible lo sigue
+       mandando className (h-* w-auto), que conserva la proporcion. */
+    width={512}
+    height={308}
+    decoding="async"
     className={className}
     style={contorno ? { filter: FILETE } : undefined}
   />

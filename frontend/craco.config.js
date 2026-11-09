@@ -68,4 +68,17 @@ webpackConfig.devServer = (devServerConfig) => {
   return devServerConfig;
 };
 
+// craco test (jest 27 de react-scripts). Jest 27 no entiende el campo
+// "exports" de package.json, y react-router 7 publica react-router/dom solo
+// por ahi: sin este mapa, cualquier prueba que importe react-router-dom muere
+// con "Cannot find module 'react-router/dom'". El alias @ es el de webpack.
+webpackConfig.jest = {
+  configure: {
+    moduleNameMapper: {
+      '^@/(.*)$': '<rootDir>/src/$1',
+      '^react-router/dom$': '<rootDir>/node_modules/react-router/dist/development/dom-export.js',
+    },
+  },
+};
+
 module.exports = webpackConfig;

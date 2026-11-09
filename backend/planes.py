@@ -20,6 +20,22 @@ EL PRECIO VIVE EN EL SERVIDOR
 # codigo -> (descripcion que se factura, monto en soles)
 PRECIOS_CHECKOUT = {"pro": ("Plan Pro (mensual)", 199.00)}
 
+# Dias de prueba de un alta nueva. La landing lo anuncia, asi que si cambia
+# aqui tiene que cambiar alli: es la misma promesa. Lo leen el alta
+# (server.signup) y la portada que arma el servidor (seo_rutas.py).
+DIAS_DE_PRUEBA = 14
+
+# Vehiculos que admite cada plan. La landing publica estas cifras, asi que
+# tienen que cumplirse: un limite anunciado y no aplicado es una cifra
+# decorativa, y el cliente lo descubre el dia que quiere pagar mas.
+#
+# Lo que NO esta en el mapa no tiene limite, y es intencionado: 'trial' -para
+# que se pueda probar con la flota entera, que es de lo que depende la venta- y
+# 'activa', que es como quedaron las empresas que ya operaban antes de que
+# existieran los planes. Ante un plan desconocido se deja pasar, por lo mismo
+# que el corte por suscripcion falla abierto.
+LIMITE_VEHICULOS = {"gratis": 3, "pro": 20}
+
 # Pago adelantado (Checkout Pro: Yape, banca movil o tarjeta). Meses que se
 # venden y el tope de Yape. CargoXprez solo tiene el precio mensual: N meses
 # cuestan N veces ese precio, sin descuento.

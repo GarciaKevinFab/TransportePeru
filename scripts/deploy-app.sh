@@ -99,7 +99,7 @@ ssh_run "cd $REMOTE_DIR && docker compose up -d --build backend" 2>&1 | tail -5
 # ---------------------------------------------------------------------------
 echo "==> 4/5 Esperando a que responda"
 # ---------------------------------------------------------------------------
-ssh_run "for i in \$(seq 1 30); do curl -sf -o /dev/null http://127.0.0.1:8001/docs && exit 0; sleep 2; done; echo 'el backend no respondio'; docker logs --tail 30 transporteperu-backend; exit 1"
+ssh_run "for i in \$(seq 1 30); do curl -sf -o /dev/null http://127.0.0.1:8001/api/salud && exit 0; sleep 2; done; echo 'el backend no respondio'; docker logs --tail 30 transporteperu-backend; exit 1"
 
 # ---------------------------------------------------------------------------
 echo "==> 5/5 Comprobaciones"
@@ -109,7 +109,7 @@ echo "==> 5/5 Comprobaciones"
 ssh_run "
   printf '    /            %s  %s\n' \"\$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8001/)\" \"\$(curl -s -o /dev/null -w '%{content_type}' http://127.0.0.1:8001/)\"
   printf '    /api/tires   %s  (401/403 = viva; 404 = TAPADA)\n' \"\$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8001/api/tires)\"
-  printf '    /docs        %s\n' \"\$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8001/docs)\"
+  printf '    /api/salud   %s\n' \"\$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8001/api/salud)\"
 "
 
 echo ""

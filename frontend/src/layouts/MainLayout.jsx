@@ -45,6 +45,7 @@ import {
 import { ScrollArea } from '../components/ui/scroll-area';
 import NotificationsPopover from '../components/NotificationsPopover';
 import AvisoPlanGratis from '../components/AvisoPlanGratis';
+import { grabarSesion } from '../lib/analitica';
 
 // Menú principal organizado por secciones lógicas.
 // Los roles por ítem se mantienen para respetar la visibilidad existente.
@@ -130,6 +131,12 @@ const MainLayout = ({ children }) => {
       }
     }).catch(() => {});
   };
+
+  // La grabacion de sesion de PostHog solo corre dentro del panel, nunca en
+  // las paginas publicas (ver lib/analitica.js).
+  useEffect(() => {
+    grabarSesion();
+  }, []);
 
   useEffect(() => {
     loadCompanyBrand();
@@ -249,7 +256,7 @@ const MainLayout = ({ children }) => {
               />
             ) : (
               <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden mx-auto">
-                <img src={companyBrand.logo_url} alt="Logo" className="w-full h-full object-contain" onError={() => setLogoError(true)} />
+                <img src={companyBrand.logo_url} alt="Logo" width={32} height={32} className="w-full h-full object-contain" onError={() => setLogoError(true)} />
               </div>
             )
           ) : (
@@ -319,7 +326,7 @@ const MainLayout = ({ children }) => {
                 style={{ backgroundColor: (companyBrand.logo_url && !logoError) ? 'transparent' : companyBrand.brand_color }}
               >
                 {companyBrand.logo_url && !logoError ? (
-                  <img src={companyBrand.logo_url} alt="Logo" className="w-full h-full object-contain" onError={() => setLogoError(true)} />
+                  <img src={companyBrand.logo_url} alt="Logo" width={32} height={32} className="w-full h-full object-contain" onError={() => setLogoError(true)} />
                 ) : (
                   <IconoCamion className="w-6 h-6 text-white" />
                 )}
@@ -385,7 +392,7 @@ const MainLayout = ({ children }) => {
             <div className="flex md:hidden items-center gap-2">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden shadow-sm" style={{ backgroundColor: (companyBrand.logo_url && !logoError) ? 'transparent' : companyBrand.brand_color }}>
                 {companyBrand.logo_url && !logoError ? (
-                  <img src={companyBrand.logo_url} alt="Logo" className="w-full h-full object-contain" onError={() => setLogoError(true)} />
+                  <img src={companyBrand.logo_url} alt="Logo" width={32} height={32} className="w-full h-full object-contain" onError={() => setLogoError(true)} />
                 ) : (
                   <IconoCamion className="w-5 h-5 text-white" />
                 )}

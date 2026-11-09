@@ -2,13 +2,19 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import "@/index.css";
 import App from "@/App";
+import { adoptarPrerender } from "@/lib/prerender";
+import { programarAnalitica } from "@/lib/analitica";
 
 // Suppress benign ResizeObserver error from UI libraries
 window.addEventListener('error', (e) => {
   if (e.message?.includes('ResizeObserver loop')) e.stopImmediatePropagation();
 });
 
-const root = ReactDOM.createRoot(document.getElementById("root"));
+const contenedor = document.getElementById("root");
+// El texto que puso el servidor en las paginas publicas queda a la vista
+// hasta que React pinte la suya (ver lib/prerender.js).
+adoptarPrerender(contenedor);
+const root = ReactDOM.createRoot(contenedor);
 root.render(
   <React.StrictMode>
     <App />
@@ -29,3 +35,6 @@ if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
       });
   });
 }
+
+// PostHog despues de la primera interaccion o en reposo (ver lib/analitica.js).
+programarAnalitica();

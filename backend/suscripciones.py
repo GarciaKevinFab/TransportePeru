@@ -68,6 +68,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 import db_pg
+import planes
 
 
 def _para_jsonb(factura: dict | None):
@@ -146,8 +147,9 @@ def puede_escribir(efectivo: str) -> bool:
 
 #: Estados sin pago vigente: la empresa sigue, pero en el plan Gratis.
 CAEN_A_GRATIS = ("prueba_vencida", "suspendida", "cancelada_vencida")
-#: Vehiculos activos (no "fuera de servicio") que admite el plan Gratis.
-TOPE_GRATIS = 3
+#: Vehiculos activos (no "fuera de servicio") que admite el plan Gratis. Sale
+#: de planes.py, que es lo que publica la portada.
+TOPE_GRATIS = planes.LIMITE_VEHICULOS["gratis"]
 #: El estado de vehiculo que no cuenta como activo.
 VEHICULO_INACTIVO = "fuera_servicio"
 

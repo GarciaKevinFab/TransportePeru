@@ -4,58 +4,69 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { TenantProvider, useTenant } from './context/TenantContext';
 import { Toaster } from './components/ui/sonner';
-import MainLayout from './layouts/MainLayout';
-import MobileLayout from './layouts/MobileLayout';
-import LoginPage from './pages/LoginPage';
 import LandingPage from './pages/LandingPage';
-import SignupPage from './pages/SignupPage';
-import CheckoutPage from './pages/CheckoutPage';
-import SuscripcionPage from './pages/SuscripcionPage';
-import AdminComprobantesPage from './pages/AdminComprobantesPage';
-import { OlvidePage, RestablecerPage } from './pages/RecuperarPage';
-import CambiarPasswordPage from './pages/CambiarPasswordPage';
-import { PrivacidadPage, TerminosPage } from './pages/LegalPage';
-import ReclamacionesPage from './pages/ReclamacionesPage';
-import DashboardPage from './pages/DashboardPage';
-import VehiclesPage from './pages/VehiclesPage';
-import UnitsPage from './pages/UnitsPage';
-import TripsPage from './pages/TripsPage';
-import DocumentsPage from './pages/DocumentsPage';
-import UsersPage from './pages/UsersPage';
-import TireSchemaPage from './pages/TireSchemaPage';
-import TiresPage from './pages/TiresPage';
-import FuelPage from './pages/FuelPage';
-import MaintenancePage from './pages/MaintenancePage';
-import InventoryPage from './pages/InventoryPage';
-import IssuesPage from './pages/IssuesPage';
-import SettlementsPage from './pages/SettlementsPage';
-import ChecklistWizardPage from './pages/ChecklistWizardPage';
-import ReportsPage from './pages/ReportsPage';
-import SettingsPage from './pages/SettingsPage';
-import CompaniesPage from './pages/CompaniesPage';
-import EquipmentPage from './pages/EquipmentPage';
-import BillingPage from './pages/BillingPage';
-import DetraccionesPage from './pages/DetraccionesPage';
-import CashboxPage from './pages/CashboxPage';
-import LiquidacionFletePage from './pages/LiquidacionFletePage';
-import LiquidacionFleteDetailPage from './pages/LiquidacionFleteDetailPage';
 import OfflineIndicator from './components/OfflineIndicator';
 import { TITULOS } from './config/seo';
 import { usePush } from './hooks/usePush';
+import './App.css';
+import { quitarPrerender } from './lib/prerender';
+
+// Todo lo que no es la portada se carga a demanda. Antes App.js importaba las
+// 40 pantallas del panel de golpe y la landing bajaba un main.js de 1,7 MB
+// (recharts, tablas, formularios) para pintar una pagina de venta: el LCP en
+// movil llegaba a 14 s. La portada va en el bundle principal porque es la
+// pagina que entra por buscadores; el panel, la app del chofer y las paginas
+// secundarias bajan su propio trozo cuando se visitan.
+const MainLayout = lazy(() => import('./layouts/MainLayout'));
+const MobileLayout = lazy(() => import('./layouts/MobileLayout'));
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const SignupPage = lazy(() => import('./pages/SignupPage'));
+const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
+const SuscripcionPage = lazy(() => import('./pages/SuscripcionPage'));
+const AdminComprobantesPage = lazy(() => import('./pages/AdminComprobantesPage'));
+const OlvidePage = lazy(() => import('./pages/RecuperarPage').then((m) => ({ default: m.OlvidePage })));
+const RestablecerPage = lazy(() => import('./pages/RecuperarPage').then((m) => ({ default: m.RestablecerPage })));
+const CambiarPasswordPage = lazy(() => import('./pages/CambiarPasswordPage'));
+const PrivacidadPage = lazy(() => import('./pages/LegalPage').then((m) => ({ default: m.PrivacidadPage })));
+const TerminosPage = lazy(() => import('./pages/LegalPage').then((m) => ({ default: m.TerminosPage })));
+const ReclamacionesPage = lazy(() => import('./pages/ReclamacionesPage'));
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const VehiclesPage = lazy(() => import('./pages/VehiclesPage'));
+const UnitsPage = lazy(() => import('./pages/UnitsPage'));
+const TripsPage = lazy(() => import('./pages/TripsPage'));
+const DocumentsPage = lazy(() => import('./pages/DocumentsPage'));
+const UsersPage = lazy(() => import('./pages/UsersPage'));
+const TireSchemaPage = lazy(() => import('./pages/TireSchemaPage'));
+const TiresPage = lazy(() => import('./pages/TiresPage'));
+const FuelPage = lazy(() => import('./pages/FuelPage'));
+const MaintenancePage = lazy(() => import('./pages/MaintenancePage'));
+const InventoryPage = lazy(() => import('./pages/InventoryPage'));
+const IssuesPage = lazy(() => import('./pages/IssuesPage'));
+const SettlementsPage = lazy(() => import('./pages/SettlementsPage'));
+const ChecklistWizardPage = lazy(() => import('./pages/ChecklistWizardPage'));
+const ReportsPage = lazy(() => import('./pages/ReportsPage'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const CompaniesPage = lazy(() => import('./pages/CompaniesPage'));
+const EquipmentPage = lazy(() => import('./pages/EquipmentPage'));
+const BillingPage = lazy(() => import('./pages/BillingPage'));
+const DetraccionesPage = lazy(() => import('./pages/DetraccionesPage'));
+const CashboxPage = lazy(() => import('./pages/CashboxPage'));
+const LiquidacionFletePage = lazy(() => import('./pages/LiquidacionFletePage'));
+const LiquidacionFleteDetailPage = lazy(() => import('./pages/LiquidacionFleteDetailPage'));
 // Driver Mobile App Pages
-import DriverLoginPage from './pages/driver/DriverLoginPage';
-import DriverHomePage from './pages/driver/DriverHomePage';
-import DriverTripPage from './pages/driver/DriverTripPage';
-import DriverFuelPage from './pages/driver/DriverFuelPage';
-import DriverIssuesPage from './pages/driver/DriverIssuesPage';
-import DriverExpensesPage from './pages/driver/DriverExpensesPage';
+const DriverLoginPage = lazy(() => import('./pages/driver/DriverLoginPage'));
+const DriverHomePage = lazy(() => import('./pages/driver/DriverHomePage'));
+const DriverTripPage = lazy(() => import('./pages/driver/DriverTripPage'));
+const DriverFuelPage = lazy(() => import('./pages/driver/DriverFuelPage'));
+const DriverIssuesPage = lazy(() => import('./pages/driver/DriverIssuesPage'));
+const DriverExpensesPage = lazy(() => import('./pages/driver/DriverExpensesPage'));
 // Tire feature pages (created by other agents) — lazy loaded
 const RotateTiresPage = lazy(() => import('./pages/RotateTiresPage'));
 const AlignTiresPage = lazy(() => import('./pages/AlignTiresPage'));
 const TireGraphsPage = lazy(() => import('./pages/TireGraphsPage'));
 const TireDimensionReportPage = lazy(() => import('./pages/TireDimensionReportPage'));
 const TireLifecyclePage = lazy(() => import('./pages/TireLifecyclePage'));
-import './App.css';
+
 
 // Protected Route Component
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -169,9 +180,22 @@ const TituloPorRuta = () => {
   return null;
 };
 
+// Si se sale de la ruta por la que se entro (la raiz manda al tablero a quien
+// ya tiene sesion, el subdominio de una empresa manda al login), el texto que
+// puso el servidor para la ruta de entrada ya no corresponde: se quita.
+const PrerenderPorRuta = () => {
+  const { pathname } = useLocation();
+  const [inicial] = React.useState(pathname);
+  useEffect(() => {
+    if (pathname !== inicial) quitarPrerender();
+  }, [pathname, inicial]);
+  return null;
+};
+
 function AppRoutes() {
   return (
     <Suspense fallback={<SuspenseFallback />}>
+    <PrerenderPorRuta />
     <Routes>
       {/* Public Routes */}
       {/* La raiz es la landing del producto. Antes redirigia a /dashboard, que

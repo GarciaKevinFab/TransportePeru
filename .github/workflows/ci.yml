@@ -129,19 +129,29 @@ jobs:
         # desinstalamos solo en CI para que los tests corran sin rate limit.
         run: pip uninstall -y slowapi
 
+      - name: Build minimo del frontend para el backend
+        # serve_react (la portada con su contenido, el 404 de verdad) solo se
+        # registra si existe frontend/build. Este job no compila React -eso lo
+        # hace el job frontend-, pero el index.html de public/ es el mismo
+        # cascaron que sale del build, y es lo que prueban test_seo_servido.py
+        # y test_seguridad_http.py contra el servidor vivo.
+        run: |
+          cp -r frontend/public frontend/build
+          mkdir -p frontend/build/static
+
       - name: Start backend server (uvicorn)
         working-directory: backend
         run: |
           uvicorn server:app --host 0.0.0.0 --port 8001 > uvicorn.log 2>&1 &
           echo "Waiting for backend to be ready..."
           for i in $(seq 1 45); do
-            if curl -sf http://localhost:8001/docs > /dev/null; then
+            if curl -sf http://localhost:8001/api/salud > /dev/null; then
               echo "Backend is up."
               break
             fi
             sleep 2
           done
-          curl -sf http://localhost:8001/docs > /dev/null || {
+          curl -sf http://localhost:8001/api/salud > /dev/null || {
             echo "Backend failed to start. Logs:";
             cat uvicorn.log;
             exit 1;
@@ -194,6 +204,14 @@ jobs:
       - name: Install dependencies
         working-directory: frontend
         run: yarn install --frozen-lockfile
+
+      - name: Pruebas (craco test)
+        working-directory: frontend
+        # La portada se monta, muestra planes y preguntas, y App.js no importa
+        # el panel de golpe. Ver src/pages/LandingPage.test.jsx.
+        run: yarn test --watchAll=false
+        env:
+          CI: "true"
 
       - name: Build
         working-directory: frontend
